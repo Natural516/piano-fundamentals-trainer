@@ -1,0 +1,798 @@
+body {
+  color: var(--text-main);
+  background:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.025) 0 1px, transparent 1px 100%),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.02) 0 1px, transparent 1px 100%),
+    linear-gradient(135deg, #070b16 0%, #0b1020 100%);
+  background-size:
+    48px 48px,
+    48px 48px,
+    auto;
+}
+
+body::before {
+  display: none;
+}
+
+.app-card,
+.practice-card,
+.info-card,
+.midi-panel,
+.midi-card,
+.midi-log-modal,
+.placeholder-panel,
+.nav-list,
+.sidebar-audio-monitor,
+.audio-control-row,
+.volume-control,
+.latest-event-box,
+.permission-badge,
+.active-note-card,
+.current-target-card,
+.latest-judgement,
+.report-grid > div,
+.judgement-result-item,
+.metronome-sound-control,
+.metronome-display > div,
+.beat-dots span,
+.midi-event-summary-grid div {
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background: var(--bg-card);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  backdrop-filter: none;
+}
+
+.app-card.is-interactive,
+.practice-card,
+.quick-action,
+.device-list-item {
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.app-card.is-interactive:hover,
+.practice-card:hover,
+.quick-action:hover,
+.device-list-item:hover {
+  border-color: var(--border-active);
+  background: var(--bg-card-hover);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+  transform: translateY(-1px);
+}
+
+.app-button,
+.primary-button,
+.primary-log-button,
+.secondary-button,
+.secondary-inline-button,
+.ghost-button,
+.monitor-toggle,
+.mini-monitor-toggle,
+.modal-close-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  color: var(--text-main);
+  background: rgba(30, 41, 59, 0.84);
+  box-shadow: none;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0;
+  white-space: nowrap;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.app-button-primary,
+.primary-button,
+.primary-log-button {
+  width: 128px;
+  min-width: 128px;
+  height: 42px;
+  padding: 0 14px;
+  border-color: rgba(129, 140, 248, 0.32);
+  background: linear-gradient(135deg, #5b5ce2, #3b82f6);
+}
+
+.app-button-secondary,
+.secondary-button,
+.secondary-inline-button,
+.ghost-button,
+.modal-close-button {
+  padding: 0 16px;
+  background: rgba(30, 41, 59, 0.78);
+}
+
+.app-button-ghost,
+.monitor-toggle,
+.mini-monitor-toggle {
+  background: rgba(30, 41, 59, 0.7);
+}
+
+.app-button:hover,
+.primary-button:hover,
+.primary-log-button:hover,
+.secondary-button:hover,
+.secondary-inline-button:hover,
+.ghost-button:hover,
+.monitor-toggle:hover,
+.mini-monitor-toggle:hover,
+.modal-close-button:hover {
+  border-color: rgba(129, 140, 248, 0.36);
+  background-color: rgba(42, 55, 78, 0.92);
+  filter: none;
+  transform: translateY(-1px);
+}
+
+.app-button:active,
+.primary-button:active,
+.primary-log-button:active,
+.secondary-button:active,
+.secondary-inline-button:active,
+.ghost-button:active,
+.monitor-toggle:active,
+.mini-monitor-toggle:active,
+.modal-close-button:active {
+  transform: translateY(0);
+}
+
+.brand-mark {
+  border-color: rgba(129, 140, 248, 0.32);
+  background: #111827;
+  box-shadow: none;
+}
+
+.brand h1 {
+  color: var(--text-main);
+  font-weight: 800;
+}
+
+.brand p,
+.home-header p,
+.panel-title-row p,
+.midi-page-header p,
+.placeholder-panel p,
+.practice-card p,
+.quick-action small,
+.stat-list dt,
+.record-item p,
+.record-item time,
+.judgement-help,
+.audio-monitor-note,
+.external-audio-note-panel p {
+  color: var(--text-secondary);
+}
+
+.home-header h2 {
+  color: var(--text-main);
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.section-heading h3,
+.quick-actions h3,
+.info-card h3,
+.panel-title-row h3 {
+  color: var(--text-main);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.practice-card {
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 16px;
+  padding: 22px;
+  overflow: hidden;
+}
+
+.practice-card::before,
+.practice-card::after {
+  display: none;
+}
+
+.module-number {
+  margin-bottom: 12px;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.practice-card h3 {
+  margin-bottom: 10px;
+  color: var(--text-main);
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.practice-card p {
+  display: -webkit-box;
+  min-height: 44px;
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.card-illustration {
+  align-self: center;
+  justify-self: end;
+  width: 74px;
+  min-width: 74px;
+  height: 74px;
+  opacity: 0.72;
+  filter: none;
+}
+
+.illustration-line,
+.illustration-soft,
+.illustration-fill-outline {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.illustration-line {
+  stroke-width: 4;
+  opacity: 0.85;
+}
+
+.illustration-soft {
+  stroke-width: 2.4;
+  opacity: 0.42;
+}
+
+.illustration-fill,
+.illustration-solid {
+  fill: currentColor;
+  opacity: 0.18;
+}
+
+.illustration-label {
+  fill: currentColor;
+  font-size: 18px;
+  font-weight: 800;
+  opacity: 0.82;
+}
+
+.accent-violet .module-number,
+.accent-violet .card-illustration {
+  color: var(--purple);
+}
+
+.accent-blue .module-number,
+.accent-blue .card-illustration {
+  color: var(--blue);
+}
+
+.accent-cyan .module-number,
+.accent-cyan .card-illustration {
+  color: var(--cyan);
+}
+
+.accent-amber .module-number,
+.accent-amber .card-illustration {
+  color: var(--gold);
+}
+
+.accent-rose .module-number,
+.accent-rose .card-illustration {
+  color: var(--pink);
+}
+
+.accent-indigo .module-number,
+.accent-indigo .card-illustration {
+  color: #6978ff;
+}
+
+.accent-violet .primary-button,
+.accent-blue .primary-button,
+.accent-cyan .primary-button,
+.accent-amber .primary-button,
+.accent-rose .primary-button,
+.accent-indigo .primary-button {
+  background: linear-gradient(135deg, #4f46e5, #3b82f6);
+  box-shadow: none;
+}
+
+.nav-list {
+  background: rgba(17, 24, 39, 0.58);
+  box-shadow: none;
+}
+
+.nav-item.app-button {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  justify-content: stretch;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.nav-item.is-active {
+  border-color: rgba(129, 140, 248, 0.24);
+  background: rgba(79, 70, 229, 0.18);
+}
+
+.nav-glyph,
+.quick-action__glyph,
+.record-icon {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(30, 41, 59, 0.72);
+  color: #b8c6ff;
+  box-shadow: none;
+}
+
+.keyboard-preview {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: #0f172a;
+  box-shadow: none;
+}
+
+.keyboard-preview .white-key {
+  border-color: rgba(203, 213, 225, 0.72);
+  background: linear-gradient(180deg, #e5e7eb, #b8c2d4);
+}
+
+.keyboard-preview .black-key {
+  background: #111827;
+}
+
+.sidebar-audio-monitor {
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.midi-card .secondary-button {
+  width: 100%;
+  min-width: 0;
+}
+
+.mini-monitor-toggle.app-button,
+.monitor-toggle.app-button {
+  width: auto;
+  min-width: 62px;
+}
+
+.quick-action.app-button {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  justify-content: stretch;
+  width: 100%;
+  text-align: left;
+}
+
+.progress-ring {
+  background:
+    conic-gradient(from -30deg, #6366f1 0 36%, #3b82f6 36% 57%, #25d6c8 57% 75%, rgba(51, 65, 85, 0.82) 75% 100%);
+  box-shadow: none;
+}
+
+.progress-ring::before {
+  background: #111827;
+}
+
+.progress-ring span {
+  color: var(--text-main);
+  font-size: 28px;
+}
+
+.progress-ring small {
+  color: var(--text-secondary);
+}
+
+.stat-list div,
+.record-item {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.stat-list div:last-child,
+.record-item:last-child {
+  border-bottom: 0;
+}
+
+.stat-list dd,
+.record-item strong {
+  color: var(--text-main);
+}
+
+.record-item {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+}
+
+.record-item time {
+  white-space: nowrap;
+}
+
+.tone-cyan {
+  color: var(--cyan);
+}
+
+.tone-amber {
+  color: var(--gold);
+}
+
+.tone-violet {
+  color: var(--purple);
+}
+
+.midi-select,
+.device-list-item {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.86);
+}
+
+.device-list-item.is-selected,
+.segmented-control button.is-active,
+.beat-dots span.is-active {
+  border-color: rgba(129, 140, 248, 0.34);
+  background: rgba(79, 70, 229, 0.16);
+}
+
+.current-note-display {
+  border-color: rgba(37, 214, 200, 0.22);
+  background: rgba(15, 23, 42, 0.86);
+}
+
+.midi-log-modal-backdrop {
+  background: rgba(3, 7, 18, 0.72);
+  backdrop-filter: none;
+}
+
+.midi-log-head {
+  background: rgba(15, 23, 42, 0.96);
+  color: var(--text-secondary);
+}
+
+.midi-log-row {
+  border-color: rgba(148, 163, 184, 0.1);
+}
+
+.primary-log-button.app-button {
+  width: auto;
+  min-width: 144px;
+}
+
+.sight-page {
+  height: calc(100vh - 30px);
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 18px;
+}
+
+.sight-layout {
+  display: grid;
+  grid-template-columns: minmax(620px, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+  margin-top: 22px;
+}
+
+.sight-main-panel,
+.sight-side-panel,
+.sight-keyboard-panel,
+.sight-report-panel,
+.sight-range-panel {
+  background: var(--bg-card);
+}
+
+.sight-staff-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.sight-staff {
+  width: 100%;
+  min-height: 250px;
+  border-radius: 12px;
+  background: #0f172a;
+}
+
+.sight-staff-lines line,
+.sight-ledger {
+  stroke: rgba(203, 213, 225, 0.58);
+  stroke-width: 2;
+}
+
+.sight-clef {
+  fill: none;
+  stroke: #a7b0cc;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+  opacity: 0.86;
+}
+
+.sight-clef circle {
+  fill: #a7b0cc;
+  stroke: none;
+}
+
+.sight-bass-clef {
+  fill: none;
+  stroke: #a7b0cc;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 5;
+  opacity: 0.86;
+}
+
+.sight-bass-clef circle {
+  fill: #a7b0cc;
+  stroke: none;
+}
+
+.sight-note {
+  fill: #f4f7ff;
+  stroke: #f4f7ff;
+  stroke-linecap: round;
+  stroke-width: 3;
+}
+
+.sight-staff-placeholder {
+  fill: var(--text-secondary);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sight-note-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.sight-note-name span,
+.sight-feedback-card span,
+.sight-stat-grid span,
+.sight-report-grid span {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.sight-note-name strong {
+  color: var(--text-main);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.sight-result-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: rgba(30, 41, 59, 0.7);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sight-result-badge.result-correct,
+.sight-feedback-card.result-correct {
+  border-color: rgba(50, 213, 131, 0.34);
+  color: var(--green);
+}
+
+.sight-result-badge.result-wrong_note,
+.sight-feedback-card.result-wrong_note {
+  border-color: rgba(249, 112, 102, 0.34);
+  color: var(--red);
+}
+
+.sight-primary-actions,
+.sight-action-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.sight-setting-group {
+  display: grid;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.sight-setting-group > span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sight-setting-group small {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sight-segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.sight-segmented button {
+  min-height: 38px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: rgba(30, 41, 59, 0.7);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.sight-segmented button.is-active {
+  border-color: rgba(129, 140, 248, 0.34);
+  color: var(--text-main);
+  background: rgba(79, 70, 229, 0.18);
+}
+
+.sight-segmented button:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.sight-feedback-card {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.sight-feedback-card strong {
+  color: var(--text-main);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.sight-feedback-card small {
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.sight-next-button {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.sight-stat-grid,
+.sight-report-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sight-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sight-report-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sight-clef-report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sight-stat-grid div,
+.sight-report-grid div,
+.sight-clef-report-grid div {
+  display: grid;
+  gap: 6px;
+  padding: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.sight-stat-grid strong,
+.sight-report-grid strong,
+.sight-clef-report-grid strong {
+  color: var(--text-main);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.sight-clef-report-grid span,
+.sight-clef-report-grid small {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.sight-keyboard-panel,
+.sight-range-panel {
+  margin-top: 18px;
+}
+
+.sight-range-panel h3,
+.sight-error-table h4 {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 18px;
+}
+
+.sight-range-panel p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
+.sight-error-table {
+  margin-top: 18px;
+}
+
+.sight-error-table > div {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sight-error-table span {
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  min-height: 54px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  background: rgba(15, 23, 42, 0.72);
+  font-size: 13px;
+}
+
+.sight-error-table strong {
+  color: var(--text-main);
+  font-size: 18px;
+}
+
+.full-white-key.is-target {
+  outline: 2px solid rgba(129, 140, 248, 0.78);
+  outline-offset: -5px;
+}
+
+.full-black-key.is-target {
+  outline: 2px solid rgba(129, 140, 248, 0.82);
+  outline-offset: -4px;
+}
+
+.full-white-key.is-correct,
+.full-black-key.is-correct {
+  background: linear-gradient(180deg, rgba(134, 239, 172, 0.96), rgba(34, 197, 94, 0.92));
+}
+
+.full-white-key.is-wrong,
+.full-black-key.is-wrong {
+  background: linear-gradient(180deg, rgba(252, 165, 165, 0.96), rgba(239, 68, 68, 0.92));
+}
+
+.full-white-key.is-correct span,
+.full-white-key.is-wrong span {
+  color: #111827;
+}

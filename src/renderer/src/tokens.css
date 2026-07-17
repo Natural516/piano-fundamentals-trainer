@@ -1,0 +1,39 @@
+:root {
+  --bg-main: #070b16;
+  --bg-panel: #0b1020;
+  --bg-card: rgba(17, 24, 39, 0.92);
+  --bg-card-hover: rgba(24, 34, 52, 0.96);
+
+  --border-soft: rgba(148, 163, 184, 0.16);
+  --border-active: rgba(129, 140, 248, 0.34);
+
+  --text-main: #f4f7ff;
+  --text-secondary: #a7b0cc;
+  --text-muted: #6f7a99;
+
+  --purple: #7c5cff;
+  --blue: #3b82f6;
+  --cyan: #25d6c8;
+  --gold: #d6a93a;
+  --pink: #e75ca8;
+  --green: #32d583;
+  --red: #f97066;
+
+  --bg: var(--bg-main);
+  --bg-deep: #050812;
+  --panel: var(--bg-card);
+  --panel-strong: var(--bg-card);
+  --panel-soft: rgba(17, 24, 39, 0.72);
+  --line: var(--border-soft);
+  --line-strong: var(--border-active);
+  --text: var(--text-main);
+  --text-strong: var(--text-main);
+  --muted: var(--text-secondary);
+  --soft: #c8d1e9;
+  --violet: var(--purple);
+  --amber: var(--gold);
+  --rose: var(--pink);
+  --indigo: #6978ff;
+  --shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+  --card-radius: 16px;
+}
