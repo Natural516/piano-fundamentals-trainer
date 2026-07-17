@@ -1,8 +1,12 @@
+import { useCallback } from 'react'
 import type { ActiveMidiNote, MidiEventRecord } from '../types'
 import { useCoordinationPractice } from '../hooks/useCoordinationPractice'
+import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
 import type { CoordinationJudgementType } from '../utils/coordinationTypes'
 import type { ToleranceLevel } from '../utils/practiceTypes'
 import { TOLERANCE_MS } from '../utils/judgement'
+import { createCoordinationRecord } from '../utils/practiceRecordAdapters'
+import type { PracticeSessionTiming } from '../utils/practiceRecordTypes'
 import { AppButton } from './AppButton'
 import { CoordinationGridView } from './CoordinationGridView'
 import { FullKeyboard } from './FullKeyboard'
@@ -41,6 +45,19 @@ export function CoordinationPracticePage({
   onBackHome
 }: CoordinationPracticePageProps): JSX.Element {
   const coordination = useCoordinationPractice(latestMidiEvent)
+  const createRecord = useCallback(
+    (timing: PracticeSessionTiming) => createCoordinationRecord({
+      timing,
+      report: coordination.report,
+      patternId: coordination.selectedPatternId
+    }),
+    [coordination.report, coordination.selectedPatternId]
+  )
+  const recorder = usePracticeSessionRecorder(coordination.isComplete, createRecord)
+  const startPractice = (): void => {
+    if (coordination.metronome.status === 'idle' || coordination.isComplete) recorder.beginSession()
+    coordination.start()
+  }
   const settingsLocked = coordination.metronome.status !== 'idle'
   const statusLabel = coordination.isComplete
     ? '已完成'
@@ -148,18 +165,19 @@ export function CoordinationPracticePage({
 
           <div className="practice-control-row coordination-control-row">
             {coordination.metronome.status === 'idle' || coordination.isComplete ? (
-              <AppButton className="primary-button coordination-action-button" onClick={coordination.start}>
+              <AppButton className="primary-button coordination-action-button" onClick={startPractice}>
                 {coordination.isComplete ? '再练一次' : '开始练习'}
               </AppButton>
             ) : coordination.isRunning ? (
               <AppButton variant="secondary" onClick={coordination.pause}>暂停练习</AppButton>
             ) : (
-              <AppButton onClick={coordination.start}>继续练习</AppButton>
+              <AppButton onClick={startPractice}>继续练习</AppButton>
             )}
             {coordination.metronome.status !== 'idle' && !coordination.isComplete ? (
               <AppButton variant="ghost" onClick={coordination.stop}>停止练习</AppButton>
             ) : null}
           </div>
+          {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
         </section>
 
         <section className="midi-panel coordination-panel coordination-status-panel">
@@ -287,4 +305,3 @@ export function CoordinationPracticePage({
     </section>
   )
 }
-

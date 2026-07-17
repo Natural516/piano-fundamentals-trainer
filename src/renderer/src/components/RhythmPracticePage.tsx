@@ -1,9 +1,13 @@
+import { useCallback } from 'react'
 import type { MidiEventRecord } from '../types'
 import { useRhythmPractice } from '../hooks/useRhythmPractice'
+import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
 import { getJudgementLabel, getToleranceMs } from '../utils/judgement'
 import { midiNumberToNoteName } from '../utils/midiNotes'
 import type { JudgementResult, TargetEvent, ToleranceLevel } from '../utils/practiceTypes'
 import { RHYTHM_MEASURE_COUNT, RHYTHM_PRACTICE_NOTE } from '../utils/rhythmPatterns'
+import { createRhythmRecord } from '../utils/practiceRecordAdapters'
+import type { PracticeSessionTiming } from '../utils/practiceRecordTypes'
 import { AppButton } from './AppButton'
 
 interface RhythmPracticePageProps {
@@ -47,6 +51,32 @@ function formatLatestResult(result: JudgementResult | null): string {
 
 export function RhythmPracticePage({ latestMidiEvent, onBackHome }: RhythmPracticePageProps): JSX.Element {
   const rhythm = useRhythmPractice(latestMidiEvent)
+  const createRecord = useCallback(
+    (timing: PracticeSessionTiming) => createRhythmRecord({
+      timing,
+      report: rhythm.report,
+      patternId: rhythm.selectedPatternId,
+      patternName: rhythm.selectedPattern.name,
+      bpm: rhythm.bpm,
+      tolerance: rhythm.toleranceLevel
+    }),
+    [rhythm.bpm, rhythm.report, rhythm.selectedPattern.name, rhythm.selectedPatternId, rhythm.toleranceLevel]
+  )
+  const recorder = usePracticeSessionRecorder(rhythm.isComplete, createRecord)
+  const startPractice = (): void => {
+    if (rhythm.isComplete) {
+      recorder.beginSession()
+      rhythm.restart()
+      return
+    }
+
+    if (rhythm.metronome.status !== 'paused') recorder.beginSession()
+    rhythm.start()
+  }
+  const restartPractice = (): void => {
+    recorder.beginSession()
+    rhythm.restart()
+  }
   const latestResult = rhythm.latestResult?.result ?? null
   const noteName = midiNumberToNoteName(RHYTHM_PRACTICE_NOTE)
 
@@ -125,7 +155,7 @@ export function RhythmPracticePage({ latestMidiEvent, onBackHome }: RhythmPracti
           </div>
 
           <div className="practice-control-row">
-            <AppButton className="primary-button rhythm-action-button" onClick={rhythm.start}>
+            <AppButton className="primary-button rhythm-action-button" onClick={startPractice}>
               {rhythm.metronome.status === 'paused' ? '继续练习' : '开始练习'}
             </AppButton>
             <AppButton className="ghost-button" variant="secondary" onClick={rhythm.pause}>
@@ -134,10 +164,11 @@ export function RhythmPracticePage({ latestMidiEvent, onBackHome }: RhythmPracti
             <AppButton className="ghost-button" variant="secondary" onClick={rhythm.stop}>
               停止
             </AppButton>
-            <AppButton className="ghost-button" variant="secondary" onClick={rhythm.restart}>
+            <AppButton className="ghost-button" variant="secondary" onClick={restartPractice}>
               重新开始
             </AppButton>
           </div>
+          {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
         </section>
 
         <section className="midi-panel rhythm-panel">

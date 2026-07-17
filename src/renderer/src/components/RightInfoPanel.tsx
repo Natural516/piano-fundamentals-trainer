@@ -1,48 +1,48 @@
+import type { CSSProperties } from 'react'
+import {
+  formatPracticeDuration,
+  formatRelativePracticeTime
+} from '../utils/practiceRecordStorage'
+import type { PracticeModule, PracticeSessionRecord, TodayPracticeStats } from '../utils/practiceRecordTypes'
 import { AppCard } from './AppCard'
 
-const recentRecords = [
-  {
-    title: '音阶练习（C大调）',
-    accuracy: '92%',
-    time: '15分钟前',
-    tone: 'cyan'
-  },
-  {
-    title: '和弦练习（大三和弦）',
-    accuracy: '85%',
-    time: '45分钟前',
-    tone: 'amber'
-  },
-  {
-    title: '节奏与切分（切分节奏）',
-    accuracy: '78%',
-    time: '1小时前',
-    tone: 'violet'
-  }
-]
+interface RightInfoPanelProps {
+  recentRecords: PracticeSessionRecord[]
+  todayStats: TodayPracticeStats
+}
 
-export function RightInfoPanel(): JSX.Element {
+const moduleTones: Record<PracticeModule, string> = {
+  'sight-reading': 'violet',
+  rhythm: 'violet',
+  scale: 'cyan',
+  chord: 'amber',
+  coordination: 'rose'
+}
+
+export function RightInfoPanel({ recentRecords, todayStats }: RightInfoPanelProps): JSX.Element {
+  const ringStyle = { '--progress': `${todayStats.accuracy}%` } as CSSProperties
+
   return (
     <aside className="right-panel" aria-label="练习信息">
       <AppCard as="section" className="info-card today-card">
         <h3>今日练习统计</h3>
         <div className="today-stat-layout">
-          <div className="progress-ring" aria-label="完成度 75%">
-            <span>75%</span>
-            <small>完成度</small>
+          <div className="progress-ring" aria-label={`今日正确率 ${todayStats.accuracy}%`} style={ringStyle}>
+            <span>{todayStats.accuracy}%</span>
+            <small>正确率</small>
           </div>
           <dl className="stat-list">
             <div>
               <dt>练习时长</dt>
-              <dd>45 分钟</dd>
+              <dd>{todayStats.durationMs === 0 ? '0 分钟' : formatPracticeDuration(todayStats.durationMs)}</dd>
             </div>
             <div>
               <dt>完成练习</dt>
-              <dd>5 个板块</dd>
+              <dd>{todayStats.completedSessions} 次</dd>
             </div>
             <div>
               <dt>正确率</dt>
-              <dd>87%</dd>
+              <dd>{todayStats.accuracy}%</dd>
             </div>
           </dl>
         </div>
@@ -51,18 +51,18 @@ export function RightInfoPanel(): JSX.Element {
       <AppCard as="section" className="info-card records-card">
         <h3>最近练习记录</h3>
         <div className="record-list">
-          {recentRecords.map((record) => (
-            <article key={record.title} className="record-item">
-              <span className={`record-icon tone-${record.tone}`} aria-hidden="true">
+          {recentRecords.length > 0 ? recentRecords.slice(0, 3).map((record) => (
+            <article key={record.id} className="record-item">
+              <span className={`record-icon tone-${moduleTones[record.module]}`} aria-hidden="true">
                 ♪
               </span>
               <div>
                 <strong>{record.title}</strong>
-                <p>正确率 {record.accuracy}</p>
+                <p>{record.moduleName} · 正确率 {record.accuracy}%</p>
               </div>
-              <time>{record.time}</time>
+              <time>{formatRelativePracticeTime(record.endedAt)}</time>
             </article>
-          ))}
+          )) : <div className="home-record-empty">完成练习后，记录会显示在这里。</div>}
         </div>
       </AppCard>
     </aside>

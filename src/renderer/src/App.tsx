@@ -5,6 +5,7 @@ import { CoordinationPracticePage } from './components/CoordinationPracticePage'
 import { JudgementTestPage } from './components/JudgementTestPage'
 import { MidiTestPage } from './components/MidiTestPage'
 import { PlaceholderPage } from './components/PlaceholderPage'
+import { PracticeHistoryPage } from './components/PracticeHistoryPage'
 import { RightInfoPanel } from './components/RightInfoPanel'
 import { RhythmPracticePage } from './components/RhythmPracticePage'
 import { ScalePracticePage } from './components/ScalePracticePage'
@@ -13,12 +14,14 @@ import { SightReadingPage } from './components/SightReadingPage'
 import { pageTitles } from './data'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMidi } from './hooks/useMidi'
+import { usePracticeHistory } from './hooks/usePracticeHistory'
 import type { PageId } from './types'
 
 function App(): JSX.Element {
   const [currentPage, setCurrentPage] = useState<PageId>('home')
   const midi = useMidi()
   const audioEngine = useAudioEngine(midi.latestEvent)
+  const practiceHistory = usePracticeHistory()
 
   const currentTitle = useMemo(() => pageTitles[currentPage], [currentPage])
   const isHomePage = currentPage === 'home'
@@ -28,7 +31,9 @@ function App(): JSX.Element {
       <Sidebar currentPage={currentPage} midiStatus={midi.sidebarStatus} audioEngine={audioEngine} onNavigate={setCurrentPage} />
       <main className={`workspace ${isHomePage ? 'workspace-home' : 'workspace-page'}`}>
         {isHomePage ? (
-          <HomePage onNavigate={setCurrentPage} />
+          <HomePage onNavigate={setCurrentPage} todayStats={practiceHistory.todayStats} />
+        ) : currentPage === 'records' ? (
+          <PracticeHistoryPage onBackHome={() => setCurrentPage('home')} />
         ) : currentPage === 'midi-test' ? (
           <MidiTestPage midi={midi} audioEngine={audioEngine} onBackHome={() => setCurrentPage('home')} />
         ) : currentPage === 'sight-reading' ? (
@@ -63,7 +68,12 @@ function App(): JSX.Element {
           <PlaceholderPage title={currentTitle} onBackHome={() => setCurrentPage('home')} />
         )}
       </main>
-      {isHomePage ? <RightInfoPanel /> : null}
+      {isHomePage ? (
+        <RightInfoPanel
+          recentRecords={practiceHistory.recentRecords}
+          todayStats={practiceHistory.todayStats}
+        />
+      ) : null}
     </div>
   )
 }

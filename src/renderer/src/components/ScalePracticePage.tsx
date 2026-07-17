@@ -1,8 +1,12 @@
+import { useCallback } from 'react'
 import type { ActiveMidiNote, MidiEventRecord } from '../types'
 import { useScalePractice } from '../hooks/useScalePractice'
+import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
 import { getJudgementLabel, getToleranceMs } from '../utils/judgement'
 import type { JudgementResult, ToleranceLevel } from '../utils/practiceTypes'
 import type { MajorScaleKey, ScalePracticeMode } from '../utils/scaleTypes'
+import { createScaleRecord } from '../utils/practiceRecordAdapters'
+import type { PracticeSessionTiming } from '../utils/practiceRecordTypes'
 import { AppButton } from './AppButton'
 import { FullKeyboard } from './FullKeyboard'
 
@@ -48,6 +52,31 @@ export function ScalePracticePage({
   onBackHome
 }: ScalePracticePageProps): JSX.Element {
   const scale = useScalePractice(latestMidiEvent)
+  const createRecord = useCallback(
+    (timing: PracticeSessionTiming) => createScaleRecord({
+      timing,
+      report: scale.report,
+      key: scale.selectedKey,
+      mode: scale.selectedMode,
+      tolerance: scale.toleranceLevel
+    }),
+    [scale.report, scale.selectedKey, scale.selectedMode, scale.toleranceLevel]
+  )
+  const recorder = usePracticeSessionRecorder(scale.isComplete, createRecord)
+  const startPractice = (): void => {
+    if (scale.isComplete) {
+      recorder.beginSession()
+      scale.restart()
+      return
+    }
+
+    if (scale.metronome.status !== 'paused') recorder.beginSession()
+    scale.start()
+  }
+  const restartPractice = (): void => {
+    recorder.beginSession()
+    scale.restart()
+  }
   const latestResult = scale.latestResult
 
   return (
@@ -144,7 +173,7 @@ export function ScalePracticePage({
           </div>
 
           <div className="practice-control-row">
-            <AppButton className="primary-button scale-action-button" onClick={scale.start}>
+            <AppButton className="primary-button scale-action-button" onClick={startPractice}>
               {scale.metronome.status === 'paused' ? '继续练习' : '开始练习'}
             </AppButton>
             <AppButton className="ghost-button" variant="secondary" onClick={scale.pause}>
@@ -153,10 +182,11 @@ export function ScalePracticePage({
             <AppButton className="ghost-button" variant="secondary" onClick={scale.stop}>
               停止
             </AppButton>
-            <AppButton className="ghost-button" variant="secondary" onClick={scale.restart}>
+            <AppButton className="ghost-button" variant="secondary" onClick={restartPractice}>
               重新开始
             </AppButton>
           </div>
+          {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
         </section>
 
         <section className="midi-panel scale-panel">

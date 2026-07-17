@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import type { ActiveMidiNote, MidiEventRecord } from '../types'
 import type {
   SightReadingClefMode,
@@ -7,6 +8,9 @@ import type {
 } from '../hooks/useSightReadingPractice'
 import { CLEF_LABELS, RANGE_LABELS, useSightReadingPractice } from '../hooks/useSightReadingPractice'
 import { getRangeDescription } from '../utils/sightReadingNotes'
+import { createSightReadingRecord } from '../utils/practiceRecordAdapters'
+import type { PracticeSessionTiming } from '../utils/practiceRecordTypes'
+import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
 import { AppButton } from './AppButton'
 import { FullKeyboard } from './FullKeyboard'
 import { SightReadingStaff } from './SightReadingStaff'
@@ -65,6 +69,17 @@ export function SightReadingPage({
   onBackHome
 }: SightReadingPageProps): JSX.Element {
   const practice = useSightReadingPractice(latestMidiEvent)
+  const createRecord = useCallback(
+    (timing: PracticeSessionTiming) => practice.report
+      ? createSightReadingRecord({ timing, report: practice.report, showNoteName: practice.showNoteName })
+      : null,
+    [practice.report, practice.showNoteName]
+  )
+  const recorder = usePracticeSessionRecorder(practice.status === 'finished', createRecord)
+  const startPractice = (): void => {
+    recorder.beginSession()
+    practice.start()
+  }
   const isRunning = practice.status === 'running'
   const targetNoteName = practice.currentNote?.noteName ?? '-'
   const currentClefLabel = practice.currentNote ? CLEF_LABELS[practice.currentNote.clef] : CLEF_LABELS[practice.clefMode]
@@ -122,13 +137,14 @@ export function SightReadingPage({
           </div>
 
           <div className="sight-action-row">
-            <AppButton className="primary-button" onClick={practice.start}>
+            <AppButton className="primary-button" onClick={startPractice}>
               再练一次
             </AppButton>
             <AppButton className="ghost-button" variant="secondary" onClick={onBackHome}>
               返回首页
             </AppButton>
           </div>
+          {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
         </section>
       </section>
     )
@@ -248,11 +264,12 @@ export function SightReadingPage({
                 停止练习
               </AppButton>
             ) : (
-              <AppButton className="primary-button" onClick={practice.start}>
+              <AppButton className="primary-button" onClick={startPractice}>
                 开始练习
               </AppButton>
             )}
           </div>
+          {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
 
           <div className="sight-feedback-card">
             <span>当前谱号</span>

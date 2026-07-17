@@ -1,11 +1,13 @@
 import { practiceModules, quickActions } from '../data'
 import type { PageId, PracticeModule, QuickAction } from '../types'
+import type { TodayPracticeStats } from '../utils/practiceRecordTypes'
 import { AppButton } from './AppButton'
 import { AppCard } from './AppCard'
 import { CardIllustration } from './CardIllustrations'
 
 interface HomePageProps {
   onNavigate: (page: PageId) => void
+  todayStats: TodayPracticeStats
 }
 
 function PracticeCard({
@@ -50,7 +52,7 @@ function QuickActionButton({
   )
 }
 
-export function HomePage({ onNavigate }: HomePageProps): JSX.Element {
+export function HomePage({ onNavigate, todayStats }: HomePageProps): JSX.Element {
   return (
     <div className="home-layout">
       <section className="home-main">
@@ -61,8 +63,8 @@ export function HomePage({ onNavigate }: HomePageProps): JSX.Element {
             <p>Piano Fundamentals Trainer</p>
           </div>
           <div className="session-chip">
-            <span>当前练习概览</span>
-            <strong>75%</strong>
+            <span>今日正确率</span>
+            <strong>{todayStats.accuracy}%</strong>
           </div>
         </header>
 

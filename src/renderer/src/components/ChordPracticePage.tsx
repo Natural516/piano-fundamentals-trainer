@@ -1,7 +1,11 @@
+import { useCallback } from 'react'
 import type { ActiveMidiNote, MidiEventRecord } from '../types'
 import { useChordPractice, CHORD_INVERSION_MODE_LABELS, CHORD_QUALITY_LABELS } from '../hooks/useChordPractice'
+import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
 import type { ChordInversionMode, ChordQualityFilter } from '../utils/chordTypes'
 import { CHORD_INPUT_WINDOW_MS } from '../utils/chordPatterns'
+import { createChordRecord } from '../utils/practiceRecordAdapters'
+import type { PracticeSessionTiming } from '../utils/practiceRecordTypes'
 import { AppButton } from './AppButton'
 import { ChordTargetView } from './ChordTargetView'
 import { FullKeyboard } from './FullKeyboard'
@@ -21,6 +25,21 @@ export function ChordPracticePage({
   onBackHome
 }: ChordPracticePageProps): JSX.Element {
   const chord = useChordPractice(latestMidiEvent)
+  const createRecord = useCallback(
+    (timing: PracticeSessionTiming) => createChordRecord({
+      timing,
+      report: chord.report,
+      chordType: chord.qualityFilter,
+      inversionMode: chord.inversionMode,
+      questionCount: chord.questionCount
+    }),
+    [chord.inversionMode, chord.qualityFilter, chord.questionCount, chord.report]
+  )
+  const recorder = usePracticeSessionRecorder(chord.status === 'finished', createRecord)
+  const startPractice = (): void => {
+    recorder.beginSession()
+    chord.start()
+  }
 
   return (
     <section className="chord-page">
@@ -144,11 +163,12 @@ export function ChordPracticePage({
                 停止练习
               </AppButton>
             ) : (
-              <AppButton className="primary-button chord-action-button" onClick={chord.start}>
+              <AppButton className="primary-button chord-action-button" onClick={startPractice}>
                 开始练习
               </AppButton>
             )}
           </div>
+          {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
         </section>
 
         <section className="midi-panel chord-panel chord-main-panel">
