@@ -181,7 +181,7 @@ export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseR
       return
     }
 
-    if (!metronome.practiceStartTimestampMs || metronome.isCountingIn || metronome.status === 'idle' || practice.isComplete) {
+    if (!metronome.practiceStartTimestampMs || metronome.isCountingIn || metronome.status !== 'running' || practice.isComplete) {
       return
     }
 

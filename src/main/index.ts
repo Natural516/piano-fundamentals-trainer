@@ -1,5 +1,7 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, dialog, shell } from 'electron'
 import { join } from 'node:path'
+
+const APP_ID = 'com.piano.fundamentals.trainer'
 
 app.commandLine.appendSwitch('enable-features', 'WebMIDI')
 
@@ -28,19 +30,33 @@ function createWindow(): void {
     mainWindow?.show()
   })
 
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedUrl, isMainFrame) => {
+    if (isMainFrame && errorCode !== -3) {
+      console.error('[main] 页面加载失败', { errorCode, errorDescription, validatedUrl })
+    }
+  })
+
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
   })
 
-  if (process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  const loadWindow = process.env.ELECTRON_RENDERER_URL
+    ? mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
+    : mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+
+  void loadWindow.catch((error: unknown) => {
+    console.error('[main] 无法加载应用窗口', error)
+    dialog.showErrorBox('钢琴基本功训练器', '应用页面加载失败，请重新启动软件。')
+  })
 }
 
 app.whenReady().then(() => {
+  app.setAppUserModelId(APP_ID)
   createWindow()
 
   app.on('activate', () => {
@@ -48,6 +64,14 @@ app.whenReady().then(() => {
       createWindow()
     }
   })
+})
+
+app.on('render-process-gone', (_event, _webContents, details) => {
+  console.error('[main] 渲染进程异常退出', details)
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[main] 未处理的异步异常', reason)
 })
 
 app.on('window-all-closed', () => {

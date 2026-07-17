@@ -12,6 +12,23 @@ interface PianoVoice {
   cleanupNodes: AudioNode[]
 }
 
+function disconnectVoice(voice: PianoVoice): void {
+  for (const source of voice.sources) {
+    try {
+      source.disconnect()
+    } catch {
+      // A source may already be disconnected after its natural decay.
+    }
+  }
+
+  for (const node of voice.cleanupNodes) {
+    try {
+      node.disconnect()
+    } catch {
+      // Disconnect is idempotent for most nodes, but guard older Chromium builds.
+    }
+  }
+}
 
 export interface UseAudioEngineResult {
   localMonitoringEnabled: boolean
@@ -108,6 +125,7 @@ function createPianoVoice(audioContext: AudioContext, midiNumber: number, veloci
     oscillator.connect(partialGain)
     partialGain.connect(filter)
     oscillator.start(now)
+    oscillator.stop(naturalEnd + 0.08)
     cleanupNodes.push(partialGain)
 
     return oscillator
@@ -133,7 +151,11 @@ function createPianoVoice(audioContext: AudioContext, midiNumber: number, veloci
     cleanupNodes
   }
 }
-function releaseVoice(audioContext: AudioContext, voice: PianoVoice): void {
+function releaseVoice(
+  audioContext: AudioContext,
+  voice: PianoVoice,
+  scheduleCleanup: (callback: () => void, delayMs: number) => void
+): void {
   const now = audioContext.currentTime
   const releaseEnd = now + 0.38
 
@@ -152,15 +174,7 @@ function releaseVoice(audioContext: AudioContext, voice: PianoVoice): void {
     }
   }
 
-  window.setTimeout(() => {
-    for (const source of voice.sources) {
-      source.disconnect()
-    }
-
-    for (const node of voice.cleanupNodes) {
-      node.disconnect()
-    }
-  }, 560)
+  scheduleCleanup(() => disconnectVoice(voice), 560)
 }
 
 
@@ -168,11 +182,21 @@ export function useAudioEngine(latestEvent: MidiEventRecord | null): UseAudioEng
   const audioContextRef = useRef<AudioContext | null>(null)
   const masterGainRef = useRef<GainNode | null>(null)
   const voicesRef = useRef<Map<number, PianoVoice>>(new Map())
+  const cleanupTimersRef = useRef<Set<number>>(new Set())
   const lastEventKeyRef = useRef('')
   const [localMonitoringEnabled, setLocalMonitoringEnabledState] = useState(false)
   const [volume, setVolumeState] = useState(70)
   const [audioStatus, setAudioStatus] = useState<AudioStatus>('idle')
   const [audioMessage, setAudioMessage] = useState('')
+
+  const scheduleCleanup = useCallback((callback: () => void, delayMs: number) => {
+    const timerId = window.setTimeout(() => {
+      cleanupTimersRef.current.delete(timerId)
+      callback()
+    }, delayMs)
+
+    cleanupTimersRef.current.add(timerId)
+  }, [])
 
   const ensureAudioContext = useCallback(async () => {
     const AudioContextConstructor = getAudioContextConstructor()
@@ -225,9 +249,9 @@ export function useAudioEngine(latestEvent: MidiEventRecord | null): UseAudioEng
       return
     }
 
-    releaseVoice(audioContext, voice)
+    releaseVoice(audioContext, voice, scheduleCleanup)
     voicesRef.current.delete(midiNumber)
-  }, [])
+  }, [scheduleCleanup])
 
   const playNote = useCallback(
     async (midiNumber: number, velocity: number) => {
@@ -257,11 +281,11 @@ export function useAudioEngine(latestEvent: MidiEventRecord | null): UseAudioEng
     }
 
     for (const voice of voicesRef.current.values()) {
-      releaseVoice(audioContext, voice)
+      releaseVoice(audioContext, voice, scheduleCleanup)
     }
 
     voicesRef.current.clear()
-  }, [])
+  }, [scheduleCleanup])
 
   const setLocalMonitoringEnabled = useCallback(
     async (enabled: boolean) => {
@@ -324,10 +348,25 @@ export function useAudioEngine(latestEvent: MidiEventRecord | null): UseAudioEng
 
   useEffect(() => {
     return () => {
-      stopAllNotes()
+      for (const timerId of cleanupTimersRef.current) {
+        window.clearTimeout(timerId)
+      }
+      cleanupTimersRef.current.clear()
+
+      for (const voice of voicesRef.current.values()) {
+        for (const source of voice.sources) {
+          try {
+            source.stop()
+          } catch {
+            // The source may already have reached its scheduled natural end.
+          }
+        }
+        disconnectVoice(voice)
+      }
+      voicesRef.current.clear()
       audioContextRef.current?.close().catch(() => undefined)
     }
-  }, [stopAllNotes])
+  }, [])
 
   return {
     localMonitoringEnabled,

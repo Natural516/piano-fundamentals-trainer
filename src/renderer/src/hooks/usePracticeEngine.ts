@@ -140,7 +140,7 @@ export function usePracticeEngine({
       return
     }
 
-    if (!metronome.practiceStartTimestampMs || metronome.isCountingIn || metronome.status === 'idle') {
+    if (!metronome.practiceStartTimestampMs || metronome.isCountingIn || metronome.status !== 'running') {
       return
     }
 
@@ -246,7 +246,7 @@ export function usePracticeEngine({
   ])
 
   useEffect(() => {
-    if (metronome.status === 'idle' || metronome.isCountingIn) {
+    if (metronome.status !== 'running' || metronome.isCountingIn) {
       return
     }
 
