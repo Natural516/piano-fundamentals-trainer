@@ -20,19 +20,28 @@ export const CHORD_QUALITY_LABELS: Record<ChordQualityFilter, string> = {
 
 export const CHORD_INVERSION_MODE_LABELS: Record<ChordInversionMode, string> = {
   root: '只练原位',
+  first: '只练第一转位',
+  second: '只练第二转位',
+  third: '只练第三转位',
   'root-first': '原位 + 第一转位',
-  all: '原位 + 第一转位 + 第二转位'
+  all: '全部转位',
+  random: '随机转位'
 }
 
 export const CHORD_INVERSION_LABELS: Record<ChordInversion, string> = {
   root: '原位',
   first: '第一转位',
-  second: '第二转位'
+  second: '第二转位',
+  third: '第三转位'
 }
 
 export const CHORD_QUALITY_NAMES: Record<ChordQuality, string> = {
   major: '大三和弦',
-  minor: '小三和弦'
+  minor: '小三和弦',
+  major7: '大七和弦',
+  dominant7: '属七和弦',
+  minor7: '小七和弦',
+  'half-diminished7': '半减七和弦'
 }
 
 export const BASE_TRIADS: BaseTriad[] = [
@@ -86,32 +95,30 @@ export const BASE_TRIADS: BaseTriad[] = [
   }
 ]
 
-function getEnabledInversions(mode: ChordInversionMode): ChordInversion[] {
+export function getEnabledInversions(mode: ChordInversionMode, noteCount = 3): ChordInversion[] {
   if (mode === 'root') {
     return ['root']
   }
+
+  if (mode === 'first') return ['first']
+  if (mode === 'second') return ['second']
+  if (mode === 'third') return noteCount >= 4 ? ['third'] : ['root']
 
   if (mode === 'root-first') {
     return ['root', 'first']
   }
 
-  return ['root', 'first', 'second']
+  return noteCount >= 4 ? ['root', 'first', 'second', 'third'] : ['root', 'first', 'second']
 }
 
-function invertNotes(notes: number[], inversion: ChordInversion): number[] {
-  if (inversion === 'first') {
-    return [notes[1], notes[2], notes[0] + 12]
-  }
-
-  if (inversion === 'second') {
-    return [notes[2], notes[0] + 12, notes[1] + 12]
-  }
-
-  return [...notes]
+export function invertChordNotes(notes: number[], inversion: ChordInversion): number[] {
+  const rotation = inversion === 'first' ? 1 : inversion === 'second' ? 2 : inversion === 'third' ? 3 : 0
+  if (rotation <= 0 || rotation >= notes.length) return [...notes]
+  return [...notes.slice(rotation), ...notes.slice(0, rotation).map((note) => note + 12)]
 }
 
 function createChordTarget(base: BaseTriad, inversion: ChordInversion): ChordTarget {
-  const notes = invertNotes(base.notes, inversion)
+  const notes = invertChordNotes(base.notes, inversion)
   const inversionName = CHORD_INVERSION_LABELS[inversion]
 
   return {

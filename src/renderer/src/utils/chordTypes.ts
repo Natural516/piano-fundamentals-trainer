@@ -1,10 +1,27 @@
-export type ChordQuality = 'major' | 'minor'
-export type ChordQualityFilter = ChordQuality | 'both'
-export type ChordInversion = 'root' | 'first' | 'second'
-export type ChordInversionMode = 'root' | 'root-first' | 'all'
+import type { PracticeDifficulty } from './practiceContentTypes'
+
+export type ChordQuality = 'major' | 'minor' | 'major7' | 'dominant7' | 'minor7' | 'half-diminished7'
+export type ChordQualityFilter = 'major' | 'minor' | 'both'
+export type SeventhChordQuality = Extract<ChordQuality, 'major7' | 'dominant7' | 'minor7' | 'half-diminished7'>
+export type SeventhChordQualityFilter = SeventhChordQuality | 'all'
+export type ChordInversion = 'root' | 'first' | 'second' | 'third'
+export type ChordInversionMode = 'root' | 'first' | 'second' | 'third' | 'root-first' | 'all' | 'random'
 export type ChordQuestionCount = 10 | 20 | 50
 export type ChordPracticeStatus = 'idle' | 'running' | 'finished'
 export type ChordJudgementType = 'correct' | 'missing_note' | 'extra_note' | 'wrong_note'
+export type ChordContentCategory = 'triad' | 'seventh' | 'progression' | 'arpeggio' | '4536251'
+export type ChordKeySignature = 'C' | 'G' | 'F'
+export type ChordInputStyle = 'block' | 'arpeggio'
+
+export interface ChordTrainingContent {
+  id: string
+  name: string
+  description: string
+  difficulty: PracticeDifficulty
+  category: ChordContentCategory
+  inputStyle: ChordInputStyle
+  progressionId?: string
+}
 
 export interface BaseTriad {
   id: string
@@ -27,6 +44,10 @@ export interface ChordTarget {
   notes: number[]
   noteNames: string[]
   label: string
+  keySignature?: ChordKeySignature
+  degree?: number
+  inputStyle?: ChordInputStyle
+  sequenceNotes?: number[]
 }
 
 export interface ChordFeedback {
@@ -53,4 +74,7 @@ export interface ChordPracticeReport {
   mostMissedChord: string
   mostMissedNote: string
   averageAttempts: number
+  contentName: string
+  keySignature: string
+  roundCount: number
 }

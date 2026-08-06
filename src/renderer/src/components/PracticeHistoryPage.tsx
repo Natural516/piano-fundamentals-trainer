@@ -29,7 +29,10 @@ const filterOptions: Array<{ id: HistoryFilter; label: string }> = [
 const settingLabels: Record<string, string> = {
   clef: '谱号',
   range: '音域',
+  staffMode: '谱表模式',
+  rangeMode: '音域',
   questionCount: '题数',
+  answerTimeLimitSeconds: '每题时限',
   noteNameVisible: '音名提示',
   pattern: '模板',
   bpm: 'BPM',
@@ -41,15 +44,71 @@ const settingLabels: Record<string, string> = {
   measureCount: '小节数'
 }
 
-function formatSettingValue(value: string | number | boolean): string {
+const detailLabels: Record<string, string> = {
+  correctCount: '正确数',
+  wrongCount: '错误数',
+  timeoutCount: '超时数',
+  averageReactionMs: '平均反应时间',
+  highestStreak: '最高连对',
+  hardestNote: '最容易错的音',
+  mostWrongNote: '最容易错的音',
+  mostTimedOutNote: '最容易超时的音',
+  weakestNote: '综合薄弱音',
+  fastestReactionMs: '最快反应时间',
+  slowestReactionMs: '最慢反应时间'
+}
+
+type HistoryValue = string | number | boolean | null
+
+function formatSettingValue(value: HistoryValue, key = ''): string {
+  if (value === null) return '暂无'
   if (typeof value === 'boolean') return value ? '开启' : '关闭'
+  if (key === 'staffMode' || key === 'clef') {
+    if (value === 'treble') return '高音谱表'
+    if (value === 'bass') return '低音谱表'
+    if (value === 'grand' || value === 'mixed') return '大谱表'
+  }
+  if (key === 'rangeMode' || key === 'range') {
+    if (value === 'common' || value === 'basic') return '常用'
+    if (value === 'extended') return '扩展'
+  }
+  if (key === 'answerTimeLimitSeconds') return `${value} 秒`
+  if (key.endsWith('ReactionMs') && typeof value === 'number') return `${value} ms`
   return String(value)
 }
 
+function getSettingsEntries(record: PracticeSessionRecord): Array<[string, HistoryValue]> {
+  if (record.module !== 'sight-reading') return Object.entries(record.settings)
+
+  return [
+    ['staffMode', record.settings.staffMode ?? record.settings.clef ?? null],
+    ['rangeMode', record.settings.rangeMode ?? record.settings.range ?? null],
+    ['questionCount', record.settings.questionCount ?? null],
+    ['answerTimeLimitSeconds', record.settings.answerTimeLimitSeconds ?? null],
+    ['noteNameVisible', record.settings.noteNameVisible ?? null]
+  ]
+}
+
+function getDetailEntries(record: PracticeSessionRecord): Array<[string, HistoryValue]> {
+  if (record.module !== 'sight-reading') return Object.entries(record.details)
+
+  return [
+    ['correctCount', record.details.correctCount ?? null],
+    ['wrongCount', record.details.wrongCount ?? null],
+    ['timeoutCount', record.details.timeoutCount ?? null],
+    ['averageReactionMs', record.details.averageReactionMs ?? null],
+    ['highestStreak', record.details.highestStreak ?? null],
+    ['mostWrongNote', record.details.mostWrongNote ?? record.details.hardestNote ?? null],
+    ['mostTimedOutNote', record.details.mostTimedOutNote ?? null],
+    ['fastestReactionMs', record.details.fastestReactionMs ?? null],
+    ['slowestReactionMs', record.details.slowestReactionMs ?? null]
+  ]
+}
+
 function getPrimarySettings(record: PracticeSessionRecord): string {
-  const entries = Object.entries(record.settings).slice(0, 3)
+  const entries = getSettingsEntries(record).slice(0, 3)
   return entries.length > 0
-    ? entries.map(([key, value]) => `${settingLabels[key] ?? key}: ${formatSettingValue(value)}`).join(' · ')
+    ? entries.map(([key, value]) => `${settingLabels[key] ?? key}: ${formatSettingValue(value, key)}`).join(' · ')
     : '无额外设置'
 }
 
@@ -145,14 +204,14 @@ export function PracticeHistoryPage({ onBackHome }: PracticeHistoryPageProps): J
                   <div className="history-detail-grid">
                     <div>
                       <h5>主要设置</h5>
-                      {Object.entries(record.settings).map(([key, value]) => (
-                        <p key={key}><span>{settingLabels[key] ?? key}</span><strong>{formatSettingValue(value)}</strong></p>
+                      {getSettingsEntries(record).map(([key, value]) => (
+                        <p key={key}><span>{settingLabels[key] ?? key}</span><strong>{formatSettingValue(value, key)}</strong></p>
                       ))}
                     </div>
                     <div>
                       <h5>模块详情</h5>
-                      {Object.entries(record.details).map(([key, value]) => (
-                        <p key={key}><span>{key}</span><strong>{value === null ? '-' : formatSettingValue(value)}</strong></p>
+                      {getDetailEntries(record).map(([key, value]) => (
+                        <p key={key}><span>{detailLabels[key] ?? key}</span><strong>{formatSettingValue(value, key)}</strong></p>
                       ))}
                     </div>
                     <div>

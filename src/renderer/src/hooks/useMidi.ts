@@ -130,6 +130,7 @@ function createSidebarStatus(
 
 export function useMidi(): UseMidiResult {
   const midiAccessRef = useRef<MidiAccessLike | null>(null)
+  const eventSequenceRef = useRef(0)
   const [isSupported, setIsSupported] = useState(() => getRequestMidiAccess() !== null)
   const [permissionStatus, setPermissionStatus] = useState<MidiPermissionStatus>('unknown')
   const [inputs, setInputs] = useState<MidiInputDevice[]>([])
@@ -237,6 +238,7 @@ export function useMidi(): UseMidiResult {
 
     const command = statusByte & 0xf0
     const deviceName = input.name || input.manufacturer || '未命名 MIDI 设备'
+    const eventId = ++eventSequenceRef.current
     let record: MidiEventRecord | null = null
 
     if (command === 0x90 || command === 0x80) {
@@ -246,6 +248,7 @@ export function useMidi(): UseMidiResult {
       const noteName = midiNumberToNoteName(midiNumber)
 
       record = {
+        id: eventId,
         type: eventType,
         midiNumber,
         noteName,
@@ -258,6 +261,7 @@ export function useMidi(): UseMidiResult {
       const sustainPedalDown = value >= 64
 
       record = {
+        id: eventId,
         type: 'controlChange',
         controllerNumber: 64,
         controllerName: '延音踏板',

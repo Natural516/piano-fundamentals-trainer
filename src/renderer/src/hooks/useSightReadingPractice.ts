@@ -4,46 +4,70 @@ import { midiNumberToNoteName } from '../utils/midiNotes'
 import {
   CLEF_LABELS,
   RANGE_LABELS,
+  STAFF_MODE_LABELS,
+  createShuffledSightReadingBag,
   getMostMissedNote,
-  getRandomSightReadingNote,
   getSightReadingNotes,
   type SightReadingClef,
-  type SightReadingClefMode,
   type SightReadingNote,
-  type SightReadingRange
+  type SightReadingRange,
+  type SightReadingStaffMode
 } from '../utils/sightReadingNotes'
+import {
+  SightReadingSessionCore,
+  getSightReadingReactionSummary,
+  type SightReadingOutcomeRecord,
+  type SightReadingSessionCounters
+} from '../utils/sightReadingSession'
+import {
+  readSightReadingSettings,
+  writeSightReadingSettings,
+  type SightReadingQuestionCount,
+  type SightReadingSettings
+} from '../utils/sightReadingSettings'
 
 export type SightReadingStatus = 'idle' | 'running' | 'finished'
-export type SightReadingResult = 'correct' | 'wrong_note' | null
-export type SightReadingQuestionCount = 10 | 20 | 50
+export type SightReadingResult = 'correct' | 'wrong_note' | 'timeout' | null
 
 export interface SightReadingClefStats {
   total: number
   correct: number
   wrong: number
+  timeout: number
   accuracy: number
 }
 
 export interface SightReadingReport {
   totalQuestions: number
+  completedQuestions: number
   correct: number
   wrong: number
+  timeout: number
   accuracy: number
   bestStreak: number
-  mostMissedNote: string
-  errorCounts: Array<{ noteName: string; count: number }>
-  clefMode: SightReadingClefMode
+  mostWrongNote: string
+  mostTimedOutNote: string
+  weakestNote: string
+  averageReactionMs: number | null
+  fastestReactionMs: number | null
+  slowestReactionMs: number | null
+  wrongNoteCounts: Array<{ noteName: string; count: number }>
+  timeoutNoteCounts: Array<{ noteName: string; count: number }>
+  staffMode: SightReadingStaffMode
   range: SightReadingRange
+  answerTimeLimitSeconds: number
   treble: SightReadingClefStats
   bass: SightReadingClefStats
 }
 
 export interface UseSightReadingPracticeResult {
   status: SightReadingStatus
-  clefMode: SightReadingClefMode
+  staffMode: SightReadingStaffMode
   range: SightReadingRange
   questionCount: SightReadingQuestionCount
+  answerTimeLimitSeconds: number
   showNoteName: boolean
+  isPaused: boolean
   currentNote: SightReadingNote | null
   currentInput: string
   currentInputMidiNumber: number | null
@@ -51,104 +75,93 @@ export interface UseSightReadingPracticeResult {
   completedQuestions: number
   correctCount: number
   wrongCount: number
+  timeoutCount: number
   currentStreak: number
   bestStreak: number
   accuracy: number
   availableNotes: SightReadingNote[]
   report: SightReadingReport | null
-  setClefMode: (clefMode: SightReadingClefMode) => void
+  setStaffMode: (staffMode: SightReadingStaffMode) => void
   setRange: (range: SightReadingRange) => void
   setQuestionCount: (questionCount: SightReadingQuestionCount) => void
+  setAnswerTimeLimitSeconds: (seconds: number) => void
   setShowNoteName: (showNoteName: boolean) => void
   start: () => void
   reset: () => void
-  nextQuestion: () => void
+  pause: () => void
+  resume: () => void
 }
 
-const CLEFS: SightReadingClef[] = ['treble', 'bass']
+const QUESTION_DISPLAY_DELAY_MS = 32
+const FEEDBACK_DURATION_MS = 350
 
-function calculateAccuracy(correct: number, wrong: number): number {
-  const total = correct + wrong
-  return total > 0 ? Math.round((correct / total) * 100) : 0
+function calculateAccuracy(correct: number, completed: number): number {
+  return completed > 0 ? Math.round((correct / completed) * 100) : 0
 }
 
-function calculateClefAccuracy(stats: Omit<SightReadingClefStats, 'accuracy'>): SightReadingClefStats {
-  return {
-    ...stats,
-    accuracy: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0
-  }
-}
-
-function createClefCounter(): Record<SightReadingClef, number> {
-  return {
-    treble: 0,
-    bass: 0
-  }
-}
-
-function createEmptyErrorCounts(notes: SightReadingNote[]): Record<number, number> {
-  return Object.fromEntries(Array.from(new Set(notes.map((note) => note.midiNumber))).map((midiNumber) => [midiNumber, 0]))
-}
-
-function createReport({
-  bestStreak,
-  clefCorrect,
-  clefMode,
-  clefTotals,
-  clefWrong,
-  correct,
-  errorCounts,
-  notes,
-  questionCount,
-  range,
-  wrong
-}: {
-  bestStreak: number
-  clefCorrect: Record<SightReadingClef, number>
-  clefMode: SightReadingClefMode
-  clefTotals: Record<SightReadingClef, number>
-  clefWrong: Record<SightReadingClef, number>
-  correct: number
-  errorCounts: Record<number, number>
-  notes: SightReadingNote[]
-  questionCount: number
-  range: SightReadingRange
-  wrong: number
-}): SightReadingReport {
-  const uniqueNotes = Array.from(new Map(notes.map((note) => [note.midiNumber, note])).values())
+function calculateClefStats(
+  clef: SightReadingClef,
+  counters: SightReadingSessionCounters
+): SightReadingClefStats {
+  const total = counters.clefTotals[clef]
+  const correct = counters.clefCorrect[clef]
 
   return {
-    totalQuestions: questionCount,
+    total,
     correct,
-    wrong,
-    accuracy: calculateAccuracy(correct, wrong),
-    bestStreak,
-    mostMissedNote: getMostMissedNote(errorCounts),
-    errorCounts: uniqueNotes.map((note) => ({
+    wrong: counters.clefWrong[clef],
+    timeout: counters.clefTimeout[clef],
+    accuracy: calculateAccuracy(correct, total)
+  }
+}
+
+function createReport(
+  settings: SightReadingSettings,
+  counters: SightReadingSessionCounters,
+  notes: SightReadingNote[]
+): SightReadingReport {
+  const uniqueNotes = Array.from(new Map(notes.map((note) => [note.midiNumber, note])).values())
+  const reactionSummary = getSightReadingReactionSummary(counters.reactionTimes)
+  const weakestNoteCounts = Object.fromEntries(uniqueNotes.map((note) => [
+    note.midiNumber,
+    (counters.wrongNoteCounts[note.midiNumber] ?? 0) + (counters.timeoutNoteCounts[note.midiNumber] ?? 0)
+  ]))
+
+  return {
+    totalQuestions: settings.questionCount,
+    completedQuestions: counters.completed,
+    correct: counters.correct,
+    wrong: counters.wrong,
+    timeout: counters.timeout,
+    accuracy: calculateAccuracy(counters.correct, counters.completed),
+    bestStreak: counters.bestStreak,
+    mostWrongNote: getMostMissedNote(counters.wrongNoteCounts),
+    mostTimedOutNote: getMostMissedNote(counters.timeoutNoteCounts),
+    weakestNote: getMostMissedNote(weakestNoteCounts),
+    ...reactionSummary,
+    wrongNoteCounts: uniqueNotes.map((note) => ({
       noteName: note.noteName,
-      count: errorCounts[note.midiNumber] ?? 0
+      count: counters.wrongNoteCounts[note.midiNumber] ?? 0
     })),
-    clefMode,
-    range,
-    treble: calculateClefAccuracy({
-      total: clefTotals.treble,
-      correct: clefCorrect.treble,
-      wrong: clefWrong.treble
-    }),
-    bass: calculateClefAccuracy({
-      total: clefTotals.bass,
-      correct: clefCorrect.bass,
-      wrong: clefWrong.bass
-    })
+    timeoutNoteCounts: uniqueNotes.map((note) => ({
+      noteName: note.noteName,
+      count: counters.timeoutNoteCounts[note.midiNumber] ?? 0
+    })),
+    staffMode: settings.staffMode,
+    range: settings.range,
+    answerTimeLimitSeconds: settings.answerTimeLimitSeconds,
+    treble: calculateClefStats('treble', counters),
+    bass: calculateClefStats('bass', counters)
   }
 }
 
 export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null): UseSightReadingPracticeResult {
+  const initialSettingsRef = useRef<SightReadingSettings | null>(null)
+  if (initialSettingsRef.current === null) initialSettingsRef.current = readSightReadingSettings()
+
+  const [settings, setSettings] = useState<SightReadingSettings>(initialSettingsRef.current)
   const [status, setStatus] = useState<SightReadingStatus>('idle')
-  const [clefMode, setClefModeState] = useState<SightReadingClefMode>('treble')
-  const [range, setRangeState] = useState<SightReadingRange>('basic')
-  const [questionCount, setQuestionCountState] = useState<SightReadingQuestionCount>(20)
-  const [showNoteName, setShowNoteName] = useState(true)
+  const [isPaused, setIsPaused] = useState(false)
   const [currentNote, setCurrentNote] = useState<SightReadingNote | null>(null)
   const [currentInput, setCurrentInput] = useState('')
   const [currentInputMidiNumber, setCurrentInputMidiNumber] = useState<number | null>(null)
@@ -156,327 +169,307 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
   const [completedQuestions, setCompletedQuestions] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
   const [wrongCount, setWrongCount] = useState(0)
+  const [timeoutCount, setTimeoutCount] = useState(0)
   const [currentStreak, setCurrentStreak] = useState(0)
   const [bestStreak, setBestStreak] = useState(0)
   const [report, setReport] = useState<SightReadingReport | null>(null)
 
-  const lastHandledEventRef = useRef<number | null>(null)
-  const practiceStartedAtRef = useRef<number | null>(null)
-  const isAdvancingRef = useRef(false)
-  const currentHadErrorRef = useRef(false)
-  const nextTimerRef = useRef<number | null>(null)
-  const activeClefModeRef = useRef<SightReadingClefMode>('treble')
-  const activeRangeRef = useRef<SightReadingRange>('basic')
-  const activeNotesRef = useRef<SightReadingNote[]>(getSightReadingNotes({ clefMode: 'treble', range: 'basic' }))
-  const completedQuestionsRef = useRef(0)
-  const correctCountRef = useRef(0)
-  const wrongCountRef = useRef(0)
-  const currentStreakRef = useRef(0)
-  const bestStreakRef = useRef(0)
-  const errorCountsRef = useRef<Record<number, number>>(createEmptyErrorCounts(activeNotesRef.current))
-  const clefTotalsRef = useRef<Record<SightReadingClef, number>>(createClefCounter())
-  const clefCorrectRef = useRef<Record<SightReadingClef, number>>(createClefCounter())
-  const clefWrongRef = useRef<Record<SightReadingClef, number>>(createClefCounter())
+  const latestMidiEventRef = useRef(latestMidiEvent)
+  const statusRef = useRef<SightReadingStatus>('idle')
+  const manualPauseRef = useRef(false)
+  const advanceDeadlineRef = useRef<number | null>(null)
+  const remainingAdvanceMsRef = useRef(0)
+  const displayTimerRef = useRef<number | null>(null)
+  const questionTimerRef = useRef<number | null>(null)
+  const advanceTimerRef = useRef<number | null>(null)
+  const activeSettingsRef = useRef<SightReadingSettings>(initialSettingsRef.current)
+  const activeNotesRef = useRef<SightReadingNote[]>(getSightReadingNotes(initialSettingsRef.current))
+  const sessionRef = useRef(new SightReadingSessionCore(activeNotesRef.current))
+  const bagRef = useRef<SightReadingNote[]>([])
+  const previousMidiNumberRef = useRef<number | null>(null)
+  const applyOutcomeRef = useRef<(record: SightReadingOutcomeRecord) => void>(() => undefined)
 
-  const availableNotes = useMemo(() => getSightReadingNotes({ clefMode, range }), [clefMode, range])
-  const accuracy = useMemo(() => calculateAccuracy(correctCount, wrongCount), [correctCount, wrongCount])
+  latestMidiEventRef.current = latestMidiEvent
 
-  const clearNextTimer = useCallback(() => {
-    if (nextTimerRef.current !== null) {
-      window.clearTimeout(nextTimerRef.current)
-      nextTimerRef.current = null
+  const availableNotes = useMemo(
+    () => getSightReadingNotes({ staffMode: settings.staffMode, range: settings.range }),
+    [settings.range, settings.staffMode]
+  )
+  const accuracy = useMemo(
+    () => calculateAccuracy(correctCount, completedQuestions),
+    [completedQuestions, correctCount]
+  )
+
+  const clearDisplayTimer = useCallback(() => {
+    if (displayTimerRef.current !== null) {
+      window.clearTimeout(displayTimerRef.current)
+      displayTimerRef.current = null
     }
   }, [])
 
-  const resetCounters = useCallback((notes: SightReadingNote[]) => {
-    const nextErrorCounts = createEmptyErrorCounts(notes)
-
-    completedQuestionsRef.current = 0
-    correctCountRef.current = 0
-    wrongCountRef.current = 0
-    currentStreakRef.current = 0
-    bestStreakRef.current = 0
-    errorCountsRef.current = nextErrorCounts
-    clefTotalsRef.current = createClefCounter()
-    clefCorrectRef.current = createClefCounter()
-    clefWrongRef.current = createClefCounter()
-
-    setCompletedQuestions(0)
-    setCorrectCount(0)
-    setWrongCount(0)
-    setCurrentStreak(0)
-    setBestStreak(0)
+  const clearQuestionTimer = useCallback(() => {
+    if (questionTimerRef.current !== null) {
+      window.clearTimeout(questionTimerRef.current)
+      questionTimerRef.current = null
+    }
   }, [])
 
-  const finishPractice = useCallback(
-    (nextCorrect: number, nextWrong: number, nextBestStreak: number, nextErrorCounts: Record<number, number>) => {
-      clearNextTimer()
-      isAdvancingRef.current = false
-      practiceStartedAtRef.current = null
-      setStatus('finished')
-      setCurrentNote(null)
-      setResult(null)
-      setCurrentInput('')
-      setCurrentInputMidiNumber(null)
-      setReport(
-        createReport({
-          bestStreak: nextBestStreak,
-          clefCorrect: clefCorrectRef.current,
-          clefMode: activeClefModeRef.current,
-          clefTotals: clefTotalsRef.current,
-          clefWrong: clefWrongRef.current,
-          correct: nextCorrect,
-          errorCounts: nextErrorCounts,
-          notes: activeNotesRef.current,
-          questionCount,
-          range: activeRangeRef.current,
-          wrong: nextWrong
-        })
-      )
-    },
-    [clearNextTimer, questionCount]
-  )
+  const clearAdvanceTimer = useCallback(() => {
+    if (advanceTimerRef.current !== null) {
+      window.clearTimeout(advanceTimerRef.current)
+      advanceTimerRef.current = null
+    }
+  }, [])
 
-  const generateNextQuestion = useCallback(() => {
-    setCurrentNote((previousNote) =>
-      getRandomSightReadingNote(
-        {
-          clefMode: activeClefModeRef.current,
-          range: activeRangeRef.current
-        },
-        previousNote
-      )
-    )
+  const clearAllTimers = useCallback(() => {
+    clearDisplayTimer()
+    clearQuestionTimer()
+    clearAdvanceTimer()
+  }, [clearAdvanceTimer, clearDisplayTimer, clearQuestionTimer])
+
+  const syncCounters = useCallback((counters: SightReadingSessionCounters) => {
+    setCompletedQuestions(counters.completed)
+    setCorrectCount(counters.correct)
+    setWrongCount(counters.wrong)
+    setTimeoutCount(counters.timeout)
+    setCurrentStreak(counters.currentStreak)
+    setBestStreak(counters.bestStreak)
+  }, [])
+
+  const finishPractice = useCallback(() => {
+    clearAllTimers()
+    const counters = sessionRef.current.counters
+    sessionRef.current.finish()
+    statusRef.current = 'finished'
+    setIsPaused(false)
+    setStatus('finished')
+    setCurrentNote(null)
+    setReport(createReport(activeSettingsRef.current, counters, activeNotesRef.current))
+  }, [clearAllTimers])
+
+  const takeNextNote = useCallback((): SightReadingNote => {
+    if (bagRef.current.length === 0) {
+      bagRef.current = createShuffledSightReadingBag(activeNotesRef.current, previousMidiNumberRef.current)
+    }
+
+    const nextNote = bagRef.current.shift() ?? activeNotesRef.current[0]
+    previousMidiNumberRef.current = nextNote.midiNumber
+    return nextNote
+  }, [])
+
+  const scheduleQuestionTimeout = useCallback((delayMs: number) => {
+    clearQuestionTimer()
+    const safeDelay = Math.max(0, delayMs)
+    sessionRef.current.questionDeadlineMs = Date.now() + safeDelay
+    sessionRef.current.remainingQuestionMs = safeDelay
+    questionTimerRef.current = window.setTimeout(() => {
+      questionTimerRef.current = null
+      if (statusRef.current !== 'running') return
+      const outcome = sessionRef.current.recordTimeout()
+      if (outcome) applyOutcomeRef.current(outcome)
+    }, safeDelay)
+  }, [clearQuestionTimer])
+
+  const unlockQuestion = useCallback(() => {
+    displayTimerRef.current = null
+    const session = sessionRef.current
+    if (statusRef.current !== 'running' || session.paused || session.phase !== 'display') return
+
+    const now = Date.now()
+    const timeLimitMs = activeSettingsRef.current.answerTimeLimitSeconds * 1000
+    session.unlockQuestion(now, latestMidiEventRef.current?.id ?? null, timeLimitMs)
+    scheduleQuestionTimeout(timeLimitMs)
+  }, [scheduleQuestionTimeout])
+
+  const displayNextQuestion = useCallback(() => {
+    clearDisplayTimer()
+    clearQuestionTimer()
+    const nextNote = takeNextNote()
+
+    sessionRef.current.beginQuestion(nextNote)
+    setCurrentNote(nextNote)
     setCurrentInput('')
     setCurrentInputMidiNumber(null)
     setResult(null)
-    isAdvancingRef.current = false
-    currentHadErrorRef.current = false
-  }, [])
+    displayTimerRef.current = window.setTimeout(unlockQuestion, QUESTION_DISPLAY_DELAY_MS)
+  }, [clearDisplayTimer, clearQuestionTimer, takeNextNote, unlockQuestion])
 
-  const completeCurrentQuestion = useCallback((note: SightReadingNote, firstTryCorrect: boolean) => {
-    const nextCompleted = completedQuestionsRef.current + 1
-    completedQuestionsRef.current = nextCompleted
-    clefTotalsRef.current = {
-      ...clefTotalsRef.current,
-      [note.clef]: clefTotalsRef.current[note.clef] + 1
+  const applyOutcome = useCallback((record: SightReadingOutcomeRecord) => {
+    clearQuestionTimer()
+    const counters = sessionRef.current.counters
+    const inputName = record.inputName || (
+      record.inputMidiNumber !== null ? midiNumberToNoteName(record.inputMidiNumber) : ''
+    )
+
+    setResult(record.outcome)
+    setCurrentInput(inputName)
+    setCurrentInputMidiNumber(record.inputMidiNumber)
+    syncCounters(counters)
+
+    clearAdvanceTimer()
+    remainingAdvanceMsRef.current = FEEDBACK_DURATION_MS
+    advanceDeadlineRef.current = Date.now() + FEEDBACK_DURATION_MS
+    advanceTimerRef.current = window.setTimeout(() => {
+      advanceTimerRef.current = null
+      const session = sessionRef.current
+      if (statusRef.current !== 'running' || session.paused) return
+      const action = session.completeFeedback(activeSettingsRef.current.questionCount)
+      if (action === 'finish') finishPractice()
+      else if (action === 'next') displayNextQuestion()
+    }, FEEDBACK_DURATION_MS)
+  }, [clearAdvanceTimer, clearQuestionTimer, displayNextQuestion, finishPractice, syncCounters])
+
+  applyOutcomeRef.current = applyOutcome
+
+  const pauseInternal = useCallback(() => {
+    const session = sessionRef.current
+    if (statusRef.current !== 'running' || session.paused) return
+
+    const now = Date.now()
+    session.pause(now)
+    setIsPaused(true)
+
+    if (session.phase === 'display') {
+      clearDisplayTimer()
+    } else if (session.phase === 'answering') {
+      clearQuestionTimer()
+    } else if (session.phase === 'feedback') {
+      remainingAdvanceMsRef.current = Math.max(0, (advanceDeadlineRef.current ?? now) - now)
+      clearAdvanceTimer()
     }
-    setCompletedQuestions(nextCompleted)
+  }, [clearAdvanceTimer, clearDisplayTimer, clearQuestionTimer])
 
-    if (firstTryCorrect) {
-      const nextCorrect = correctCountRef.current + 1
-      const nextStreak = currentStreakRef.current + 1
-      const nextBestStreak = Math.max(bestStreakRef.current, nextStreak)
+  const resumeInternal = useCallback(() => {
+    const session = sessionRef.current
+    if (statusRef.current !== 'running' || !session.paused || manualPauseRef.current) return
 
-      correctCountRef.current = nextCorrect
-      currentStreakRef.current = nextStreak
-      bestStreakRef.current = nextBestStreak
-      clefCorrectRef.current = {
-        ...clefCorrectRef.current,
-        [note.clef]: clefCorrectRef.current[note.clef] + 1
-      }
+    const now = Date.now()
+    session.resume(now, latestMidiEventRef.current?.id ?? null)
+    setIsPaused(false)
 
-      setCorrectCount(nextCorrect)
-      setCurrentStreak(nextStreak)
-      setBestStreak(nextBestStreak)
-    } else {
-      currentStreakRef.current = 0
-      setCurrentStreak(0)
-    }
-
-    return nextCompleted
-  }, [])
-
-  const nextQuestion = useCallback(() => {
-    clearNextTimer()
-    isAdvancingRef.current = false
-    if (status !== 'running' || !currentNote) {
+    if (session.phase === 'display') {
+      displayTimerRef.current = window.setTimeout(unlockQuestion, QUESTION_DISPLAY_DELAY_MS)
       return
     }
 
-    if (currentHadErrorRef.current) {
-      const nextCompleted = completeCurrentQuestion(currentNote, false)
-
-      if (nextCompleted >= questionCount) {
-        finishPractice(correctCountRef.current, wrongCountRef.current, bestStreakRef.current, errorCountsRef.current)
-        return
-      }
+    if (session.phase === 'answering') {
+      scheduleQuestionTimeout(session.remainingQuestionMs)
+      return
     }
 
-    generateNextQuestion()
-  }, [
-    clearNextTimer,
-    completeCurrentQuestion,
-    currentNote,
-    finishPractice,
-    generateNextQuestion,
-    questionCount,
-    status
-  ])
+    if (session.phase === 'feedback') {
+      const delay = Math.max(0, remainingAdvanceMsRef.current)
+      advanceDeadlineRef.current = now + delay
+      advanceTimerRef.current = window.setTimeout(() => {
+        advanceTimerRef.current = null
+        const activeSession = sessionRef.current
+        if (statusRef.current !== 'running' || activeSession.paused) return
+        const action = activeSession.completeFeedback(activeSettingsRef.current.questionCount)
+        if (action === 'finish') finishPractice()
+        else if (action === 'next') displayNextQuestion()
+      }, delay)
+    }
+  }, [displayNextQuestion, finishPractice, scheduleQuestionTimeout, unlockQuestion])
+
+  const pause = useCallback(() => {
+    manualPauseRef.current = true
+    pauseInternal()
+  }, [pauseInternal])
+
+  const resume = useCallback(() => {
+    manualPauseRef.current = false
+    if (!document.hidden && document.hasFocus()) resumeInternal()
+  }, [resumeInternal])
 
   const reset = useCallback(() => {
-    clearNextTimer()
-    isAdvancingRef.current = false
-    practiceStartedAtRef.current = null
-    currentHadErrorRef.current = false
-    lastHandledEventRef.current = null
+    clearAllTimers()
+    const notes = getSightReadingNotes({ staffMode: settings.staffMode, range: settings.range })
+
+    statusRef.current = 'idle'
+    manualPauseRef.current = false
+    sessionRef.current = new SightReadingSessionCore(notes)
+    bagRef.current = []
+    previousMidiNumberRef.current = null
     setStatus('idle')
+    setIsPaused(false)
     setCurrentNote(null)
     setCurrentInput('')
     setCurrentInputMidiNumber(null)
     setResult(null)
-    resetCounters(getSightReadingNotes({ clefMode, range }))
     setReport(null)
-  }, [clearNextTimer, clefMode, range, resetCounters])
+    syncCounters(sessionRef.current.counters)
+  }, [clearAllTimers, settings.range, settings.staffMode, syncCounters])
 
   const start = useCallback(() => {
-    const nextNotes = getSightReadingNotes({ clefMode, range })
+    clearAllTimers()
+    const activeSettings = { ...settings }
+    const notes = getSightReadingNotes({ staffMode: activeSettings.staffMode, range: activeSettings.range })
 
-    clearNextTimer()
-    isAdvancingRef.current = false
-    practiceStartedAtRef.current = Date.now()
-    activeClefModeRef.current = clefMode
-    activeRangeRef.current = range
-    activeNotesRef.current = nextNotes
-    currentHadErrorRef.current = false
-    lastHandledEventRef.current = null
+    activeSettingsRef.current = activeSettings
+    activeNotesRef.current = notes
+    sessionRef.current = new SightReadingSessionCore(notes)
+    bagRef.current = []
+    previousMidiNumberRef.current = null
+    sessionRef.current.start(Date.now(), latestMidiEventRef.current?.id ?? null)
+    statusRef.current = 'running'
+    manualPauseRef.current = false
     setStatus('running')
-    setCurrentInput('')
-    setCurrentInputMidiNumber(null)
-    setResult(null)
-    resetCounters(nextNotes)
+    setIsPaused(false)
     setReport(null)
-    setCurrentNote(getRandomSightReadingNote({ clefMode, range }))
-  }, [clearNextTimer, clefMode, range, resetCounters])
+    syncCounters(sessionRef.current.counters)
+    displayNextQuestion()
+  }, [clearAllTimers, displayNextQuestion, settings, syncCounters])
 
-  const setClefMode = useCallback(
-    (nextClefMode: SightReadingClefMode) => {
-      if (status === 'running') {
-        return
-      }
-
-      setClefModeState(nextClefMode)
-    },
-    [status]
-  )
-
-  const setRange = useCallback(
-    (nextRange: SightReadingRange) => {
-      if (status === 'running') {
-        return
-      }
-
-      setRangeState(nextRange)
-    },
-    [status]
-  )
-
-  const setQuestionCount = useCallback(
-    (nextQuestionCount: SightReadingQuestionCount) => {
-      if (status === 'running') {
-        return
-      }
-
-      setQuestionCountState(nextQuestionCount)
-    },
-    [status]
-  )
-
-  const setShowNoteNameValue = useCallback((nextShowNoteName: boolean) => {
-    setShowNoteName(nextShowNoteName)
+  const updateSetting = useCallback(<Key extends keyof SightReadingSettings>(
+    key: Key,
+    value: SightReadingSettings[Key]
+  ) => {
+    if (statusRef.current === 'running') return
+    setSettings((current) => ({ ...current, [key]: value }))
   }, [])
 
   useEffect(() => {
-    return () => {
-      clearNextTimer()
-    }
-  }, [clearNextTimer])
+    writeSightReadingSettings(settings)
+  }, [settings])
 
   useEffect(() => {
-    if (status !== 'running' || !currentNote || !latestMidiEvent || latestMidiEvent.type !== 'noteOn') {
-      return
+    const handleBlur = (): void => pauseInternal()
+    const handleFocus = (): void => {
+      if (!document.hidden) resumeInternal()
+    }
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) pauseInternal()
+      else if (document.hasFocus()) resumeInternal()
     }
 
-    if (isAdvancingRef.current) {
-      return
+    window.addEventListener('blur', handleBlur)
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('blur', handleBlur)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
+  }, [pauseInternal, resumeInternal])
 
-    if (practiceStartedAtRef.current !== null && latestMidiEvent.timestamp < practiceStartedAtRef.current) {
-      return
-    }
+  useEffect(() => () => clearAllTimers(), [clearAllTimers])
 
-    if (typeof latestMidiEvent.midiNumber !== 'number') {
-      return
-    }
+  useEffect(() => {
+    if (status !== 'running' || isPaused || !latestMidiEvent) return
 
-    if (lastHandledEventRef.current === latestMidiEvent.timestamp) {
-      return
-    }
-
-    lastHandledEventRef.current = latestMidiEvent.timestamp
-
-    const inputName = latestMidiEvent.noteName || midiNumberToNoteName(latestMidiEvent.midiNumber)
-
-    setCurrentInput(inputName)
-    setCurrentInputMidiNumber(latestMidiEvent.midiNumber)
-
-    if (latestMidiEvent.midiNumber !== currentNote.midiNumber) {
-      setResult('wrong_note')
-
-      if (!currentHadErrorRef.current) {
-        currentHadErrorRef.current = true
-        const nextWrong = wrongCountRef.current + 1
-        const nextErrorCounts = {
-          ...errorCountsRef.current,
-          [currentNote.midiNumber]: (errorCountsRef.current[currentNote.midiNumber] ?? 0) + 1
-        }
-
-        wrongCountRef.current = nextWrong
-        currentStreakRef.current = 0
-        errorCountsRef.current = nextErrorCounts
-        clefWrongRef.current = {
-          ...clefWrongRef.current,
-          [currentNote.clef]: clefWrongRef.current[currentNote.clef] + 1
-        }
-        setWrongCount(nextWrong)
-        setCurrentStreak(0)
-      }
-
-      return
-    }
-
-    setResult('correct')
-
-    const nextCompleted = completeCurrentQuestion(currentNote, !currentHadErrorRef.current)
-
-    if (nextCompleted >= questionCount) {
-      finishPractice(correctCountRef.current, wrongCountRef.current, bestStreakRef.current, errorCountsRef.current)
-      return
-    }
-
-    isAdvancingRef.current = true
-    clearNextTimer()
-    nextTimerRef.current = window.setTimeout(() => {
-      isAdvancingRef.current = false
-      generateNextQuestion()
-    }, 500)
-  }, [
-    clearNextTimer,
-    completeCurrentQuestion,
-    currentNote,
-    finishPractice,
-    generateNextQuestion,
-    latestMidiEvent,
-    questionCount,
-    status
-  ])
+    const outcome = sessionRef.current.processMidiEvent(latestMidiEvent)
+    if (outcome) applyOutcome(outcome)
+  }, [applyOutcome, isPaused, latestMidiEvent, status])
 
   return {
     status,
-    clefMode,
-    range,
-    questionCount,
-    showNoteName,
+    staffMode: settings.staffMode,
+    range: settings.range,
+    questionCount: settings.questionCount,
+    answerTimeLimitSeconds: settings.answerTimeLimitSeconds,
+    showNoteName: settings.noteNameVisible,
+    isPaused,
     currentNote,
     currentInput,
     currentInputMidiNumber,
@@ -484,20 +477,25 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
     completedQuestions,
     correctCount,
     wrongCount,
+    timeoutCount,
     currentStreak,
     bestStreak,
     accuracy,
     availableNotes,
     report,
-    setClefMode,
-    setRange,
-    setQuestionCount,
-    setShowNoteName: setShowNoteNameValue,
+    setStaffMode: (value) => updateSetting('staffMode', value),
+    setRange: (value) => updateSetting('range', value),
+    setQuestionCount: (value) => updateSetting('questionCount', value),
+    setAnswerTimeLimitSeconds: (value) => {
+      if (Number.isInteger(value) && value >= 1 && value <= 60) updateSetting('answerTimeLimitSeconds', value)
+    },
+    setShowNoteName: (value) => updateSetting('noteNameVisible', value),
     start,
     reset,
-    nextQuestion
+    pause,
+    resume
   }
 }
 
-export { CLEF_LABELS, RANGE_LABELS }
-export type { SightReadingClefMode, SightReadingRange }
+export { CLEF_LABELS, RANGE_LABELS, STAFF_MODE_LABELS }
+export type { SightReadingQuestionCount, SightReadingRange, SightReadingStaffMode }

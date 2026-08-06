@@ -1,10 +1,19 @@
 import type { SightReadingReport } from '../hooks/useSightReadingPractice'
-import type { ChordPracticeReport, ChordInversionMode, ChordQualityFilter } from './chordTypes'
+import { STAFF_MODE_LABELS } from './sightReadingNotes'
+import type {
+  ChordContentCategory,
+  ChordInputStyle,
+  ChordInversionMode,
+  ChordPracticeReport,
+  ChordQualityFilter,
+  SeventhChordQualityFilter
+} from './chordTypes'
 import type { CoordinationPracticeReport } from './coordinationTypes'
 import type { ToleranceLevel } from './practiceTypes'
 import type { PracticeSessionRecord, PracticeSessionTiming } from './practiceRecordTypes'
 import type { RhythmPracticeReport } from './rhythmTypes'
 import type { MajorScaleKey, ScalePracticeMode, ScalePracticeReport } from './scaleTypes'
+import type { PracticeDifficulty } from './practiceContentTypes'
 
 function createBaseRecord(
   timing: PracticeSessionTiming,
@@ -40,28 +49,42 @@ export function createSightReadingRecord(input: {
     ...createBaseRecord(input.timing, {
       module: 'sight-reading',
       moduleName: '识谱练习',
-      title: `${report.clefMode === 'mixed' ? '双谱号随机' : report.clefMode === 'treble' ? '高音谱号' : '低音谱号'} · 单音识别`,
+      title: `${STAFF_MODE_LABELS[report.staffMode]} · 单音识别`,
       subtitle: 'C 大调识谱',
-      totalEvents: report.totalQuestions,
+      totalEvents: report.completedQuestions,
       correctEvents: report.correct,
       accuracy: report.accuracy
     }),
     wrongNoteCount: report.wrong,
+    missingNoteCount: report.timeout,
     settings: {
-      clef: report.clefMode,
-      range: report.range,
+      staffMode: report.staffMode,
+      rangeMode: report.range,
       questionCount: report.totalQuestions,
+      answerTimeLimitSeconds: report.answerTimeLimitSeconds,
       noteNameVisible: input.showNoteName
     },
     details: {
-      trebleAccuracy: report.treble.accuracy,
-      bassAccuracy: report.bass.accuracy,
+      correctCount: report.correct,
+      wrongCount: report.wrong,
+      timeoutCount: report.timeout,
+      averageReactionMs: report.averageReactionMs,
       highestStreak: report.bestStreak,
-      hardestNote: report.mostMissedNote
+      hardestNote: report.mostWrongNote,
+      mostWrongNote: report.mostWrongNote,
+      mostTimedOutNote: report.mostTimedOutNote,
+      weakestNote: report.weakestNote,
+      fastestReactionMs: report.fastestReactionMs,
+      slowestReactionMs: report.slowestReactionMs
     },
-    mistakes: report.errorCounts
-      .filter((entry) => entry.count > 0)
-      .map((entry) => ({ label: entry.noteName, count: entry.count, type: 'wrong_note' }))
+    mistakes: [
+      ...report.wrongNoteCounts
+        .filter((entry) => entry.count > 0)
+        .map((entry) => ({ label: entry.noteName, count: entry.count, type: 'wrong_note' })),
+      ...report.timeoutNoteCounts
+        .filter((entry) => entry.count > 0)
+        .map((entry) => ({ label: entry.noteName, count: entry.count, type: 'timeout' }))
+    ]
   }
 }
 
@@ -72,6 +95,7 @@ export function createRhythmRecord(input: {
   patternName: string
   bpm: number
   tolerance: ToleranceLevel
+  difficulty: PracticeDifficulty
 }): PracticeSessionRecord {
   const { report } = input
   const extraNoteCount = report.extraNote + report.extraInput
@@ -93,6 +117,11 @@ export function createRhythmRecord(input: {
     lateCount: report.late,
     restErrorCount: report.restError,
     averageOffsetMs: report.averageOffsetMs,
+    contentId: input.patternId,
+    contentName: input.patternName,
+    difficulty: input.difficulty,
+    bpm: input.bpm,
+    practiceMode: 'rhythm-pattern',
     settings: {
       pattern: input.patternId,
       bpm: input.bpm,
@@ -139,11 +168,21 @@ export function createScaleRecord(input: {
     lateCount: report.late,
     restErrorCount: report.restError,
     averageOffsetMs: report.averageOffsetMs,
+    contentId: `${input.key}-${input.mode}-${report.range}`,
+    contentName: `${report.keyName} · ${report.modeName}`,
+    difficulty: report.range === 'two-octave' || report.notesPerBeat === 4 ? 'challenge' : report.loopCount > 1 ? 'intermediate' : 'basic',
+    bpm: report.targetBpm,
+    loopCount: report.loopCount,
+    keySignature: input.key,
+    practiceMode: input.mode,
     settings: {
       key: input.key,
       mode: input.mode,
       bpm: report.bpm,
-      tolerance: input.tolerance
+      tolerance: input.tolerance,
+      range: report.range,
+      loopCount: report.loopCount,
+      notesPerBeat: report.notesPerBeat
     },
     details: {
       keyName: report.keyName,
@@ -163,17 +202,30 @@ export function createChordRecord(input: {
   timing: PracticeSessionTiming
   report: ChordPracticeReport
   chordType: ChordQualityFilter
+  seventhChordType: SeventhChordQualityFilter
   inversionMode: ChordInversionMode
   questionCount: number
+  contentId: string
+  contentName: string
+  difficulty: PracticeDifficulty
+  category: ChordContentCategory
+  inputStyle: ChordInputStyle
+  keySignature?: string
+  roundCount?: number
 }): PracticeSessionRecord {
   const { report } = input
+  const isIdentification = input.category === 'triad' || input.category === 'seventh'
+  const inputStyleLabel = input.inputStyle === 'arpeggio' ? '分解' : '柱式'
+  const subtitle = isIdentification
+    ? `${input.questionCount} 题 · ${inputStyleLabel}和弦`
+    : `${input.keySignature ?? ''}大调 · ${input.roundCount ?? 1}轮 · ${inputStyleLabel}`
 
   return {
     ...createBaseRecord(input.timing, {
       module: 'chord',
       moduleName: '和弦练习',
-      title: 'C 大调自然三和弦',
-      subtitle: `${input.questionCount} 题柱式和弦`,
+      title: input.contentName,
+      subtitle,
       totalEvents: report.totalQuestions,
       correctEvents: report.correct,
       accuracy: report.accuracy
@@ -181,10 +233,21 @@ export function createChordRecord(input: {
     wrongNoteCount: report.wrongNote,
     missingNoteCount: report.missingNote,
     extraNoteCount: report.extraNote,
+    contentId: input.contentId,
+    contentName: input.contentName,
+    difficulty: input.difficulty,
+    ...(typeof input.roundCount === 'number' ? { loopCount: input.roundCount } : {}),
+    ...(input.keySignature ? { keySignature: input.keySignature } : {}),
+    practiceMode: `${input.category}:${input.inputStyle}`,
     settings: {
-      chordType: input.chordType,
-      inversionMode: input.inversionMode,
-      questionCount: input.questionCount
+      contentId: input.contentId,
+      category: input.category,
+      inputStyle: input.inputStyle,
+      ...(input.category === 'triad' ? { chordType: input.chordType } : {}),
+      ...(input.category === 'seventh' ? { seventhChordType: input.seventhChordType } : {}),
+      ...(isIdentification ? { inversionMode: input.inversionMode, questionCount: input.questionCount } : {}),
+      ...(input.keySignature ? { keySignature: input.keySignature } : {}),
+      ...(typeof input.roundCount === 'number' ? { roundCount: input.roundCount } : {})
     },
     details: {
       hardestChord: report.mostMissedChord,
@@ -203,6 +266,7 @@ export function createCoordinationRecord(input: {
   timing: PracticeSessionTiming
   report: CoordinationPracticeReport
   patternId: string
+  difficulty: PracticeDifficulty
 }): PracticeSessionRecord {
   const { report } = input
 
@@ -224,6 +288,12 @@ export function createCoordinationRecord(input: {
     restErrorCount: report.restError,
     syncWarningCount: report.syncWarning,
     averageOffsetMs: report.averageOffsetMs,
+    contentId: input.patternId,
+    contentName: report.patternName,
+    difficulty: input.difficulty,
+    bpm: report.bpm,
+    loopCount: report.completedLoops,
+    practiceMode: input.patternId,
     settings: {
       pattern: input.patternId,
       bpm: report.bpm,

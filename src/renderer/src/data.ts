@@ -1,10 +1,10 @@
-import type { NavigationItem, PageId, PracticeModule, QuickAction } from './types'
+import type { NavigationItem, PageId, PracticeModule } from './types'
 
 export const navigationItems: NavigationItem[] = [
   { id: 'home', label: '首页', glyph: '⌂' },
+  { id: 'training-plan', label: '训练计划', glyph: '▦' },
   { id: 'records', label: '练习记录', glyph: '□' },
   { id: 'analytics', label: '统计分析', glyph: '▥' },
-  { id: 'badges', label: '成就徽章', glyph: '◇' },
   { id: 'settings', label: '设置', glyph: '⚙' }
 ]
 
@@ -59,15 +59,9 @@ export const practiceModules: PracticeModule[] = [
   }
 ]
 
-export const quickActions: QuickAction[] = [
-  { id: 'midi-test', title: 'MIDI 测试', description: '检测设备与键盘', glyph: '▦' },
-  { id: 'metronome', title: '节拍器', description: '判定系统测试', glyph: '△' },
-  { id: 'settings', title: '设置', description: '调整软件偏好', glyph: '⚙' },
-  { id: 'help', title: '帮助中心', description: '使用说明与常见问题', glyph: '?' }
-]
-
 export const pageTitles: Record<PageId, string> = {
   home: '首页',
+  'training-plan': '稳定六级综合训练计划',
   records: '练习记录',
   analytics: '统计分析',
   badges: '成就徽章',

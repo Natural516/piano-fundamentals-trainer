@@ -3,21 +3,17 @@ import type { MidiEventRecord } from '../types'
 import { useMetronome } from '../hooks/useMetronome'
 import { useMetronomeSound } from '../hooks/useMetronomeSound'
 import { usePracticeEngine } from '../hooks/usePracticeEngine'
-import { getJudgementLabel, getToleranceMs } from '../utils/judgement'
+import { getJudgementLabel } from '../utils/judgement'
 import { midiNumberToNoteName } from '../utils/midiNotes'
 import type { TargetEvent, TestExercise, ToleranceLevel } from '../utils/practiceTypes'
 import { AppButton } from './AppButton'
+import { MetronomeVolumeControl } from './MetronomeVolumeControl'
+import { PracticeSettingsDrawer } from './PracticeSettingsDrawer'
+import { SettingsIcon } from './SettingsIcon'
 
 interface JudgementTestPageProps {
   latestMidiEvent: MidiEventRecord | null
-  onBackHome: () => void
 }
-
-const toleranceOptions: Array<{ value: ToleranceLevel; label: string }> = [
-  { value: 'loose', label: '宽松' },
-  { value: 'standard', label: '标准' },
-  { value: 'strict', label: '严格' }
-]
 
 function createTestExercises(beatMs: number): TestExercise[] {
   return [
@@ -116,11 +112,13 @@ function formatOffset(offset?: number): string {
   return `${offset > 0 ? '+' : ''}${offset}ms`
 }
 
-export function JudgementTestPage({ latestMidiEvent, onBackHome }: JudgementTestPageProps): JSX.Element {
+export function JudgementTestPage({ latestMidiEvent }: JudgementTestPageProps): JSX.Element {
   const metronome = useMetronome(60)
   const metronomeSound = useMetronomeSound(metronome)
   const [selectedExerciseId, setSelectedExerciseId] = useState('single-c4')
-  const [toleranceLevel, setToleranceLevel] = useState<ToleranceLevel>('standard')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [draftMetronomeSoundEnabled, setDraftMetronomeSoundEnabled] = useState(metronomeSound.enabled)
+  const toleranceLevel: ToleranceLevel = 'standard'
   const beatMs = 60000 / metronome.bpm
   const exercises = useMemo(() => createTestExercises(beatMs), [beatMs])
   const selectedExercise = exercises.find((exercise) => exercise.id === selectedExerciseId) ?? exercises[0]
@@ -147,6 +145,18 @@ export function JudgementTestPage({ latestMidiEvent, onBackHome }: JudgementTest
   const latestResult = practice.latestResult
   const recentResults = practice.results.slice(-6).reverse()
 
+  const openSettings = (): void => {
+    setDraftMetronomeSoundEnabled(metronomeSound.enabled)
+    setSettingsOpen(true)
+  }
+
+  const saveSettings = (): void => {
+    if (draftMetronomeSoundEnabled !== metronomeSound.enabled) {
+      void metronomeSound.setEnabled(draftMetronomeSoundEnabled)
+    }
+    setSettingsOpen(false)
+  }
+
   return (
     <section className="judgement-page">
       <header className="midi-page-header judgement-header">
@@ -155,9 +165,12 @@ export function JudgementTestPage({ latestMidiEvent, onBackHome }: JudgementTest
           <h2>节拍器与判定测试</h2>
           <p>验证 BPM、预备拍、目标事件、MIDI 输入与通用判定结果。</p>
         </div>
-        <AppButton className="secondary-inline-button" variant="secondary" onClick={onBackHome}>
-          返回首页
-        </AppButton>
+        <div className="midi-page-header__actions">
+          <MetronomeVolumeControl id="judgement-header-metronome-volume" value={metronomeSound.volume} onChange={metronomeSound.setVolume} />
+          <button className="practice-settings-trigger" type="button" aria-label="判定测试设置" title="判定测试设置" onClick={openSettings}>
+            <SettingsIcon />
+          </button>
+        </div>
       </header>
 
       <div className="judgement-grid">
@@ -200,58 +213,6 @@ export function JudgementTestPage({ latestMidiEvent, onBackHome }: JudgementTest
               onChange={(event) => metronome.setBpm(Number(event.target.value))}
             />
           </label>
-
-          <section className="metronome-sound-control" aria-label="节拍器声音设置">
-            <div className="metronome-sound-header">
-              <div>
-                <strong>节拍器声音</strong>
-                <span>
-                  {metronomeSound.enabled ? '开启' : '关闭'} / 音量 {metronomeSound.volume}%
-                </span>
-              </div>
-              <AppButton
-                className={`monitor-toggle ${metronomeSound.enabled ? 'is-on' : ''}`}
-                variant="ghost"
-                onClick={() => {
-                  void metronomeSound.setEnabled(!metronomeSound.enabled)
-                }}
-              >
-                {metronomeSound.enabled ? '开启' : '关闭'}
-              </AppButton>
-            </div>
-            <label className="metronome-volume-control" htmlFor="metronome-sound-volume">
-              <span>节拍器音量</span>
-              <strong>{metronomeSound.volume}%</strong>
-              <input
-                id="metronome-sound-volume"
-                type="range"
-                min="0"
-                max="100"
-                value={metronomeSound.volume}
-                onChange={(event) => metronomeSound.setVolume(Number(event.target.value))}
-              />
-            </label>
-            <small>
-              强拍为较高频短促点击，弱拍为较低频轻点击；此设置独立于本地监听。
-            </small>
-          </section>
-
-          <div className="tolerance-control">
-            <span>判定宽容度</span>
-            <div className="segmented-control">
-              {toleranceOptions.map((option) => (
-                <button
-                  key={option.value}
-                  className={toleranceLevel === option.value ? 'is-active' : ''}
-                  type="button"
-                  onClick={() => setToleranceLevel(option.value)}
-                >
-                  {option.label}
-                  <small>±{getToleranceMs(option.value)}ms</small>
-                </button>
-              ))}
-            </div>
-          </div>
 
           <div className="practice-control-row">
             <button
@@ -381,6 +342,13 @@ export function JudgementTestPage({ latestMidiEvent, onBackHome }: JudgementTest
           </div>
         </section>
       </div>
+
+      <PracticeSettingsDrawer isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={saveSettings} title="判定测试设置">
+        <div className="tolerance-control"><span>节拍器声音</span><div className="segmented-control">
+          <button className={draftMetronomeSoundEnabled ? 'is-active' : ''} type="button" onClick={() => setDraftMetronomeSoundEnabled(true)}>开启</button>
+          <button className={!draftMetronomeSoundEnabled ? 'is-active' : ''} type="button" onClick={() => setDraftMetronomeSoundEnabled(false)}>关闭</button>
+        </div><small>强拍为较高频短促点击，弱拍为较低频轻点击。</small></div>
+      </PracticeSettingsDrawer>
     </section>
   )
 }

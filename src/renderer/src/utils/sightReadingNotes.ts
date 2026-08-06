@@ -2,8 +2,8 @@ import { midiNumberToNoteName } from './midiNotes'
 import { getStaffPosition } from './staffPosition'
 
 export type SightReadingClef = 'treble' | 'bass'
-export type SightReadingClefMode = SightReadingClef | 'mixed'
-export type SightReadingRange = 'basic' | 'common' | 'extended'
+export type SightReadingStaffMode = SightReadingClef | 'grand'
+export type SightReadingRange = 'common' | 'extended'
 
 export interface SightReadingNote {
   midiNumber: number
@@ -17,30 +17,32 @@ export interface SightReadingNote {
 }
 
 export interface SightReadingPoolOptions {
-  clefMode: SightReadingClefMode
+  staffMode: SightReadingStaffMode
   range: SightReadingRange
 }
 
-export const CLEF_LABELS: Record<SightReadingClefMode, string> = {
+export const STAFF_MODE_LABELS: Record<SightReadingStaffMode, string> = {
+  treble: '高音谱表',
+  bass: '低音谱表',
+  grand: '大谱表'
+}
+
+export const CLEF_LABELS: Record<SightReadingClef, string> = {
   treble: '高音谱号',
-  bass: '低音谱号',
-  mixed: '双谱号随机'
+  bass: '低音谱号'
 }
 
 export const RANGE_LABELS: Record<SightReadingRange, string> = {
-  basic: '基础',
   common: '常用',
   extended: '扩展'
 }
 
 const SIGHT_READING_RANGES: Record<SightReadingClef, Record<SightReadingRange, number[]>> = {
   treble: {
-    basic: [60, 62, 64, 65, 67, 69, 71, 72],
     common: [55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79],
     extended: [48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84]
   },
   bass: {
-    basic: [48, 50, 52, 53, 55, 57, 59, 60],
     common: [41, 43, 45, 47, 48, 50, 52, 53, 55, 57, 59, 60],
     extended: [36, 38, 40, 41, 43, 45, 47, 48, 50, 52, 53, 55, 57, 59, 60]
   }
@@ -68,18 +70,20 @@ export function getSightReadingNotesForClef(clef: SightReadingClef, range: Sight
   return SIGHT_READING_RANGES[clef][range].map((midiNumber) => createNote(clef, midiNumber))
 }
 
-export function getSightReadingNotes({ clefMode, range }: SightReadingPoolOptions): SightReadingNote[] {
-  if (clefMode === 'mixed') {
-    return [
-      ...getSightReadingNotesForClef('treble', range),
-      ...getSightReadingNotesForClef('bass', range)
-    ]
+export function getSightReadingNotes({ staffMode, range }: SightReadingPoolOptions): SightReadingNote[] {
+  if (staffMode !== 'grand') {
+    return getSightReadingNotesForClef(staffMode, range)
   }
 
-  return getSightReadingNotesForClef(clefMode, range)
+  const midiNumbers = Array.from(new Set([
+    ...SIGHT_READING_RANGES.bass[range],
+    ...SIGHT_READING_RANGES.treble[range]
+  ])).sort((left, right) => left - right)
+
+  return midiNumbers.map((midiNumber) => createNote(midiNumber >= 60 ? 'treble' : 'bass', midiNumber))
 }
 
-export const SIGHT_READING_NOTES = getSightReadingNotes({ clefMode: 'treble', range: 'basic' })
+export const SIGHT_READING_NOTES = getSightReadingNotes({ staffMode: 'treble', range: 'common' })
 export const SIGHT_READING_NOTE_NUMBERS = SIGHT_READING_NOTES.map((note) => note.midiNumber)
 
 export function getSightReadingNoteByMidi(
@@ -89,38 +93,31 @@ export function getSightReadingNoteByMidi(
 ): SightReadingNote | null {
   const notes = clef
     ? getSightReadingNotesForClef(clef, range)
-    : getSightReadingNotes({ clefMode: 'mixed', range })
+    : getSightReadingNotes({ staffMode: 'grand', range })
 
   return notes.find((note) => note.midiNumber === midiNumber) ?? null
 }
 
-export function getRandomSightReadingNote(
-  options: SightReadingPoolOptions,
-  previousNote?: SightReadingNote | null
-): SightReadingNote {
-  const clefMode = options.clefMode === 'mixed'
-    ? (Math.random() > 0.5 ? 'treble' : 'bass')
-    : options.clefMode
-  const notes = getSightReadingNotesForClef(clefMode, options.range)
+export function createShuffledSightReadingBag(
+  notes: SightReadingNote[],
+  previousMidiNumber: number | null = null,
+  random: () => number = Math.random
+): SightReadingNote[] {
+  const bag = [...notes]
 
-  if (notes.length === 1) {
-    return notes[0]
+  for (let index = bag.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1))
+    ;[bag[index], bag[swapIndex]] = [bag[swapIndex], bag[index]]
   }
 
-  let nextNote = notes[Math.floor(Math.random() * notes.length)]
-  let attempts = 0
-
-  while (
-    attempts < 12 &&
-    previousNote &&
-    nextNote.midiNumber === previousNote.midiNumber &&
-    nextNote.clef === previousNote.clef
-  ) {
-    nextNote = notes[Math.floor(Math.random() * notes.length)]
-    attempts += 1
+  if (bag.length > 1 && bag[0].midiNumber === previousMidiNumber) {
+    const replacementIndex = bag.findIndex((note) => note.midiNumber !== previousMidiNumber)
+    if (replacementIndex > 0) {
+      ;[bag[0], bag[replacementIndex]] = [bag[replacementIndex], bag[0]]
+    }
   }
 
-  return nextNote
+  return bag
 }
 
 export function getMostMissedNote(errorCounts: Record<number, number>): string {
@@ -136,12 +133,8 @@ export function getMostMissedNote(errorCounts: Record<number, number>): string {
   return midiNumberToNoteName(entries[0].midiNumber)
 }
 
-export function getRangeDescription(clefMode: SightReadingClefMode, range: SightReadingRange): string {
-  if (clefMode === 'mixed') {
-    return `${RANGE_LABELS[range]}：高音谱号 ${getRangeDescription('treble', range)} / 低音谱号 ${getRangeDescription('bass', range)}`
-  }
-
-  const notes = getSightReadingNotesForClef(clefMode, range)
+export function getRangeDescription(staffMode: SightReadingStaffMode, range: SightReadingRange): string {
+  const notes = getSightReadingNotes({ staffMode, range })
   const first = notes[0]?.noteName ?? '-'
   const last = notes[notes.length - 1]?.noteName ?? '-'
 

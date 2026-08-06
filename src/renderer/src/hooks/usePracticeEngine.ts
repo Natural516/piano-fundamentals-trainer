@@ -77,13 +77,13 @@ export function usePracticeEngine({
   const resultsRef = useRef<JudgementResult[]>([])
   const finalizedTargetIdsRef = useRef<Set<string>>(new Set())
   const pendingChordRef = useRef<PendingChordInput | null>(null)
-  const lastMidiEventKeyRef = useRef('')
+  const lastMidiEventIdRef = useRef<number | null>(null)
 
   const reset = useCallback(() => {
     pendingChordRef.current = null
     finalizedTargetIdsRef.current = new Set()
     resultsRef.current = []
-    lastMidiEventKeyRef.current = ''
+    lastMidiEventIdRef.current = null
     setResults([])
   }, [])
 
@@ -145,13 +145,11 @@ export function usePracticeEngine({
     }
 
     const midiEvent = toPracticeMidiEvent(latestMidiEvent)
-    const eventKey = `${midiEvent.timestamp}-${midiEvent.type}-${midiEvent.midiNumber}-${midiEvent.velocity}-${midiEvent.deviceName}`
-
-    if (lastMidiEventKeyRef.current === eventKey || typeof midiEvent.midiNumber !== 'number') {
+    if (lastMidiEventIdRef.current === latestMidiEvent.id || typeof midiEvent.midiNumber !== 'number') {
       return
     }
 
-    lastMidiEventKeyRef.current = eventKey
+    lastMidiEventIdRef.current = latestMidiEvent.id
 
     const relativeTimeMs = midiEvent.timestamp - metronome.practiceStartTimestampMs
 

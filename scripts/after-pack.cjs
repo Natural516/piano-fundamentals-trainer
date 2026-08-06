@@ -12,8 +12,8 @@ module.exports = async (context) => {
 
   await rcedit(executablePath, {
     icon: iconPath,
-    'file-version': '0.9.0.0',
-    'product-version': '0.9.0.0',
+    'file-version': '0.9.1.0',
+    'product-version': '0.9.1.0',
     'requested-execution-level': 'asInvoker',
     'version-string': {
       CompanyName: 'Piano Fundamentals Trainer',

@@ -104,6 +104,15 @@ function normalizeRecord(value: unknown, index: number): PracticeSessionRecord |
     averageOffsetMs: typeof value.averageOffsetMs === 'number' && Number.isFinite(value.averageOffsetMs)
       ? Math.round(value.averageOffsetMs)
       : undefined,
+    contentId: typeof value.contentId === 'string' ? value.contentId : undefined,
+    contentName: typeof value.contentName === 'string' ? value.contentName : undefined,
+    difficulty: typeof value.difficulty === 'string' ? value.difficulty : undefined,
+    bpm: typeof value.bpm === 'number' && Number.isFinite(value.bpm) ? value.bpm : undefined,
+    loopCount: typeof value.loopCount === 'number' && Number.isFinite(value.loopCount)
+      ? toNonNegativeInteger(value.loopCount)
+      : undefined,
+    keySignature: typeof value.keySignature === 'string' ? value.keySignature : undefined,
+    practiceMode: typeof value.practiceMode === 'string' ? value.practiceMode : undefined,
     settings: sanitizeScalarRecord(value.settings, false) as Record<string, string | number | boolean>,
     details: sanitizeScalarRecord(value.details, true),
     mistakes: sanitizeMistakes(value.mistakes)
@@ -235,4 +244,3 @@ export function formatRelativePracticeTime(dateString: string, now = Date.now())
   const days = Math.floor(hours / 24)
   return `${days} 天前`
 }
-

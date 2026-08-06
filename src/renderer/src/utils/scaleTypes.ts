@@ -1,4 +1,5 @@
 import type { PracticeReport } from './practiceTypes'
+import type { PracticeDifficulty } from './practiceContentTypes'
 
 export type MajorScaleKey =
   | 'C'
@@ -20,6 +21,27 @@ export type ScalePracticeMode =
   | 'right-up-down'
   | 'left-up-down'
   | 'both-ascending'
+  | 'right-descending'
+  | 'left-descending'
+  | 'right-continuous'
+  | 'left-continuous'
+  | 'right-speed'
+
+export type ScaleRange = 'one-octave' | 'two-octave'
+export type ScaleNotesPerBeat = 1 | 2 | 4
+
+export interface ScalePracticeModeDefinition {
+  id: ScalePracticeMode
+  name: string
+  description: string
+  difficulty: PracticeDifficulty
+}
+
+export interface ScaleSequenceOptions {
+  range?: ScaleRange
+  loopCount?: number
+  notesPerBeat?: ScaleNotesPerBeat
+}
 
 export interface MajorScalePattern {
   key: MajorScaleKey
@@ -42,6 +64,11 @@ export interface ScalePracticeReport extends PracticeReport {
   keyName: string
   modeName: string
   bpm: number
+  targetBpm: number
+  loopCount: number
+  completedNotes: number
+  range: ScaleRange
+  notesPerBeat: ScaleNotesPerBeat
   totalNotes: number
   bestStreak: number
   mostMissedNote: string

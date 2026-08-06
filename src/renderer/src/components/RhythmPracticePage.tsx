@@ -1,56 +1,65 @@
-import { useCallback } from 'react'
-import type { MidiEventRecord } from '../types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ActiveMidiNote, MidiEventRecord } from '../types'
+import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { useRhythmPractice } from '../hooks/useRhythmPractice'
 import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
-import { getJudgementLabel, getToleranceMs } from '../utils/judgement'
+import { getJudgementLabel } from '../utils/judgement'
 import { midiNumberToNoteName } from '../utils/midiNotes'
-import type { JudgementResult, TargetEvent, ToleranceLevel } from '../utils/practiceTypes'
-import { RHYTHM_MEASURE_COUNT, RHYTHM_PRACTICE_NOTE } from '../utils/rhythmPatterns'
+import type { JudgementResult, TargetEvent } from '../utils/practiceTypes'
+import { RHYTHM_BEATS_PER_MEASURE, RHYTHM_CATEGORY_LABELS, RHYTHM_MEASURE_COUNT, RHYTHM_PRACTICE_NOTE } from '../utils/rhythmPatterns'
+import { PRACTICE_DIFFICULTY_LABELS } from '../utils/practiceContentTypes'
+import type { RhythmCategory } from '../utils/rhythmTypes'
 import { createRhythmRecord } from '../utils/practiceRecordAdapters'
 import type { PracticeSessionTiming } from '../utils/practiceRecordTypes'
 import { AppButton } from './AppButton'
+import { FullKeyboard } from './FullKeyboard'
+import { MetronomeVolumeControl } from './MetronomeVolumeControl'
+import { PracticeFeedbackNotice } from './PracticeFeedbackNotice'
+import { PracticePageHeader } from './PracticePageHeader'
+import { PracticeReportModal } from './PracticeReportModal'
+import { PracticeSettingsDrawer } from './PracticeSettingsDrawer'
+import { PracticeStatBar } from './PracticeStatBar'
 
 interface RhythmPracticePageProps {
+  activeNotes: ActiveMidiNote[]
+  exitPromptOpen: boolean
   latestMidiEvent: MidiEventRecord | null
   onBackHome: () => void
+  onPracticeRunningChange: (running: boolean) => void
 }
 
-const toleranceOptions: Array<{ value: ToleranceLevel; label: string }> = [
-  { value: 'loose', label: '宽松' },
-  { value: 'standard', label: '标准' },
-  { value: 'strict', label: '严格' }
-]
+const rhythmCategories = Object.keys(RHYTHM_CATEGORY_LABELS) as RhythmCategory[]
 
 function formatTarget(target: TargetEvent | null): string {
-  if (!target) {
-    return '等待开始'
-  }
-
-  if (target.type === 'rest') {
-    return '休止'
-  }
-
+  if (!target) return '等待开始'
+  if (target.type === 'rest') return '休止'
   return target.notes.map(midiNumberToNoteName).join(' / ')
 }
 
 function formatOffset(offset?: number): string {
-  if (typeof offset !== 'number') {
-    return '-'
-  }
-
+  if (typeof offset !== 'number') return '-'
   return `${offset > 0 ? '+' : ''}${offset}ms`
 }
 
 function formatLatestResult(result: JudgementResult | null): string {
-  if (!result) {
-    return '暂无判定'
-  }
-
-  return getJudgementLabel(result.type)
+  return result ? getJudgementLabel(result.type) : '暂无判定'
 }
 
-export function RhythmPracticePage({ latestMidiEvent, onBackHome }: RhythmPracticePageProps): JSX.Element {
+export function RhythmPracticePage({
+  activeNotes,
+  exitPromptOpen,
+  latestMidiEvent,
+  onBackHome,
+  onPracticeRunningChange
+}: RhythmPracticePageProps): JSX.Element {
   const rhythm = useRhythmPractice(latestMidiEvent)
+  const { showVirtualKeyboard, setShowVirtualKeyboard } = useDisplayPreferences('rhythm')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [draftPatternId, setDraftPatternId] = useState(rhythm.selectedPatternId)
+  const [draftBpm, setDraftBpm] = useState(rhythm.bpm)
+  const [draftMetronomeSoundEnabled, setDraftMetronomeSoundEnabled] = useState(rhythm.metronomeSound.enabled)
+  const [draftShowVirtualKeyboard, setDraftShowVirtualKeyboard] = useState(showVirtualKeyboard)
+  const pausedForExitRef = useRef(false)
   const createRecord = useCallback(
     (timing: PracticeSessionTiming) => createRhythmRecord({
       timing,
@@ -58,230 +67,218 @@ export function RhythmPracticePage({ latestMidiEvent, onBackHome }: RhythmPracti
       patternId: rhythm.selectedPatternId,
       patternName: rhythm.selectedPattern.name,
       bpm: rhythm.bpm,
-      tolerance: rhythm.toleranceLevel
+      tolerance: rhythm.toleranceLevel,
+      difficulty: rhythm.selectedPattern.difficulty
     }),
-    [rhythm.bpm, rhythm.report, rhythm.selectedPattern.name, rhythm.selectedPatternId, rhythm.toleranceLevel]
+    [rhythm.bpm, rhythm.report, rhythm.selectedPattern.difficulty, rhythm.selectedPattern.name, rhythm.selectedPatternId, rhythm.toleranceLevel]
   )
   const recorder = usePracticeSessionRecorder(rhythm.isComplete, createRecord)
+  const settingsLocked = rhythm.metronome.status !== 'idle' && !rhythm.isComplete
+  const practiceActive = settingsLocked
+
+  useEffect(() => {
+    onPracticeRunningChange(practiceActive)
+  }, [onPracticeRunningChange, practiceActive])
+
+  useEffect(() => () => onPracticeRunningChange(false), [onPracticeRunningChange])
+
+  useEffect(() => {
+    if (!practiceActive) {
+      pausedForExitRef.current = false
+      return
+    }
+
+    if (exitPromptOpen && rhythm.metronome.status === 'running') {
+      pausedForExitRef.current = true
+      rhythm.pause()
+    } else if (!exitPromptOpen && pausedForExitRef.current) {
+      pausedForExitRef.current = false
+      rhythm.start()
+    }
+  }, [exitPromptOpen, practiceActive, rhythm.metronome.status, rhythm.pause, rhythm.start])
+
   const startPractice = (): void => {
+    setSettingsOpen(false)
     if (rhythm.isComplete) {
       recorder.beginSession()
       rhythm.restart()
       return
     }
-
     if (rhythm.metronome.status !== 'paused') recorder.beginSession()
     rhythm.start()
   }
+
   const restartPractice = (): void => {
+    setSettingsOpen(false)
     recorder.beginSession()
     rhythm.restart()
   }
+
+  const openSettings = (): void => {
+    setDraftPatternId(rhythm.selectedPatternId)
+    setDraftBpm(rhythm.bpm)
+    setDraftMetronomeSoundEnabled(rhythm.metronomeSound.enabled)
+    setDraftShowVirtualKeyboard(showVirtualKeyboard)
+    setSettingsOpen(true)
+  }
+
+  const saveSettings = (): void => {
+    rhythm.setSelectedPatternId(draftPatternId)
+    rhythm.setBpm(draftBpm)
+    if (draftMetronomeSoundEnabled !== rhythm.metronomeSound.enabled) {
+      void rhythm.metronomeSound.setEnabled(draftMetronomeSoundEnabled)
+    }
+    setShowVirtualKeyboard(draftShowVirtualKeyboard)
+    setSettingsOpen(false)
+  }
+
   const latestResult = rhythm.latestResult?.result ?? null
   const noteName = midiNumberToNoteName(RHYTHM_PRACTICE_NOTE)
+  const practiceNoteNames = Array.from(new Set(
+    rhythm.selectedPattern.beats.flatMap((beat) => beat.notes ?? (beat.type === 'note' ? [RHYTHM_PRACTICE_NOTE] : []))
+  )).map(midiNumberToNoteName).join(' / ') || noteName
+  const settingsSummary = `4/4 · ${RHYTHM_CATEGORY_LABELS[rhythm.selectedPattern.category]} · ${rhythm.selectedPattern.name} · ${rhythm.bpm} BPM · ${PRACTICE_DIFFICULTY_LABELS[rhythm.selectedPattern.difficulty]}`
+  const patternMeasureSpan = (rhythm.selectedPattern.lengthBeats ?? RHYTHM_BEATS_PER_MEASURE) / RHYTHM_BEATS_PER_MEASURE
+  const totalMeasures = RHYTHM_MEASURE_COUNT * patternMeasureSpan
+  const rhythmGridStyle = { gridTemplateColumns: rhythm.cells.map((cell) => `${cell.duration}fr`).join(' ') }
+  const targetNotes = rhythm.currentTarget?.notes ?? []
+  const correctNotes = latestResult?.type === 'correct' ? latestResult.inputNotes : []
+  const wrongNotes = latestResult && latestResult.type !== 'correct' ? latestResult.inputNotes : []
+  const judgedCount = rhythm.report.correct + rhythm.report.wrongNote + rhythm.report.missingNote +
+    rhythm.report.extraNote + rhythm.report.early + rhythm.report.late + rhythm.report.restError + rhythm.report.extraInput
 
   return (
-    <section className="rhythm-page">
-      <header className="midi-page-header rhythm-page-header">
-        <div>
-          <span className="eyebrow">Rhythm Practice</span>
-          <h2>节奏与切分</h2>
-          <p>4/4 拍 · 节奏稳定性训练</p>
-        </div>
-        <AppButton className="secondary-inline-button" variant="secondary" onClick={onBackHome}>
-          返回首页
-        </AppButton>
-      </header>
+    <section className="rhythm-page practice-workspace-page">
+      <PracticePageHeader
+        controls={<MetronomeVolumeControl id="rhythm-header-metronome-volume" value={rhythm.metronomeSound.volume} onChange={rhythm.metronomeSound.setVolume} />}
+        eyebrow="Rhythm Practice"
+        onOpenSettings={openSettings}
+        summary={settingsSummary}
+        title="节奏与切分"
+      />
 
-      <div className="rhythm-grid-layout">
-        <section className="midi-panel rhythm-panel rhythm-settings-panel">
+      <div className="practice-single-column">
+        <section className="midi-panel rhythm-panel practice-primary-panel">
           <div className="panel-title-row">
             <div>
-              <h3>练习设置</h3>
-              <p>第一版固定使用 C4，软件只判断按键时机。</p>
-            </div>
-          </div>
-
-          <label className="midi-select-label" htmlFor="rhythm-pattern-select">
-            当前节奏模板
-          </label>
-          <select
-            id="rhythm-pattern-select"
-            className="midi-select"
-            disabled={rhythm.isRunning}
-            value={rhythm.selectedPatternId}
-            onChange={(event) => rhythm.setSelectedPatternId(event.target.value)}
-          >
-            {rhythm.patterns.map((pattern) => (
-              <option key={pattern.id} value={pattern.id}>
-                {pattern.name}
-              </option>
-            ))}
-          </select>
-          <p className="judgement-help">{rhythm.selectedPattern.description}</p>
-
-          <label className="bpm-control" htmlFor="rhythm-bpm-input">
-            <div>
-              <span>BPM</span>
-              <strong>{rhythm.bpm}</strong>
-            </div>
-            <input
-              id="rhythm-bpm-input"
-              type="range"
-              min="40"
-              max="200"
-              disabled={rhythm.isRunning}
-              value={rhythm.bpm}
-              onChange={(event) => rhythm.setBpm(Number(event.target.value))}
-            />
-          </label>
-
-          <div className="tolerance-control">
-            <span>判定宽容度</span>
-            <div className="segmented-control">
-              {toleranceOptions.map((option) => (
-                <button
-                  key={option.value}
-                  className={rhythm.toleranceLevel === option.value ? 'is-active' : ''}
-                  disabled={rhythm.isRunning}
-                  type="button"
-                  onClick={() => rhythm.setToleranceLevel(option.value)}
-                >
-                  {option.label}
-                  <small>±{getToleranceMs(option.value)}ms</small>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="practice-control-row">
-            <AppButton className="primary-button rhythm-action-button" onClick={startPractice}>
-              {rhythm.metronome.status === 'paused' ? '继续练习' : '开始练习'}
-            </AppButton>
-            <AppButton className="ghost-button" variant="secondary" onClick={rhythm.pause}>
-              暂停
-            </AppButton>
-            <AppButton className="ghost-button" variant="secondary" onClick={rhythm.stop}>
-              停止
-            </AppButton>
-            <AppButton className="ghost-button" variant="secondary" onClick={restartPractice}>
-              重新开始
-            </AppButton>
-          </div>
-          {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
-        </section>
-
-        <section className="midi-panel rhythm-panel">
-          <div className="panel-title-row">
-            <div>
-              <h3>节拍器状态</h3>
-              <p>一小节预备拍后进入正式练习。</p>
+              <h3>节拍器与当前目标</h3>
+              <p>一小节预备拍后进入正式练习，本模板使用 {practiceNoteNames}。</p>
             </div>
             <span className={`audio-status-badge status-${rhythm.metronome.status === 'running' ? 'ready' : 'suspended'}`}>
               {rhythm.metronome.status === 'running' ? '运行中' : rhythm.metronome.status === 'paused' ? '已暂停' : '未开始'}
             </span>
           </div>
 
-          <div className="metronome-display">
-            <div>
-              <span>{rhythm.metronome.isCountingIn ? '预备拍' : '当前小节'}</span>
-              <strong>
-                {rhythm.metronome.isCountingIn
-                  ? `${rhythm.metronome.countInBeat} / 4`
-                  : `${rhythm.metronome.currentMeasure || 1} / ${RHYTHM_MEASURE_COUNT}`}
-              </strong>
+          <div className="rhythm-live-row">
+            <div className="rhythm-clock-card">
+              <div className="metronome-display">
+                <div>
+                  <span>{rhythm.metronome.isCountingIn ? '预备拍' : '当前小节'}</span>
+                  <strong>{rhythm.metronome.isCountingIn ? `${rhythm.metronome.countInBeat} / 4` : `${rhythm.metronome.currentMeasure || 1} / ${RHYTHM_MEASURE_COUNT}`}</strong>
+                </div>
+                <div><span>当前拍</span><strong>{rhythm.metronome.currentBeat}</strong></div>
+              </div>
+
+              <div className="beat-dots" aria-label="当前拍点">
+                {[1, 2, 3, 4].map((beat) => (
+                  <span key={beat} className={`${rhythm.metronome.currentBeat === beat ? 'is-active' : ''} ${rhythm.metronome.isCountingIn ? 'is-count-in' : ''}`}>{beat}</span>
+                ))}
+              </div>
             </div>
-            <div>
-              <span>当前拍</span>
-              <strong>{rhythm.metronome.currentBeat}</strong>
+            <div className="current-target-card practice-current-target">
+              <span>当前目标</span>
+              <strong>{rhythm.isComplete ? '练习结束' : rhythm.currentTarget ? formatTarget(rhythm.currentTarget) : noteName}</strong>
+              <small>{rhythm.currentTarget?.label || (rhythm.metronome.isCountingIn ? '预备拍进行中' : `练习音：${noteName}`)}</small>
             </div>
           </div>
 
-          <div className="beat-dots" aria-label="当前拍点">
-            {[1, 2, 3, 4].map((beat) => (
-              <span
-                key={beat}
-                className={`${rhythm.metronome.currentBeat === beat ? 'is-active' : ''} ${rhythm.metronome.isCountingIn ? 'is-count-in' : ''}`}
-              >
-                {beat}
-              </span>
-            ))}
-          </div>
+          {latestResult ? (
+            <PracticeFeedbackNotice
+              detail={`${latestResult.message} / offset ${formatOffset(latestResult.timeOffsetMs)}`}
+              label="最近结果"
+              resultType={latestResult.type}
+              title={formatLatestResult(latestResult)}
+            />
+          ) : null}
 
-          <div className="current-target-card">
-            <span>当前目标</span>
-            <strong>{rhythm.isComplete ? '练习结束' : formatTarget(rhythm.currentTarget)}</strong>
-            <small>{rhythm.currentTarget?.label || (rhythm.metronome.isCountingIn ? '等待预备拍结束' : `练习音：${noteName}`)}</small>
+          <div className="practice-primary-actions">
+              {rhythm.metronome.status === 'idle' || rhythm.isComplete ? <AppButton onClick={startPractice}>开始练习</AppButton> : null}
+              {rhythm.metronome.status === 'running' ? <AppButton variant="secondary" onClick={rhythm.pause}>暂停</AppButton> : null}
+              {rhythm.metronome.status === 'paused' ? <AppButton onClick={startPractice}>继续练习</AppButton> : null}
+              {practiceActive ? <AppButton variant="secondary" onClick={rhythm.stop}>停止</AppButton> : null}
+              {practiceActive ? <AppButton variant="ghost" onClick={restartPractice}>重新开始</AppButton> : null}
           </div>
+          {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
         </section>
+
+        <PracticeStatBar items={[
+          { label: '当前小节', value: rhythm.metronome.status === 'idle' ? '—' : `${Math.min(rhythm.metronome.currentMeasure || 1, totalMeasures)} / ${totalMeasures}` },
+          { label: '正确', value: rhythm.report.correct },
+          { label: '早弹', value: rhythm.report.early },
+          { label: '晚弹', value: rhythm.report.late },
+          { label: '漏弹', value: rhythm.report.missingNote },
+          { label: '多余', value: rhythm.report.extraNote + rhythm.report.extraInput },
+          { label: '正确率', value: judgedCount > 0 ? `${rhythm.report.accuracy}%` : '—' }
+        ]} />
 
         <section className="midi-panel rhythm-panel rhythm-pattern-panel">
           <div className="panel-title-row">
-            <div>
-              <h3>节奏格子</h3>
-              <p>{rhythm.selectedPattern.name} · {RHYTHM_MEASURE_COUNT} 小节 · 练习音 {noteName}</p>
-            </div>
+            <div><h3>节奏格子</h3><p>{rhythm.selectedPattern.name} · {totalMeasures} 小节 · {practiceNoteNames}</p></div>
           </div>
-
           <div className={`rhythm-pattern-grid rhythm-${rhythm.selectedPattern.subdivision}`}>
-            <div className="rhythm-grid-row rhythm-label-row">
-              {rhythm.cells.map((cell, index) => (
-                <span key={cell.id} className={rhythm.currentCellIndex === index ? 'is-active' : ''}>
-                  {cell.label}
-                </span>
-              ))}
+            <div className="rhythm-grid-row rhythm-label-row" style={rhythmGridStyle}>
+              {rhythm.cells.map((cell, index) => <span key={cell.id} className={rhythm.currentCellIndex === index ? 'is-active' : ''}>{cell.label}</span>)}
             </div>
-            <div className="rhythm-grid-row rhythm-symbol-row">
+            <div className="rhythm-grid-row rhythm-symbol-row" style={rhythmGridStyle}>
               {rhythm.cells.map((cell, index) => (
-                <span
-                  key={`${cell.id}-symbol`}
-                  className={`${cell.type === 'note' ? 'is-note' : 'is-rest'} ${rhythm.currentCellIndex === index ? 'is-active' : ''}`}
-                >
-                  {cell.type === 'note' ? '●' : '空'}
+                <span key={`${cell.id}-symbol`} className={`${cell.type === 'note' ? 'is-note' : 'is-rest'} ${rhythm.currentCellIndex === index ? 'is-active' : ''}`}>
+                  {cell.type === 'note' ? (cell.symbol ?? '●') : '空'}
                 </span>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="midi-panel rhythm-panel rhythm-result-panel">
-          <div className="panel-title-row">
-            <div>
-              <h3>实时判定</h3>
-              <p>只读取 MIDI noteOn，noteOff 不参与节奏判定。</p>
-            </div>
-          </div>
+        {showVirtualKeyboard ? (
+          <section className="midi-panel rhythm-panel practice-keyboard-panel">
+            <div className="panel-title-row"><div><h3>虚拟钢琴键盘</h3><p>当前目标音淡色高亮，实际 MIDI 输入保持实时显示。</p></div></div>
+            <FullKeyboard activeNotes={activeNotes} correctNotes={correctNotes} targetNotes={targetNotes} wrongNotes={wrongNotes} />
+          </section>
+        ) : null}
 
-          <div className={`latest-judgement ${latestResult ? `result-${latestResult.type}` : ''}`}>
-            <span>最近结果</span>
-            <strong>{formatLatestResult(latestResult)}</strong>
-            <small>{latestResult ? `${latestResult.message} / offset ${formatOffset(latestResult.timeOffsetMs)}` : '开始后按 C4 跟随节拍器'}</small>
-          </div>
+      </div>
 
-          <div className="judgement-result-list rhythm-result-list">
-            {rhythm.recentResults.length > 0 ? (
-              rhythm.recentResults.map(({ result, source }) => (
-                <article key={`${source}-${result.id}`} className={`judgement-result-item result-${result.type}`}>
-                  <span>{getJudgementLabel(result.type)}</span>
-                  <strong>{result.target.label || result.target.id}</strong>
-                  <small>{formatOffset(result.timeOffsetMs)}</small>
-                </article>
-              ))
-            ) : (
-              <div className="empty-midi-state compact">暂无判定结果</div>
-            )}
-          </div>
-        </section>
+      <PracticeSettingsDrawer isLocked={settingsLocked} isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={saveSettings} title="节奏练习设置">
+        <label className="midi-field" htmlFor="rhythm-pattern-select">
+          <span>当前节奏模板</span>
+          <select id="rhythm-pattern-select" className="midi-select" disabled={settingsLocked} value={draftPatternId} onChange={(event) => setDraftPatternId(event.target.value)}>
+            {rhythmCategories.map((category) => (
+              <optgroup key={category} label={RHYTHM_CATEGORY_LABELS[category]}>
+                {rhythm.patterns.filter((pattern) => pattern.category === category).map((pattern) => (
+                  <option key={pattern.id} value={pattern.id}>{pattern.name} · {PRACTICE_DIFFICULTY_LABELS[pattern.difficulty]}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        <p className="judgement-help">{rhythm.patterns.find((pattern) => pattern.id === draftPatternId)?.description}</p>
+        <label className="bpm-control" htmlFor="rhythm-bpm-input">
+          <div><span>BPM</span><strong>{draftBpm}</strong></div>
+          <input id="rhythm-bpm-input" type="range" min="40" max="200" disabled={settingsLocked} value={draftBpm} onChange={(event) => setDraftBpm(Number(event.target.value))} />
+        </label>
+        <div className="tolerance-control"><span>节拍器声音</span><div className="segmented-control">
+          <button className={draftMetronomeSoundEnabled ? 'is-active' : ''} disabled={settingsLocked} type="button" onClick={() => setDraftMetronomeSoundEnabled(true)}>开启</button>
+          <button className={!draftMetronomeSoundEnabled ? 'is-active' : ''} disabled={settingsLocked} type="button" onClick={() => setDraftMetronomeSoundEnabled(false)}>关闭</button>
+        </div></div>
+        <div className="tolerance-control"><span>显示虚拟键盘</span><div className="segmented-control">
+          <button className={draftShowVirtualKeyboard ? 'is-active' : ''} disabled={settingsLocked} type="button" onClick={() => setDraftShowVirtualKeyboard(true)}>显示</button>
+          <button className={!draftShowVirtualKeyboard ? 'is-active' : ''} disabled={settingsLocked} type="button" onClick={() => setDraftShowVirtualKeyboard(false)}>隐藏</button>
+        </div></div>
+      </PracticeSettingsDrawer>
 
-        <section className="midi-panel rhythm-panel report-panel rhythm-report-panel">
-          <div className="panel-title-row">
-            <div>
-              <h3>练习报告</h3>
-              <p>{rhythm.isComplete ? '节奏练习完成。' : '练习中会实时汇总当前统计。'}</p>
-            </div>
-            <span className="log-count-badge">{rhythm.report.correct}/{rhythm.report.totalTargets}</span>
-          </div>
-
+      {rhythm.isComplete ? (
+        <PracticeReportModal title="节奏练习完成">
+          <p className="practice-report-summary">{settingsSummary}</p>
           <div className="report-grid">
             <div><span>总节奏事件</span><strong>{rhythm.report.totalTargets}</strong></div>
             <div><span>正确次数</span><strong>{rhythm.report.correct}</strong></div>
@@ -293,38 +290,12 @@ export function RhythmPracticePage({ latestMidiEvent, onBackHome }: RhythmPracti
             <div><span>平均偏移</span><strong>{rhythm.report.averageOffsetMs}ms</strong></div>
             <div><span>节奏准确率</span><strong>{rhythm.report.accuracy}%</strong></div>
           </div>
-        </section>
-
-        <section className="midi-panel rhythm-panel rhythm-sound-panel">
-          <div className="metronome-sound-header">
-            <div>
-              <strong>节拍器声音</strong>
-              <span>{rhythm.metronomeSound.enabled ? '开启' : '关闭'} / 音量 {rhythm.metronomeSound.volume}%</span>
-            </div>
-            <AppButton
-              className={`monitor-toggle ${rhythm.metronomeSound.enabled ? 'is-on' : ''}`}
-              variant="ghost"
-              onClick={() => {
-                void rhythm.metronomeSound.setEnabled(!rhythm.metronomeSound.enabled)
-              }}
-            >
-              {rhythm.metronomeSound.enabled ? '开启' : '关闭'}
-            </AppButton>
+          <div className="practice-report-actions">
+            <AppButton onClick={restartPractice}>再练一次</AppButton>
+            <AppButton variant="secondary" onClick={onBackHome}>返回首页</AppButton>
           </div>
-          <label className="metronome-volume-control" htmlFor="rhythm-metronome-volume">
-            <span>节拍器音量</span>
-            <strong>{rhythm.metronomeSound.volume}%</strong>
-            <input
-              id="rhythm-metronome-volume"
-              type="range"
-              min="0"
-              max="100"
-              value={rhythm.metronomeSound.volume}
-              onChange={(event) => rhythm.metronomeSound.setVolume(Number(event.target.value))}
-            />
-          </label>
-        </section>
-      </div>
+        </PracticeReportModal>
+      ) : null}
     </section>
   )
 }

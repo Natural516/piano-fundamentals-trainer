@@ -2,7 +2,7 @@
 
 钢琴基本功训练器是一个基于 Electron、React 和 TypeScript 的 Windows 桌面练习软件。
 
-当前测试版本：`0.9.0-beta`
+当前测试版本：`0.9.1-beta`
 
 ## 已实现功能
 
@@ -61,8 +61,8 @@ npm run dist
 
 ```text
 release/
-├─ 钢琴基本功训练器-Setup-0.9.0-beta.exe
-├─ 钢琴基本功训练器-Portable-0.9.0-beta.exe
+├─ 钢琴基本功训练器-Setup-0.9.1-beta.exe
+├─ 钢琴基本功训练器-Portable-0.9.1-beta.exe
 └─ win-unpacked/
 ```
 
@@ -74,4 +74,4 @@ release/
 
 ## 临时程序图标
 
-当前 `build/icon.ico` 是用于 `0.9.0-beta` 构建的临时程序图标，生成脚本为 `scripts/generate-app-icon.py`。它与首页六个练习模块图标无关，后续可直接替换正式 ICO。
+当前 `build/icon.ico` 是用于 `0.9.1-beta` 构建的临时程序图标，生成脚本为 `scripts/generate-app-icon.py`。它与首页六个练习模块图标无关，后续可直接替换正式 ICO。

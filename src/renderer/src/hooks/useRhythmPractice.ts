@@ -85,7 +85,7 @@ export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseR
   const [toleranceLevel, setToleranceLevelState] = useState<ToleranceLevel>('standard')
   const [extraResults, setExtraResults] = useState<JudgementResult[]>([])
   const extraResultsRef = useRef<JudgementResult[]>([])
-  const lastExtraEventKeyRef = useRef('')
+  const lastExtraEventIdRef = useRef<number | null>(null)
 
   const selectedPattern = useMemo(() => getRhythmPatternById(selectedPatternId), [selectedPatternId])
   const cells = useMemo(() => getRhythmGridCells(selectedPattern), [selectedPattern])
@@ -102,7 +102,7 @@ export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseR
 
   const resetExtraResults = useCallback(() => {
     extraResultsRef.current = []
-    lastExtraEventKeyRef.current = ''
+    lastExtraEventIdRef.current = null
     setExtraResults([])
   }, [])
 
@@ -189,13 +189,11 @@ export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseR
       return
     }
 
-    const eventKey = `${latestMidiEvent.timestamp}-${latestMidiEvent.type}-${latestMidiEvent.midiNumber}-${latestMidiEvent.velocity}-${latestMidiEvent.deviceName}`
-
-    if (lastExtraEventKeyRef.current === eventKey) {
+    if (lastExtraEventIdRef.current === latestMidiEvent.id) {
       return
     }
 
-    lastExtraEventKeyRef.current = eventKey
+    lastExtraEventIdRef.current = latestMidiEvent.id
 
     const relativeTimeMs = latestMidiEvent.timestamp - metronome.practiceStartTimestampMs
 
@@ -262,11 +260,12 @@ export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseR
       return -1
     }
 
-    const beatPosition = (metronome.practiceElapsedMs / metronome.beatDurationMs) % RHYTHM_BEATS_PER_MEASURE
+    const patternLengthBeats = selectedPattern.lengthBeats ?? RHYTHM_BEATS_PER_MEASURE
+    const beatPosition = (metronome.practiceElapsedMs / metronome.beatDurationMs) % patternLengthBeats
     const currentIndex = cells.findIndex((cell) => beatPosition >= cell.position && beatPosition < cell.position + cell.duration)
 
     return currentIndex >= 0 ? currentIndex : cells.length - 1
-  }, [cells, metronome.beatDurationMs, metronome.isCountingIn, metronome.practiceElapsedMs, metronome.status])
+  }, [cells, metronome.beatDurationMs, metronome.isCountingIn, metronome.practiceElapsedMs, metronome.status, selectedPattern.lengthBeats])
 
   const displayResults = useMemo<RhythmDisplayResult[]>(
     () => [

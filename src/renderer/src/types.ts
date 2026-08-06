@@ -4,6 +4,7 @@ export type PageId =
   | 'analytics'
   | 'badges'
   | 'settings'
+  | 'training-plan'
   | 'sight-reading'
   | 'rhythm'
   | 'scales'
@@ -32,13 +33,6 @@ export interface PracticeModule {
   accent: AccentKind
 }
 
-export interface QuickAction {
-  id: PageId
-  title: string
-  description: string
-  glyph: string
-}
-
 export type MidiEventType = 'noteOn' | 'noteOff' | 'controlChange'
 export type MidiPermissionStatus = 'unknown' | 'prompt' | 'granted' | 'denied' | 'unsupported' | 'error'
 export type MidiConnectionState = 'disconnected' | 'pending' | 'connected'
@@ -52,6 +46,7 @@ export interface MidiInputDevice {
 }
 
 export interface MidiEventRecord {
+  id: number
   type: MidiEventType
   timestamp: number
   deviceName: string

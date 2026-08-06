@@ -1,6 +1,6 @@
 {
   "name": "piano-fundamentals-trainer",
-  "version": "0.9.0-beta",
+  "version": "0.9.1-beta",
   "description": "钢琴基本功训练器：MIDI 输入、节拍器及五个基本功练习模块。",
   "productName": "钢琴基本功训练器",
   "author": "Piano Fundamentals Trainer",

@@ -1,39 +1,31 @@
 :root {
-  --bg-main: #070b16;
-  --bg-panel: #0b1020;
-  --bg-card: rgba(17, 24, 39, 0.92);
-  --bg-card-hover: rgba(24, 34, 52, 0.96);
+  --bg-main: var(--bg-app);
+  --border-active: var(--border-strong);
+  --text-main: var(--text-primary);
 
-  --border-soft: rgba(148, 163, 184, 0.16);
-  --border-active: rgba(129, 140, 248, 0.34);
+  --purple: var(--module-sight-reading);
+  --blue: var(--module-rhythm);
+  --cyan: var(--module-scale);
+  --gold: var(--module-chord);
+  --pink: var(--module-coordination);
+  --indigo: var(--module-free-practice);
+  --green: var(--success);
+  --red: var(--danger);
 
-  --text-main: #f4f7ff;
-  --text-secondary: #a7b0cc;
-  --text-muted: #6f7a99;
-
-  --purple: #7c5cff;
-  --blue: #3b82f6;
-  --cyan: #25d6c8;
-  --gold: #d6a93a;
-  --pink: #e75ca8;
-  --green: #32d583;
-  --red: #f97066;
-
-  --bg: var(--bg-main);
-  --bg-deep: #050812;
+  --bg: var(--bg-app);
+  --bg-deep: var(--bg-sidebar);
   --panel: var(--bg-card);
-  --panel-strong: var(--bg-card);
-  --panel-soft: rgba(17, 24, 39, 0.72);
+  --panel-strong: var(--bg-elevated);
+  --panel-soft: var(--bg-soft);
   --line: var(--border-soft);
-  --line-strong: var(--border-active);
-  --text: var(--text-main);
-  --text-strong: var(--text-main);
+  --line-strong: var(--border-strong);
+  --text: var(--text-primary);
+  --text-strong: var(--text-primary);
   --muted: var(--text-secondary);
-  --soft: #c8d1e9;
-  --violet: var(--purple);
-  --amber: var(--gold);
-  --rose: var(--pink);
-  --indigo: #6978ff;
-  --shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+  --soft: var(--text-secondary);
+  --violet: var(--accent-primary);
+  --amber: var(--warning);
+  --rose: var(--module-coordination);
+  --shadow: var(--shadow-elevated);
   --card-radius: 16px;
 }

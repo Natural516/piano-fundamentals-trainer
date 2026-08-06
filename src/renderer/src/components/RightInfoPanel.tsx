@@ -20,16 +20,19 @@ const moduleTones: Record<PracticeModule, string> = {
 }
 
 export function RightInfoPanel({ recentRecords, todayStats }: RightInfoPanelProps): JSX.Element {
-  const ringStyle = { '--progress': `${todayStats.accuracy}%` } as CSSProperties
+  const hasTodayData = todayStats.completedSessions > 0
+  const ringStyle = { '--progress': `${hasTodayData ? todayStats.accuracy : 0}%` } as CSSProperties
 
   return (
     <aside className="right-panel" aria-label="练习信息">
       <AppCard as="section" className="info-card today-card">
         <h3>今日练习统计</h3>
         <div className="today-stat-layout">
-          <div className="progress-ring" aria-label={`今日正确率 ${todayStats.accuracy}%`} style={ringStyle}>
-            <span>{todayStats.accuracy}%</span>
-            <small>正确率</small>
+          <div className={`progress-ring ${hasTodayData ? '' : 'is-empty'}`} aria-label={hasTodayData ? `今日正确率 ${todayStats.accuracy}%` : '今日暂无练习数据'} style={ringStyle}>
+            <div className="progress-ring-center">
+              <strong>{hasTodayData ? `${todayStats.accuracy}%` : '—'}</strong>
+              <span>{hasTodayData ? '正确率' : '暂无数据'}</span>
+            </div>
           </div>
           <dl className="stat-list">
             <div>
@@ -42,7 +45,7 @@ export function RightInfoPanel({ recentRecords, todayStats }: RightInfoPanelProp
             </div>
             <div>
               <dt>正确率</dt>
-              <dd>{todayStats.accuracy}%</dd>
+              <dd>{hasTodayData ? `${todayStats.accuracy}%` : '—'}</dd>
             </div>
           </dl>
         </div>

@@ -1,14 +1,15 @@
 import { useState } from 'react'
-import type { UseAudioEngineResult } from '../hooks/useAudioEngine'
+import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import type { UseMidiResult } from '../hooks/useMidi'
 import type { ActiveMidiNote, MidiEventRecord } from '../types'
 import { AppButton } from './AppButton'
+import { EventLogIcon } from './EventLogIcon'
 import { FullKeyboard } from './FullKeyboard'
+import { PracticeSettingsDrawer } from './PracticeSettingsDrawer'
+import { SettingsIcon } from './SettingsIcon'
 
 interface MidiTestPageProps {
   midi: UseMidiResult
-  audioEngine: UseAudioEngineResult
-  onBackHome: () => void
 }
 
 function formatEventTime(timestamp: number): string {
@@ -31,69 +32,6 @@ function ActiveNoteCard({ note }: { note: ActiveMidiNote }): JSX.Element {
   )
 }
 
-
-function getAudioStatusLabel(status: UseAudioEngineResult['audioStatus']): string {
-  const labels: Record<UseAudioEngineResult['audioStatus'], string> = {
-    idle: '未启动',
-    ready: '已就绪',
-    suspended: '已暂停',
-    unsupported: '不支持',
-    error: '启动失败'
-  }
-
-  return labels[status]
-}
-
-function AudioMonitoringCard({ audioEngine }: { audioEngine: UseAudioEngineResult }): JSX.Element {
-  return (
-    <section className="midi-panel audio-monitor-panel">
-      <div className="panel-title-row">
-        <div>
-          <h3>{'音频监听'}</h3>
-          <p>{'本地监听只影响软件发声，不影响 MIDI 输入和日志'}</p>
-        </div>
-        <span className={`audio-status-badge status-${audioEngine.audioStatus}`}>
-          {getAudioStatusLabel(audioEngine.audioStatus)}
-        </span>
-      </div>
-
-      <div className="audio-control-row">
-        <div>
-          <strong>{'本地监听'}</strong>
-          <span>{audioEngine.localMonitoringEnabled ? '开启：MIDI 输入会触发内置钢琴音色' : '关闭：只显示 MIDI 输入，软件不发声'}</span>
-        </div>
-        <button
-          className={`monitor-toggle ${audioEngine.localMonitoringEnabled ? 'is-on' : ''}`}
-          type="button"
-          onClick={() => void audioEngine.setLocalMonitoringEnabled(!audioEngine.localMonitoringEnabled)}
-        >
-          {audioEngine.localMonitoringEnabled ? '已开启' : '启用'}
-        </button>
-      </div>
-
-      <label className="volume-control" htmlFor="audio-monitor-volume">
-        <div>
-          <span>{'音量'}</span>
-          <strong>{audioEngine.volume}%</strong>
-        </div>
-        <input
-          id="audio-monitor-volume"
-          type="range"
-          min="0"
-          max="100"
-          value={audioEngine.volume}
-          onChange={(event) => audioEngine.setVolume(Number(event.target.value))}
-        />
-      </label>
-
-      <p className="audio-monitor-note">
-        {'如果你的电钢琴本身已经发声，可以关闭本地监听，避免双重声音。'}
-      </p>
-
-      {audioEngine.audioMessage ? <div className="midi-warning">{audioEngine.audioMessage}</div> : null}
-    </section>
-  )
-}
 
 function getEventName(event: MidiEventRecord): string {
   if (event.type === 'controlChange') {
@@ -155,63 +93,6 @@ function MidiLogRow({ event }: { event: MidiEventRecord }): JSX.Element {
   )
 }
 
-function MidiEventSummaryCard({
-  latestEvent,
-  activeNoteCount,
-  onOpenLog
-}: {
-  latestEvent: MidiEventRecord | null
-  activeNoteCount: number
-  onOpenLog: () => void
-}): JSX.Element {
-  return (
-    <section className="midi-panel midi-event-summary-panel">
-      <div className="panel-title-row">
-        <div>
-          <h3>事件摘要</h3>
-          <p>MIDI 日志作为调试工具，可按需打开查看</p>
-        </div>
-        <span className="log-count-badge">{latestEvent ? '最近 1 条' : '暂无事件'}</span>
-      </div>
-
-      <div className="midi-event-summary-grid">
-        <div>
-          <span>最近事件</span>
-          <strong>{getLatestEventSummary(latestEvent)}</strong>
-        </div>
-        <div>
-          <span>按下音符</span>
-          <strong>{activeNoteCount} 个</strong>
-        </div>
-        <div>
-          <span>事件类型</span>
-          <strong>{latestEvent?.type || '-'}</strong>
-        </div>
-      </div>
-
-      <AppButton className="primary-log-button" onClick={onOpenLog}>
-        查看事件日志
-      </AppButton>
-    </section>
-  )
-}
-
-function ExternalAudioNoteCard(): JSX.Element {
-  return (
-    <section className="midi-panel external-audio-note-panel">
-      <div className="panel-title-row">
-        <div>
-          <h3>外部音源</h3>
-          <p>使用真实钢琴音色时的监听建议</p>
-        </div>
-      </div>
-      <p>
-        如果你使用 Garritan CFX、Pianoteq、Kontakt、DAW 等外部音源，可以在外部音源中直接选择同一个 MIDI 键盘作为输入，并关闭本软件的本地监听，避免双重声音。
-      </p>
-    </section>
-  )
-}
-
 function MidiEventLogModal({ events, onClose }: { events: MidiEventRecord[]; onClose: () => void }): JSX.Element {
   return (
     <div className="midi-log-modal-backdrop" role="presentation" onClick={onClose}>
@@ -236,8 +117,8 @@ function MidiEventLogModal({ events, onClose }: { events: MidiEventRecord[]; onC
             <span>设备</span>
           </div>
           {events.length > 0 ? (
-            events.map((event, index) => (
-              <MidiLogRow key={`${event.timestamp}-${event.type}-${event.midiNumber ?? event.controllerNumber}-${index}`} event={event} />
+            events.map((event) => (
+              <MidiLogRow key={event.id} event={event} />
             ))
           ) : (
             <div className="empty-midi-state log-empty">暂无 MIDI 输入事件</div>
@@ -248,10 +129,23 @@ function MidiEventLogModal({ events, onClose }: { events: MidiEventRecord[]; onC
   )
 }
 
-export function MidiTestPage({ midi, audioEngine, onBackHome }: MidiTestPageProps): JSX.Element {
+export function MidiTestPage({ midi }: MidiTestPageProps): JSX.Element {
   const [isLogModalOpen, setIsLogModalOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const { showVirtualKeyboard, setShowVirtualKeyboard } = useDisplayPreferences('midi-test')
+  const [draftShowVirtualKeyboard, setDraftShowVirtualKeyboard] = useState(showVirtualKeyboard)
   const activeNoteNames = midi.activeNotes.map((note) => note.noteName).join(' / ')
   const hasInputs = midi.inputs.length > 0
+
+  const openSettings = (): void => {
+    setDraftShowVirtualKeyboard(showVirtualKeyboard)
+    setSettingsOpen(true)
+  }
+
+  const saveSettings = (): void => {
+    setShowVirtualKeyboard(draftShowVirtualKeyboard)
+    setSettingsOpen(false)
+  }
 
   return (
     <section className="midi-test-page">
@@ -261,9 +155,14 @@ export function MidiTestPage({ midi, audioEngine, onBackHome }: MidiTestPageProp
           <h2>MIDI 输入测试</h2>
           <p>选择输入设备后，按下电钢琴或 MIDI 键盘即可查看实时事件。</p>
         </div>
-        <AppButton className="secondary-inline-button" variant="secondary" onClick={onBackHome}>
-          返回首页
-        </AppButton>
+        <div className="midi-page-header__actions">
+          <button className="midi-log-trigger" type="button" aria-label="查看 MIDI 事件日志" title="查看事件日志" onClick={() => setIsLogModalOpen(true)}>
+            <EventLogIcon />
+          </button>
+          <button className="practice-settings-trigger" type="button" aria-label="MIDI 测试设置" title="MIDI 测试设置" onClick={openSettings}>
+            <SettingsIcon />
+          </button>
+        </div>
       </header>
 
       <div className="midi-dashboard">
@@ -370,31 +269,34 @@ export function MidiTestPage({ midi, audioEngine, onBackHome }: MidiTestPageProp
             </div>
           </section>
 
-          <AudioMonitoringCard audioEngine={audioEngine} />
-
-          <MidiEventSummaryCard
-            latestEvent={midi.latestEvent}
-            activeNoteCount={midi.activeNotes.length}
-            onOpenLog={() => setIsLogModalOpen(true)}
-          />
-
-          <ExternalAudioNoteCard />
         </div>
       </div>
 
-      <section className="midi-panel keyboard-panel">
-        <div className="panel-title-row">
-          <div>
-            <h3>虚拟钢琴键盘</h3>
-            <p>范围 A0 到 C8，当前按下的琴键会同步高亮</p>
+      {showVirtualKeyboard ? (
+        <section className="midi-panel keyboard-panel">
+          <div className="panel-title-row">
+            <div>
+              <h3>虚拟钢琴键盘</h3>
+              <p>范围 A0 到 C8，当前按下的琴键会同步高亮</p>
+            </div>
           </div>
-        </div>
-        <FullKeyboard activeNotes={midi.activeNotes} />
-      </section>
+          <FullKeyboard activeNotes={midi.activeNotes} />
+        </section>
+      ) : null}
 
       {isLogModalOpen ? (
         <MidiEventLogModal events={midi.recentEvents} onClose={() => setIsLogModalOpen(false)} />
       ) : null}
+
+      <PracticeSettingsDrawer isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={saveSettings} title="MIDI 测试设置">
+        <div className="midi-setting-group">
+          <span>显示虚拟键盘</span>
+          <div className="segmented-control">
+            <button className={draftShowVirtualKeyboard ? 'is-active' : ''} type="button" onClick={() => setDraftShowVirtualKeyboard(true)}>显示</button>
+            <button className={!draftShowVirtualKeyboard ? 'is-active' : ''} type="button" onClick={() => setDraftShowVirtualKeyboard(false)}>隐藏</button>
+          </div>
+        </div>
+      </PracticeSettingsDrawer>
     </section>
   )
 }

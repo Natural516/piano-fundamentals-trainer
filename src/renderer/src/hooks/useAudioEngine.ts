@@ -183,7 +183,7 @@ export function useAudioEngine(latestEvent: MidiEventRecord | null): UseAudioEng
   const masterGainRef = useRef<GainNode | null>(null)
   const voicesRef = useRef<Map<number, PianoVoice>>(new Map())
   const cleanupTimersRef = useRef<Set<number>>(new Set())
-  const lastEventKeyRef = useRef('')
+  const lastEventIdRef = useRef<number | null>(null)
   const [localMonitoringEnabled, setLocalMonitoringEnabledState] = useState(false)
   const [volume, setVolumeState] = useState(70)
   const [audioStatus, setAudioStatus] = useState<AudioStatus>('idle')
@@ -325,13 +325,11 @@ export function useAudioEngine(latestEvent: MidiEventRecord | null): UseAudioEng
       return
     }
 
-    const eventKey = String(latestEvent.timestamp) + '-' + latestEvent.type + '-' + String(latestEvent.midiNumber) + '-' + String(latestEvent.velocity) + '-' + latestEvent.deviceName
-
-    if (lastEventKeyRef.current === eventKey) {
+    if (lastEventIdRef.current === latestEvent.id) {
       return
     }
 
-    lastEventKeyRef.current = eventKey
+    lastEventIdRef.current = latestEvent.id
 
     if (latestEvent.type === 'noteOn' && typeof latestEvent.midiNumber === 'number') {
       void playNote(latestEvent.midiNumber, latestEvent.velocity ?? 0)

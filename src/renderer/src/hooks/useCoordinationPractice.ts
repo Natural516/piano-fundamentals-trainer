@@ -4,10 +4,10 @@ import {
   COORDINATION_GROUP_WINDOW_MS,
   COORDINATION_MEASURE_OPTIONS,
   COORDINATION_PATTERNS,
-  COORDINATION_STEPS_PER_MEASURE,
   COORDINATION_SYNC_THRESHOLD_MS,
   createCoordinationTimeline,
-  getCoordinationPattern
+  getCoordinationPattern,
+  shouldCompareCoordinationSync
 } from '../utils/coordinationPatterns'
 import type {
   CoordinationHand,
@@ -171,7 +171,7 @@ function createStepResult(
     ? Math.abs(Math.min(...leftEventTimes) - Math.min(...rightEventTimes))
     : undefined
   const pitchComplete = expectedNotes.length > 0 && missingNotes.length === 0 && extraNotes.length === 0
-  const syncWarning = pitchComplete && typeof syncOffsetMs === 'number' && syncOffsetMs > COORDINATION_SYNC_THRESHOLD_MS
+  const syncWarning = shouldCompareCoordinationSync(step) && pitchComplete && typeof syncOffsetMs === 'number' && syncOffsetMs > COORDINATION_SYNC_THRESHOLD_MS
 
   const missingLeft = getMissingNotes(step.leftNotes, inputNotes).length > 0
   const missingRight = getMissingNotes(step.rightNotes, inputNotes).length > 0
@@ -259,7 +259,8 @@ function createReport(
     leftWrongCount: results.filter((result) => result.leftError).length,
     rightWrongCount: results.filter((result) => result.rightError).length,
     generalExtraCount: results.reduce((sum, result) => sum + result.generalExtraCount, 0),
-    hardestPosition: hardest?.[0] ?? '暂无'
+    hardestPosition: hardest?.[0] ?? '暂无',
+    completedLoops: measureCount
   }
 }
 
@@ -275,7 +276,7 @@ export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null)
   const resultsRef = useRef<CoordinationStepResult[]>([])
   const finalizedTargetIdsRef = useRef(new Set<string>())
   const pendingInputsRef = useRef(new Map<string, PendingStepInput>())
-  const lastMidiEventKeyRef = useRef('')
+  const lastMidiEventIdRef = useRef<number | null>(null)
 
   const selectedPattern = useMemo(() => getCoordinationPattern(selectedPatternId), [selectedPatternId])
   const eighthNoteDurationMs = metronome.beatDurationMs / 2
@@ -288,7 +289,7 @@ export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null)
     resultsRef.current = []
     finalizedTargetIdsRef.current = new Set()
     pendingInputsRef.current = new Map()
-    lastMidiEventKeyRef.current = ''
+    lastMidiEventIdRef.current = null
     setResults([])
     setIsComplete(false)
   }, [])
@@ -400,9 +401,8 @@ export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null)
     if (!metronome.practiceStartTimestampMs || metronome.status !== 'running' || metronome.isCountingIn || isComplete) return
     if (typeof latestMidiEvent.midiNumber !== 'number') return
 
-    const eventKey = `${latestMidiEvent.timestamp}-${latestMidiEvent.midiNumber}-${latestMidiEvent.velocity}-${latestMidiEvent.deviceName}`
-    if (lastMidiEventKeyRef.current === eventKey) return
-    lastMidiEventKeyRef.current = eventKey
+    if (lastMidiEventIdRef.current === latestMidiEvent.id) return
+    lastMidiEventIdRef.current = latestMidiEvent.id
 
     const relativeTimeMs = latestMidiEvent.timestamp - metronome.practiceStartTimestampMs
     if (relativeTimeMs < 0) return
@@ -439,8 +439,9 @@ export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null)
 
   const currentStepIndex = useMemo(() => {
     if (metronome.status === 'idle' || metronome.isCountingIn || isComplete || timeline.length === 0) return -1
-    return Math.min(timeline.length - 1, Math.floor(metronome.practiceElapsedMs / eighthNoteDurationMs))
-  }, [eighthNoteDurationMs, isComplete, metronome.isCountingIn, metronome.practiceElapsedMs, metronome.status, timeline.length])
+    const nextIndex = timeline.findIndex((step) => step.expectedTimeMs > metronome.practiceElapsedMs)
+    return nextIndex < 0 ? timeline.length - 1 : Math.max(0, nextIndex - 1)
+  }, [isComplete, metronome.isCountingIn, metronome.practiceElapsedMs, metronome.status, timeline])
   const currentStep = currentStepIndex >= 0 ? timeline[currentStepIndex] ?? null : null
   const currentMeasureIndex = currentStep?.measureIndex ?? (isComplete ? Math.max(0, measureCount - 1) : 0)
   const currentPosition = currentStep?.position ?? -1

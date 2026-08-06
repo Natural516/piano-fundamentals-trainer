@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { CoordinationPattern, CoordinationStepResult } from '../utils/coordinationTypes'
 
 interface CoordinationGridViewProps {
@@ -34,7 +35,7 @@ export function CoordinationGridView({
   const resultByPosition = new Map(results.map((result) => [result.position, result]))
 
   return (
-    <div className="coordination-grid-view">
+    <div className="coordination-grid-view" style={{ '--coordination-step-count': pattern.steps.length } as CSSProperties}>
       <div className="coordination-grid-row coordination-label-row">
         <span className="coordination-row-heading">格位</span>
         {pattern.steps.map((step) => (
@@ -76,4 +77,3 @@ export function CoordinationGridView({
     </div>
   )
 }
-

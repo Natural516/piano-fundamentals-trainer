@@ -1,15 +1,12 @@
 import { navigationItems } from '../data'
-import type { UseAudioEngineResult } from '../hooks/useAudioEngine'
 import type { MidiSidebarStatus, PageId } from '../types'
 import { AppButton } from './AppButton'
 import { AppCard } from './AppCard'
 import { StatusBadge } from './StatusBadge'
-import { VirtualKeyboard } from './VirtualKeyboard'
 
 interface SidebarProps {
   currentPage: PageId
   midiStatus: MidiSidebarStatus
-  audioEngine: UseAudioEngineResult
   onNavigate: (page: PageId) => void
 }
 
@@ -25,7 +22,7 @@ function getMidiTone(connectionState: MidiSidebarStatus['connectionState']): 'da
   return 'danger'
 }
 
-export function Sidebar({ currentPage, midiStatus, audioEngine, onNavigate }: SidebarProps): JSX.Element {
+export function Sidebar({ currentPage, midiStatus, onNavigate }: SidebarProps): JSX.Element {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -57,7 +54,7 @@ export function Sidebar({ currentPage, midiStatus, audioEngine, onNavigate }: Si
         ))}
       </nav>
 
-      <AppCard as="section" className="midi-card" aria-label="MIDI 状态">
+      <AppCard as="section" className="midi-card midi-card--compact" aria-label="MIDI 状态">
         <div className="midi-card__header">
           <span>MIDI 设备</span>
           <StatusBadge className={`status-pill status-${midiStatus.connectionState}`} tone={getMidiTone(midiStatus.connectionState)}>
@@ -65,23 +62,6 @@ export function Sidebar({ currentPage, midiStatus, audioEngine, onNavigate }: Si
           </StatusBadge>
         </div>
         <div className="midi-device">{midiStatus.deviceName}</div>
-        <VirtualKeyboard />
-        <div className="sidebar-audio-monitor">
-          <div className="sidebar-audio-row">
-            <span>本地监听</span>
-            <AppButton
-              className={`mini-monitor-toggle ${audioEngine.localMonitoringEnabled ? 'is-on' : ''}`}
-              variant="ghost"
-              onClick={() => void audioEngine.setLocalMonitoringEnabled(!audioEngine.localMonitoringEnabled)}
-            >
-              {audioEngine.localMonitoringEnabled ? '开启' : '关闭'}
-            </AppButton>
-          </div>
-          <div className="sidebar-audio-row muted">
-            <span>音量</span>
-            <strong>{audioEngine.volume}%</strong>
-          </div>
-        </div>
         <AppButton
           className={`secondary-button ${currentPage === 'midi-test' ? 'is-active' : ''}`}
           variant="secondary"

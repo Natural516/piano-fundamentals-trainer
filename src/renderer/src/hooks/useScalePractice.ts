@@ -10,7 +10,15 @@ import {
   getMajorScaleByKey,
   getScalePracticeModeName
 } from '../utils/scalePatterns'
-import type { MajorScaleKey, MajorScalePattern, ScalePracticeMode, ScalePracticeReport, ScalePracticeStep } from '../utils/scaleTypes'
+import type {
+  MajorScaleKey,
+  MajorScalePattern,
+  ScaleNotesPerBeat,
+  ScalePracticeMode,
+  ScalePracticeReport,
+  ScalePracticeStep,
+  ScaleRange
+} from '../utils/scaleTypes'
 import { useMetronome } from './useMetronome'
 import { useMetronomeSound } from './useMetronomeSound'
 
@@ -34,6 +42,12 @@ interface UseScalePracticeResult {
   selectedMode: ScalePracticeMode
   selectedModeName: string
   setSelectedMode: (mode: ScalePracticeMode) => void
+  range: ScaleRange
+  setRange: (range: ScaleRange) => void
+  loopCount: number
+  setLoopCount: (loopCount: number) => void
+  notesPerBeat: ScaleNotesPerBeat
+  setNotesPerBeat: (notesPerBeat: ScaleNotesPerBeat) => void
   bpm: number
   setBpm: (bpm: number) => void
   toleranceLevel: ToleranceLevel
@@ -59,11 +73,25 @@ interface UseScalePracticeResult {
 
 const CHORD_INPUT_WINDOW_MS = 120
 
-function createEmptyReport(keyName: string, modeName: string, bpm: number, totalNotes: number): ScalePracticeReport {
+function createEmptyReport(
+  keyName: string,
+  modeName: string,
+  bpm: number,
+  totalNotes: number,
+  completedNotes: number,
+  range: ScaleRange,
+  loopCount: number,
+  notesPerBeat: ScaleNotesPerBeat
+): ScalePracticeReport {
   return {
     keyName,
     modeName,
     bpm,
+    targetBpm: bpm,
+    loopCount,
+    completedNotes,
+    range,
+    notesPerBeat,
     totalNotes,
     totalTargets: totalNotes,
     correct: 0,
@@ -95,9 +123,22 @@ function buildScaleReport(
   targets: TargetEvent[],
   keyName: string,
   modeName: string,
-  bpm: number
+  bpm: number,
+  completedNotes: number,
+  range: ScaleRange,
+  loopCount: number,
+  notesPerBeat: ScaleNotesPerBeat
 ): ScalePracticeReport {
-  const report = createEmptyReport(keyName, modeName, bpm, targets.length)
+  const report = createEmptyReport(
+    keyName,
+    modeName,
+    bpm,
+    targets.length,
+    completedNotes,
+    range,
+    loopCount,
+    notesPerBeat
+  )
   const offsets = results
     .map((result) => result.timeOffsetMs)
     .filter((offset): offset is number => typeof offset === 'number')
@@ -159,6 +200,9 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
   const metronomeSound = useMetronomeSound(metronome)
   const [selectedKey, setSelectedKeyState] = useState<MajorScaleKey>('C')
   const [selectedMode, setSelectedModeState] = useState<ScalePracticeMode>('right-ascending')
+  const [range, setRangeState] = useState<ScaleRange>('one-octave')
+  const [loopCount, setLoopCountState] = useState(1)
+  const [notesPerBeat, setNotesPerBeatState] = useState<ScaleNotesPerBeat>(1)
   const [toleranceLevel, setToleranceLevelState] = useState<ToleranceLevel>('standard')
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [results, setResults] = useState<JudgementResult[]>([])
@@ -169,14 +213,18 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
   const resultsRef = useRef<JudgementResult[]>([])
   const targetFlagsRef = useRef<Record<string, TargetFlags>>({})
   const pendingInputRef = useRef<PendingInput | null>(null)
-  const lastMidiEventKeyRef = useRef('')
+  const lastMidiEventIdRef = useRef<number | null>(null)
 
   const selectedScale = useMemo(() => getMajorScaleByKey(selectedKey), [selectedKey])
   const selectedModeName = useMemo(() => getScalePracticeModeName(selectedMode), [selectedMode])
-  const steps = useMemo(() => createScalePracticeSteps(selectedScale, selectedMode), [selectedMode, selectedScale])
+  const sequenceOptions = useMemo(() => ({ range, loopCount, notesPerBeat }), [loopCount, notesPerBeat, range])
+  const steps = useMemo(
+    () => createScalePracticeSteps(selectedScale, selectedMode, sequenceOptions),
+    [selectedMode, selectedScale, sequenceOptions]
+  )
   const targets = useMemo(
-    () => createScaleTargets(selectedScale, selectedMode, metronome.beatDurationMs),
-    [metronome.beatDurationMs, selectedMode, selectedScale]
+    () => createScaleTargets(selectedScale, selectedMode, metronome.beatDurationMs, sequenceOptions),
+    [metronome.beatDurationMs, selectedMode, selectedScale, sequenceOptions]
   )
 
   const resetProgress = useCallback(() => {
@@ -184,7 +232,7 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
     resultsRef.current = []
     targetFlagsRef.current = createTargetFlagMap(targets)
     pendingInputRef.current = null
-    lastMidiEventKeyRef.current = ''
+    lastMidiEventIdRef.current = null
     setCurrentStepIndex(0)
     setResults([])
     setWrongNotes([])
@@ -278,6 +326,25 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
     },
     [metronome]
   )
+
+  const setRange = useCallback((nextRange: ScaleRange) => {
+    if (metronome.status === 'running') return
+    setRangeState(nextRange)
+    metronome.stop()
+  }, [metronome])
+
+  const setLoopCount = useCallback((nextLoopCount: number) => {
+    if (metronome.status === 'running') return
+    setLoopCountState(Math.min(20, Math.max(1, Math.round(nextLoopCount))))
+    metronome.stop()
+  }, [metronome])
+
+  const setNotesPerBeat = useCallback((nextNotesPerBeat: ScaleNotesPerBeat) => {
+    if (metronome.status === 'running') return
+    if (![1, 2, 4].includes(nextNotesPerBeat)) return
+    setNotesPerBeatState(nextNotesPerBeat)
+    metronome.stop()
+  }, [metronome])
 
   const setBpm = useCallback(
     (bpm: number) => {
@@ -377,13 +444,11 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
       return
     }
 
-    const eventKey = `${latestMidiEvent.timestamp}-${latestMidiEvent.type}-${latestMidiEvent.midiNumber}-${latestMidiEvent.velocity}-${latestMidiEvent.deviceName}`
-
-    if (lastMidiEventKeyRef.current === eventKey) {
+    if (lastMidiEventIdRef.current === latestMidiEvent.id) {
       return
     }
 
-    lastMidiEventKeyRef.current = eventKey
+    lastMidiEventIdRef.current = latestMidiEvent.id
 
     const target = targets[currentStepIndexRef.current]
 
@@ -476,8 +541,18 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
   const currentStep = isComplete ? null : steps[currentStepIndex] ?? null
   const latestResult = results[results.length - 1] ?? null
   const report = useMemo(
-    () => buildScaleReport(results, targets, selectedScale.name, selectedModeName, metronome.bpm),
-    [metronome.bpm, results, selectedModeName, selectedScale.name, targets]
+    () => buildScaleReport(
+      results,
+      targets,
+      selectedScale.name,
+      selectedModeName,
+      metronome.bpm,
+      Math.min(currentStepIndex, targets.length),
+      range,
+      loopCount,
+      notesPerBeat
+    ),
+    [currentStepIndex, loopCount, metronome.bpm, notesPerBeat, range, results, selectedModeName, selectedScale.name, targets]
   )
 
   return {
@@ -489,6 +564,12 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
     selectedMode,
     selectedModeName,
     setSelectedMode,
+    range,
+    setRange,
+    loopCount,
+    setLoopCount,
+    notesPerBeat,
+    setNotesPerBeat,
     bpm: metronome.bpm,
     setBpm,
     toleranceLevel,

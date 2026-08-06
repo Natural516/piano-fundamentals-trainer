@@ -475,16 +475,7 @@ body::before {
   padding-bottom: 18px;
 }
 
-.sight-layout {
-  display: grid;
-  grid-template-columns: minmax(620px, 1fr) 340px;
-  gap: 18px;
-  align-items: start;
-  margin-top: 22px;
-}
-
 .sight-main-panel,
-.sight-side-panel,
 .sight-keyboard-panel,
 .sight-report-panel,
 .sight-range-panel {

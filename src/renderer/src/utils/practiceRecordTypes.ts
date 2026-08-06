@@ -35,6 +35,13 @@ export interface PracticeSessionRecord {
   restErrorCount: number
   syncWarningCount: number
   averageOffsetMs?: number
+  contentId?: string
+  contentName?: string
+  difficulty?: string
+  bpm?: number
+  loopCount?: number
+  keySignature?: string
+  practiceMode?: string
   settings: Record<string, string | number | boolean>
   details: Record<string, string | number | boolean | null>
   mistakes: PracticeMistakeSummary[]
@@ -62,4 +69,3 @@ export const PRACTICE_MODULE_NAMES: Record<PracticeModule, string> = {
   chord: '和弦练习',
   coordination: '左右手协调'
 }
-

@@ -1,6 +1,8 @@
 import type { ToleranceLevel } from './practiceTypes'
+import type { PracticeDifficulty } from './practiceContentTypes'
 
 export type CoordinationHand = 'left' | 'right'
+export type CoordinationCategory = 'synchronous' | 'alternating' | 'accompaniment' | 'asynchronous' | 'polyrhythm'
 
 export type CoordinationJudgementType =
   | 'correct'
@@ -13,11 +15,13 @@ export type CoordinationJudgementType =
 
 export interface CoordinationStep {
   position: number
+  beatPosition?: number
   label: string
   leftNotes: number[]
   rightNotes: number[]
   leftNoteNames: string[]
   rightNoteNames: string[]
+  syncExpected?: boolean
 }
 
 export interface CoordinationPattern {
@@ -25,6 +29,8 @@ export interface CoordinationPattern {
   name: string
   description: string
   bpmDefault: number
+  category: CoordinationCategory
+  difficulty: PracticeDifficulty
   steps: CoordinationStep[]
 }
 
@@ -77,5 +83,5 @@ export interface CoordinationPracticeReport {
   rightWrongCount: number
   generalExtraCount: number
   hardestPosition: string
+  completedLoops: number
 }
-
