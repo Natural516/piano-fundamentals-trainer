@@ -35,3 +35,8 @@ Legend: UNIT PASS / INTEGRATION PASS / REGRESSION PASS / HARDWARE QA PENDING / H
 | Practice segments storage | PASS | PASS | PASS | — | — | — |
 | Score practice page (demo/import) | PASS | PASS | PASS | — | PENDING | — |
 | Multi-measure notation rendering | — | — | — | — | PENDING | — |
+| Realtime score alignment | PASS | PASS | PASS | PENDING | — | — |
+| Follow-Me alignment | PASS | PASS | PASS | PENDING | — | — |
+| Plan 2.0 migration (v1 preserved) | PASS | PASS | PASS | — | — | — |
+| Period analytics + weekly report | PASS | PASS | PASS | — | PENDING | — |
+| Plan 2.0 full UI | — | — | — | — | PENDING | — |

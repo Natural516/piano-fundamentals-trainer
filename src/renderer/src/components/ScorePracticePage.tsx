@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ActiveMidiNote } from '../types'
-import { useScoreWaitPractice } from '../hooks/useScoreWaitPractice'
+import { useScorePractice, type ScorePracticeMode } from '../hooks/useScorePractice'
 import { loadMusicXmlDocument } from '../score/musicXmlParser'
 import { extractMxlContainer } from '../score/zipReader'
 import { createEmptySegmentState, readPracticeSegments, upsertPracticeSegment, writePracticeSegments, type PracticeSegment } from '../score/practiceSegment'
@@ -48,8 +48,9 @@ export function ScorePracticePage({
   const [scoreTitle, setScoreTitle] = useState('')
   const [loadError, setLoadError] = useState('')
   const [segmentName, setSegmentName] = useState('')
+  const [mode, setMode] = useState<ScorePracticeMode>('wait')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const practice = useScoreWaitPractice(score)
+  const practice = useScorePractice(score, mode)
   const pausedForExitRef = useRef(false)
 
   useEffect(() => {
@@ -128,7 +129,7 @@ export function ScorePracticePage({
       <PracticePageHeader
         eyebrow="Score Practice"
         title="曲谱练习"
-        summary={scoreTitle ? `${scoreTitle} · Wait 模式` : '导入 MusicXML / MXL 或使用内置示例'}
+        summary={scoreTitle ? `${scoreTitle} · ${mode === 'wait' ? 'Wait' : mode === 'realtime' ? 'Realtime' : 'Follow'} 模式` : '导入 MusicXML / MXL 或使用内置示例'}
       />
 
       <div className="practice-single-column">
@@ -136,7 +137,13 @@ export function ScorePracticePage({
           <div className="panel-title-row">
             <div>
               <h3>{scoreTitle || '未加载曲谱'}</h3>
-              <p>Wait 模式：当前目标单元满足后才推进，不要求强制时间流逝。</p>
+              <p>
+                {mode === 'wait'
+                  ? 'Wait 模式：当前目标单元满足后才推进，不要求强制时间流逝。'
+                  : mode === 'realtime'
+                    ? 'Realtime 模式：时间持续运行，早/晚/漏/多按窗口判定，单个错误不会永久错位。'
+                    : 'Follow 模式：软件跟随用户，停下等待、继续跟上，跳过/多弹不永久错位。'}
+              </p>
             </div>
             <span className={`audio-status-badge status-${practice.isRunning ? 'ready' : 'suspended'}`}>
               {practice.status === 'running' ? '练习中' : practice.status === 'finished' ? '已完成' : '未开始'}
@@ -144,6 +151,19 @@ export function ScorePracticePage({
           </div>
 
           <div className="score-practice-toolbar">
+            <div className="segmented-control score-practice-mode">
+              {(['wait', 'realtime', 'follow'] as ScorePracticeMode[]).map((option) => (
+                <button
+                  key={option}
+                  className={mode === option ? 'is-active' : ''}
+                  disabled={practice.isRunning}
+                  type="button"
+                  onClick={() => setMode(option)}
+                >
+                  {option === 'wait' ? 'Wait' : option === 'realtime' ? 'Realtime' : 'Follow'}
+                </button>
+              ))}
+            </div>
             <input
               ref={fileInputRef}
               className="score-practice-file"
@@ -178,7 +198,7 @@ export function ScorePracticePage({
               </>
             ) : (
               <div className="score-practice-empty">
-                <strong>{practice.status === 'finished' ? '曲谱完成' : practice.expectedMidi.length === 0 && practice.isRunning ? '当前为休止或延音，自动推进' : '开始后按 Wait 模式弹奏'}</strong>
+                <strong>{practice.status === 'finished' ? '曲谱完成' : practice.expectedMidi.length === 0 && practice.isRunning ? '当前为休止或延音，自动推进' : `开始后按 ${mode === 'wait' ? 'Wait' : mode === 'realtime' ? 'Realtime' : 'Follow'} 模式弹奏`}</strong>
               </div>
             )}
           </div>
@@ -213,6 +233,9 @@ export function ScorePracticePage({
           { label: '正确', value: practice.report.correct },
           { label: '错误', value: practice.report.wrong },
           { label: '自动跳过', value: practice.report.skipped },
+          { label: '漏音', value: practice.report.missing },
+          { label: '多音', value: practice.report.extra },
+          ...(mode !== 'wait' ? [{ label: '经过时间', value: `${Math.round(practice.elapsedMs / 1000)}s` }] : []),
           { label: '正确率', value: practice.currentIndex > 0 ? `${practice.report.accuracy}%` : '—' }
         ]} />
       </div>
@@ -224,6 +247,8 @@ export function ScorePracticePage({
             <div><span>正确</span><strong>{practice.report.correct}</strong></div>
             <div><span>错误</span><strong>{practice.report.wrong}</strong></div>
             <div><span>自动跳过</span><strong>{practice.report.skipped}</strong></div>
+            <div><span>漏音</span><strong>{practice.report.missing}</strong></div>
+            <div><span>多音</span><strong>{practice.report.extra}</strong></div>
             <div><span>正确率</span><strong>{practice.report.accuracy}%</strong></div>
           </div>
         </PracticeReportModal>

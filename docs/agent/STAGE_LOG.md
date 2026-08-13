@@ -98,3 +98,18 @@
 - Verification: typecheck 0, build 0, regression 84/84, diff --check 0.
 - Pending: notation rendering (VexFlow multi-measure), Realtime/Follow (stage 6), real-score content (HUMAN QA), MXL deflate support (stored-only now).
 - Commit: `stage5 score practice 1.0` (next).
+
+## Stage 6 — Realtime/Follow + plan 2.0 + analytics
+
+- Goal: continuous-time score judgment, follow-me alignment, plan v2 migration, factual analytics.
+- Implementation:
+  - `score/realtimeScoreCore.ts` — continuous timeline with on-time/early/late windows, missing/extra recording, cursor advances so one error does not permanently misalign.
+  - `score/followScoreCore.ts` — beam of position candidates with time/pitch/skip costs; stop/resume, slow/fast, skip, extra and repeat handled by local search.
+  - `plan/planV2.ts` — v2 plan state with profile/goals; `migratePlanV1ToV2` preserves v1 legacy data; corrupt-safe storage.
+  - `analytics/periodStats.ts` — today/week/month/all stats, per-module accuracy, confidence (sample count), no-data rules, weekly report with facts/suggestions separated.
+  - `hooks/useScorePractice.ts` — unified Wait/Realtime/Follow hook (replaces direct Wait usage; `useScoreWaitPractice` is a wrapper).
+  - `ScorePracticePage` mode toggle (Wait/Realtime/Follow); `AnalyticsPage` + route.
+- Tests: regression 84 → 89 (Realtime windows/missing/extra, Follow recovery, plan v2 migration, period stats + weekly report, wiring).
+- Verification: typecheck 0, build 0, regression 89/89, diff --check 0.
+- Pending: real-hardware Follow feel (HARDWARE QA), tempo-based beat duration wiring from MusicXML tempo (currently fixed 500ms in cores), full plan 2.0 UI.
+- Commit: `stage6 score following plan and analytics` (next).

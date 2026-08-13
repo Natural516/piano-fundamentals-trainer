@@ -43,6 +43,10 @@ const scoreTimeline = require('../src/renderer/src/score/scoreTimeline.ts')
 const waitScoreCore = require('../src/renderer/src/score/waitScoreCore.ts')
 const zipReader = require('../src/renderer/src/score/zipReader.ts')
 const practiceSegment = require('../src/renderer/src/score/practiceSegment.ts')
+const realtimeScoreCore = require('../src/renderer/src/score/realtimeScoreCore.ts')
+const followScoreCore = require('../src/renderer/src/score/followScoreCore.ts')
+const planV2 = require('../src/renderer/src/plan/planV2.ts')
+const periodStats = require('../src/renderer/src/analytics/periodStats.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -2409,10 +2413,12 @@ test('练习片段存储：损坏回退、净化与 upsert', () => {
 })
 
 test('曲谱 Wait 练习 Hook 与页面接入逐事件总线且路由存在', () => {
-  const hookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useScoreWaitPractice.ts'), 'utf8')
+  const wrapperSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useScoreWaitPractice.ts'), 'utf8')
+  const hookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useScorePractice.ts'), 'utf8')
   const pageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ScorePracticePage.tsx'), 'utf8')
   const appSource = fs.readFileSync(require.resolve('../src/renderer/src/App.tsx'), 'utf8')
 
+  assert.match(wrapperSource, /useScorePractice/)
   assert.match(hookSource, /useMidiEventSubscription/)
   assert.match(hookSource, /WaitScoreCore/)
   assert.doesNotMatch(hookSource, /latestMidiEvent|latestEvent/)
@@ -2421,6 +2427,177 @@ test('曲谱 Wait 练习 Hook 与页面接入逐事件总线且路由存在', ()
   assert.match(pageSource, /accept="\.xml,\.musicxml,\.mxl"/)
   assert.match(appSource, /ScorePracticePage/)
   assert.doesNotMatch(pageSource, /返回首页/)
+})
+
+test('Realtime 核心：准时正确、早/晚偏移、漏音与多音且不永久错位', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/single-melody.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const timeline = scoreTimeline.buildScoreTimeline(score)
+  const core = new realtimeScoreCore.RealtimeScoreCore(timeline, { toleranceMs: 180, beatDurationMs: 500 })
+
+  // 单元0：准时 → correct
+  assert.equal(core.processNoteOn(60, 0), 'correct')
+  // 单元1：晚 200ms → late
+  assert.equal(core.processNoteOn(62, 500 + 200), 'late')
+  // 单元2：早 200ms → early
+  assert.equal(core.processNoteOn(64, 1000 - 200), 'early')
+  // 单元3：错误音 → wrong (extra)，不推进
+  core.processNoteOn(70, 1500)
+  assert.equal(core.currentIndex, 3)
+  // 单元3：正确音
+  core.processNoteOn(65, 1500)
+  // 单元4：跳过（直接推进到窗口结束）
+  core.advanceTo(2000 + 400)
+  assert.equal(core.results.filter((result) => result.outcome === 'missing').length, 1)
+  // 剩余继续（追赶式）：A4、B4、C5
+  core.processNoteOn(67, 2500)
+  core.processNoteOn(69, 2600)
+  core.processNoteOn(71, 3100)
+  assert.equal(core.processNoteOn(72, 3700), 'complete')
+  assert.equal(core.isComplete, true)
+  assert.equal(core.results.filter((result) => result.outcome === 'correct').length, 4)
+})
+
+test('Follow 核心：跟弹、漏一个音恢复、多弹不永久错位', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/single-melody.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const timeline = scoreTimeline.buildScoreTimeline(score)
+
+  // 完全正确
+  const perfect = new followScoreCore.FollowScoreCore(timeline, { beatDurationMs: 500 })
+  ;[60, 62, 64, 65, 67, 69, 71, 72].forEach((midi, index) => perfect.observeNoteOn(midi, index * 500))
+  assert.equal(perfect.isComplete, true)
+  assert.equal(perfect.results.filter((result) => result.outcome === 'correct').length, 8)
+
+  // 漏一个音：跳过 E4，后面 F4 应仍能对上
+  const skip = new followScoreCore.FollowScoreCore(timeline, { beatDurationMs: 500 })
+  skip.observeNoteOn(60, 0)
+  skip.observeNoteOn(62, 500)
+  skip.observeNoteOn(65, 1500)
+  assert.equal(skip.isComplete, false)
+  skip.observeNoteOn(67, 2000)
+  skip.observeNoteOn(69, 2500)
+  skip.observeNoteOn(71, 3000)
+  skip.observeNoteOn(72, 3500)
+  assert.equal(skip.isComplete, true)
+
+  // 多弹一个音：不推进当前单元，恢复后继续
+  const extra = new followScoreCore.FollowScoreCore(timeline, { beatDurationMs: 500 })
+  extra.observeNoteOn(60, 0)
+  extra.observeNoteOn(70, 300)
+  extra.observeNoteOn(62, 500)
+  assert.equal(extra.currentIndex >= 2, true)
+})
+
+test('训练计划 2.0：v1 迁移保留遗留数据且损坏回退', () => {
+  const migrated = planV2.migratePlanV1ToV2({
+    currentStageId: 'stage-2',
+    stageStartDates: { 'stage-1': '2026-08-01' },
+    stageProjects: { 'p1': { status: 'completed' } },
+    dailyRecords: { '2026-08-03': {} },
+    weeklyRecords: {},
+    levelSixProgress: { passed: true }
+  })
+  assert.equal(migrated.version, 2)
+  assert.equal(migrated.profile.stage, 'stage-2')
+  assert.equal(migrated.migratedFromV1, true)
+  assert.equal(migrated.legacy.stageStartDates['stage-1'], '2026-08-01')
+  assert.equal(migrated.legacy.levelSixProgress.passed, true)
+
+  assert.equal(planV2.migratePlanV1ToV2(null).migratedFromV1, false)
+  assert.equal(planV2.sanitizePlanV2('bogus').version, 2)
+
+  const values = new Map()
+  const storage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) }
+  }
+  assert.deepEqual(planV2.readPlanV2(storage), planV2.createDefaultPlanV2())
+  assert.equal(planV2.writePlanV2(migrated, storage), true)
+  assert.equal(planV2.readPlanV2(storage).profile.stage, 'stage-2')
+})
+
+test('统计周期：今日/周/月/全部与置信度、周报事实建议分离', () => {
+  const now = new Date(2026, 7, 13, 12, 0, 0)
+  const iso = (dayOffset, hours) => new Date(2026, 7, dayOffset, hours, 0, 0).toISOString()
+  const record = (id, module, endedAt, accuracy, extra) => ({
+    id,
+    schemaVersion: 1,
+    module,
+    moduleName: module,
+    title: '测试',
+    startedAt: endedAt,
+    endedAt,
+    durationMs: 1200000,
+    status: 'completed',
+    totalEvents: 10,
+    correctEvents: Math.round(10 * accuracy / 100),
+    accuracy,
+    wrongNoteCount: 0,
+    missingNoteCount: 0,
+    extraNoteCount: 0,
+    earlyCount: 0,
+    lateCount: 0,
+    restErrorCount: 0,
+    syncWarningCount: 0,
+    settings: {},
+    details: extra ?? {},
+    mistakes: []
+  })
+
+  const records = [
+    record('1', 'sight-reading', iso(13, 9), 80, { averageReactionMs: 1500 }),
+    record('2', 'sight-reading', iso(13, 10), 90, { averageReactionMs: 1200 }),
+    record('3', 'rhythm', iso(12, 10), 70, {}),
+    record('4', 'scale', iso(1, 10), 85, {}),
+    record('5', 'chord', iso(1, 11), 60, { hardestChord: 'Dm7' })
+  ]
+
+  const today = periodStats.computePeriodStats(records, now, 'today')
+  assert.equal(today.sessions, 2)
+  assert.equal(today.sightReadingAverageReactionMs, 1350)
+  assert.equal(today.confidence, 'low')
+
+  const week = periodStats.computePeriodStats(records, now, 'week')
+  assert.equal(week.sessions, 3)
+  assert.equal(week.chordWeakness, '暂无')
+
+  const month = periodStats.computePeriodStats(records, now, 'month')
+  assert.equal(month.sessions, 5)
+  assert.equal(month.confidence, 'medium')
+  assert.equal(month.chordWeakness, 'Dm7')
+
+  const all = periodStats.computePeriodStats(records, now, 'all')
+  assert.equal(all.sessions, 5)
+
+  const empty = periodStats.computePeriodStats([], now, 'week')
+  assert.equal(empty.sessions, 0)
+  assert.equal(empty.confidence, 'low')
+  assert.equal(periodStats.formatNoData(null), '—')
+
+  const report = periodStats.buildWeeklyReport(records, now)
+  assert.ok(report.facts.length > 0)
+  assert.ok(report.suggestions.length > 0)
+  const emptyReport = periodStats.buildWeeklyReport([], now)
+  assert.match(emptyReport.facts[0], /暂无练习数据/)
+})
+
+test('曲谱练习三模式 Hook 与统计页面接线', () => {
+  const hookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useScorePractice.ts'), 'utf8')
+  const pageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ScorePracticePage.tsx'), 'utf8')
+  const analyticsSource = fs.readFileSync(require.resolve('../src/renderer/src/components/AnalyticsPage.tsx'), 'utf8')
+  const appSource = fs.readFileSync(require.resolve('../src/renderer/src/App.tsx'), 'utf8')
+
+  assert.match(hookSource, /WaitScoreCore/)
+  assert.match(hookSource, /RealtimeScoreCore/)
+  assert.match(hookSource, /FollowScoreCore/)
+  assert.match(hookSource, /useMidiEventSubscription/)
+  assert.doesNotMatch(hookSource, /latestMidiEvent|latestEvent/)
+  assert.match(pageSource, /realtime|follow/)
+  assert.match(pageSource, /setMode\(option\)/)
+  assert.match(analyticsSource, /computePeriodStats/)
+  assert.match(analyticsSource, /buildWeeklyReport/)
+  assert.match(appSource, /AnalyticsPage/)
 })
 
 let failed = 0

@@ -4,7 +4,7 @@ Updated: 2026-08-13
 
 ## Current stage
 
-Stage 5 complete — entering Stage 6 (Realtime/Follow + plan 2.0 + analytics).
+Stage 6 complete — entering Stage 7 (AI coach).
 
 ## Completed stages
 
@@ -15,12 +15,13 @@ Stage 5 complete — entering Stage 6 (Realtime/Follow + plan 2.0 + analytics).
 - Stage 3: chord V2 model (identity/inversion/voicing/texture/harmony), layered judgment, symbol parser, V2 practice page + mini keyboard; regression 71/71.
 - Stage 4: progression model + 4536251 + 4 common progressions, arrangement variations, progression practice panel; regression 75/75.
 - Stage 5: MusicXML/MXL subset parser, score timeline, Wait-mode engine, practice segments, ScorePracticePage; regression 84/84.
+- Stage 6: Realtime + Follow cores, plan 2.0 migration, period analytics + AnalyticsPage; regression 89/89.
 
 ## Recent checkpoint
 
 `c717616` checkpoint: complete first UI and interaction optimization (HEAD before stage 0).
-`5bf63b4` stage0 · `b3c9356` stage1 · `4cedebd` stage2 · `373cf2e` stage3 · `110cc78` stage4.
-Next checkpoint: `stage5 score practice 1.0`.
+`5bf63b4` stage0 · `b3c9356` stage1 · `4cedebd` stage2 · `373cf2e` stage3 · `110cc78` stage4 · `ea40342` stage5.
+Next checkpoint: `stage6 score following plan and analytics`.
 
 ## Key architecture
 
@@ -32,6 +33,9 @@ Next checkpoint: `stage5 score practice 1.0`.
 - Chord V2: `chordV2/` identity/voicing/harmony pure modules; layered judgment; `ChordV2Page` + `MiniKeyboard`.
 - Harmony: `harmony/` progression definitions + builder + arrangement variation + playability; `ProgressionPracticePanel`.
 - Score: `score/` XML mini parser, MusicXML subset parser, ZIP/MXL reader, timeline, WaitScoreCore, practice segments; `ScorePracticePage`.
+- Realtime/Follow: `score/realtimeScoreCore.ts` + `followScoreCore.ts`; unified `useScorePractice(score, mode)`.
+- Plan: `plan/planV2.ts` (migration from v1 preserved).
+- Analytics: `analytics/periodStats.ts` + `AnalyticsPage`.
 
 ## Main entry points
 
@@ -45,7 +49,7 @@ Next checkpoint: `stage5 score practice 1.0`.
 
 - `npm run typecheck`
 - `npm run build`
-- `npm run test:regression` (84 tests)
+- `npm run test:regression` (89 tests)
 - `git diff --check`
 
 ## Current P0/P1

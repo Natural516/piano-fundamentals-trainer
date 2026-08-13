@@ -4,6 +4,7 @@ import { ChordV2Page } from './components/ChordV2Page'
 import { CoordinationPracticePage } from './components/CoordinationPracticePage'
 import { FreePracticePage } from './components/FreePracticePage'
 import { ScorePracticePage } from './components/ScorePracticePage'
+import { AnalyticsPage } from './components/AnalyticsPage'
 import { JudgementTestPage } from './components/JudgementTestPage'
 import { MidiTestPage } from './components/MidiTestPage'
 import { PlaceholderPage } from './components/PlaceholderPage'
@@ -273,6 +274,8 @@ function App(): JSX.Element {
             exitPromptOpen={pendingNavigation !== null}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
+        ) : currentPage === 'analytics' ? (
+          <AnalyticsPage onBackHome={() => handleNavigate('home')} practiceRecords={practiceHistory.records} />
         ) : currentPage === 'metronome' ? (
           <JudgementTestPage />
         ) : (

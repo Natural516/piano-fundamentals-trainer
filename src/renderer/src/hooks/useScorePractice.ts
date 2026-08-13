@@ -1,0 +1,205 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ScoreDocument } from '../score/musicXmlTypes'
+import { buildScoreTimeline } from '../score/scoreTimeline'
+import { WaitScoreCore } from '../score/waitScoreCore'
+import { RealtimeScoreCore, type RealtimeStepResult } from '../score/realtimeScoreCore'
+import { FollowScoreCore, type FollowStepResult } from '../score/followScoreCore'
+import { useMidiEventSubscription } from './useMidiEvents'
+
+export type ScorePracticeMode = 'wait' | 'realtime' | 'follow'
+
+export interface ScorePracticeReport {
+  totalUnits: number
+  correct: number
+  wrong: number
+  missing: number
+  extra: number
+  skipped: number
+  accuracy: number
+}
+
+export interface UseScorePracticeResult {
+  status: 'idle' | 'running' | 'finished'
+  mode: ScorePracticeMode
+  timelineUnits: number
+  currentIndex: number
+  expectedMidi: number[]
+  feedback: 'correct' | 'wrong' | null
+  elapsedMs: number
+  results: Array<RealtimeStepResult | FollowStepResult | { unitId: string; outcome: string; offsetMs?: number }>
+  report: ScorePracticeReport
+  isRunning: boolean
+  start: () => void
+  stop: () => void
+  reset: () => void
+}
+
+export function useScorePractice(
+  score: ScoreDocument | null,
+  mode: ScorePracticeMode = 'wait'
+): UseScorePracticeResult {
+  const timeline = useMemo(() => (score ? buildScoreTimeline(score) : { units: [] }), [score])
+  const waitCoreRef = useRef<WaitScoreCore | null>(null)
+  const realtimeCoreRef = useRef<RealtimeScoreCore | null>(null)
+  const followCoreRef = useRef<FollowScoreCore | null>(null)
+
+  if (waitCoreRef.current === null) waitCoreRef.current = new WaitScoreCore(timeline)
+  if (realtimeCoreRef.current === null) realtimeCoreRef.current = new RealtimeScoreCore(timeline)
+  if (followCoreRef.current === null) followCoreRef.current = new FollowScoreCore(timeline)
+
+  const [status, setStatus] = useState<'idle' | 'running' | 'finished'>('idle')
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [results, setResults] = useState<UseScorePracticeResult['results']>([])
+  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
+  const [elapsedMs, setElapsedMs] = useState(0)
+  const statusRef = useRef(status)
+  statusRef.current = status
+  const startTimeRef = useRef(0)
+  const tickerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    waitCoreRef.current = new WaitScoreCore(timeline)
+    realtimeCoreRef.current = new RealtimeScoreCore(timeline)
+    followCoreRef.current = new FollowScoreCore(timeline)
+    setCurrentIndex(0)
+    setResults([])
+    setFeedback(null)
+    setElapsedMs(0)
+    setStatus('idle')
+  }, [timeline])
+
+  const sync = useCallback(() => {
+    const core = mode === 'wait'
+      ? waitCoreRef.current
+      : mode === 'realtime'
+        ? realtimeCoreRef.current
+        : followCoreRef.current
+    if (!core) return
+    setCurrentIndex(core.currentIndex)
+    setResults([...core.results])
+  }, [mode])
+
+  const stopTicker = useCallback(() => {
+    if (tickerRef.current !== null) {
+      window.clearInterval(tickerRef.current)
+      tickerRef.current = null
+    }
+  }, [])
+
+  const start = useCallback(() => {
+    waitCoreRef.current?.reset()
+    realtimeCoreRef.current?.reset()
+    followCoreRef.current?.reset()
+    setResults([])
+    setFeedback(null)
+    setElapsedMs(0)
+    startTimeRef.current = performance.now()
+    setStatus('running')
+    sync()
+
+    if (mode !== 'wait') {
+      tickerRef.current = window.setInterval(() => {
+        if (statusRef.current !== 'running') return
+        const elapsed = performance.now() - startTimeRef.current
+        setElapsedMs(elapsed)
+        if (mode === 'realtime') {
+          realtimeCoreRef.current?.advanceTo(elapsed)
+          sync()
+          if (realtimeCoreRef.current?.isComplete) {
+            setStatus('finished')
+            stopTicker()
+          }
+        }
+      }, 40)
+    }
+  }, [mode, stopTicker, sync])
+
+  const stop = useCallback(() => {
+    stopTicker()
+    setStatus('idle')
+  }, [stopTicker])
+
+  const reset = useCallback(() => {
+    stopTicker()
+    waitCoreRef.current?.reset()
+    realtimeCoreRef.current?.reset()
+    followCoreRef.current?.reset()
+    setStatus('idle')
+    setFeedback(null)
+    setElapsedMs(0)
+    sync()
+  }, [stopTicker, sync])
+
+  useMidiEventSubscription((event) => {
+    if (statusRef.current !== 'running' || event.type !== 'noteOn' || typeof event.midiNumber !== 'number') return
+    const midiNumber = event.midiNumber
+
+    if (mode === 'wait') {
+      const core = waitCoreRef.current
+      if (!core || core.isComplete) return
+      const outcome = core.processNoteOn(midiNumber)
+      setFeedback(outcome === 'wrong' ? 'wrong' : outcome === 'complete' ? 'correct' : null)
+      sync()
+      if (core.isComplete) {
+        setStatus('finished')
+      }
+      return
+    }
+
+    if (mode === 'realtime') {
+      const core = realtimeCoreRef.current
+      if (!core || core.isComplete) return
+      const elapsed = performance.now() - startTimeRef.current
+      const outcome = core.processNoteOn(midiNumber, elapsed)
+      setFeedback(outcome === 'wrong' ? 'wrong' : outcome === 'complete' ? 'correct' : outcome === 'correct' ? 'correct' : null)
+      sync()
+      if (core.isComplete) {
+        setStatus('finished')
+        stopTicker()
+      }
+      return
+    }
+
+    const core = followCoreRef.current
+    if (!core || core.isComplete) return
+    const elapsed = performance.now() - startTimeRef.current
+    const outcome = core.observeNoteOn(midiNumber, elapsed)
+    setFeedback(outcome === 'wrong' ? 'wrong' : outcome === 'complete' ? 'correct' : 'correct')
+    sync()
+    if (core.isComplete) {
+      setStatus('finished')
+      stopTicker()
+    }
+  })
+
+  useEffect(() => stopTicker, [stopTicker])
+
+  const report: ScorePracticeReport = {
+    totalUnits: timeline.units.length,
+    correct: results.filter((entry) => entry.outcome === 'correct').length,
+    wrong: results.filter((entry) => entry.outcome === 'wrong').length,
+    missing: results.filter((entry) => entry.outcome === 'missing').length,
+    extra: results.filter((entry) => entry.outcome === 'extra').length,
+    skipped: results.filter((entry) => entry.outcome === 'skip').length,
+    accuracy: timeline.units.length > 0
+      ? Math.round((results.filter((entry) => entry.outcome === 'correct').length / timeline.units.length) * 100)
+      : 0
+  }
+  const core = mode === 'wait' ? waitCoreRef.current : mode === 'realtime' ? realtimeCoreRef.current : followCoreRef.current
+
+  return {
+    status,
+    mode,
+    timelineUnits: timeline.units.length,
+    currentIndex,
+    expectedMidi: core?.currentUnit?.expectedMidi ?? [],
+    feedback,
+    elapsedMs,
+    results,
+    report,
+    isRunning: status === 'running',
+    start,
+    stop,
+    reset
+  }
+}

@@ -10,5 +10,6 @@
 | curriculum progress | curriculum-progress.v1 | corrupt/unknown → empty; per-exercise sanitize; attempts recorded |
 | practice records | schemaVersion 1 | added module `free-practice` (same schema) |
 | score practice segments | score-practice-segments.v1 | corrupt/unknown → empty; sanitize per segment |
+| training plan | training-plan.v2 | v1→v2: legacy fields (currentStageId/stageStartDates/stageProjects/daily/weekly/levelSix) preserved in `legacy`; v1 storage remains readable |
 
 Future migrations (stage 2+): curriculum progress, repertoire, score index, plan 2.0, backup format — must add a row here with schemaVersion before rollout.

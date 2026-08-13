@@ -50,7 +50,14 @@
 
 ## Follow
 
-- Planned (Stage 6): Realtime alignment + Follow Me cursor alignment.
+- `realtimeScoreCore.ts`: continuous time, windows, missing/extra, cursor advance (no permanent misalignment).
+- `followScoreCore.ts`: beam search with time/pitch/skip costs; stop/resume/slow/fast/skip/extra/repeat.
+- `useScorePractice(score, mode)` unifies Wait/Realtime/Follow in one hook.
+
+## Plan / Analytics
+
+- `plan/planV2.ts`: profile + goals; v1→v2 migration preserves legacy fields.
+- `analytics/periodStats.ts`: period stats, confidence, no-data rules, weekly report (facts vs suggestions).
 
 ## Storage
 
