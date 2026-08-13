@@ -1186,6 +1186,17 @@ body::before {
   line-height: 1.6;
 }
 
+.coach-report {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.settings-ai {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
 .score-practice-file {
   position: absolute;
   width: 1px;

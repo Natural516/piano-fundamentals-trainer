@@ -69,4 +69,7 @@
 
 ## AI
 
-- Planned (Stage 7): OpenAI-compatible provider abstraction, key safety, facts→interpretation→recommendation layering.
+- `ai/aiProvider.ts`: OpenAI-compatible client (key in Authorization header only).
+- `ai/aiSettings.ts`: local settings v1; `toSafeAiSettingsExport` never includes the key.
+- `ai/aiCoach.ts`: structured snapshots → system/user prompts → layered JSON output → validation (no record mutation / auto-promotion claims) → fallback.
+- `ai/musicAi.ts`: deterministic variation generation passed through playability + voice-leading validation [HEURISTIC].

@@ -47,6 +47,9 @@ const realtimeScoreCore = require('../src/renderer/src/score/realtimeScoreCore.t
 const followScoreCore = require('../src/renderer/src/score/followScoreCore.ts')
 const planV2 = require('../src/renderer/src/plan/planV2.ts')
 const periodStats = require('../src/renderer/src/analytics/periodStats.ts')
+const aiSettings = require('../src/renderer/src/ai/aiSettings.ts')
+const aiCoach = require('../src/renderer/src/ai/aiCoach.ts')
+const musicAi = require('../src/renderer/src/ai/musicAi.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -2598,6 +2601,105 @@ test('曲谱练习三模式 Hook 与统计页面接线', () => {
   assert.match(analyticsSource, /computePeriodStats/)
   assert.match(analyticsSource, /buildWeeklyReport/)
   assert.match(appSource, /AnalyticsPage/)
+})
+
+test('AI 设置：默认停用、净化与安全导出不含 Key', () => {
+  const defaults = aiSettings.createDefaultAiSettings()
+  assert.equal(defaults.enabled, false)
+  assert.equal(defaults.config.apiKey, '')
+
+  const sanitized = aiSettings.sanitizeAiSettings({
+    enabled: true,
+    config: { endpoint: 'https://example.com/v1/chat/completions', apiKey: 'sk-secret', model: 'm', temperature: 9, timeoutMs: 1, maxTokens: 99999 }
+  })
+  assert.equal(sanitized.config.temperature, 1.5)
+  assert.equal(sanitized.config.timeoutMs, 1000)
+  assert.equal(sanitized.config.maxTokens, 4000)
+  assert.equal(sanitized.config.apiKey, 'sk-secret')
+
+  const safe = aiSettings.toSafeAiSettingsExport(sanitized)
+  assert.equal('apiKey' in safe.config, false)
+  assert.equal(safe.config.apiKeyConfigured, true)
+  assert.doesNotMatch(JSON.stringify(safe), /sk-secret/)
+
+  const values = new Map()
+  const storage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) }
+  }
+  assert.equal(aiSettings.writeAiSettings(sanitized, storage), true)
+  assert.equal(aiSettings.readAiSettings(storage).config.apiKey, 'sk-secret')
+})
+
+test('AI 教练：快照不含 Key、消息分层、输出校验与回退', () => {
+  const snapshot = aiCoach.buildCoachSnapshot(
+    periodStats.computePeriodStats([], new Date(), 'week'),
+    { version: 2, profile: { stage: 'stage-1', goal: '', dailyMinutes: 60, focusAreas: [], repertoire: [], curriculum: [] }, goals: [], legacy: {}, migratedFromV1: false },
+    []
+  )
+  const messages = aiCoach.buildCoachMessages(snapshot, 'weekly-review')
+  const serialized = JSON.stringify(messages)
+  assert.doesNotMatch(serialized, /sk-|apiKey|Authorization/)
+  assert.equal(messages[0].role, 'system')
+  assert.match(messages[1].content, /facts/)
+
+  const parsed = aiCoach.parseCoachResponse('{"facts":["f1"],"interpretation":["i1"],"recommendation":["r1"]}')
+  assert.deepEqual(parsed.facts, ['f1'])
+  assert.deepEqual(parsed.interpretation, ['i1'])
+  assert.deepEqual(parsed.recommendation, ['r1'])
+
+  const plain = aiCoach.parseCoachResponse('一段没有 JSON 的文本')
+  assert.equal(plain.recommendation[0], '一段没有 JSON 的文本')
+
+  assert.equal(aiCoach.validateCoachOutput({ facts: ['a'], interpretation: [], recommendation: [] }), true)
+  assert.equal(
+    aiCoach.validateCoachOutput({ facts: [], interpretation: ['已修改你的练习记录'], recommendation: [] }),
+    false
+  )
+  assert.equal(aiCoach.validateCoachOutput({ facts: [], interpretation: [], recommendation: [] }), false)
+
+  const fallback = aiCoach.getFallbackCoachLayers(snapshot)
+  assert.equal(fallback.facts.length, 1)
+  assert.equal(fallback.recommendation.length, 1)
+})
+
+test('音乐 AI：变化生成必须通过校验，校验器拒绝不可演奏输出', () => {
+  const variation = musicAi.generatePracticeVariation({ progressionId: '4536251', keyPitchClass: 0, variationIndex: 1 })
+  const validation = musicAi.validateGeneratedVariation(variation)
+  assert.equal(validation.valid, true)
+  assert.equal(variation.steps.length, 7)
+
+  const invalid = musicAi.validateGeneratedVariation({
+    progressionId: '4536251',
+    key: 0,
+    steps: [],
+    voiceLeadingScore: 999,
+    playable: false
+  })
+  assert.equal(invalid.valid, false)
+  assert.ok(invalid.reasons.length > 0)
+
+  assert.equal(musicAi.validateMelodyCandidate([60, 64, 67], { lowest: 48, highest: 84 }), true)
+  assert.equal(musicAi.validateMelodyCandidate([36, 100], { lowest: 48, highest: 84 }), false)
+
+  const score = musicAi.scoreVoiceLeadingBetweenVariants(variation, variation)
+  assert.ok(score >= 0)
+})
+
+test('AI 页面接线：设置页含 AI 卡、分析页含教练卡、无硬编码 Key', () => {
+  const settingsSource = fs.readFileSync(require.resolve('../src/renderer/src/components/SettingsPage.tsx'), 'utf8')
+  const analyticsSource = fs.readFileSync(require.resolve('../src/renderer/src/components/AnalyticsPage.tsx'), 'utf8')
+  const hookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useAiCoach.ts'), 'utf8')
+  const providerSource = fs.readFileSync(require.resolve('../src/renderer/src/ai/aiProvider.ts'), 'utf8')
+
+  assert.match(settingsSource, /AI 教练/)
+  assert.match(settingsSource, /type="password"/)
+  assert.match(settingsSource, /测试连接/)
+  assert.match(analyticsSource, /AI 教练/)
+  assert.match(analyticsSource, /requestCoach/)
+  assert.match(hookSource, /createOpenAiCompatibleClient/)
+  assert.doesNotMatch(hookSource + settingsSource + providerSource, /sk-[A-Za-z0-9]{8,}/)
+  assert.match(providerSource, /Authorization: `Bearer/)
 })
 
 let failed = 0

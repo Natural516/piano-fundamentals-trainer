@@ -4,7 +4,7 @@ Updated: 2026-08-13
 
 ## Current stage
 
-Stage 6 complete — entering Stage 7 (AI coach).
+Stage 7 complete — entering Stage 8 (productization / Release Candidate).
 
 ## Completed stages
 
@@ -16,12 +16,13 @@ Stage 6 complete — entering Stage 7 (AI coach).
 - Stage 4: progression model + 4536251 + 4 common progressions, arrangement variations, progression practice panel; regression 75/75.
 - Stage 5: MusicXML/MXL subset parser, score timeline, Wait-mode engine, practice segments, ScorePracticePage; regression 84/84.
 - Stage 6: Realtime + Follow cores, plan 2.0 migration, period analytics + AnalyticsPage; regression 89/89.
+- Stage 7: AI provider abstraction, key-safe settings, layered coach output, validated music-AI variations; regression 93/93.
 
 ## Recent checkpoint
 
 `c717616` checkpoint: complete first UI and interaction optimization (HEAD before stage 0).
-`5bf63b4` stage0 · `b3c9356` stage1 · `4cedebd` stage2 · `373cf2e` stage3 · `110cc78` stage4 · `ea40342` stage5.
-Next checkpoint: `stage6 score following plan and analytics`.
+`5bf63b4` stage0 · `b3c9356` stage1 · `4cedebd` stage2 · `373cf2e` stage3 · `110cc78` stage4 · `ea40342` stage5 · `2beba8d` stage6.
+Next checkpoint: `stage7 ai coach`.
 
 ## Key architecture
 
@@ -36,6 +37,7 @@ Next checkpoint: `stage6 score following plan and analytics`.
 - Realtime/Follow: `score/realtimeScoreCore.ts` + `followScoreCore.ts`; unified `useScorePractice(score, mode)`.
 - Plan: `plan/planV2.ts` (migration from v1 preserved).
 - Analytics: `analytics/periodStats.ts` + `AnalyticsPage`.
+- AI: `ai/` provider + settings (key-safe export) + coach (facts/interpretation/recommendation) + music-AI validation.
 
 ## Main entry points
 
@@ -49,7 +51,7 @@ Next checkpoint: `stage6 score following plan and analytics`.
 
 - `npm run typecheck`
 - `npm run build`
-- `npm run test:regression` (89 tests)
+- `npm run test:regression` (93 tests)
 - `git diff --check`
 
 ## Current P0/P1

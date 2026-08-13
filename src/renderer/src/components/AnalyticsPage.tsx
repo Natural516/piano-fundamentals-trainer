@@ -2,6 +2,10 @@ import { useMemo, useState } from 'react'
 import { AppButton } from './AppButton'
 import { AppCard } from './AppCard'
 import { buildWeeklyReport, computePeriodStats, formatNoData, STAT_PERIOD_LABELS, type StatPeriod } from '../analytics/periodStats'
+import { buildCoachSnapshot, getFallbackCoachLayers, type CoachSnapshot } from '../ai/aiCoach'
+import { readPlanV2 } from '../plan/planV2'
+import { readCurriculumProgress } from '../curriculum/curriculumProgress'
+import { useAiCoach } from '../hooks/useAiCoach'
 import type { PracticeSessionRecord } from '../utils/practiceRecordTypes'
 
 interface AnalyticsPageProps {
@@ -13,6 +17,39 @@ export function AnalyticsPage({ onBackHome, practiceRecords }: AnalyticsPageProp
   const [period, setPeriod] = useState<StatPeriod>('week')
   const stats = useMemo(() => computePeriodStats(practiceRecords, new Date(), period), [period, practiceRecords])
   const weeklyReport = useMemo(() => buildWeeklyReport(practiceRecords), [practiceRecords])
+  const ai = useAiCoach()
+  const [coachLayers, setCoachLayers] = useState<ReturnType<typeof getFallbackCoachLayers> | null>(null)
+  const [coachError, setCoachError] = useState('')
+  const [coachLoading, setCoachLoading] = useState(false)
+
+  const requestCoach = async (): Promise<void> => {
+    setCoachError('')
+    setCoachLoading(true)
+    const plan = readPlanV2()
+    const curriculum = readCurriculumProgress()
+    const snapshot: CoachSnapshot = buildCoachSnapshot(
+      computePeriodStats(practiceRecords, new Date(), 'week'),
+      plan,
+      Object.values(curriculum.exercises).map((entry) => ({
+        exerciseId: entry.exerciseId,
+        status: entry.status,
+        currentTempo: entry.currentTempo
+      }))
+    )
+
+    try {
+      const result = await ai.requestCoach('weekly-review', snapshot)
+      if (result.ok) {
+        setCoachLayers(result.layers)
+      } else if (!ai.settings.enabled) {
+        setCoachLayers(getFallbackCoachLayers(snapshot))
+      } else {
+        setCoachError(result.error ?? 'AI 请求失败')
+      }
+    } finally {
+      setCoachLoading(false)
+    }
+  }
 
   return (
     <section className="settings-page">
@@ -74,6 +111,34 @@ export function AnalyticsPage({ onBackHome, practiceRecords }: AnalyticsPageProp
               {weeklyReport.suggestions.map((suggestion) => <p key={suggestion}>{suggestion}</p>)}
             </div>
           </div>
+        </AppCard>
+
+        <AppCard as="section" className="settings-card">
+          <div className="panel-title-row">
+            <div><h3>AI 教练</h3><p>基于本周事实给出解释与建议；AI 不能修改记录、伪造事实或自动晋级。</p></div>
+          </div>
+          <div className="settings-audio__actions">
+            <AppButton variant="secondary" onClick={() => void requestCoach()} disabled={coachLoading}>
+              {coachLoading ? '请求中…' : '获取 AI 周建议'}
+            </AppButton>
+          </div>
+          {coachError ? <p className="practice-save-error">{coachError}</p> : null}
+          {coachLayers ? (
+            <div className="analytics-report coach-report">
+              <div>
+                <h4>事实</h4>
+                {coachLayers.facts.length > 0 ? coachLayers.facts.map((fact) => <p key={fact}>{fact}</p>) : <p>—</p>}
+              </div>
+              <div>
+                <h4>解释</h4>
+                {coachLayers.interpretation.length > 0 ? coachLayers.interpretation.map((item) => <p key={item}>{item}</p>) : <p>—</p>}
+              </div>
+              <div>
+                <h4>建议</h4>
+                {coachLayers.recommendation.length > 0 ? coachLayers.recommendation.map((item) => <p key={item}>{item}</p>) : <p>—</p>}
+              </div>
+            </div>
+          ) : null}
         </AppCard>
       </div>
     </section>

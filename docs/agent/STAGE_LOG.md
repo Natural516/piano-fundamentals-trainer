@@ -113,3 +113,18 @@
 - Verification: typecheck 0, build 0, regression 89/89, diff --check 0.
 - Pending: real-hardware Follow feel (HARDWARE QA), tempo-based beat duration wiring from MusicXML tempo (currently fixed 500ms in cores), full plan 2.0 UI.
 - Commit: `stage6 score following plan and analytics` (next).
+
+## Stage 7 — AI coach
+
+- Goal: OpenAI-compatible provider abstraction, key safety, facts→interpretation→recommendation, validated music-AI variations.
+- Implementation:
+  - `ai/aiTypes.ts`, `ai/aiSettings.ts` — settings v1 (endpoint/model/temperature/timeout/maxTokens), local-only API key, `toSafeAiSettingsExport` strips the key.
+  - `ai/aiProvider.ts` — `createOpenAiCompatibleClient` (fetch, Authorization header only, timeout, HTTP/format errors).
+  - `ai/aiCoach.ts` — structured snapshot (period facts, plan, curriculum statuses), prompt builder (never contains key/Authorization), layered JSON parse, output validation (rejects claims of record mutation/auto-promotion), fallback layers.
+  - `ai/musicAi.ts` — deterministic practice-variation generation + playability/voice-leading validation [HEURISTIC].
+  - `hooks/useAiCoach.ts` — settings + test connection + request coach.
+  - Settings page AI card (enable/endpoint/model/key masked/test); Analytics page AI coach card (weekly review).
+- Tests: regression 89 → 93 (settings sanitize + safe export, coach prompt/layers/validation/fallback, music-AI validation, wiring + no hardcoded key).
+- Verification: typecheck 0, build 0, regression 93/93, diff --check 0.
+- Pending: real provider integration (HUMAN QA), AI suggestions quality (HUMAN QA), DeepSeek/OpenAI live test (HUMAN QA).
+- Commit: `stage7 ai coach` (next).

@@ -40,3 +40,7 @@ Legend: UNIT PASS / INTEGRATION PASS / REGRESSION PASS / HARDWARE QA PENDING / H
 | Plan 2.0 migration (v1 preserved) | PASS | PASS | PASS | — | — | — |
 | Period analytics + weekly report | PASS | PASS | PASS | — | PENDING | — |
 | Plan 2.0 full UI | — | — | — | — | PENDING | — |
+| AI provider abstraction | PASS | PASS | PASS | — | PENDING | — |
+| AI key safety (no logs/export) | PASS | PASS | PASS | — | — | — |
+| AI coach output layers + validation | PASS | PASS | PASS | — | PENDING | — |
+| Music-AI variation validation | PASS | PASS | PASS | — | — | MUSICAL PENDING |
