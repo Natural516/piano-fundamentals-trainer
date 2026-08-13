@@ -16,6 +16,7 @@ import { SightReadingPage } from './components/SightReadingPage'
 import { TrainingPlanPage } from './components/TrainingPlanPage'
 import { pageTitles } from './data'
 import { useMidi } from './hooks/useMidi'
+import { usePianoAudio } from './hooks/usePianoAudio'
 import { usePracticeHistory } from './hooks/usePracticeHistory'
 import type { PageId } from './types'
 import {
@@ -63,6 +64,7 @@ function App(): JSX.Element {
   const confirmedHistoryNavigationRef = useRef<PendingHistoryNavigation | null>(null)
   const bypassNextHistoryGuardRef = useRef(false)
   const midi = useMidi()
+  const pianoAudio = usePianoAudio()
   const practiceHistory = usePracticeHistory()
 
   const currentTitle = useMemo(() => pageTitles[currentPage], [currentPage])
@@ -215,7 +217,7 @@ function App(): JSX.Element {
           {isHomePage ? (
           <HomePage onNavigate={handleNavigate} />
         ) : currentPage === 'settings' ? (
-          <SettingsPage onBackHome={() => handleNavigate('home')} />
+          <SettingsPage onBackHome={() => handleNavigate('home')} pianoAudio={pianoAudio} />
         ) : currentPage === 'records' ? (
           <PracticeHistoryPage onBackHome={() => handleNavigate('home')} />
         ) : currentPage === 'training-plan' ? (

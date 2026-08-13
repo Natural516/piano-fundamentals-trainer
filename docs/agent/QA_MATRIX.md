@@ -9,4 +9,7 @@ Legend: UNIT PASS / INTEGRATION PASS / REGRESSION PASS / HARDWARE QA PENDING / H
 | Scale 8/8 time-axis | PASS | PASS | PASS | PENDING | — | — |
 | Sight-reading report cleanup | PASS | PASS | PASS | — | PENDING | — |
 | Report back action | PASS | PASS | PASS | — | PENDING | — |
-| Built-in piano audio (stage 1) | — | — | — | PENDING | PENDING | PENDING |
+| Built-in piano audio engine | PASS | PASS | PASS | PENDING | PENDING | PENDING |
+| Sample-pack loading (SFZ/anchors) | PASS | PASS | PASS | — | — | — |
+| Audio mode + piano volume settings | PASS | PASS | PASS | — | PENDING | — |
+| Salamander Grand Piano V2 assets | — | — | — | — | — | PENDING |

@@ -25,6 +25,9 @@ function test(name, callback) {
 const midiNotes = require('../src/renderer/src/utils/midiNotes.ts')
 const midiEventBus = require('../src/renderer/src/midi/midiEventBus.ts')
 const midiMessages = require('../src/renderer/src/midi/midiMessages.ts')
+const samplePackLoader = require('../src/renderer/src/audio/samplePackLoader.ts')
+const audioModeSettings = require('../src/renderer/src/audio/audioModeSettings.ts')
+const voicePolicy = require('../src/renderer/src/audio/voicePolicy.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -1734,6 +1737,124 @@ test('结果报告返回行为统一且识谱报告精简', () => {
   const themesCss = fs.readFileSync(require.resolve('../src/renderer/src/styles/themes.css'), 'utf8')
   assert.doesNotMatch(componentCss, /sight-clef-report-grid/)
   assert.doesNotMatch(themesCss, /sight-clef-report-grid/)
+})
+
+test('SFZ 采样包解析：锚点、键区、循环与分组默认值', () => {
+  const sfz = `
+    // Salamander Grand Piano V2 子集
+    <group>
+      loop_mode=loop_continuous
+      volume=-3
+    </group>
+    <region> sample=A0.wav lokey=21 hikey=27 pitch_keycenter=21 </region>
+    <region> sample=C4.wav lokey=48 hikey=63 pitch_keycenter=60 loop_start=44100 loop_end=88200 </region>
+    <region> sample=C7.wav lokey=96 hikey=108 pitch_keycenter=96 </region>
+  `
+  const anchors = samplePackLoader.parseSfz(sfz)
+  assert.equal(anchors.length, 3)
+  assert.deepEqual(
+    anchors.map((anchor) => [anchor.sample, anchor.lokey, anchor.hikey, anchor.pitchKeycenter]),
+    [
+      ['A0.wav', 21, 27, 21],
+      ['C4.wav', 48, 63, 60],
+      ['C7.wav', 96, 108, 96]
+    ]
+  )
+  assert.equal(anchors[0].loopMode, 'continuous')
+  assert.equal(anchors[0].volume, -3)
+  assert.equal(anchors[1].loopStart, 44100)
+  assert.equal(anchors[1].loopEnd, 88200)
+})
+
+test('采样锚点选择与移调 playbackRate 计算正确', () => {
+  const anchors = samplePackLoader.parseSfz(`
+    <region> sample=low.wav lokey=21 hikey=40 pitch_keycenter=36 </region>
+    <region> sample=mid.wav lokey=41 hikey=72 pitch_keycenter=60 </region>
+    <region> sample=high.wav lokey=73 hikey=108 pitch_keycenter=84 </region>
+  `)
+
+  assert.equal(samplePackLoader.computePlaybackRate(anchors[1], 60), 1)
+  assert.equal(samplePackLoader.computePlaybackRate(anchors[1], 72), 2)
+  assert.equal(samplePackLoader.computePlaybackRate(anchors[1], 48), 0.5)
+  assert.ok(Math.abs(samplePackLoader.computePlaybackRate(anchors[1], 62) - 2 ** (2 / 12)) < 1e-9)
+
+  assert.equal(samplePackLoader.selectSampleAndRate(anchors, 60).anchor.sample, 'mid.wav')
+  assert.equal(samplePackLoader.selectSampleAndRate(anchors, 40).anchor.sample, 'low.wav')
+  assert.equal(samplePackLoader.selectSampleAndRate(anchors, 96).anchor.sample, 'high.wav')
+  assert.equal(samplePackLoader.selectSampleAndRate([], 60), null)
+
+  assert.equal(samplePackLoader.getVelocityGain(0), 0.28)
+  assert.equal(samplePackLoader.getVelocityGain(127), 1)
+  assert.equal(samplePackLoader.clampPianoVolume(150), 100)
+  assert.equal(samplePackLoader.clampPianoVolume(-5), 0)
+})
+
+test('钢琴音频模式设置默认内置并安全读写', () => {
+  const values = new Map()
+  const storage = {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null
+    },
+    setItem(key, value) {
+      values.set(key, String(value))
+    }
+  }
+
+  assert.equal(audioModeSettings.sanitizeAudioMode('builtin'), 'builtin')
+  assert.equal(audioModeSettings.sanitizeAudioMode('silent'), 'silent')
+  assert.equal(audioModeSettings.sanitizeAudioMode('external'), 'external')
+  assert.equal(audioModeSettings.sanitizeAudioMode('bogus'), 'builtin')
+  assert.equal(audioModeSettings.sanitizeAudioMode(null), 'builtin')
+
+  assert.equal(audioModeSettings.readAudioMode(storage), 'builtin')
+  assert.equal(audioModeSettings.writeAudioMode('external', storage), true)
+  assert.equal(audioModeSettings.readAudioMode(storage), 'external')
+  assert.equal(audioModeSettings.readPianoVolume(storage), 70)
+  assert.equal(audioModeSettings.writePianoVolume(88, storage), true)
+  assert.equal(audioModeSettings.readPianoVolume(storage), 88)
+
+  values.set(audioModeSettings.PIANO_VOLUME_STORAGE_KEY, '999')
+  assert.equal(audioModeSettings.readPianoVolume(storage), 100)
+})
+
+test('采样器复音策略：重复音、抢声部与延音集合', () => {
+  const voices = [
+    { id: 1, midiNumber: 60, released: false, sustained: false, startedAt: 100 },
+    { id: 2, midiNumber: 64, released: true, sustained: false, startedAt: 200 },
+    { id: 3, midiNumber: 67, released: false, sustained: true, startedAt: 300 }
+  ]
+
+  assert.equal(voicePolicy.findVoiceForNote(voices, 60)?.id, 1)
+  assert.equal(voicePolicy.findVoiceForNote(voices, 64), null)
+  assert.equal(voicePolicy.pickVoiceToSteal(voices, 8), null)
+  assert.equal(voicePolicy.pickVoiceToSteal(voices, 2)?.id, 2, '超限时应优先偷已释放声部')
+  assert.deepEqual(
+    voicePolicy.collectSustainedVoices(voices).map((voice) => voice.id),
+    [3]
+  )
+  assert.equal(voicePolicy.countReleasedVoices(voices), 1)
+
+  const allActive = [
+    { id: 1, midiNumber: 60, released: false, sustained: false, startedAt: 100 },
+    { id: 2, midiNumber: 62, released: false, sustained: false, startedAt: 200 }
+  ]
+  assert.equal(voicePolicy.pickVoiceToSteal(allActive, 1)?.id, 1, '无已释放声部时偷最旧活动声部')
+})
+
+test('钢琴音频层接入逐事件总线且不使用 latestEvent', () => {
+  const audioHook = fs.readFileSync(require.resolve('../src/renderer/src/hooks/usePianoAudio.ts'), 'utf8')
+  const samplerSource = fs.readFileSync(require.resolve('../src/renderer/src/audio/pianoSampler.ts'), 'utf8')
+  const legacyAudioSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useAudioEngine.ts'), 'utf8')
+
+  assert.match(audioHook, /useMidiEventSubscription/)
+  assert.doesNotMatch(audioHook, /latestEvent|latestMidiEvent/)
+  assert.doesNotMatch(legacyAudioSource, /latestEvent|latestMidiEvent/)
+  assert.match(samplerSource, /class PianoSampler/)
+  assert.match(samplerSource, /setSustain/)
+  assert.match(samplerSource, /pickVoiceToSteal/)
+  assert.match(samplerSource, /loadSamplePack/)
+  assert.match(audioHook, /readAudioMode/)
+  assert.match(audioHook, /writePianoVolume/)
 })
 
 let failed = 0

@@ -801,3 +801,61 @@ body::before {
 .full-white-key.is-wrong span {
   color: #111827;
 }
+
+.settings-page {
+  width: 100%;
+}
+
+.settings-content {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+  margin-top: 18px;
+}
+
+.settings-audio {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.settings-audio__row {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-audio__row > span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.settings-audio__slider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-audio__slider input {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-audio__slider strong {
+  min-width: 44px;
+  color: var(--text-primary);
+  font-size: 16px;
+  text-align: right;
+}
+
+.settings-audio__status {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-audio__actions {
+  display: flex;
+  gap: 10px;
+}

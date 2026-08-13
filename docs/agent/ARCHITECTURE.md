@@ -11,7 +11,10 @@
 
 ## Audio
 
-- Not yet implemented (Stage 1). Planned: `PianoSampler` (Web Audio), sample anchors + nearest selection + playbackRate pitch shifting, velocity gain, polyphony, voice stealing, CC64 sustain, cleanup, volume control, audio mode (built-in / silent / external).
+- `PianoSampler` (Web Audio): sample voices from SFZ anchors (`samplePackLoader`) with playbackRate pitch shifting; synthesized fallback when no pack; polyphony + voice stealing (`voicePolicy`); CC64 sustain/pedal release; master piano volume; cleanup.
+- Audio mode: builtin / silent / external (persisted `audioModeSettings`), default builtin.
+- `usePianoAudio` subscribes to the MIDI event bus (never `latestEvent`); `useAudioEngine` is a compatibility wrapper.
+- Sample pack location: `assets/samples/salamander` (Salamander Grand Piano V2, CC BY 3.0). CONTENT PARTIAL until user provides/imports the pack.
 
 ## Practice Engine
 
