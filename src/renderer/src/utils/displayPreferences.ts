@@ -3,7 +3,14 @@ export interface DisplayPreferences {
   showVirtualKeyboard: boolean
 }
 
-export type DisplayPreferenceScope = 'midi-test' | 'sight-reading' | 'rhythm' | 'scales' | 'chords' | 'coordination'
+export type DisplayPreferenceScope =
+  | 'midi-test'
+  | 'sight-reading'
+  | 'rhythm'
+  | 'scales'
+  | 'chords'
+  | 'coordination'
+  | 'free-practice'
 
 export const DISPLAY_PREFERENCES_STORAGE_KEY = 'piano-trainer.display-preferences.v1'
 export const DISPLAY_PREFERENCES_CHANGED_EVENT = 'piano-trainer:display-preferences-changed'
@@ -13,7 +20,8 @@ export const DISPLAY_PREFERENCES_STORAGE_KEYS: Record<DisplayPreferenceScope, st
   rhythm: 'piano-trainer.display-preferences.v2.rhythm',
   scales: 'piano-trainer.display-preferences.v2.scales',
   chords: 'piano-trainer.display-preferences.v2.chords',
-  coordination: 'piano-trainer.display-preferences.v2.coordination'
+  coordination: 'piano-trainer.display-preferences.v2.coordination',
+  'free-practice': 'piano-trainer.display-preferences.v2.free-practice'
 }
 
 export const DEFAULT_DISPLAY_PREFERENCES: DisplayPreferences = {

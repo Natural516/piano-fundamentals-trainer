@@ -3,7 +3,7 @@ import { SettingsIcon } from './SettingsIcon'
 
 interface PracticePageHeaderProps {
   eyebrow: string
-  onOpenSettings: () => void
+  onOpenSettings?: () => void
   controls?: ReactNode
   summary: string
   title: string
@@ -25,15 +25,17 @@ export function PracticePageHeader({
       </div>
       <div className="practice-page-header__actions">
         {controls}
-        <button
-          className="practice-settings-trigger"
-          type="button"
-          aria-label="练习设置"
-          title="练习设置"
-          onClick={onOpenSettings}
-        >
-          <SettingsIcon />
-        </button>
+        {onOpenSettings ? (
+          <button
+            className="practice-settings-trigger"
+            type="button"
+            aria-label="练习设置"
+            title="练习设置"
+            onClick={onOpenSettings}
+          >
+            <SettingsIcon />
+          </button>
+        ) : null}
       </div>
     </header>
   )

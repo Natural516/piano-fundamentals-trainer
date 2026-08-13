@@ -13,3 +13,8 @@ Legend: UNIT PASS / INTEGRATION PASS / REGRESSION PASS / HARDWARE QA PENDING / H
 | Sample-pack loading (SFZ/anchors) | PASS | PASS | PASS | — | — | — |
 | Audio mode + piano volume settings | PASS | PASS | PASS | — | PENDING | — |
 | Salamander Grand Piano V2 assets | — | — | — | — | — | PENDING |
+| Free practice recording/stats | PASS | PASS | PASS | PENDING | PENDING | — |
+| Free practice playback | PASS | PASS | PASS | — | PENDING | — |
+| Curriculum catalog (Hanon/Czerny/scale/coordination) | PASS | PASS | PASS | — | — | PENDING |
+| Curriculum progress storage v1 | PASS | PASS | PASS | — | — | — |
+| Hanon/Czerny structured scores | — | — | — | — | — | PENDING (CONTENT PARTIAL) |

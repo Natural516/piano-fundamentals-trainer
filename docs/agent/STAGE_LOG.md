@@ -35,3 +35,19 @@
 - Verification: typecheck 0, build 0, regression 60/60, diff --check 0.
 - Unverified / pending: Salamander real samples (CONTENT PARTIAL — no local pack found), actual listening latency, sustain pedal feel, long-session stability (HARDWARE/AUDIO/HUMAN QA PENDING).
 - Commit: `stage1 built-in piano audio` (next).
+
+## Stage 2 — free practice + curriculum
+
+- Goal: free-play with factual recording/report; MIDI recording + playback; curriculum model (Hanon/Czerny frameworks, scale/coordination inheritance); progress storage.
+- Implementation:
+  - `curriculum/curriculumTypes.ts` — CurriculumBook/Exercise, TechniqueTag, ExerciseProgress, PracticePrescription.
+  - `curriculum/curriculumCatalog.ts` — Hanon (10 metadata exercises, CONTENT PARTIAL), Czerny 599 (100-entry directory, no guessed tags), scale book (real 12-major exercises from existing engine), coordination book (real timelines).
+  - `curriculum/curriculumProgress.ts` — v1 storage with corrupt/unknown fallback and attempt recording.
+  - `midi/midiRecording.ts` — recording session, factual stats (duration/range/velocity/pedal/density/left-right), playback timeline + `PlaybackCursorCore` (seek/advance/speed).
+  - `hooks/useFreePractice.ts` — bus-subscribed recorder + playback loop (play/pause/replay/seek/speed).
+  - `components/FreePracticePage.tsx` — start/pause/continue/finish, fact report, playback controls, notes, virtual keyboard; record saved as `free-practice` module.
+  - `PracticeModule` extended with `free-practice` (record types/storage/adapters/history tones); display preferences add `free-practice` scope.
+- Tests: regression 60 → 65 (recording capture/stats, playback timeline/seek, curriculum catalog integrity + no fabricated notes, progress migration, free record adapter).
+- Verification: typecheck 0, build 0, regression 65/65, diff --check 0.
+- Not done (honest): old scale/coordination entries NOT removed — curriculum practice mode + hardware validation still pending before entry removal; Hanon/Czerny structured scores CONTENT PARTIAL; free-play playback latency/feel HUMAN/HARDWARE QA PENDING.
+- Commit: `stage2 free practice and curriculum` (next).

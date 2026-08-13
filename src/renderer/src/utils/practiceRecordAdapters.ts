@@ -9,6 +9,7 @@ import type {
   SeventhChordQualityFilter
 } from './chordTypes'
 import type { CoordinationPracticeReport } from './coordinationTypes'
+import type { RecordingStats } from '../midi/midiRecording'
 import type { ToleranceLevel } from './practiceTypes'
 import type { PracticeSessionRecord, PracticeSessionTiming } from './practiceRecordTypes'
 import type { RhythmPracticeReport } from './rhythmTypes'
@@ -322,5 +323,44 @@ export function createCoordinationRecord(input: {
       { label: report.hardestPosition, count: report.wrongNote + report.missingNote + report.extraNote + report.restError, type: 'position' },
       { label: '同步警告', count: report.syncWarning, type: 'sync_warning' }
     ].filter((entry) => entry.count > 0 && entry.label !== '暂无')
+  }
+}
+
+export function createFreePracticeRecord(input: {
+  timing: PracticeSessionTiming
+  stats: RecordingStats
+  notes: string
+}): PracticeSessionRecord {
+  const { stats, notes } = input
+
+  return {
+    ...createBaseRecord(input.timing, {
+      module: 'free-practice',
+      moduleName: '自由练习',
+      title: '自由弹奏',
+      subtitle: `实际音域 ${stats.lowestMidi ?? '-'}–${stats.highestMidi ?? '-'}`,
+      totalEvents: stats.noteOnCount,
+      correctEvents: 0,
+      accuracy: 0
+    }),
+    practiceMode: 'free-play',
+    settings: {
+      noteOnCount: stats.noteOnCount,
+      durationMs: stats.durationMs
+    },
+    details: {
+      lowestMidi: stats.lowestMidi,
+      highestMidi: stats.highestMidi,
+      actualRange: stats.actualRange,
+      averageVelocity: stats.averageVelocity,
+      velocityRange: stats.velocityRange,
+      pedalDownCount: stats.pedalDownCount,
+      pedalDownDurationMs: stats.pedalDownDurationMs,
+      densityPerSecond: stats.densityPerSecond,
+      leftRegionNoteOnCount: stats.leftRegionNoteOnCount,
+      rightRegionNoteOnCount: stats.rightRegionNoteOnCount,
+      notes: notes || null
+    },
+    mistakes: []
   }
 }

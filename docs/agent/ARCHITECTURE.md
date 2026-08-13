@@ -25,7 +25,10 @@
 
 ## Curriculum
 
-- Planned (Stage 2): Curriculum/Book/Chapter/Exercise/Section model; Hanon + Czerny 599 frameworks; migrate scale + coordination engines into curriculum capability.
+- `curriculum/curriculumTypes.ts` + `curriculumCatalog.ts`: books (Hanon metadata-only, Czerny 100 directory, real scale + coordination exercises); no fabricated notes.
+- `curriculumProgress.ts`: v1 progress storage, corrupt-safe, attempt recording.
+- Free practice: `midiRecording` (facts only) + `PlaybackCursorCore`; `useFreePractice` records bus events and plays back via `PianoSampler`.
+- Planned: curriculum practice mode (uses ScalePracticeCore), old entry removal after hardware validation, MusicXML-based books.
 
 ## Chord/Harmony
 

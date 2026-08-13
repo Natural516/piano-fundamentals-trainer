@@ -20,6 +20,9 @@ export interface UsePianoAudioResult {
   samplerStatus: PianoSamplerStatus
   enableAudio: () => Promise<void>
   testPlayChord: () => Promise<void>
+  playNote: (midiNumber: number, velocity: number) => void
+  stopNote: (midiNumber: number) => void
+  setSustain: (down: boolean) => void
   stopAllNotes: () => void
 }
 
@@ -142,6 +145,19 @@ export function usePianoAudio(): UsePianoAudioResult {
     }, 700)
   }, [enableAudio])
 
+  const playNote = useCallback((midiNumber: number, velocity: number) => {
+    if (modeRef.current !== 'builtin') return
+    samplerRef.current?.noteOn(midiNumber, velocity)
+  }, [])
+
+  const stopNote = useCallback((midiNumber: number) => {
+    samplerRef.current?.noteOff(midiNumber)
+  }, [])
+
+  const setSustain = useCallback((down: boolean) => {
+    samplerRef.current?.setSustain(down)
+  }, [])
+
   const setMode = useCallback((nextMode: PianoAudioMode) => {
     setModeState(nextMode)
     writeAudioMode(nextMode)
@@ -207,6 +223,9 @@ export function usePianoAudio(): UsePianoAudioResult {
     samplerStatus,
     enableAudio,
     testPlayChord,
+    playNote,
+    stopNote,
+    setSustain,
     stopAllNotes
   }
 }

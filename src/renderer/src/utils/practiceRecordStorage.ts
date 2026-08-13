@@ -15,7 +15,7 @@ export interface PracticeStorageResult {
   message?: string
 }
 
-const modules = new Set<PracticeModule>(['sight-reading', 'rhythm', 'scale', 'chord', 'coordination'])
+const modules = new Set<PracticeModule>(['sight-reading', 'rhythm', 'scale', 'chord', 'coordination', 'free-practice'])
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

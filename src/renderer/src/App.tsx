@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HomePage } from './components/HomePage'
 import { ChordPracticePage } from './components/ChordPracticePage'
 import { CoordinationPracticePage } from './components/CoordinationPracticePage'
+import { FreePracticePage } from './components/FreePracticePage'
 import { JudgementTestPage } from './components/JudgementTestPage'
 import { MidiTestPage } from './components/MidiTestPage'
 import { PlaceholderPage } from './components/PlaceholderPage'
@@ -256,6 +257,13 @@ function App(): JSX.Element {
           <CoordinationPracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
+            onPracticeRunningChange={handlePracticeRunningChange}
+          />
+        ) : currentPage === 'free-practice' ? (
+          <FreePracticePage
+            activeNotes={midi.activeNotes}
+            exitPromptOpen={pendingNavigation !== null}
+            pianoAudio={pianoAudio}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'metronome' ? (

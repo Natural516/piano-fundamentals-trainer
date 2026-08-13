@@ -16,7 +16,8 @@ const moduleTones: Record<PracticeModule, string> = {
   rhythm: 'violet',
   scale: 'cyan',
   chord: 'amber',
-  coordination: 'rose'
+  coordination: 'rose',
+  'free-practice': 'cyan'
 }
 
 export function RightInfoPanel({ recentRecords, todayStats }: RightInfoPanelProps): JSX.Element {

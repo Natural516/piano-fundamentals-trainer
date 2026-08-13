@@ -28,6 +28,9 @@ const midiMessages = require('../src/renderer/src/midi/midiMessages.ts')
 const samplePackLoader = require('../src/renderer/src/audio/samplePackLoader.ts')
 const audioModeSettings = require('../src/renderer/src/audio/audioModeSettings.ts')
 const voicePolicy = require('../src/renderer/src/audio/voicePolicy.ts')
+const midiRecording = require('../src/renderer/src/midi/midiRecording.ts')
+const curriculumCatalog = require('../src/renderer/src/curriculum/curriculumCatalog.ts')
+const curriculumProgress = require('../src/renderer/src/curriculum/curriculumProgress.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -1233,7 +1236,7 @@ test('虚拟键盘偏好按模块独立存储且默认隐藏', () => {
       values.set(key, String(value))
     }
   }
-  const scopes = ['midi-test', 'sight-reading', 'rhythm', 'scales', 'chords', 'coordination']
+  const scopes = ['midi-test', 'sight-reading', 'rhythm', 'scales', 'chords', 'coordination', 'free-practice']
   const keys = scopes.map((scope) => displayPreferences.DISPLAY_PREFERENCES_STORAGE_KEYS[scope])
 
   assert.equal(new Set(keys).size, scopes.length)
@@ -1855,6 +1858,178 @@ test('钢琴音频层接入逐事件总线且不使用 latestEvent', () => {
   assert.match(samplerSource, /loadSamplePack/)
   assert.match(audioHook, /readAudioMode/)
   assert.match(audioHook, /writePianoVolume/)
+})
+
+test('自由练习 MIDI 录制逐条捕获并生成事实统计', () => {
+  const session = midiRecording.createRecordingSession(5000)
+  const noteOn = (id, midiNumber, timestamp, velocity = 100) => ({
+    id, type: 'noteOn', midiNumber, velocity, timestamp, deviceName: 'Regression MIDI'
+  })
+  const noteOff = (id, midiNumber, timestamp) => ({
+    id, type: 'noteOff', midiNumber, velocity: 0, timestamp, deviceName: 'Regression MIDI'
+  })
+  const cc64 = (id, value, timestamp) => ({
+    id, type: 'controlChange', controllerNumber: 64, value, sustainPedalDown: value >= 64, timestamp, deviceName: 'Regression MIDI'
+  })
+
+  // 同 timestamp 三音 + 快速 8 音 + 踏板
+  for (const midiNumber of [62, 65, 69]) {
+    midiRecording.appendRecordedEvent(session, noteOn(session.events.length + 1, midiNumber, 5000))
+  }
+  midiRecording.appendRecordedEvent(session, cc64(4, 127, 5100))
+  for (let index = 0; index < 8; index += 1) {
+    midiRecording.appendRecordedEvent(session, noteOn(10 + index, 60 + index, 5200 + index))
+    midiRecording.appendRecordedEvent(session, noteOff(20 + index, 60 + index, 5350 + index))
+  }
+  midiRecording.appendRecordedEvent(session, cc64(99, 0, 9000))
+
+  assert.equal(session.events.length, 21)
+  assert.equal(session.events[0].relativeTimeMs, 0)
+  assert.equal(session.events[1].relativeTimeMs, 0)
+  assert.equal(session.events[2].relativeTimeMs, 0)
+
+  const stats = midiRecording.summarizeRecording(session, 9500)
+  assert.equal(stats.noteOnCount, 11)
+  assert.equal(stats.lowestMidi, 60)
+  assert.equal(stats.highestMidi, 69)
+  assert.equal(stats.actualRange, 9)
+  assert.equal(stats.pedalDownCount, 1)
+  assert.ok(stats.pedalDownDurationMs >= 3900)
+  assert.equal(stats.leftRegionNoteOnCount, 0)
+  assert.equal(stats.rightRegionNoteOnCount, 11)
+  assert.ok(stats.averageVelocity > 0)
+})
+
+test('自由练习回放时间线有序并支持跳转与速度', () => {
+  const session = midiRecording.createRecordingSession(0)
+  const push = (id, type, midiNumber, timestamp, velocity = 100) => {
+    midiRecording.appendRecordedEvent(session, {
+      id, type, midiNumber, velocity, timestamp, deviceName: 'Regression MIDI'
+    })
+  }
+  push(1, 'noteOn', 60, 0)
+  push(2, 'noteOn', 64, 0)
+  push(3, 'noteOff', 60, 500)
+  push(4, 'noteOn', 60, 700)
+  push(5, 'noteOff', 64, 900)
+
+  const timeline = midiRecording.createPlaybackTimeline(session.events)
+  assert.deepEqual(timeline.map((action) => action.type), ['noteOn', 'noteOn', 'noteOff', 'noteOn', 'noteOff'])
+  assert.deepEqual(timeline.map((action) => action.timeMs), [0, 0, 500, 700, 900])
+  assert.equal(midiRecording.getPlaybackDurationMs(session.events), 900)
+
+  const cursor = new midiRecording.PlaybackCursorCore(session.events)
+  cursor.seek(0)
+  const first = cursor.advanceTo(0)
+  assert.equal(first.length, 2)
+  assert.equal(cursor.advanceTo(500).length, 1)
+  cursor.seek(650)
+  const afterSeek = cursor.advanceTo(900)
+  assert.deepEqual(afterSeek.map((action) => action.midiNumber), [60, 64])
+  assert.equal(cursor.isFinished(), true)
+})
+
+test('教材目录：哈农元数据、车尔尼100目录与真实音阶/协调练习', () => {
+  const hanon = curriculumCatalog.getCurriculumBook('hanon')
+  const czerny = curriculumCatalog.getCurriculumBook('czerny-599')
+  const scales = curriculumCatalog.getCurriculumBook('scales')
+  const coordination = curriculumCatalog.getCurriculumBook('coordination')
+
+  assert.equal(hanon.exercises.length, 10)
+  assert.equal(czerny.exercises.length, 100)
+  assert.ok(scales.exercises.length >= 12)
+  assert.ok(coordination.exercises.length >= 4)
+
+  // 不允许伪造教材音符：未导入的哈农/车尔尼必须是 partial 且无 noteSequence
+  assert.ok(hanon.exercises.every((exercise) => exercise.contentStatus === 'partial' && exercise.noteSequence === null))
+  assert.ok(czerny.exercises.every((exercise) => exercise.contentStatus === 'partial' && exercise.noteSequence === null))
+  assert.ok(czerny.exercises.every((exercise) => exercise.techniqueTags.length === 0), '不得凭编号猜测车尔尼技术标签')
+  assert.ok(hanon.exercises.every((exercise) => exercise.techniqueTags.length > 0))
+
+  const cMajorScale = curriculumCatalog.getCurriculumExercise('scale-C-right-ascending')
+  assert.ok(cMajorScale !== null)
+  assert.deepEqual(cMajorScale.noteSequence.midi, [60, 62, 64, 65, 67, 69, 71, 72])
+  assert.equal(cMajorScale.contentStatus, 'verified')
+
+  const ids = curriculumCatalog.CURRICULUM_BOOKS.flatMap((book) => book.exercises.map((exercise) => exercise.id))
+  assert.equal(new Set(ids).size, ids.length)
+})
+
+test('教材进度存储：损坏回退、合法迁移与练习记录', () => {
+  const values = new Map()
+  const storage = {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null
+    },
+    setItem(key, value) {
+      values.set(key, String(value))
+    }
+  }
+
+  assert.deepEqual(curriculumProgress.readCurriculumProgress(storage), {
+    version: 1,
+    exercises: {}
+  })
+
+  values.set(curriculumProgress.CURRICULUM_PROGRESS_STORAGE_KEY, '{bad json')
+  assert.deepEqual(curriculumProgress.readCurriculumProgress(storage).exercises, {})
+
+  const migrated = curriculumProgress.migrateProgressState({
+    exercises: {
+      'hanon-1': { exerciseId: 'hanon-1', status: 'mastered', attempts: 3, currentTempo: 80, bogus: true },
+      broken: 'not-an-object'
+    }
+  })
+  assert.equal(migrated.version, 1)
+  assert.equal(migrated.exercises['hanon-1'].status, 'mastered')
+  assert.equal(migrated.exercises['hanon-1'].attempts, 3)
+  assert.equal(migrated.exercises['hanon-1'].lastPracticedAt, null)
+  assert.equal(migrated.exercises.broken, undefined)
+
+  const attempted = curriculumProgress.recordExerciseAttempt(migrated, 'hanon-1', {
+    currentTempo: 88,
+    targetTempo: 100,
+    durationMs: 60000
+  })
+  assert.equal(attempted.exercises['hanon-1'].attempts, 4)
+  assert.equal(attempted.exercises['hanon-1'].currentTempo, 88)
+  assert.equal(attempted.exercises['hanon-1'].totalDurationMs, 60000)
+  assert.ok(attempted.exercises['hanon-1'].lastPracticedAt !== null)
+
+  assert.equal(curriculumProgress.writeCurriculumProgress(attempted, storage), true)
+  assert.equal(curriculumProgress.readCurriculumProgress(storage).exercises['hanon-1'].currentTempo, 88)
+})
+
+test('自由练习记录适配器只保存事实字段', () => {
+  const practiceRecordAdapters = require('../src/renderer/src/utils/practiceRecordAdapters.ts')
+  const timing = {
+    id: 'free-session-1',
+    startedAt: '2026-08-13T00:00:00.000Z',
+    endedAt: '2026-08-13T00:01:00.000Z',
+    durationMs: 60000
+  }
+  const stats = {
+    durationMs: 60000,
+    noteOnCount: 24,
+    lowestMidi: 48,
+    highestMidi: 84,
+    actualRange: 36,
+    averageVelocity: 90,
+    velocityRange: 70,
+    pedalDownCount: 2,
+    pedalDownDurationMs: 8000,
+    densityPerSecond: 0.4,
+    leftRegionNoteOnCount: 8,
+    rightRegionNoteOnCount: 16
+  }
+  const record = practiceRecordAdapters.createFreePracticeRecord({ timing, stats, notes: '试音' })
+  assert.equal(record.module, 'free-practice')
+  assert.equal(record.moduleName, '自由练习')
+  assert.equal(record.accuracy, 0)
+  assert.equal(record.details.lowestMidi, 48)
+  assert.equal(record.details.rightRegionNoteOnCount, 16)
+  assert.equal(record.mistakes.length, 0)
+  assert.equal('wrongNoteCount' in record && record.wrongNoteCount, 0)
 })
 
 let failed = 0
