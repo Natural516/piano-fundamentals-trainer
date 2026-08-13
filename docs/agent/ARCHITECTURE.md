@@ -32,7 +32,10 @@
 
 ## Chord/Harmony
 
-- Planned (Stage 3/4): Chord Identity → Bass/Inversion → Voicing → Texture → Voice Leading → Harmony Context; progression + 4536251.
+- `chordV2/`: identity (root/quality/required+optional pitch classes) → voicing (exactNotes/register/doubling/spacing/bassConstraint) → texture (block window 150ms / ordered arpeggio state machine / composite) → harmony context (I/IV/V verified, voice-leading heuristic).
+- Symbol parser supports standard set incl. slash chords and ♭.
+- Layered judgment: identity (pitch-class), inversion (lowest note), exact (pitch-set equality).
+- Stage 4 will add progression + 4536251 + arrangement on top of these layers.
 
 ## Score
 

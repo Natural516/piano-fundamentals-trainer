@@ -18,3 +18,9 @@ Legend: UNIT PASS / INTEGRATION PASS / REGRESSION PASS / HARDWARE QA PENDING / H
 | Curriculum catalog (Hanon/Czerny/scale/coordination) | PASS | PASS | PASS | — | — | PENDING |
 | Curriculum progress storage v1 | PASS | PASS | PASS | — | — | — |
 | Hanon/Czerny structured scores | — | — | — | — | — | PENDING (CONTENT PARTIAL) |
+| Chord V2 identity model | PASS | PASS | PASS | — | — | — |
+| Chord V2 symbol parse/format | PASS | PASS | PASS | — | — | — |
+| Chord V2 layered judgment | PASS | PASS | PASS | PENDING | — | MUSICAL PENDING |
+| Chord V2 arpeggio state machine | PASS | PASS | PASS | PENDING | — | — |
+| Chord V2 harmony function | PASS | PASS | PASS | — | — | MUSICAL PENDING |
+| Chord V2 page + mini keyboard | PASS | PASS | PASS | — | PENDING | — |

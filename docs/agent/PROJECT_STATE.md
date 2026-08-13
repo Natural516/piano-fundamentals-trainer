@@ -4,7 +4,7 @@ Updated: 2026-08-13
 
 ## Current stage
 
-Stage 2 complete — entering Stage 3 (chord practice V2).
+Stage 3 complete — entering Stage 4 (harmony progressions + 4536251).
 
 ## Completed stages
 
@@ -12,12 +12,13 @@ Stage 2 complete — entering Stage 3 (chord practice V2).
 - Stage 0: MIDI per-event layer, scale time-axis core, chord feedback extraction, sight-reading report cleanup, unified report back action, regression 55/55.
 - Stage 1: PianoSampler engine, SFZ loader, audio mode + piano volume, settings UI; regression 60/60.
 - Stage 2: free practice + MIDI recording/playback, curriculum catalog (Hanon/Czerny frameworks, scale/coordination inheritance), progress storage; regression 65/65.
+- Stage 3: chord V2 model (identity/inversion/voicing/texture/harmony), layered judgment, symbol parser, V2 practice page + mini keyboard; regression 71/71.
 
 ## Recent checkpoint
 
 `c717616` checkpoint: complete first UI and interaction optimization (HEAD before stage 0).
-`5bf63b4` stage0 · `b3c9356` stage1 built-in piano audio.
-Next checkpoint: `stage2 free practice and curriculum`.
+`5bf63b4` stage0 · `b3c9356` stage1 · `4cedebd` stage2.
+Next checkpoint: `stage3 chord practice v2`.
 
 ## Key architecture
 
@@ -26,6 +27,7 @@ Next checkpoint: `stage2 free practice and curriculum`.
 - Reports: `PracticeReportModal` shared back/repeat actions; sight-reading report cleaned.
 - Audio: `PianoSampler` (Web Audio) — sample anchors + synthesized fallback, polyphony/stealing, CC64 sustain; audio mode builtin/silent/external; independent piano volume.
 - Curriculum: `curriculum/` catalog + progress v1; free practice recording/playback in `midi/midiRecording.ts` + `hooks/useFreePractice.ts`.
+- Chord V2: `chordV2/` identity/voicing/harmony pure modules; layered judgment; `ChordV2Page` + `MiniKeyboard`.
 
 ## Main entry points
 
@@ -39,7 +41,7 @@ Next checkpoint: `stage2 free practice and curriculum`.
 
 - `npm run typecheck`
 - `npm run build`
-- `npm run test:regression` (65 tests)
+- `npm run test:regression` (71 tests)
 - `git diff --check`
 
 ## Current P0/P1

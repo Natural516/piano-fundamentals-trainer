@@ -51,3 +51,18 @@
 - Verification: typecheck 0, build 0, regression 65/65, diff --check 0.
 - Not done (honest): old scale/coordination entries NOT removed — curriculum practice mode + hardware validation still pending before entry removal; Hanon/Czerny structured scores CONTENT PARTIAL; free-play playback latency/feel HUMAN/HARDWARE QA PENDING.
 - Commit: `stage2 free practice and curriculum` (next).
+
+## Stage 3 — chord practice V2
+
+- Goal: structural chord model (Identity → Bass/Inversion → Voicing → Texture → Harmony), layered judgment, chord symbol UI with local keyboard.
+- Implementation:
+  - `chordV2/chordV2Types.ts` — qualities, difficulties L1-L7, judge modes, VoicingSpec, HarmonyContext.
+  - `chordV2/chordIdentity.ts` — quality definitions (required/optional pitch classes, extensions/alterations), standard symbol formatting + parsing (incl. slash chords and ♭), octave-agnostic identity.
+  - `chordV2/voicing.ts` — default voicing builder (register/doubling/spacing/bassConstraint), layered judgment (identity/inversion/exact), `ArpeggioStateMachine`, arpeggio sequence builder.
+  - `chordV2/harmony.ts` — [VERIFIED] I/IV/V function in major, scale degree, voice-leading heuristic [HEURISTIC].
+  - `hooks/useChordV2Practice.ts` — bus-subscribed practice engine: 150ms block window, ordered arpeggio, composite texture, question generator, report.
+  - `components/ChordV2Page.tsx` + `components/MiniKeyboard.tsx` — chord symbol + voicing + local 3-octave keyboard; settings (judge mode/inversion/texture/difficulty/count); App routes `chords` → V2.
+- Tests: regression 65 → 71 (identity model, symbol parse/format, layered voicing judgment, arpeggio machine, harmony/voice-leading, page wiring).
+- Verification: typecheck 0, build 0, regression 71/71, diff --check 0.
+- Pending: musicality of voicings (MUSICAL QA), real-hardware block/arpeggio feel (HARDWARE QA), progression/4536251 (stage 4), old chord page kept for stage 4 content.
+- Commit: `stage3 chord practice v2` (next).

@@ -31,6 +31,9 @@ const voicePolicy = require('../src/renderer/src/audio/voicePolicy.ts')
 const midiRecording = require('../src/renderer/src/midi/midiRecording.ts')
 const curriculumCatalog = require('../src/renderer/src/curriculum/curriculumCatalog.ts')
 const curriculumProgress = require('../src/renderer/src/curriculum/curriculumProgress.ts')
+const chordIdentity = require('../src/renderer/src/chordV2/chordIdentity.ts')
+const voicing = require('../src/renderer/src/chordV2/voicing.ts')
+const harmony = require('../src/renderer/src/chordV2/harmony.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -2030,6 +2033,136 @@ test('自由练习记录适配器只保存事实字段', () => {
   assert.equal(record.details.rightRegionNoteOnCount, 16)
   assert.equal(record.mistakes.length, 0)
   assert.equal('wrongNoteCount' in record && record.wrongNoteCount, 0)
+})
+
+test('和弦 V2 身份模型：根音、音级集合与扩展/变化音分离', () => {
+  const cMajor = chordIdentity.getChordV2Identity(0, 'major')
+  assert.deepEqual(cMajor.requiredPitchClasses, [0, 4, 7])
+  assert.deepEqual(cMajor.optionalPitchClasses, [])
+
+  const dMinor = chordIdentity.getChordV2Identity(2, 'minor')
+  assert.deepEqual(dMinor.requiredPitchClasses, [2, 5, 9])
+
+  const cmaj7 = chordIdentity.getChordV2Identity(0, 'maj7')
+  assert.deepEqual(cmaj7.requiredPitchClasses, [0, 4, 7, 11])
+
+  const c9 = chordIdentity.getChordV2Identity(0, '9')
+  assert.deepEqual(c9.requiredPitchClasses, [0, 4, 7, 10])
+  assert.deepEqual(c9.optionalPitchClasses, [2])
+
+  // 同音异名根音归一
+  assert.deepEqual(chordIdentity.getChordV2Identity(12, 'major').requiredPitchClasses, [0, 4, 7])
+  assert.deepEqual(chordIdentity.getChordV2Identity(14, 'minor').requiredPitchClasses, [2, 5, 9])
+})
+
+test('和弦 V2 标准符号：格式化与解析（含 slash 与 ♭）', () => {
+  assert.equal(chordIdentity.formatChordSymbol(0, 'maj7', 7), 'Cmaj7/G')
+  assert.equal(chordIdentity.formatChordSymbol(2, 'm7b5'), 'Dm7♭5')
+  assert.equal(chordIdentity.formatChordSymbol(0, '6/9'), 'C6/9')
+  assert.equal(chordIdentity.formatChordSymbol(0, 'major'), 'C')
+
+  assert.deepEqual(chordIdentity.parseChordSymbol('Cmaj7/G'), {
+    rootPitchClass: 0,
+    quality: 'maj7',
+    slashBass: 7
+  })
+  assert.deepEqual(chordIdentity.parseChordSymbol('Cm7♭5'), {
+    rootPitchClass: 0,
+    quality: 'm7b5',
+    slashBass: null
+  })
+  assert.deepEqual(chordIdentity.parseChordSymbol('C6/9'), {
+    rootPitchClass: 0,
+    quality: '6/9',
+    slashBass: null
+  })
+  assert.deepEqual(chordIdentity.parseChordSymbol('Csus4'), {
+    rootPitchClass: 0,
+    quality: 'sus4',
+    slashBass: null
+  })
+  assert.equal(chordIdentity.parseChordSymbol('Hmaj7'), null)
+})
+
+test('和弦 V2 Voicing：分层判定（身份/转位/精确）', () => {
+  const identity = chordIdentity.getChordV2Identity(2, 'minor')
+  const rootVoicing = voicing.createDefaultVoicing(identity, {
+    registerLowest: 48,
+    registerHighest: 84,
+    bassConstraint: 2
+  })
+  assert.equal(rootVoicing.bassConstraint % 12, 2)
+  assert.ok(rootVoicing.exactNotes.every((note) => note >= 48 && note <= 84))
+  assert.equal(rootVoicing.exactNotes.length >= 3, true)
+
+  // 身份判定：不同八度、合理重复均正确
+  assert.equal(voicing.judgeVoicing(rootVoicing, [38, 53, 57], 'identity').judgement, 'correct')
+  assert.equal(voicing.judgeVoicing(rootVoicing, [38, 57], 'identity').judgement, 'missing')
+  assert.equal(voicing.judgeVoicing(rootVoicing, [38, 53, 57, 58], 'identity').judgement, 'extra')
+
+  // 转位判定：最低音错误
+  const inversionVoicing = voicing.createDefaultVoicing(identity, {
+    registerLowest: 48,
+    registerHighest: 84,
+    bassConstraint: 5
+  })
+  assert.equal(voicing.judgeVoicing(inversionVoicing, [38, 53, 57], 'inversion').judgement, 'wrong_bass')
+  assert.equal(voicing.judgeVoicing(inversionVoicing, [41, 50, 57], 'inversion').judgement, 'correct')
+
+  // 精确判定：必须完全一致
+  const exact = voicing.judgeVoicing(rootVoicing, rootVoicing.exactNotes, 'exact')
+  assert.equal(exact.judgement, 'correct')
+  const exactWrong = voicing.judgeVoicing(rootVoicing, [rootVoicing.exactNotes[0], rootVoicing.exactNotes[1] + 12, rootVoicing.exactNotes[2]], 'exact')
+  assert.equal(exactWrong.judgement, 'missing')
+})
+
+test('和弦 V2 分解有序状态机', () => {
+  const machine = new voicing.ArpeggioStateMachine([50, 53, 57])
+  assert.equal(machine.processNote(50), 'correct')
+  assert.equal(machine.processNote(52), 'wrong')
+  assert.equal(machine.processNote(53), 'correct')
+  assert.equal(machine.processNote(57), 'complete')
+  assert.equal(machine.isComplete, true)
+  assert.equal(machine.progress, 3)
+
+  const resetMachine = new voicing.ArpeggioStateMachine([50, 53, 57])
+  resetMachine.processNote(50)
+  resetMachine.reset()
+  assert.equal(resetMachine.progress, 0)
+  assert.equal(resetMachine.processNote(50), 'correct')
+})
+
+test('和弦 V2 和声功能与 Voice Leading 启发式', () => {
+  assert.equal(harmony.getHarmonicFunction(0, 0, 'major'), 'tonic')
+  assert.equal(harmony.getHarmonicFunction(0, 5, 'major'), 'subdominant')
+  assert.equal(harmony.getHarmonicFunction(0, 7, 'major'), 'dominant')
+  assert.equal(harmony.getHarmonicFunction(0, 2, 'minor'), 'other')
+  assert.equal(harmony.getScaleDegree(0, 7), 5)
+  assert.equal(harmony.getScaleDegree(0, 1), null)
+
+  const cMajor = chordIdentity.getChordV2Identity(0, 'major')
+  const aMinor = chordIdentity.getChordV2Identity(9, 'minor')
+  const fMajor = chordIdentity.getChordV2Identity(5, 'major')
+  const smooth = harmony.voiceLeadingScore(cMajor, aMinor)
+  const jumpy = harmony.voiceLeadingScore(cMajor, fMajor)
+  assert.ok(smooth >= 0)
+  assert.ok(smooth < jumpy, '共同音更多、低音移动更小的进行应得分更低（更平滑）')
+})
+
+test('和弦 V2 页面与 Hook 接入逐事件总线且不使用 latestEvent', () => {
+  const hookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useChordV2Practice.ts'), 'utf8')
+  const pageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ChordV2Page.tsx'), 'utf8')
+  const appSource = fs.readFileSync(require.resolve('../src/renderer/src/App.tsx'), 'utf8')
+
+  assert.match(hookSource, /useMidiEventSubscription/)
+  assert.match(hookSource, /judgeVoicing/)
+  assert.match(hookSource, /ArpeggioStateMachine/)
+  assert.doesNotMatch(hookSource, /latestMidiEvent|latestEvent/)
+  assert.match(pageSource, /MiniKeyboard/)
+  assert.match(pageSource, /PracticeSettingsDrawer/)
+  assert.match(appSource, /ChordV2Page/)
+  assert.match(pageSource, /onBack=\{/)
+  assert.doesNotMatch(pageSource, /返回首页/)
 })
 
 let failed = 0

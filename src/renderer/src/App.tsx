@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HomePage } from './components/HomePage'
-import { ChordPracticePage } from './components/ChordPracticePage'
+import { ChordV2Page } from './components/ChordV2Page'
 import { CoordinationPracticePage } from './components/CoordinationPracticePage'
 import { FreePracticePage } from './components/FreePracticePage'
 import { JudgementTestPage } from './components/JudgementTestPage'
@@ -248,7 +248,7 @@ function App(): JSX.Element {
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'chords' ? (
-          <ChordPracticePage
+          <ChordV2Page
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
             onPracticeRunningChange={handlePracticeRunningChange}
