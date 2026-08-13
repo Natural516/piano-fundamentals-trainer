@@ -56,6 +56,14 @@ export const practiceModules: PracticeModule[] = [
     description: '自由 MIDI 输入与键盘显示',
     visual: 'pen',
     accent: 'indigo'
+  },
+  {
+    id: 'score-practice',
+    number: '07',
+    title: '曲谱练习',
+    description: 'MusicXML / MXL 曲谱的 Wait 模式练习',
+    visual: 'staff',
+    accent: 'indigo'
   }
 ]
 
@@ -72,6 +80,7 @@ export const pageTitles: Record<PageId, string> = {
   chords: '和弦练习',
   coordination: '左右手协调',
   'free-practice': '自由练习',
+  'score-practice': '曲谱练习',
   'midi-test': 'MIDI 输入测试',
   metronome: '节拍器与判定测试',
   help: '帮助中心'

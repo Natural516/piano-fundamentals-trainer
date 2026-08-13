@@ -37,6 +37,12 @@ const harmony = require('../src/renderer/src/chordV2/harmony.ts')
 const progressions = require('../src/renderer/src/harmony/progressions.ts')
 const progressionTypes = require('../src/renderer/src/harmony/progressionTypes.ts')
 const arrangement = require('../src/renderer/src/harmony/arrangement.ts')
+const xmlMiniParser = require('../src/renderer/src/score/xmlMiniParser.ts')
+const musicXmlParser = require('../src/renderer/src/score/musicXmlParser.ts')
+const scoreTimeline = require('../src/renderer/src/score/scoreTimeline.ts')
+const waitScoreCore = require('../src/renderer/src/score/waitScoreCore.ts')
+const zipReader = require('../src/renderer/src/score/zipReader.ts')
+const practiceSegment = require('../src/renderer/src/score/practiceSegment.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -1197,7 +1203,7 @@ test('顶层页面路由稳定且无效地址安全回到首页', () => {
   const expectedPages = [
     'home', 'records', 'analytics', 'badges', 'settings', 'training-plan',
     'sight-reading', 'rhythm', 'scales', 'chords', 'coordination',
-    'free-practice', 'midi-test', 'metronome', 'help'
+    'free-practice', 'score-practice', 'midi-test', 'metronome', 'help'
   ]
 
   assert.deepEqual(pageRouting.TOP_LEVEL_PAGE_IDS, expectedPages)
@@ -2238,6 +2244,183 @@ test('进行练习 Hook 与面板接入逐事件总线且不使用 latestEvent',
   assert.match(panelSource, /PracticeReportModal/)
   assert.match(chordPageSource, /ProgressionPracticePanel/)
   assert.match(chordPageSource, /practice-content-toggle/)
+})
+
+test('XML 迷你解析器：元素、属性、文本与自闭合', () => {
+  const root = xmlMiniParser.parseXml(
+    '<?xml version="1.0"?><score-partwise version="4.0"><work><work-title>Hi &amp; bye</work-title></work><part id="P1"/><note pitch="C4">text</note></score-partwise>'
+  )
+  assert.equal(root.tag, 'score-partwise')
+  assert.equal(root.attributes.version, '4.0')
+  const work = xmlMiniParser.findChild(root, 'work')
+  assert.equal(xmlMiniParser.childText(work, 'work-title'), 'Hi & bye')
+  const part = xmlMiniParser.findChild(root, 'part')
+  assert.equal(part.attributes.id, 'P1')
+  assert.equal(xmlMiniParser.findChild(root, 'note').text, 'text')
+  assert.equal(xmlMiniParser.findChildren(root, 'note').length, 1)
+})
+
+test('MusicXML 解析：单旋律、调号、拍号与速度', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/single-melody.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  assert.equal(score.title, 'Single Melody')
+  assert.equal(score.parts.length, 1)
+  assert.equal(score.parts[0].measures.length, 1)
+  const measure = score.parts[0].measures[0]
+  assert.equal(measure.keySignature, 0)
+  assert.equal(measure.timeBeats, 4)
+  assert.equal(measure.timeBeatType, 4)
+  assert.equal(measure.tempoBpm, 80)
+  assert.deepEqual(measure.notes.map((note) => note.midiNumber), [60, 62, 64, 65, 67, 69, 71, 72])
+  assert.deepEqual(measure.notes.map((note) => note.voice), Array(8).fill('1'))
+  assert.equal(score.defaultTempoBpm, 80)
+})
+
+test('MusicXML 解析：和弦、延音、休止、临时记号与调号变化', () => {
+  const chordXml = fs.readFileSync(require.resolve('./score-fixtures/chord-tie-rest.xml'), 'utf8')
+  const chordScore = musicXmlParser.loadMusicXmlDocument(chordXml)
+  const firstMeasure = chordScore.parts[0].measures[0]
+  assert.equal(firstMeasure.notes.filter((note) => note.isChordTone).length, 1)
+  assert.equal(firstMeasure.notes.find((note) => note.midiNumber === 60)?.tie, 'start')
+  assert.equal(firstMeasure.notes.some((note) => note.type === 'rest'), true)
+  const secondMeasure = chordScore.parts[0].measures[1]
+  assert.equal(secondMeasure.notes.find((note) => note.midiNumber === 60)?.tie, 'stop')
+
+  const accidentalXml = fs.readFileSync(require.resolve('./score-fixtures/accidental-key-change.xml'), 'utf8')
+  const accidentalScore = musicXmlParser.loadMusicXmlDocument(accidentalXml)
+  assert.equal(accidentalScore.parts[0].measures[0].keySignature, 1)
+  assert.equal(accidentalScore.parts[0].measures[0].notes[0].alter, 1)
+  assert.equal(accidentalScore.parts[0].measures[0].notes[0].accidental, 'sharp')
+  assert.equal(accidentalScore.parts[0].measures[1].keySignature, -1)
+  assert.equal(accidentalScore.parts[0].measures[1].notes[0].alter, -1)
+})
+
+test('时间线：同 onset 和弦归组、休止与延音单元', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/chord-tie-rest.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const timeline = scoreTimeline.buildScoreTimeline(score)
+
+  assert.equal(timeline.units.length, 7)
+  const chordUnit = timeline.units.find((unit) => unit.expectedMidi.length === 2)
+  assert.ok(chordUnit !== undefined, '和弦单元应包含同 onset 的多个音')
+  assert.deepEqual(chordUnit.expectedMidi, [67, 72])
+
+  const tieUnit = timeline.units[0]
+  assert.equal(tieUnit.tieStart, true)
+  assert.deepEqual(tieUnit.expectedMidi, [60])
+  const restUnit = timeline.units.find((unit) => unit.rest)
+  assert.ok(restUnit !== undefined)
+  assert.deepEqual(restUnit.expectedMidi, [])
+})
+
+test('Wait 模式核心：正确推进、错误不推进、休止/延音自动跳过', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/chord-tie-rest.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const timeline = scoreTimeline.buildScoreTimeline(score)
+  const core = new waitScoreCore.WaitScoreCore(timeline)
+
+  // 单元0: C4（延音开始）→ 正确
+  assert.equal(core.processNoteOn(60), 'none')
+  // 单元1: E4 → 正确
+  core.processNoteOn(64)
+  // 单元2: G4+C5 和弦（两个新 onset）→ 先按 G 不满足，再按 C5 满足
+  core.processNoteOn(67)
+  assert.equal(core.processNoteOn(72), 'none')
+  // 单元3: 休止 → 自动跳过
+  // 单元4: C4 延音停止（不需要重按）→ 自动跳过
+  // 单元5: F4 → 正确并完成
+  core.processNoteOn(65)
+  core.processNoteOn(69)
+  assert.equal(core.isComplete, true)
+  assert.equal(core.results.filter((entry) => entry.outcome === 'correct').length, 5)
+  assert.equal(core.results.filter((entry) => entry.outcome === 'skip').length, 2)
+  assert.equal(core.results.filter((entry) => entry.outcome === 'wrong').length, 0)
+
+  const wrongCore = new waitScoreCore.WaitScoreCore(timeline)
+  wrongCore.processNoteOn(61)
+  assert.equal(wrongCore.results[0].outcome, 'wrong')
+  assert.equal(wrongCore.currentIndex, 0, '错误输入不得推进')
+  wrongCore.processNoteOn(60)
+  assert.equal(wrongCore.currentIndex, 1)
+})
+
+test('Wait 模式：单旋律全部正确与错误计数', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/single-melody.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const timeline = scoreTimeline.buildScoreTimeline(score)
+  const core = new waitScoreCore.WaitScoreCore(timeline)
+
+  for (const midiNumber of [60, 62, 64, 65, 67, 69, 71, 72]) {
+    core.processNoteOn(midiNumber)
+  }
+  assert.equal(core.isComplete, true)
+  assert.equal(core.results.filter((entry) => entry.outcome === 'correct').length, 8)
+})
+
+test('MXL 容器：存储型 ZIP 可解出 MusicXML 文本', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/single-melody.xml'), 'utf8')
+  const zipBuffer = zipReader.createStoredZip([{ name: 'container.xml', content: xml }])
+  const container = zipReader.extractMxlContainer(zipBuffer)
+  assert.ok(container !== null)
+  assert.equal(container.fileName, 'container.xml')
+  assert.match(container.xmlText, /score-partwise/)
+  assert.match(container.xmlText, /Single Melody/)
+})
+
+test('练习片段存储：损坏回退、净化与 upsert', () => {
+  const values = new Map()
+  const storage = {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null
+    },
+    setItem(key, value) {
+      values.set(key, String(value))
+    }
+  }
+
+  assert.deepEqual(practiceSegment.readPracticeSegments(storage), { version: 1, segments: [] })
+  values.set(practiceSegment.PRACTICE_SEGMENT_STORAGE_KEY, '{bad')
+  assert.deepEqual(practiceSegment.readPracticeSegments(storage).segments, [])
+
+  const state = practiceSegment.upsertPracticeSegment({ version: 1, segments: [] }, {
+    id: 's1',
+    scoreId: 'demo',
+    title: '片段 A',
+    startMeasure: 1,
+    endMeasure: 2,
+    tempo: 80,
+    handMode: 'both',
+    practiceMode: 'wait',
+    loop: false,
+    notes: '',
+    createdAt: '2026-08-13T00:00:00.000Z',
+    updatedAt: '2026-08-13T00:00:00.000Z'
+  })
+  assert.equal(state.segments.length, 1)
+  const updated = practiceSegment.upsertPracticeSegment(state, {
+    ...state.segments[0],
+    tempo: 90,
+    updatedAt: '2026-08-13T01:00:00.000Z'
+  })
+  assert.equal(updated.segments.length, 1)
+  assert.equal(updated.segments[0].tempo, 90)
+  assert.equal(practiceSegment.writePracticeSegments(updated, storage), true)
+  assert.equal(practiceSegment.readPracticeSegments(storage).segments[0].id, 's1')
+})
+
+test('曲谱 Wait 练习 Hook 与页面接入逐事件总线且路由存在', () => {
+  const hookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useScoreWaitPractice.ts'), 'utf8')
+  const pageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ScorePracticePage.tsx'), 'utf8')
+  const appSource = fs.readFileSync(require.resolve('../src/renderer/src/App.tsx'), 'utf8')
+
+  assert.match(hookSource, /useMidiEventSubscription/)
+  assert.match(hookSource, /WaitScoreCore/)
+  assert.doesNotMatch(hookSource, /latestMidiEvent|latestEvent/)
+  assert.match(pageSource, /loadMusicXmlDocument/)
+  assert.match(pageSource, /extractMxlContainer/)
+  assert.match(pageSource, /accept="\.xml,\.musicxml,\.mxl"/)
+  assert.match(appSource, /ScorePracticePage/)
+  assert.doesNotMatch(pageSource, /返回首页/)
 })
 
 let failed = 0

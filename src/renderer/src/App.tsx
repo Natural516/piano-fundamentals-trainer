@@ -3,6 +3,7 @@ import { HomePage } from './components/HomePage'
 import { ChordV2Page } from './components/ChordV2Page'
 import { CoordinationPracticePage } from './components/CoordinationPracticePage'
 import { FreePracticePage } from './components/FreePracticePage'
+import { ScorePracticePage } from './components/ScorePracticePage'
 import { JudgementTestPage } from './components/JudgementTestPage'
 import { MidiTestPage } from './components/MidiTestPage'
 import { PlaceholderPage } from './components/PlaceholderPage'
@@ -264,6 +265,12 @@ function App(): JSX.Element {
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
             pianoAudio={pianoAudio}
+            onPracticeRunningChange={handlePracticeRunningChange}
+          />
+        ) : currentPage === 'score-practice' ? (
+          <ScorePracticePage
+            activeNotes={midi.activeNotes}
+            exitPromptOpen={pendingNavigation !== null}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'metronome' ? (

@@ -28,3 +28,10 @@ Legend: UNIT PASS / INTEGRATION PASS / REGRESSION PASS / HARDWARE QA PENDING / H
 | Progression step judgment | PASS | PASS | PASS | PENDING | — | — |
 | Arrangement variation + playability | PASS | PASS | PASS | — | — | MUSICAL PENDING |
 | Progression practice panel | PASS | PASS | PASS | — | PENDING | — |
+| MusicXML subset parser | PASS | PASS | PASS | — | — | — |
+| MXL (stored ZIP) container | PASS | PASS | PASS | — | — | — |
+| Score timeline (chord/tie/rest) | PASS | PASS | PASS | — | — | — |
+| Wait-mode engine | PASS | PASS | PASS | PENDING | — | — |
+| Practice segments storage | PASS | PASS | PASS | — | — | — |
+| Score practice page (demo/import) | PASS | PASS | PASS | — | PENDING | — |
+| Multi-measure notation rendering | — | — | — | — | PENDING | — |

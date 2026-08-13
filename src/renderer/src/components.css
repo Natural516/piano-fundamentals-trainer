@@ -1125,3 +1125,60 @@ body::before {
 .progression-steps-log span.is-wrong {
   color: var(--danger);
 }
+
+.score-practice-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.score-practice-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.score-practice-target {
+  margin-top: 16px;
+}
+
+.score-practice-target > strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  font-size: 18px;
+  text-align: center;
+}
+
+.score-practice-empty {
+  display: grid;
+  place-items: center;
+  padding: 28px 0;
+  color: var(--text-secondary);
+}
+
+.score-practice-empty strong {
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.score-practice-segment {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.score-practice-segment input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  font: inherit;
+}

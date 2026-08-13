@@ -13,6 +13,7 @@ export const PAGE_HASHES: Record<PageId, `#/${string}`> = {
   chords: '#/chords',
   coordination: '#/coordination',
   'free-practice': '#/free-practice',
+  'score-practice': '#/score-practice',
   'midi-test': '#/midi-test',
   metronome: '#/metronome',
   help: '#/help'

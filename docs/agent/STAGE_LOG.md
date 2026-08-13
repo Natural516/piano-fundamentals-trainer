@@ -80,3 +80,21 @@
 - Verification: typecheck 0, build 0, regression 75/75, diff --check 0.
 - Pending: musicality of 4536251 voicings (MUSICAL QA), real-hardware step timing (HARDWARE QA), more progression catalog (extensible definitions).
 - Commit: `stage4 harmony progressions and 4536251` (next).
+
+## Stage 5 — score practice 1.0 (MusicXML + Wait)
+
+- Goal: MusicXML/MXL subset parsing, score model, Wait-mode practice, practice segments, fixtures.
+- Implementation:
+  - `score/xmlMiniParser.ts` — dependency-free XML tree parser (attributes/text/comments/CDATA/entities).
+  - `score/musicXmlTypes.ts` + `musicXmlParser.ts` — part/measure/note/rest/chord/tie/voice/staff/key/time/tempo/accidental; MIDI from step+alter+octave.
+  - `score/zipReader.ts` — minimal stored-ZIP reader + `createStoredZip` (MXL containers).
+  - `score/scoreTimeline.ts` — onset grouping (chords/multi-voice), rest and tie units.
+  - `score/waitScoreCore.ts` — Wait engine: advance only when required new-onset notes satisfied; rests/tie-only auto-skip; ties keep sounding.
+  - `score/practiceSegment.ts` — segment storage v1 (scoreId/measures/tempo/hand/mode/loop).
+  - `hooks/useScoreWaitPractice.ts` + `components/ScorePracticePage.tsx` — built-in demo score, .xml/.musicxml/.mxl import, Wait practice with mini keyboard, segment save.
+  - New `score-practice` page id, home card, route.
+- Fixtures: `scripts/score-fixtures/` (single melody, chord/tie/rest, accidental/key change).
+- Tests: regression 75 → 84 (XML parser, MusicXML parsing, timeline grouping, Wait core, stored MXL, segment storage, wiring).
+- Verification: typecheck 0, build 0, regression 84/84, diff --check 0.
+- Pending: notation rendering (VexFlow multi-measure), Realtime/Follow (stage 6), real-score content (HUMAN QA), MXL deflate support (stored-only now).
+- Commit: `stage5 score practice 1.0` (next).

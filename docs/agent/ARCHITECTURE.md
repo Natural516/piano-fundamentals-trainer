@@ -44,7 +44,9 @@
 
 ## Score
 
-- Planned (Stage 5): MusicXML subset parser; Wait mode; fixtures.
+- `score/xmlMiniParser.ts` (no deps) → `musicXmlParser.ts` (part/measure/note/rest/chord/tie/voice/staff/key/time/tempo/accidental) → `scoreTimeline.ts` (onset units) → `waitScoreCore.ts` (Wait engine).
+- `zipReader.ts` reads stored-ZIP MXL containers (deflate unsupported → clear error).
+- `practiceSegment.ts` v1 storage; `ScorePracticePage` with demo score + import + Wait practice.
 
 ## Follow
 

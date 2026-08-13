@@ -11,6 +11,7 @@ export type PageId =
   | 'chords'
   | 'coordination'
   | 'free-practice'
+  | 'score-practice'
   | 'midi-test'
   | 'metronome'
   | 'help'
