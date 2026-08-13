@@ -44,3 +44,9 @@ Legend: UNIT PASS / INTEGRATION PASS / REGRESSION PASS / HARDWARE QA PENDING / H
 | AI key safety (no logs/export) | PASS | PASS | PASS | — | — | — |
 | AI coach output layers + validation | PASS | PASS | PASS | — | PENDING | — |
 | Music-AI variation validation | PASS | PASS | PASS | — | — | MUSICAL PENDING |
+| Unified backup (key-safe) | PASS | PASS | PASS | — | — | — |
+| Non-destructive restore | PASS | PASS | PASS | — | — | — |
+| First-run onboarding | PASS | PASS | PASS | — | PENDING | — |
+| About/Licenses | PASS | PASS | PASS | — | PENDING | — |
+| Windows unpacked packaging | PASS | PASS | PASS | — | PENDING | — |
+| NSIS installer final QA | — | — | — | — | PENDING | — |

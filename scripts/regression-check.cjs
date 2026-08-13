@@ -50,6 +50,9 @@ const periodStats = require('../src/renderer/src/analytics/periodStats.ts')
 const aiSettings = require('../src/renderer/src/ai/aiSettings.ts')
 const aiCoach = require('../src/renderer/src/ai/aiCoach.ts')
 const musicAi = require('../src/renderer/src/ai/musicAi.ts')
+const backup = require('../src/renderer/src/storage/backup.ts')
+const firstRun = require('../src/renderer/src/storage/firstRun.ts')
+const appInfo = require('../src/renderer/src/appInfo.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -2700,6 +2703,73 @@ test('AI 页面接线：设置页含 AI 卡、分析页含教练卡、无硬编�
   assert.match(hookSource, /createOpenAiCompatibleClient/)
   assert.doesNotMatch(hookSource + settingsSource + providerSource, /sk-[A-Za-z0-9]{8,}/)
   assert.match(providerSource, /Authorization: `Bearer/)
+})
+
+test('统一备份：构建、安全导出不含 Key、校验与恢复', () => {
+  const state = {
+    'practice-records': '[]',
+    'ai-settings.v1': JSON.stringify({ version: 1, enabled: true, config: { apiKey: 'sk-secret-123' } }),
+    'piano-volume.v1': '70'
+  }
+  const document = backup.buildBackup(state, '1.0.0-rc.1', new Date('2026-08-13T00:00:00.000Z'))
+  assert.equal(document.schemaVersion, 1)
+  assert.equal(document.appVersion, '1.0.0-rc.1')
+  assert.equal(document.createdAt, '2026-08-13T00:00:00.000Z')
+  const serialized = JSON.stringify(document)
+  assert.doesNotMatch(serialized, /sk-secret-123/)
+  assert.match(serialized, /apiKeyExported/)
+
+  assert.equal(backup.validateBackup(document), true)
+  assert.equal(backup.validateBackup({ schemaVersion: 99, data: {} }), false)
+  assert.equal(backup.validateBackup('bad'), false)
+  assert.equal(backup.validateBackup({ schemaVersion: 1, appVersion: 'v', createdAt: 'c', data: { k: 1 } }), false)
+
+  const values = new Map()
+  values.set('existing', 'keep-me')
+  const storage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) },
+    removeItem(key) { values.delete(key) }
+  }
+  const invalid = backup.restoreFromBackup({ bad: true }, storage)
+  assert.equal(invalid.ok, false)
+  assert.equal(values.get('existing'), 'keep-me')
+
+  const valid = backup.restoreFromBackup(document, storage)
+  assert.equal(valid.ok, true)
+  assert.equal(valid.restoredKeys.length, 3)
+  assert.equal(values.get('piano-volume.v1'), '70')
+})
+
+test('首次启动标记与应用信息（版本与许可）', () => {
+  const values = new Map()
+  const storage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) }
+  }
+  assert.equal(firstRun.isFirstRun(storage), true)
+  firstRun.completeFirstRun(storage)
+  assert.equal(firstRun.isFirstRun(storage), false)
+
+  assert.equal(appInfo.APP_VERSION, '1.0.0-rc.1')
+  const salamander = appInfo.APP_LICENSES.find((entry) => entry.name.includes('Salamander'))
+  assert.equal(salamander.license, 'CC BY 3.0')
+  assert.ok(appInfo.APP_LICENSES.some((entry) => entry.name === 'VexFlow'))
+})
+
+test('产品化接线：设置页含数据/关于、应用含首次启动、版本为 RC', () => {
+  const settingsSource = fs.readFileSync(require.resolve('../src/renderer/src/components/SettingsPage.tsx'), 'utf8')
+  const appSource = fs.readFileSync(require.resolve('../src/renderer/src/App.tsx'), 'utf8')
+  const welcomeSource = fs.readFileSync(require.resolve('../src/renderer/src/components/FirstRunWelcome.tsx'), 'utf8')
+  const packageJson = JSON.parse(fs.readFileSync(require.resolve('../package.json'), 'utf8'))
+
+  assert.match(settingsSource, /下载备份/)
+  assert.match(settingsSource, /恢复备份/)
+  assert.match(settingsSource, /关于/)
+  assert.match(settingsSource, /APP_VERSION/)
+  assert.match(appSource, /FirstRunWelcome/)
+  assert.match(welcomeSource, /开始使用/)
+  assert.equal(packageJson.version, '1.0.0-rc.1')
 })
 
 let failed = 0

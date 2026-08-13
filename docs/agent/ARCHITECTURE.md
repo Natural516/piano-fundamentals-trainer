@@ -73,3 +73,8 @@
 - `ai/aiSettings.ts`: local settings v1; `toSafeAiSettingsExport` never includes the key.
 - `ai/aiCoach.ts`: structured snapshots → system/user prompts → layered JSON output → validation (no record mutation / auto-promotion claims) → fallback.
 - `ai/musicAi.ts`: deterministic variation generation passed through playability + voice-leading validation [HEURISTIC].
+
+## Storage / Backup
+
+- `storage/backup.ts`: unified backup (schemaVersion 1, appVersion, createdAt); AI key excluded from export; restore validates structure before writing; invalid input never destroys existing data.
+- `storage/firstRun.ts`: onboarding flag.

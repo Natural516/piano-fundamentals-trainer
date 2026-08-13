@@ -1197,6 +1197,56 @@ body::before {
   margin-top: 14px;
 }
 
+.settings-about-licenses {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-about-licenses li {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.first-run-backdrop {
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--bg-overlay);
+}
+
+.first-run-card {
+  width: min(440px, calc(100vw - 48px));
+  padding: 26px;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-elevated);
+}
+
+.first-run-card h3 {
+  margin: 8px 0 0;
+  font-size: 24px;
+}
+
+.first-run-card p {
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.first-run-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
 .score-practice-file {
   position: absolute;
   width: 1px;

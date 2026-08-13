@@ -2,6 +2,8 @@ import { AppButton } from './AppButton'
 import { AppCard } from './AppCard'
 import { ThemeSwitcher } from './ThemeSwitcher'
 import { useState } from 'react'
+import { APP_LICENSES, APP_VERSION } from '../appInfo'
+import { buildBackup, collectCurrentStorageState, exportBackupToFile, restoreFromBackup, validateBackup } from '../storage/backup'
 import type { UsePianoAudioResult } from '../hooks/usePianoAudio'
 import { PIANO_AUDIO_MODE_LABELS, type PianoAudioMode } from '../audio/pianoAudioTypes'
 import { useAiCoach } from '../hooks/useAiCoach'
@@ -143,6 +145,59 @@ export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX
             {aiStatus ? <p className="settings-audio__status">{aiStatus}</p> : null}
             <p className="settings-audio__status">未配置 AI 时，识谱、节奏、和弦、教材、曲谱、记录、统计与计划全部正常。</p>
           </div>
+        </AppCard>
+
+        <AppCard as="section" className="settings-card">
+          <div className="panel-title-row">
+            <div>
+              <h3>数据</h3>
+              <p>统一备份与恢复；备份不包含 AI API Key（仅保留已配置标记）。</p>
+            </div>
+          </div>
+          <div className="settings-audio__actions">
+            <AppButton variant="secondary" onClick={() => exportBackupToFile(buildBackup(collectCurrentStorageState(), APP_VERSION))}>
+              下载备份
+            </AppButton>
+            <input
+              aria-label="恢复备份"
+              className="score-practice-file"
+              type="file"
+              accept=".json"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (!file) return
+                void file.text().then((text) => {
+                  try {
+                    const parsed = JSON.parse(text)
+                    if (!validateBackup(parsed)) {
+                      alert('备份结构无效，未修改任何现有数据')
+                      return
+                    }
+                    const result = restoreFromBackup(parsed)
+                    alert(result.message)
+                  } catch {
+                    alert('备份文件无法解析，未修改任何现有数据')
+                  }
+                })
+              }}
+            />
+            <AppButton variant="ghost" onClick={() => {
+              const input = document.querySelector<HTMLInputElement>('input[aria-label="恢复备份"]')
+              input?.click()
+            }}>恢复备份</AppButton>
+          </div>
+        </AppCard>
+
+        <AppCard as="section" className="settings-card">
+          <div className="panel-title-row">
+            <div><h3>关于</h3><p>版本与第三方许可。</p></div>
+          </div>
+          <p className="settings-audio__status">钢琴基本功训练器 · 版本 {APP_VERSION}（Release Candidate）</p>
+          <ul className="settings-about-licenses">
+            {APP_LICENSES.map((entry) => (
+              <li key={entry.name}>{entry.name} {entry.version} · {entry.license} · {entry.usage}</li>
+            ))}
+          </ul>
         </AppCard>
 
       </div>

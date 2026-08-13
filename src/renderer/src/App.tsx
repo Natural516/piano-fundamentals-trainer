@@ -5,6 +5,8 @@ import { CoordinationPracticePage } from './components/CoordinationPracticePage'
 import { FreePracticePage } from './components/FreePracticePage'
 import { ScorePracticePage } from './components/ScorePracticePage'
 import { AnalyticsPage } from './components/AnalyticsPage'
+import { FirstRunWelcome } from './components/FirstRunWelcome'
+import { isFirstRun } from './storage/firstRun'
 import { JudgementTestPage } from './components/JudgementTestPage'
 import { MidiTestPage } from './components/MidiTestPage'
 import { PlaceholderPage } from './components/PlaceholderPage'
@@ -59,6 +61,7 @@ function getInitialPage(): PageId {
 function App(): JSX.Element {
   const [currentPage, setCurrentPage] = useState<PageId>(getInitialPage)
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null)
+  const [showFirstRun, setShowFirstRun] = useState(() => isFirstRun())
   const currentPageRef = useRef(currentPage)
   const practiceRunningRef = useRef(false)
   const pendingNavigationRef = useRef<PendingNavigation | null>(null)
@@ -282,6 +285,7 @@ function App(): JSX.Element {
           <PlaceholderPage title={currentTitle} onBackHome={() => handleNavigate('home')} />
         )}
         </main>
+        {showFirstRun ? <FirstRunWelcome onClose={() => setShowFirstRun(false)} /> : null}
         {isHomePage ? (
           <RightInfoPanel
             recentRecords={practiceHistory.recentRecords}

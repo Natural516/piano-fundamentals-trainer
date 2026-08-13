@@ -128,3 +128,17 @@
 - Verification: typecheck 0, build 0, regression 93/93, diff --check 0.
 - Pending: real provider integration (HUMAN QA), AI suggestions quality (HUMAN QA), DeepSeek/OpenAI live test (HUMAN QA).
 - Commit: `stage7 ai coach` (next).
+
+## Stage 8 — productization / Release Candidate
+
+- Goal: unified backup/restore, first-run onboarding, About/licenses, RC versioning, Windows packaging.
+- Implementation:
+  - `storage/backup.ts` — unified backup (schemaVersion/appVersion/createdAt), key-safe export (AI key excluded, apiKeyExported flag), structural validation, non-destructive restore.
+  - `storage/firstRun.ts` + `components/FirstRunWelcome.tsx` — 4-step first-launch flow.
+  - `appInfo.ts` — APP_VERSION 1.0.0-rc.1 + licenses (VexFlow MIT, Bravura OFL 1.1, React MIT, Electron MIT, Salamander CC BY 3.0).
+  - Settings page: organized Theme / Audio / AI / Data (backup+restore) / About cards.
+  - package.json version → 1.0.0-rc.1; `npm run pack` builds `release/win-unpacked/钢琴基本功训练器.exe`.
+- Tests: regression 93 → 96 (backup build/validate/restore/key-safe, first-run flag, app info, RC wiring).
+- Verification: typecheck 0, build 0, regression 96/96, diff --check 0, `npm run pack` exit 0.
+- Pending: NSIS installer final QA, theme 2.0 custom wallpapers (deferred, HUMAN QA), full plan 2.0 UI, Hanon/Czerny structured scores (CONTENT PARTIAL), Salamander samples (CONTENT PARTIAL), FP-30X hardware QA.
+- Commit: `checkpoint: stage8 release candidate` (next).
