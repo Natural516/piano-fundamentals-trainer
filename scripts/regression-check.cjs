@@ -34,6 +34,9 @@ const curriculumProgress = require('../src/renderer/src/curriculum/curriculumPro
 const chordIdentity = require('../src/renderer/src/chordV2/chordIdentity.ts')
 const voicing = require('../src/renderer/src/chordV2/voicing.ts')
 const harmony = require('../src/renderer/src/chordV2/harmony.ts')
+const progressions = require('../src/renderer/src/harmony/progressions.ts')
+const progressionTypes = require('../src/renderer/src/harmony/progressionTypes.ts')
+const arrangement = require('../src/renderer/src/harmony/arrangement.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -2163,6 +2166,78 @@ test('和弦 V2 页面与 Hook 接入逐事件总线且不使用 latestEvent', (
   assert.match(appSource, /ChordV2Page/)
   assert.match(pageSource, /onBack=\{/)
   assert.doesNotMatch(pageSource, /返回首页/)
+})
+
+test('进行模型：4536251 与四个常用进行定义完整且级数/功能正确', () => {
+  assert.equal(progressionTypes.PROGRESSION_IDS.length, 5)
+  const p453 = progressions.getProgressionDefinition('4536251')
+  assert.deepEqual(p453.steps.map((step) => step.degree), [4, 5, 3, 6, 2, 5, 1])
+  assert.deepEqual(p453.steps.map((step) => step.quality), ['major', 'major', 'minor', 'minor', 'minor', 'major', 'major'])
+
+  const model = progressions.buildProgression('4536251', 0)
+  assert.equal(model.steps.length, 7)
+  assert.deepEqual(model.steps.map((step) => step.roman), ['IV', 'V', 'III', 'VI', 'II', 'V', 'I'])
+  assert.deepEqual(model.steps.map((step) => step.function), [
+    'subdominant', 'dominant', 'other', 'other', 'other', 'dominant', 'tonic'
+  ])
+
+  const iiVI = progressions.buildProgression('ii-V-I', 0)
+  assert.deepEqual(iiVI.steps.map((step) => step.roman), ['II', 'V', 'I'])
+  assert.equal(progressions.getDiatonicRoot(0, 1), 0)
+  assert.equal(progressions.getDiatonicRoot(0, 5), 7)
+  assert.equal(progressions.getDiatonicRoot(0, 6), 9)
+
+  const fKey = progressions.buildProgression('I-IV-V-I', 5)
+  assert.deepEqual(fKey.steps.map((step) => step.identity.root), [5, 10, 0, 5])
+})
+
+test('进行步骤判定与符号输出', () => {
+  const model = progressions.buildProgression('ii-V-I', 0)
+  const step = model.steps[0]
+  assert.equal(progressions.getProgressionStepSymbol(step), 'Dm')
+  assert.equal(progressions.judgeProgressionStep(step, step.voicing.exactNotes), 'correct')
+  const wrongNotes = step.voicing.exactNotes.map((note, index) => index === 0 ? note + 1 : note)
+  assert.equal(progressions.judgeProgressionStep(step, wrongNotes), 'wrong')
+})
+
+test('编配变化：纹理选择、可演奏性校验与 Voice Leading 评分', () => {
+  const variation = arrangement.createArrangementVariation('4536251', 0, () => 0.1)
+  assert.equal(variation.progressionId, '4536251')
+  assert.equal(variation.steps.length, 7)
+  assert.ok(variation.steps.every((step) => step.texture === 'block' || step.texture === 'arpeggio'))
+  assert.ok(variation.voiceLeadingScore >= 0)
+  assert.equal(typeof variation.playable, 'boolean')
+
+  const identity = chordIdentity.getChordV2Identity(0, 'major')
+  const wideVoicing = voicing.createDefaultVoicing(identity, {
+    registerLowest: 36,
+    registerHighest: 84,
+    bassConstraint: 0
+  })
+  assert.equal(arrangement.validatePlayability(wideVoicing, { registerHighest: 84 }), true)
+  assert.equal(arrangement.validatePlayability({
+    ...wideVoicing,
+    exactNotes: [36, 72],
+    range: { lowest: 36, highest: 84 }
+  }, { registerHighest: 84, maxSpacingSemitones: 24 }), false, '过宽声部间距应判为不可演奏')
+
+  const formatted = arrangement.formatArrangementStep(variation.steps[0])
+  assert.match(formatted, /IV/)
+  assert.match(formatted, /柱式|分解/)
+})
+
+test('进行练习 Hook 与面板接入逐事件总线且不使用 latestEvent', () => {
+  const hookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useProgressionPractice.ts'), 'utf8')
+  const panelSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ProgressionPracticePanel.tsx'), 'utf8')
+  const chordPageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ChordV2Page.tsx'), 'utf8')
+
+  assert.match(hookSource, /useMidiEventSubscription/)
+  assert.match(hookSource, /buildProgression/)
+  assert.doesNotMatch(hookSource, /latestMidiEvent|latestEvent/)
+  assert.match(panelSource, /useProgressionPractice/)
+  assert.match(panelSource, /PracticeReportModal/)
+  assert.match(chordPageSource, /ProgressionPracticePanel/)
+  assert.match(chordPageSource, /practice-content-toggle/)
 })
 
 let failed = 0

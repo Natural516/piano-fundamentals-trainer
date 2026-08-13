@@ -12,6 +12,8 @@ Classification: [VERIFIED] hard-checkable / [HEURISTIC] score-only / [HYPOTHESIS
 - [VERIFIED] Chord V2 identity pitch-class sets (18 qualities) and standard symbol spellings.
 - [HEURISTIC] Voice-leading score (common tones + bass movement) — advisory only.
 - [HEURISTIC] Open-voicing doubling heuristics — advisory only.
+- [VERIFIED] Diatonic progression definitions: 4536251 = IV-V-iii-vi-ii-V-I (major-key diatonic qualities).
+- [HEURISTIC] Arrangement variation generation and voice-leading score — advisory only, never auto-marked wrong.
 - [HEURISTIC] (pending stage 3/4) chord voicing omissions and open voicing choices.
 - [HYPOTHESIS] (pending stage 4) 4536251 harmonic function mapping until verified against reliable sources.
 

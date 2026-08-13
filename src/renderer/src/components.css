@@ -1053,3 +1053,75 @@ body::before {
 .mini-keyboard .mini-key--black.is-wrong {
   background: #6366f1;
 }
+
+.practice-content-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.practice-content-toggle button {
+  appearance: none;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: var(--text-secondary);
+  background: var(--bg-button);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.practice-content-toggle button.is-active {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  background: var(--bg-selected);
+}
+
+.progression-panel-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.progression-step-display {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+  text-align: center;
+}
+
+.progression-step-display strong {
+  color: var(--text-primary);
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.progression-step-display span {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.progression-steps-log {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.progression-steps-log span {
+  padding: 6px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.progression-steps-log span.is-correct {
+  color: var(--accent-cyan);
+}
+
+.progression-steps-log span.is-wrong {
+  color: var(--danger);
+}

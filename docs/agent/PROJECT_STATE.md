@@ -4,7 +4,7 @@ Updated: 2026-08-13
 
 ## Current stage
 
-Stage 3 complete — entering Stage 4 (harmony progressions + 4536251).
+Stage 4 complete — entering Stage 5 (score practice 1.0 / MusicXML).
 
 ## Completed stages
 
@@ -13,12 +13,13 @@ Stage 3 complete — entering Stage 4 (harmony progressions + 4536251).
 - Stage 1: PianoSampler engine, SFZ loader, audio mode + piano volume, settings UI; regression 60/60.
 - Stage 2: free practice + MIDI recording/playback, curriculum catalog (Hanon/Czerny frameworks, scale/coordination inheritance), progress storage; regression 65/65.
 - Stage 3: chord V2 model (identity/inversion/voicing/texture/harmony), layered judgment, symbol parser, V2 practice page + mini keyboard; regression 71/71.
+- Stage 4: progression model + 4536251 + 4 common progressions, arrangement variations, progression practice panel; regression 75/75.
 
 ## Recent checkpoint
 
 `c717616` checkpoint: complete first UI and interaction optimization (HEAD before stage 0).
-`5bf63b4` stage0 · `b3c9356` stage1 · `4cedebd` stage2.
-Next checkpoint: `stage3 chord practice v2`.
+`5bf63b4` stage0 · `b3c9356` stage1 · `4cedebd` stage2 · `373cf2e` stage3.
+Next checkpoint: `stage4 harmony progressions and 4536251`.
 
 ## Key architecture
 
@@ -28,6 +29,7 @@ Next checkpoint: `stage3 chord practice v2`.
 - Audio: `PianoSampler` (Web Audio) — sample anchors + synthesized fallback, polyphony/stealing, CC64 sustain; audio mode builtin/silent/external; independent piano volume.
 - Curriculum: `curriculum/` catalog + progress v1; free practice recording/playback in `midi/midiRecording.ts` + `hooks/useFreePractice.ts`.
 - Chord V2: `chordV2/` identity/voicing/harmony pure modules; layered judgment; `ChordV2Page` + `MiniKeyboard`.
+- Harmony: `harmony/` progression definitions + builder + arrangement variation + playability; `ProgressionPracticePanel`.
 
 ## Main entry points
 
@@ -41,7 +43,7 @@ Next checkpoint: `stage3 chord practice v2`.
 
 - `npm run typecheck`
 - `npm run build`
-- `npm run test:regression` (71 tests)
+- `npm run test:regression` (75 tests)
 - `git diff --check`
 
 ## Current P0/P1

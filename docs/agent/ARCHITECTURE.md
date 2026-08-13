@@ -37,6 +37,11 @@
 - Layered judgment: identity (pitch-class), inversion (lowest note), exact (pitch-set equality).
 - Stage 4 will add progression + 4536251 + arrangement on top of these layers.
 
+## Harmony / 4536251
+
+- `harmony/progressions.ts`: diatonic progression definitions (4536251 = IV-V-iii-vi-ii-V-I etc.), roman numerals, verified I/IV/V functions, smooth-bass voicing selection, step judgment.
+- `harmony/arrangement.ts`: texture candidate generation + playability validation + voice-leading scoring [HEURISTIC]; `ArrangementVariation` output is advisory, never hard-judged.
+
 ## Score
 
 - Planned (Stage 5): MusicXML subset parser; Wait mode; fixtures.

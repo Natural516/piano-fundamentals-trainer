@@ -24,3 +24,7 @@ Legend: UNIT PASS / INTEGRATION PASS / REGRESSION PASS / HARDWARE QA PENDING / H
 | Chord V2 arpeggio state machine | PASS | PASS | PASS | PENDING | — | — |
 | Chord V2 harmony function | PASS | PASS | PASS | — | — | MUSICAL PENDING |
 | Chord V2 page + mini keyboard | PASS | PASS | PASS | — | PENDING | — |
+| Progression model + 4536251 | PASS | PASS | PASS | — | — | MUSICAL PENDING |
+| Progression step judgment | PASS | PASS | PASS | PENDING | — | — |
+| Arrangement variation + playability | PASS | PASS | PASS | — | — | MUSICAL PENDING |
+| Progression practice panel | PASS | PASS | PASS | — | PENDING | — |

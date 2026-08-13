@@ -8,6 +8,7 @@ import { PracticePageHeader } from './PracticePageHeader'
 import { PracticeReportModal } from './PracticeReportModal'
 import { PracticeSettingsDrawer } from './PracticeSettingsDrawer'
 import { PracticeStatBar } from './PracticeStatBar'
+import { ProgressionPracticePanel } from './ProgressionPracticePanel'
 
 interface ChordV2PageProps {
   activeNotes: ActiveMidiNote[]
@@ -37,6 +38,7 @@ export function ChordV2Page({
   onPracticeRunningChange
 }: ChordV2PageProps): JSX.Element {
   const chord = useChordV2Practice()
+  const [content, setContent] = useState<'chord' | 'progression'>('chord')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draftJudgeMode, setDraftJudgeMode] = useState<ChordV2JudgeMode>(chord.judgeMode)
   const [draftInversionMode, setDraftInversionMode] = useState<ChordV2InversionMode>(chord.inversionMode)
@@ -97,6 +99,19 @@ export function ChordV2Page({
       />
 
       <div className="practice-single-column">
+        <div className="practice-content-toggle">
+          <button className={content === 'chord' ? 'is-active' : ''} type="button" onClick={() => setContent('chord')}>单和弦</button>
+          <button className={content === 'progression' ? 'is-active' : ''} type="button" onClick={() => setContent('progression')}>进行训练</button>
+        </div>
+
+        {content === 'progression' ? (
+          <ProgressionPracticePanel
+            activeNotes={activeNotes}
+            exitPromptOpen={exitPromptOpen}
+            onPracticeRunningChange={onPracticeRunningChange}
+          />
+        ) : (
+        <>
         <section className={`midi-panel chord-v2-panel practice-primary-panel ${chord.feedback ? `has-${feedbackType}` : ''}`}>
           <div className="panel-title-row">
             <div>
@@ -146,6 +161,8 @@ export function ChordV2Page({
           { label: '转位错误', value: chord.report.wrongBass },
           { label: '正确率', value: chord.completedQuestions > 0 ? `${chord.report.accuracy}%` : '—' }
         ]} />
+        </>
+        )}
       </div>
 
       <PracticeSettingsDrawer

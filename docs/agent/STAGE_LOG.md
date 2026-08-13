@@ -66,3 +66,17 @@
 - Verification: typecheck 0, build 0, regression 71/71, diff --check 0.
 - Pending: musicality of voicings (MUSICAL QA), real-hardware block/arpeggio feel (HARDWARE QA), progression/4536251 (stage 4), old chord page kept for stage 4 content.
 - Commit: `stage3 chord practice v2` (next).
+
+## Stage 4 — harmony progressions + 4536251 + arrangement
+
+- Goal: progression training and arrangement candidates built on the chord V2 layers.
+- Implementation:
+  - `harmony/progressionTypes.ts` — ProgressionDefinition/Model/StepModel, ArrangementVariation, 5 progression ids.
+  - `harmony/progressions.ts` — diatonic definitions (4536251 = IV-V-iii-vi-ii-V-I, I-IV-V-I, I-V-vi-IV, ii-V-I, I-vi-IV-V), roman numerals, I/IV/V function, smooth-bass voicing, step symbol + judgment.
+  - `harmony/arrangement.ts` — texture candidates (block/arpeggio), playability validation (range/spacing), voice-leading scoring [HEURISTIC], variation generator.
+  - `hooks/useProgressionPractice.ts` — bus-subscribed step engine (block window / ordered arpeggio), per-step results, report.
+  - `components/ProgressionPracticePanel.tsx` — progression/key/texture controls, step display, mini keyboard, feedback, report; ChordV2Page content toggle (单和弦 / 进行训练).
+- Tests: regression 71 → 75 (definitions/degrees/functions, roots per key, step symbol/judgment, arrangement validation + scoring, wiring).
+- Verification: typecheck 0, build 0, regression 75/75, diff --check 0.
+- Pending: musicality of 4536251 voicings (MUSICAL QA), real-hardware step timing (HARDWARE QA), more progression catalog (extensible definitions).
+- Commit: `stage4 harmony progressions and 4536251` (next).
