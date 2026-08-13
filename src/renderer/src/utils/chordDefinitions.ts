@@ -1,7 +1,9 @@
-import { midiNumberToNoteName } from './midiNotes'
 import { CHORD_INVERSION_LABELS, CHORD_QUALITY_NAMES, getEnabledInversions, invertChordNotes } from './chordPatterns'
+import { getMajorKeySignature } from './musicKeySignatures'
+import { spellMidiPitch } from './musicPitchSpelling'
 import type {
   ChordInversionMode,
+  ChordKeySignature,
   ChordTarget,
   SeventhChordQuality,
   SeventhChordQualityFilter
@@ -13,6 +15,7 @@ export interface SeventhChordDefinition {
   rootMidi: number
   quality: SeventhChordQuality
   notes: number[]
+  degree?: number
 }
 
 const ROOTS = [
@@ -51,13 +54,15 @@ export const SEVENTH_CHORD_DEFINITIONS: SeventhChordDefinition[] = ROOTS.flatMap
 
 export function getSeventhChordTargets(
   inversionMode: ChordInversionMode,
-  qualityFilter: SeventhChordQualityFilter = 'all'
+  qualityFilter: SeventhChordQualityFilter = 'all',
+  keySignature: ChordKeySignature = 'C'
 ): ChordTarget[] {
-  const definitions = qualityFilter === 'all'
-    ? SEVENTH_CHORD_DEFINITIONS
-    : SEVENTH_CHORD_DEFINITIONS.filter((definition) => definition.quality === qualityFilter)
+  const definitions = createDiatonicSeventhChordDefinitions(keySignature)
+  const filteredDefinitions = qualityFilter === 'all'
+    ? definitions
+    : definitions.filter((definition) => definition.quality === qualityFilter)
 
-  return definitions.flatMap((definition) =>
+  return filteredDefinitions.flatMap((definition) =>
     getEnabledInversions(inversionMode, 4).map((inversion) => {
       const notes = invertChordNotes(definition.notes, inversion)
       const qualityName = CHORD_QUALITY_NAMES[definition.quality]
@@ -72,10 +77,43 @@ export function getSeventhChordTargets(
         inversion,
         inversionName,
         notes,
-        noteNames: notes.map(midiNumberToNoteName),
+        noteNames: notes.map((note) => spellMidiPitch(note, keySignature, 'grand').spelling),
         label: `${definition.root} ${qualityName} · ${inversionName}`,
+        keySignature,
+        degree: definition.degree,
         inputStyle: 'block'
       }
     })
   )
+}
+
+const MAJOR_SCALE_OFFSETS = [0, 2, 4, 5, 7, 9, 11] as const
+const DIATONIC_SEVENTH_QUALITIES: readonly SeventhChordQuality[] = [
+  'major7', 'minor7', 'minor7', 'major7', 'dominant7', 'minor7', 'half-diminished7'
+]
+
+function getKeyRootMidi(keySignature: ChordKeySignature): number {
+  const pitchClass = getMajorKeySignature(keySignature).tonicPitchClass
+  const midi = 60 + pitchClass
+  return midi > 65 ? midi - 12 : midi
+}
+
+export function createDiatonicSeventhChordDefinitions(
+  keySignature: ChordKeySignature
+): SeventhChordDefinition[] {
+  const key = getMajorKeySignature(keySignature)
+  const keyRootMidi = getKeyRootMidi(keySignature)
+
+  return key.scaleDegrees.map((degree, index) => {
+    const quality = DIATONIC_SEVENTH_QUALITIES[index]
+    const rootMidi = keyRootMidi + MAJOR_SCALE_OFFSETS[index]
+    return {
+      id: `${keySignature}-${index + 1}-${quality}`,
+      root: degree.spelling,
+      rootMidi,
+      quality,
+      notes: SEVENTH_INTERVALS[quality].map((interval) => rootMidi + interval),
+      degree: index + 1
+    }
+  })
 }

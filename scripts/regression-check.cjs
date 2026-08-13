@@ -23,9 +23,13 @@ function test(name, callback) {
 }
 
 const midiNotes = require('../src/renderer/src/utils/midiNotes.ts')
+const midiEventBus = require('../src/renderer/src/midi/midiEventBus.ts')
+const midiMessages = require('../src/renderer/src/midi/midiMessages.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
+const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
 const chordPatterns = require('../src/renderer/src/utils/chordPatterns.ts')
+const chordFeedback = require('../src/renderer/src/utils/chordFeedback.ts')
 const rhythmPatterns = require('../src/renderer/src/utils/rhythmPatterns.ts')
 const coordinationPatterns = require('../src/renderer/src/utils/coordinationPatterns.ts')
 const chordDefinitions = require('../src/renderer/src/utils/chordDefinitions.ts')
@@ -34,6 +38,10 @@ const chordTrainingContents = require('../src/renderer/src/utils/chordTrainingCo
 const timingSubdivisions = require('../src/renderer/src/utils/timingSubdivisions.ts')
 const sightReadingNotes = require('../src/renderer/src/utils/sightReadingNotes.ts')
 const sightReadingSession = require('../src/renderer/src/utils/sightReadingSession.ts')
+const sightReadingSettings = require('../src/renderer/src/utils/sightReadingSettings.ts')
+const musicKeySignatures = require('../src/renderer/src/utils/musicKeySignatures.ts')
+const musicPitchSpelling = require('../src/renderer/src/utils/musicPitchSpelling.ts')
+const musicStaffModel = require('../src/renderer/src/utils/musicStaffModel.ts')
 const themeTypes = require('../src/renderer/src/utils/themeTypes.ts')
 const themeStorage = require('../src/renderer/src/utils/themeStorage.ts')
 const displayPreferences = require('../src/renderer/src/utils/displayPreferences.ts')
@@ -82,18 +90,20 @@ test('通用单音、和弦、休止和时间判定', () => {
   assert.equal(Number.isNaN(report.averageOffsetMs), false)
 })
 
-test('识谱谱表、两档音域与洗牌袋', () => {
+test('识谱固定谱表范围、C4 归属与洗牌袋', () => {
   const trebleCommon = sightReadingNotes.getSightReadingNotesForClef('treble', 'common')
   const trebleExtended = sightReadingNotes.getSightReadingNotesForClef('treble', 'extended')
   const bassCommon = sightReadingNotes.getSightReadingNotesForClef('bass', 'common')
   const bassExtended = sightReadingNotes.getSightReadingNotesForClef('bass', 'extended')
   const grandCommon = sightReadingNotes.getSightReadingNotes({ staffMode: 'grand', range: 'common' })
 
-  assert.deepEqual([trebleCommon[0].midiNumber, trebleCommon.at(-1).midiNumber], [55, 79])
-  assert.deepEqual([trebleExtended[0].midiNumber, trebleExtended.at(-1).midiNumber], [48, 84])
-  assert.deepEqual([bassCommon[0].midiNumber, bassCommon.at(-1).midiNumber], [41, 60])
-  assert.deepEqual([bassExtended[0].midiNumber, bassExtended.at(-1).midiNumber], [36, 60])
+  assert.deepEqual([trebleCommon[0].midiNumber, trebleCommon.at(-1).midiNumber], [60, 88])
+  assert.deepEqual([trebleExtended[0].midiNumber, trebleExtended.at(-1).midiNumber], [60, 88])
+  assert.deepEqual([bassCommon[0].midiNumber, bassCommon.at(-1).midiNumber], [36, 64])
+  assert.deepEqual([bassExtended[0].midiNumber, bassExtended.at(-1).midiNumber], [36, 64])
+  assert.deepEqual([grandCommon[0].midiNumber, grandCommon.at(-1).midiNumber], [36, 88])
   assert.equal(new Set(grandCommon.map((note) => note.midiNumber)).size, grandCommon.length)
+  assert.equal(grandCommon.find((note) => note.midiNumber === 59).clef, 'bass')
   assert.equal(grandCommon.find((note) => note.midiNumber === 60).clef, 'treble')
   assert.ok([...trebleExtended, ...bassExtended].every((note) => Number.isFinite(note.staffPosition)))
 
@@ -112,6 +122,185 @@ test('识谱谱表、两档音域与洗牌袋', () => {
   const occurrenceCounts = Array.from(new Set(grandCommon.map((note) => note.midiNumber)))
     .map((midiNumber) => sequence.filter((note) => note.midiNumber === midiNumber).length)
   assert.ok(Math.max(...occurrenceCounts) - Math.min(...occurrenceCounts) <= 1)
+})
+
+test('十五种常用大调制谱元数据、同音异名与调号顺序', () => {
+  const keys = musicKeySignatures.MAJOR_KEY_SIGNATURES
+  const displayOrder = ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B', 'Cb']
+  assert.equal(keys.length, 15)
+  assert.equal(new Set(keys.map((key) => key.id)).size, 15)
+  assert.ok(keys.every((key) => key.scaleDegrees.length === 7))
+  assert.deepEqual(musicKeySignatures.MAJOR_KEY_DISPLAY_ORDER, displayOrder)
+  assert.deepEqual(
+    musicKeySignatures.MAJOR_KEY_DISPLAY_SIGNATURES.map((key) => key.id),
+    displayOrder
+  )
+  assert.deepEqual(musicKeySignatures.getMajorKeySignature('D').signatureOrder, ['F', 'C'])
+  assert.deepEqual(musicKeySignatures.getMajorKeySignature('Db').signatureOrder, ['B', 'E', 'A', 'D', 'G'])
+  assert.equal(musicKeySignatures.getScaleDegree('F#', 7).spelling, 'E#')
+  assert.equal(musicKeySignatures.getScaleDegree('F#', 7).pitchClass, 5)
+  assert.equal(musicKeySignatures.getScaleDegree('Bb', 1).spelling, 'Bb')
+  assert.equal(musicKeySignatures.getScaleDegree('Db', 4).spelling, 'Gb')
+  assert.deepEqual(
+    musicKeySignatures.getMajorKeySignature('C#').scaleDegrees.map((degree) => degree.spelling),
+    ['C#', 'D#', 'E#', 'F#', 'G#', 'A#', 'B#']
+  )
+  assert.deepEqual(
+    musicKeySignatures.getMajorKeySignature('Gb').scaleDegrees.map((degree) => degree.spelling),
+    ['Gb', 'Ab', 'Bb', 'Cb', 'Db', 'Eb', 'F']
+  )
+  assert.deepEqual(
+    musicKeySignatures.getMajorKeySignature('Cb').scaleDegrees.map((degree) => degree.spelling),
+    ['Cb', 'Db', 'Eb', 'Fb', 'Gb', 'Ab', 'Bb']
+  )
+  assert.deepEqual(
+    musicKeySignatures.getMajorKeySignature('C#').scaleDegrees.map((degree) => degree.pitchClass),
+    [1, 3, 5, 6, 8, 10, 0]
+  )
+  assert.deepEqual(
+    musicKeySignatures.getMajorKeySignature('Gb').scaleDegrees.map((degree) => degree.pitchClass),
+    [6, 8, 10, 11, 1, 3, 5]
+  )
+  assert.deepEqual(
+    musicKeySignatures.getMajorKeySignature('Cb').scaleDegrees.map((degree) => degree.pitchClass),
+    [11, 1, 3, 4, 6, 8, 10]
+  )
+  assert.deepEqual(
+    ['C#', 'Gb', 'Cb'].map((key) => {
+      const metadata = musicKeySignatures.getMajorKeySignature(key)
+      return [metadata.vexFlowKey, metadata.accidentalCount, metadata.accidentalType]
+    }),
+    [['C#', 7, 'sharp'], ['Gb', 6, 'flat'], ['Cb', 7, 'flat']]
+  )
+  assert.deepEqual(musicKeySignatures.getMajorKeySignature('C#').signatureOrder, ['F', 'C', 'G', 'D', 'A', 'E', 'B'])
+  assert.deepEqual(musicKeySignatures.getMajorKeySignature('Gb').signatureOrder, ['B', 'E', 'A', 'D', 'G', 'C'])
+  assert.deepEqual(musicKeySignatures.getMajorKeySignature('Cb').signatureOrder, ['B', 'E', 'A', 'D', 'G', 'C', 'F'])
+
+  assert.equal(musicPitchSpelling.spellMidiPitch(65, 'F#', 'treble').spelling, 'E#4')
+  assert.equal(musicPitchSpelling.spellMidiPitch(70, 'Bb', 'treble').spelling, 'Bb4')
+  assert.equal(musicPitchSpelling.spellMidiPitch(66, 'Db', 'treble').spelling, 'Gb4')
+  assert.equal(musicPitchSpelling.spellMidiPitch(60, 'C#', 'treble').spelling, 'B#3')
+  assert.equal(musicPitchSpelling.spellMidiPitch(59, 'Cb', 'bass').spelling, 'Cb4')
+  assert.equal(musicPitchSpelling.spellMidiPitch(64, 'Cb', 'treble').spelling, 'Fb4')
+  assert.equal(musicPitchSpelling.spellMidiPitch(65, 'C#', 'treble').spelling, 'E#4')
+  assert.equal(musicPitchSpelling.spellMidiPitch(66, 'Gb', 'treble').spelling, 'Gb4')
+  assert.equal(musicPitchSpelling.spellMidiPitch(60, 'C#', 'treble').displayAccidental, null)
+  assert.equal(musicPitchSpelling.spellMidiPitch(59, 'Cb', 'bass').displayAccidental, null)
+  assert.equal(musicPitchSpelling.spellMidiPitch(60, 'Cb', 'treble').displayAccidental, 'n')
+})
+
+test('十五调调内与半音识谱候选遵守固定音域、标准拼写和题袋规则', () => {
+  for (const key of musicKeySignatures.MAJOR_KEY_IDS) {
+    const metadata = musicKeySignatures.getMajorKeySignature(key)
+    const spellingByPitchClass = new Map(
+      metadata.scaleDegrees.map((degree) => [degree.pitchClass, degree.spelling])
+    )
+
+    for (const staffMode of ['treble', 'bass', 'grand']) {
+      const [start, end] = sightReadingNotes.SIGHT_READING_MIDI_RANGES[staffMode]
+      const diatonic = sightReadingNotes.getSightReadingNotes({
+        staffMode, keySignature: key, notePoolMode: 'diatonic'
+      })
+      const chromatic = sightReadingNotes.getSightReadingNotes({
+        staffMode, keySignature: key, notePoolMode: 'chromatic'
+      })
+
+      assert.ok(diatonic.length > 0)
+      assert.ok(diatonic.every((note) => note.midiNumber >= start && note.midiNumber <= end))
+      assert.ok(diatonic.every((note) => spellingByPitchClass.has(note.midiNumber % 12)))
+      assert.ok(diatonic.every((note) => note.pitchClass === spellingByPitchClass.get(note.midiNumber % 12)))
+      assert.ok(diatonic.every((note) => note.notation.displayAccidental === null))
+      assert.equal(new Set(diatonic.map((note) => note.midiNumber % 12)).size, 7)
+
+      assert.equal(chromatic.length, end - start + 1)
+      assert.ok(chromatic.length > diatonic.length)
+      assert.ok(chromatic.some((note) => !spellingByPitchClass.has(note.midiNumber % 12)))
+
+      for (const notes of [diatonic, chromatic]) {
+        const previousMidiNumber = notes[0].midiNumber
+        const bag = sightReadingNotes.createShuffledSightReadingBag(notes, previousMidiNumber, () => 0)
+        assert.equal(bag.length, notes.length)
+        assert.notEqual(bag[0].midiNumber, previousMidiNumber)
+      }
+    }
+  }
+
+  assert.equal(musicKeySignatures.getScaleDegree('C#', 3).spelling, 'E#')
+  assert.equal(musicKeySignatures.getScaleDegree('C#', 3).pitchClass, 5)
+  assert.equal(musicKeySignatures.getScaleDegree('C#', 7).spelling, 'B#')
+  assert.equal(musicKeySignatures.getScaleDegree('C#', 7).pitchClass, 0)
+  assert.equal(musicKeySignatures.getScaleDegree('Gb', 4).spelling, 'Cb')
+  assert.equal(musicKeySignatures.getScaleDegree('Gb', 4).pitchClass, 11)
+  assert.equal(musicKeySignatures.getScaleDegree('Cb', 4).spelling, 'Fb')
+  assert.equal(musicKeySignatures.getScaleDegree('Cb', 4).pitchClass, 4)
+
+  const chromaticAccidentals = [
+    sightReadingNotes.getSightReadingNoteByMidi(65, 'treble', 'extended', 'G', 'chromatic'),
+    sightReadingNotes.getSightReadingNoteByMidi(71, 'treble', 'extended', 'F', 'chromatic'),
+    sightReadingNotes.getSightReadingNoteByMidi(64, 'treble', 'extended', 'C#', 'chromatic'),
+    sightReadingNotes.getSightReadingNoteByMidi(65, 'treble', 'extended', 'Cb', 'chromatic')
+  ]
+  assert.deepEqual(chromaticAccidentals.map((note) => note.notation.displayAccidental), ['n', 'n', 'n', 'n'])
+  assert.deepEqual(chromaticAccidentals.map((note) => note.pitchClass), ['F', 'B', 'E', 'F'])
+  assert.equal(sightReadingNotes.getSightReadingNoteByMidi(65, 'treble', 'extended', 'G', 'diatonic'), null)
+})
+
+test('识谱设置迁移删除旧音域和旧时限并固定 5000ms', () => {
+  const migrated = sightReadingSettings.migrateSightReadingSettings({
+    staffMode: 'mixed', range: 'common', answerTimeLimitSeconds: 3,
+    customTimeLimit: 10, noteCount: 3, questionCount: 50, keySignature: 'bad'
+  })
+  assert.deepEqual(migrated, {
+    staffMode: 'grand', noteCount: 1, questionCount: 50, keySignature: 'C',
+    notePoolMode: 'diatonic', noteNameVisible: true
+  })
+  assert.equal('range' in migrated, false)
+  assert.equal('answerTimeLimitSeconds' in migrated, false)
+  assert.equal(sightReadingSettings.SIGHT_READING_ANSWER_TIMEOUT_MS, 5000)
+
+  assert.equal(sightReadingSettings.migrateSightReadingSettings({ notePoolMode: 'chromatic' }).notePoolMode, 'chromatic')
+  assert.equal(sightReadingSettings.migrateSightReadingSettings({ notePoolMode: 'invalid' }).notePoolMode, 'diatonic')
+  assert.equal(sightReadingSettings.migrateSightReadingSettings(null).notePoolMode, 'diatonic')
+
+  class SettingsStorage {
+    constructor() { this.values = new Map() }
+    getItem(key) { return this.values.get(key) ?? null }
+    setItem(key, value) { this.values.set(key, String(value)) }
+  }
+  const hadWindow = Object.prototype.hasOwnProperty.call(global, 'window')
+  const previousWindow = global.window
+  const localStorage = new SettingsStorage()
+  global.window = { localStorage }
+  try {
+    sightReadingSettings.writeSightReadingSettings({
+      ...sightReadingSettings.DEFAULT_SIGHT_READING_SETTINGS,
+      keySignature: 'Gb',
+      notePoolMode: 'chromatic'
+    })
+    const restored = sightReadingSettings.readSightReadingSettings()
+    assert.equal(restored.keySignature, 'Gb')
+    assert.equal(restored.notePoolMode, 'chromatic')
+
+    sightReadingSettings.writeSightReadingSettings({ ...restored, notePoolMode: 'diatonic' })
+    assert.equal(sightReadingSettings.readSightReadingSettings().notePoolMode, 'diatonic')
+  } finally {
+    if (hadWindow) global.window = previousWindow
+    else delete global.window
+  }
+})
+
+test('统一谱面模型支持三种谱表、十五调与一到三音并安全回退', () => {
+  const pitches = [60, 64, 67].map((midi) => musicPitchSpelling.spellMidiPitch(midi, 'C', 'grand'))
+  for (const staffMode of ['treble', 'bass', 'grand']) {
+    for (const key of musicKeySignatures.MAJOR_KEY_IDS) {
+      const model = musicStaffModel.createMusicStaffRenderModel({ staffMode, keySignature: key, notes: pitches })
+      assert.equal(model.staffMode, staffMode)
+      assert.equal(model.keySignature, key)
+      assert.equal(model.notes.length, 3)
+    }
+  }
+  assert.equal(musicStaffModel.createMusicStaffRenderModel({ staffMode: 'bad', keySignature: 'bad', notes: null }).staffMode, 'treble')
+  assert.equal(musicStaffModel.createMusicStaffRenderModel({ notes: [...pitches, pitches[0]] }).notes.length, 3)
 })
 
 function createSightReadingMidiEvent(id, midiNumber, timestamp, type = 'noteOn') {
@@ -234,6 +423,34 @@ test('识谱状态机暂停期间不超时并在恢复后续用剩余时间', ()
   assert.equal(core.counters.timeout, 1)
 })
 
+test('识谱倒计时读取权威剩余时间并随暂停、反馈和下一题同步', () => {
+  const notes = sightReadingNotes.getSightReadingNotesForClef('treble', 'common')
+  const core = new sightReadingSession.SightReadingSessionCore(notes)
+  prepareSightReadingQuestion(core, notes[0], 1000, null, 5000)
+
+  assert.equal(sightReadingSession.getSightReadingAnswerProgress(5000, 5000), 1)
+  assert.equal(sightReadingSession.getSightReadingAnswerProgress(2500, 5000), 0.5)
+  assert.equal(sightReadingSession.getSightReadingAnswerProgress(0, 5000), 0)
+  assert.equal(core.getRemainingQuestionMs(1032), 5000)
+  assert.equal(core.getRemainingQuestionMs(3032), 3000)
+
+  core.pause(3032)
+  assert.equal(core.getRemainingQuestionMs(9000), 3000)
+  core.resume(10000, 7)
+  assert.equal(core.getRemainingQuestionMs(11000), 2000)
+
+  const outcome = core.processMidiEvent(createSightReadingMidiEvent(8, notes[0].midiNumber, 11000))
+  assert.equal(outcome.outcome, 'correct')
+  assert.equal(core.getRemainingQuestionMs(20000), 2000)
+
+  assert.equal(core.completeFeedback(2), 'next')
+  core.beginQuestion(notes[1])
+  core.unlockQuestion(12000, 8, 5000)
+  assert.equal(core.getRemainingQuestionMs(12000), 5000)
+  core.recordTimeout()
+  assert.equal(core.getRemainingQuestionMs(17000), 0)
+})
+
 test('十二大调、升降号名称与练习序列', () => {
   assert.equal(scalePatterns.MAJOR_SCALE_PATTERNS.length, 12)
   assert.equal(new Set(scalePatterns.MAJOR_SCALE_PATTERNS.map((scale) => scale.key)).size, 12)
@@ -277,27 +494,93 @@ test('自然三和弦、转位与归组窗口', () => {
   assert.equal(chordPatterns.BASE_TRIADS.length, 6)
   assert.equal(chordPatterns.CHORD_INPUT_WINDOW_MS, 150)
   assert.deepEqual(chordPatterns.BASE_TRIADS.find((chord) => chord.id === 'd-minor').notes, [62, 65, 69])
-  assert.equal(chordPatterns.getChordTargets('both', 'all').length, 18)
+  assert.equal(chordPatterns.getChordTargets('both', 'all').length, 21)
 
-  const cTargets = chordPatterns.getChordTargets('major', 'all').filter((target) => target.baseId === 'c-major')
+  const cTargets = chordPatterns.getChordTargets('major', 'all').filter((target) => target.root === 'C')
   assert.deepEqual(cTargets.find((target) => target.inversion === 'root').notes, [60, 64, 67])
   assert.deepEqual(cTargets.find((target) => target.inversion === 'first').notes, [64, 67, 72])
   assert.deepEqual(cTargets.find((target) => target.inversion === 'second').notes, [67, 72, 76])
 })
 
-test('七和弦四音集合与 4536251 级数顺序', () => {
-  const cRootTargets = chordDefinitions.getSeventhChordTargets('root').filter((target) => target.root === 'C')
-  const notesByQuality = Object.fromEntries(cRootTargets.map((target) => [target.quality, target.notes]))
-  assert.deepEqual(notesByQuality.major7, [60, 64, 67, 71])
-  assert.deepEqual(notesByQuality.dominant7, [60, 64, 67, 70])
-  assert.deepEqual(notesByQuality.minor7, [60, 63, 67, 70])
-  assert.deepEqual(notesByQuality['half-diminished7'], [60, 63, 66, 70])
+test('调内七和弦四音集合与 4536251 级数顺序', () => {
+  const cTargets = chordDefinitions.getSeventhChordTargets('root')
+  assert.deepEqual(cTargets.find((target) => target.degree === 1).notes, [60, 64, 67, 71])
+  assert.deepEqual(cTargets.find((target) => target.degree === 2).notes, [62, 65, 69, 72])
+  assert.deepEqual(cTargets.find((target) => target.degree === 5).notes, [67, 71, 74, 77])
+  assert.deepEqual(cTargets.find((target) => target.degree === 7).notes, [71, 74, 77, 81])
 
   const thirdInversion = chordDefinitions.getSeventhChordTargets('all')
-    .find((target) => target.root === 'C' && target.quality === 'major7' && target.inversion === 'third')
+    .find((target) => target.degree === 1 && target.quality === 'major7' && target.inversion === 'third')
   assert.deepEqual(thirdInversion.notes, [71, 72, 76, 79])
   assert.deepEqual(chordProgressions.getChordProgressionById('4536251').degrees, [4, 5, 3, 6, 2, 5, 1])
   assert.equal(chordProgressions.createProgressionTargets('4536251', 'C', 'block').length, 7)
+})
+
+test('和弦十五调目标、进行、4536251 与转位拼写', () => {
+  for (const key of musicKeySignatures.MAJOR_KEY_IDS) {
+    const triads = chordPatterns.createDiatonicTriads(key)
+    assert.equal(triads.length, 7)
+    assert.deepEqual(triads.map((triad) => triad.quality), [
+      'major', 'minor', 'minor', 'major', 'major', 'minor', 'diminished'
+    ])
+    for (const progressionId of ['I-IV-V-I', 'I-V-vi-IV', 'ii-V-I', 'I-vi-IV-V', '4536251']) {
+      const targets = chordProgressions.createProgressionTargets(progressionId, key, 'block')
+      assert.equal(targets.length, chordProgressions.getChordProgressionById(progressionId).degrees.length)
+      assert.ok(targets.every((target) => target.keySignature === key))
+    }
+  }
+
+  assert.equal(chordPatterns.createDiatonicTriads('F#')[6].root, 'E#')
+  assert.equal(chordPatterns.createDiatonicTriads('Bb')[3].root, 'Eb')
+  assert.equal(chordPatterns.createDiatonicTriads('Db')[4].root, 'Ab')
+  const dbFive = chordProgressions.createProgressionTargets('I-IV-V-I', 'Db').find((target) => target.degree === 5)
+  assert.equal(dbFive.root, 'Ab')
+
+  const rootNotes = chordPatterns.getChordTargets('major', 'root', 'F#').find((target) => target.root === 'F#').notes
+  const firstNotes = chordPatterns.getChordTargets('major', 'first', 'F#').find((target) => target.root === 'F#').notes
+  assert.deepEqual(firstNotes, [rootNotes[1], rootNotes[2], rootNotes[0] + 12])
+  assert.equal(chordPatterns.CHORD_INPUT_WINDOW_MS, 150)
+})
+
+test('C#、Gb 与 Cb 大调和弦、进行及转位使用正确拼写与 MIDI 集合', () => {
+  const stripOctave = (noteName) => noteName.replace(/-?\d+$/, '')
+  const expectations = {
+    'C#': {
+      triads: [['C#', 'E#', 'G#'], ['F#', 'A#', 'C#'], ['G#', 'B#', 'D#'], ['A#', 'C#', 'E#'], ['B#', 'D#', 'F#']],
+      iiVI: ['D#', 'G#', 'C#']
+    },
+    Gb: {
+      triads: [['Gb', 'Bb', 'Db'], ['Cb', 'Eb', 'Gb'], ['Db', 'F', 'Ab'], ['Eb', 'Gb', 'Bb'], ['F', 'Ab', 'Cb']],
+      iiVI: ['Ab', 'Db', 'Gb']
+    },
+    Cb: {
+      triads: [['Cb', 'Eb', 'Gb'], ['Fb', 'Ab', 'Cb'], ['Gb', 'Bb', 'Db'], ['Ab', 'Cb', 'Eb'], ['Bb', 'Db', 'Fb']],
+      iiVI: ['Db', 'Gb', 'Cb']
+    }
+  }
+
+  for (const [key, expected] of Object.entries(expectations)) {
+    const triads = chordPatterns.createDiatonicTriads(key)
+    const selectedTriads = [triads[0], triads[3], triads[4], triads[5], triads[6]]
+    assert.deepEqual(
+      selectedTriads.map((triad) => triad.noteNames.map(stripOctave)),
+      expected.triads
+    )
+
+    const iiVI = chordProgressions.createProgressionTargets('ii-V-I', key, 'block')
+    assert.deepEqual(iiVI.map((target) => target.root), expected.iiVI)
+
+    const fourFiveThree = chordProgressions.createProgressionTargets('4536251', key, 'block')
+    assert.deepEqual(fourFiveThree.map((target) => target.degree), [4, 5, 3, 6, 2, 5, 1])
+    assert.ok(fourFiveThree.every((target) => target.keySignature === key))
+
+    const root = chordPatterns.getChordTargets('both', 'root', key)
+      .find((target) => target.root === key)
+    const first = chordPatterns.getChordTargets('both', 'first', key)
+      .find((target) => target.root === key)
+    assert.deepEqual(first.notes, [root.notes[1], root.notes[2], root.notes[0] + 12])
+    assert.equal(chordDefinitions.getSeventhChordTargets('root', 'all', key).length, 7)
+  }
 })
 
 test('四个节奏模板与目标时间线', () => {
@@ -401,7 +684,7 @@ test('新增训练内容 ID 唯一且原有内容仍可加载', () => {
   assert.ok(chordTrainingContents.CHORD_TRAINING_CONTENTS.every((content) => content.name && content.description && content.difficulty))
   assert.ok(coordinationPatterns.COORDINATION_PATTERNS.every((pattern) => pattern.name && pattern.description && pattern.difficulty))
   assert.equal(rhythmPatterns.getRhythmPatternById('quarter-basic').name, '四分音符基础')
-  assert.equal(chordPatterns.getChordTargets('both', 'root').length, 6)
+  assert.equal(chordPatterns.getChordTargets('both', 'root').length, 7)
   assert.equal(coordinationPatterns.getCoordinationPattern('hands-together').name, '双手同步单音')
 })
 
@@ -475,7 +758,7 @@ test('四模块新增内容可由设置状态连接到实际生成器', () => {
   assert.match(chordPage, /chord\.contents\.filter/)
   assert.match(chordPage, /setSelectedContentId\(draftContentId\)/)
   assert.match(chordPage, /setSeventhQualityFilter\(draftSeventhQuality\)/)
-  assert.match(chordHook, /getSeventhChordTargets\(inversionMode, seventhQualityFilter\)/)
+  assert.match(chordHook, /getSeventhChordTargets\(inversionMode, seventhQualityFilter, keySignature\)/)
   assert.match(chordHook, /createProgressionTargets\(selectedContent\.progressionId, keySignature, selectedContent\.inputStyle\)/)
   assert.match(coordinationPage, /coordination\.patterns\.filter/)
   assert.match(coordinationPage, /setSelectedPatternId\(draftPatternId\)/)
@@ -493,6 +776,25 @@ test('新增内容报告与记录保存实际设置且省略不适用字段', ()
     totalTargets: 4, correct: 3, wrongNote: 1, missingNote: 0, extraNote: 0,
     early: 0, late: 0, restError: 0, averageOffsetMs: 12, accuracy: 75
   }
+  const sightRecord = practiceRecordAdapters.createSightReadingRecord({
+    timing,
+    showNoteName: true,
+    report: {
+      totalQuestions: 20, completedQuestions: 20, correct: 17, wrong: 2, timeout: 1,
+      accuracy: 85, bestStreak: 9, mostWrongNote: 'E#4', mostTimedOutNote: 'C#5',
+      weakestNote: 'E#4', averageReactionMs: 412, fastestReactionMs: 188, slowestReactionMs: 802,
+      wrongNoteCounts: [], timeoutNoteCounts: [], staffMode: 'grand', noteCount: 1,
+      keySignature: 'F#', keyName: 'F♯ 大调', notePoolMode: 'chromatic', answerTimeLimitSeconds: 5,
+      treble: { total: 10, correct: 9, wrong: 1, timeout: 0, accuracy: 90 },
+      bass: { total: 10, correct: 8, wrong: 1, timeout: 1, accuracy: 80 }
+    }
+  })
+  assert.equal(sightRecord.keySignature, 'F#')
+  assert.equal(sightRecord.settings.rangeMode, 'fixed')
+  assert.equal(sightRecord.settings.answerTimeLimitSeconds, 5)
+  assert.equal(sightRecord.settings.noteCount, 1)
+  assert.equal(sightRecord.settings.notePoolMode, 'chromatic')
+
   const rhythmRecord = practiceRecordAdapters.createRhythmRecord({
     timing, report: { ...baseReport, extraInput: 0 }, patternId: 'eighth-triplets',
     patternName: '一拍三个八分三连音', bpm: 80, tolerance: 'standard', difficulty: 'challenge'
@@ -609,19 +911,138 @@ test('四个核心练习页面使用统一交互结构', () => {
 
 test('统一页面改造保留核心判定常量与记录去重', () => {
   const scaleHookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useScalePractice.ts'), 'utf8')
+  const scaleCoreSource = fs.readFileSync(require.resolve('../src/renderer/src/utils/scalePracticeCore.ts'), 'utf8')
   const rhythmHookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useRhythmPractice.ts'), 'utf8')
   const chordHookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useChordPractice.ts'), 'utf8')
   const coordinationHookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useCoordinationPractice.ts'), 'utf8')
   const recorderSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/usePracticeSessionRecorder.ts'), 'utf8')
 
   assert.match(rhythmHookSource, /usePracticeEngine/, '节奏练习应继续复用通用判定引擎')
-  assert.match(scaleHookSource, /if \(type === 'wrong_note'\)/, '音阶错音专用分支必须保留')
-  assert.match(scaleHookSource, /if \(type === 'missing_note'\)/, '音阶漏音专用分支必须保留')
+  assert.match(scaleCoreSource, /if \(type === 'wrong_note'\)/, '音阶错音专用分支必须保留')
+  assert.match(scaleCoreSource, /if \(type === 'missing_note'\)/, '音阶漏音专用分支必须保留')
   assert.match(chordHookSource, /CHORD_INPUT_WINDOW_MS/, '和弦 150ms 输入窗口必须保留')
   assert.equal(chordPatterns.CHORD_INPUT_WINDOW_MS, 150)
   assert.match(coordinationHookSource, /COORDINATION_SYNC_THRESHOLD_MS/, '左右手同步阈值必须保留')
   assert.equal(coordinationPatterns.COORDINATION_SYNC_THRESHOLD_MS, 100)
   assert.match(recorderSource, /savedSessionIdRef\.current === session\.id/, '练习记录会话去重必须保留')
+})
+
+test('VexFlow SVG、本地 Bravura 与协调 BPM 步进器接入', () => {
+  const rendererSource = fs.readFileSync(require.resolve('../src/renderer/src/components/MusicStaffRenderer.tsx'), 'utf8')
+  const fontSource = fs.readFileSync(require.resolve('../src/renderer/src/utils/musicNotationFont.ts'), 'utf8')
+  const sightStaffSource = fs.readFileSync(require.resolve('../src/renderer/src/components/SightReadingStaff.tsx'), 'utf8')
+  const sightPageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/SightReadingPage.tsx'), 'utf8')
+  const sightHookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useSightReadingPractice.ts'), 'utf8')
+  const timeBarSource = fs.readFileSync(require.resolve('../src/renderer/src/components/SightReadingTimeBar.tsx'), 'utf8')
+  const sightSettingsSource = fs.readFileSync(require.resolve('../src/renderer/src/utils/sightReadingSettings.ts'), 'utf8')
+  const historyPageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/PracticeHistoryPage.tsx'), 'utf8')
+  const chordPageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ChordPracticePage.tsx'), 'utf8')
+  const stepperSource = fs.readFileSync(require.resolve('../src/renderer/src/components/NumericStepper.tsx'), 'utf8')
+  const coordinationPage = fs.readFileSync(require.resolve('../src/renderer/src/components/CoordinationPracticePage.tsx'), 'utf8')
+  const fullKeyboardSource = fs.readFileSync(require.resolve('../src/renderer/src/components/FullKeyboard.tsx'), 'utf8')
+  const virtualKeyboardSource = fs.readFileSync(require.resolve('../src/renderer/src/components/VirtualKeyboard.tsx'), 'utf8')
+  const componentCss = fs.readFileSync(require.resolve('../src/renderer/src/components.css'), 'utf8')
+  const practiceCss = fs.readFileSync(require.resolve('../src/renderer/src/styles/practice-usability.css'), 'utf8')
+  const themeCss = fs.readFileSync(require.resolve('../src/renderer/src/styles/themes.css'), 'utf8')
+  const baseCss = fs.readFileSync(require.resolve('../src/renderer/src/styles.css'), 'utf8')
+  const notationCss = [componentCss, practiceCss, themeCss].join('\n')
+  const keyboardCss = [baseCss, componentCss, themeCss].join('\n')
+  const packageJson = JSON.parse(fs.readFileSync(require.resolve('../package.json'), 'utf8'))
+
+  assert.match(rendererSource, /Renderer\.Backends\.SVG/)
+  assert.match(rendererSource, /ResizeObserver/)
+  assert.match(rendererSource, /replaceChildren\(\)/)
+  assert.match(rendererSource, /setType\('brace'\)/)
+  assert.match(rendererSource, /setType\('singleLeft'\)/)
+  assert.match(fontSource, /@vexflow-fonts\/bravura\/bravura\.woff2\?url/)
+  assert.match(fontSource, /document\.fonts\.ready/)
+  assert.doesNotMatch(fontSource, /https?:\/\/|\bcdn\b|VexFlow\.loadFonts/i)
+  assert.match(rendererSource, /drawWithStyle\(\)/)
+  assert.match(rendererSource, /setContextColor/)
+  assert.match(rendererSource, /setLedgerLineStyle/)
+  assert.match(rendererSource, /setLedgerLineStyle\(\{[\s\S]+MUSIC_STAFF_INK_COLOR/)
+  assert.match(rendererSource, /modifier\.setStyle/)
+  assert.match(rendererSource, /MUSIC_STAFF_INK_COLOR = '#171717'/)
+  assert.doesNotMatch(rendererSource, /--staff-(?:background|line|symbol|note)/)
+  assert.match(componentCss, /--music-staff-ink: #171717/)
+  assert.match(componentCss, /--music-staff-paper: #ffffff/)
+  assert.doesNotMatch(componentCss, /--music-staff-paper:\s*#fffdf8/)
+  assert.doesNotMatch(themeCss, /--staff-(?:background|line|symbol|note)/)
+  assert.match(sightStaffSource, /MusicStaffRenderer/)
+  assert.doesNotMatch(sightStaffSource, /𝄞|𝄢/)
+  assert.doesNotMatch(notationCss, /Segoe UI Symbol|Noto Music|Bravura Text/)
+  assert.doesNotMatch(notationCss, /sight-custom-time-limit/)
+  assert.equal(packageJson.dependencies.vexflow, '5.0.0')
+  assert.equal(packageJson.dependencies['@vexflow-fonts/bravura'], '1.0.2')
+  assert.ok(fs.existsSync(require.resolve('../src/renderer/public/third-party-licenses/VexFlow-MIT.txt')))
+  assert.ok(fs.existsSync(require.resolve('../src/renderer/public/third-party-licenses/Bravura-OFL-1.1.txt')))
+  assert.match(stepperSource, /aria-label="BPM 数值"/)
+  assert.doesNotMatch(stepperSource, /<button|降低 BPM|提高 BPM|\bnudge\b/)
+  assert.ok(stepperSource.includes("if (!/^\\d+$/.test(normalizedDraft))"))
+  assert.match(stepperSource, /onBlur=\{commit\}/)
+  assert.match(stepperSource, /event\.key === 'Enter'/)
+  assert.match(stepperSource, /event\.key === 'Escape'/)
+  assert.match(stepperSource, /onFocus=\{\(event\) => event\.currentTarget\.select\(\)\}/)
+  assert.match(stepperSource, /Math\.min\(max, Math\.max\(min, value\)\)/)
+  assert.doesNotMatch(practiceCss, /\.numeric-stepper button/)
+  assert.match(coordinationPage, /<NumericStepper[^>]+max=\{120\} min=\{40\} step=\{1\}/)
+  assert.match(coordinationPage, /type="range"/)
+  assert.match(sightPageSource, /MAJOR_KEY_DISPLAY_SIGNATURES\.map/)
+  assert.match(chordPageSource, /MAJOR_KEY_DISPLAY_SIGNATURES\.map/)
+  assert.doesNotMatch(`${sightPageSource}\n${chordPageSource}`, /MAJOR_KEY_SIGNATURES\.map/)
+  assert.match(fullKeyboardSource, /isActive[\s\S]+isTarget[\s\S]+isCorrect[\s\S]+isWrong/)
+  assert.match(virtualKeyboardSource, /white-key/)
+  assert.match(virtualKeyboardSource, /black-key/)
+  assert.match(keyboardCss, /\.full-white-key\.is-active/)
+  assert.match(keyboardCss, /\.full-white-key\.is-target/)
+  assert.match(keyboardCss, /\.full-white-key\.is-correct/)
+  assert.match(keyboardCss, /\.full-white-key\.is-wrong/)
+  assert.match(keyboardCss, /translateY\(2px\)/)
+  assert.doesNotMatch(keyboardCss, /url\(/i)
+  assert.doesNotMatch(
+    keyboardCss,
+    /\.(?:keyboard-preview|full-keyboard-shell|keyboard-scroll)[^{]*\{[^}]*backdrop-filter/s
+  )
+  assert.match(sightHookSource, /getRemainingTimeMs/)
+  assert.match(sightHookSource, /notePoolMode: settings\.notePoolMode/)
+  assert.match(sightHookSource, /setNotePoolMode: \(value\) => updateSetting\('notePoolMode', value\)/)
+  assert.match(sightPageSource, /<SightReadingTimeBar/)
+  assert.match(sightPageSource, />音符内容</)
+  assert.match(sightPageSource, /setDraftNotePoolMode/)
+  assert.match(sightSettingsSource, /sight-reading-settings\.v4/)
+  assert.match(sightSettingsSource, /notePoolMode: 'diatonic'/)
+  assert.match(historyPageSource, /notePoolMode === 'diatonic' \|\| notePoolMode === 'chromatic'/)
+  assert.match(timeBarSource, /requestAnimationFrame/)
+  assert.match(timeBarSource, /cancelAnimationFrame/)
+  assert.match(timeBarSource, /role="progressbar"/)
+  assert.match(timeBarSource, /aria-label="本题剩余时间"/)
+  assert.match(timeBarSource, /aria-valuemin=\{0\}/)
+  assert.match(timeBarSource, /aria-valuemax=\{SIGHT_READING_ANSWER_TIMEOUT_MS\}/)
+  assert.match(timeBarSource, /aria-valuenow=\{Math\.round\(remainingTimeMs\)\}/)
+  assert.doesNotMatch(timeBarSource, /setTimeout|recordTimeout/)
+  assert.match(practiceCss, /transform-origin: left center/)
+})
+
+test('单谱表与大谱表极限音保留安全边距', () => {
+  const layout = musicStaffModel.MUSIC_STAFF_LAYOUT
+  const staveTopLineOffset = 40
+  const staveBottomLineOffset = 80
+  const trebleE6OffsetAboveTopLine = 35
+  const trebleC4OffsetBelowBottomLine = 20
+  const bassE4OffsetAboveTopLine = 20
+  const bassC2OffsetBelowBottomLine = 20
+
+  const singleTopLine = layout.single.staveY + staveTopLineOffset
+  const singleBottomLine = layout.single.staveY + staveBottomLineOffset
+  assert.ok(singleTopLine - trebleE6OffsetAboveTopLine >= 24)
+  assert.ok(layout.single.height - (singleBottomLine + trebleC4OffsetBelowBottomLine) >= 24)
+  assert.ok(singleTopLine - bassE4OffsetAboveTopLine >= 24)
+  assert.ok(layout.single.height - (singleBottomLine + bassC2OffsetBelowBottomLine) >= 24)
+
+  const grandTrebleTopLine = layout.grand.trebleStaveY + staveTopLineOffset
+  const grandBassBottomLine = layout.grand.bassStaveY + staveBottomLineOffset
+  assert.ok(grandTrebleTopLine - trebleE6OffsetAboveTopLine >= 24)
+  assert.ok(layout.grand.height - (grandBassBottomLine + bassC2OffsetBelowBottomLine) >= 24)
 })
 
 test('练习记录损坏容错、200 条上限与今日加权统计', () => {
@@ -927,6 +1348,392 @@ test('训练计划损坏和未知版本存储安全回退', () => {
   const unknownVersion = trainingPlanStorage.migrateTrainingPlanState({ version: 99 }, new Date(2026, 7, 3))
   assert.equal(unknownVersion.version, 1)
   assert.equal(unknownVersion.currentStageId, 'stage-1')
+})
+
+test('MIDI 逐事件分发层不丢事件且不回放订阅前旧事件', () => {
+  midiEventBus.resetMidiEventBusForTests()
+  const receivedA = []
+  const receivedB = []
+  const unsubscribeA = midiEventBus.subscribeMidiEvents((event) => receivedA.push(event.id))
+  midiEventBus.subscribeMidiEvents((event) => receivedB.push(event.id))
+
+  const makeEvent = (id, midiNumber) => ({
+    id,
+    type: 'noteOn',
+    midiNumber,
+    velocity: 100,
+    timestamp: 1000 + id,
+    deviceName: 'Regression MIDI'
+  })
+
+  midiEventBus.publishMidiEvent(makeEvent(1, 60))
+  midiEventBus.publishMidiEvent(makeEvent(2, 64))
+  assert.deepEqual(receivedA, [1, 2])
+  assert.deepEqual(receivedB, [1, 2])
+
+  unsubscribeA()
+  midiEventBus.publishMidiEvent(makeEvent(3, 67))
+  assert.deepEqual(receivedA, [1, 2])
+  assert.deepEqual(receivedB, [1, 2, 3])
+
+  const receivedC = []
+  midiEventBus.subscribeMidiEvents((event) => receivedC.push(event.id))
+  midiEventBus.publishMidiEvent(makeEvent(4, 69))
+  assert.deepEqual(receivedC, [4], '订阅后不得重放订阅前的旧事件')
+  assert.equal(midiEventBus.getLastMidiEventId(), 4)
+})
+
+test('Web MIDI 入口解析覆盖 noteOn/noteOff/velocity0/CC64 并接入总线', () => {
+  midiEventBus.resetMidiEventBusForTests()
+  const noteOn = midiMessages.parseMidiMessage([0x90, 60, 100], 'FP-30X', 1, 5000)
+  assert.equal(noteOn.type, 'noteOn')
+  assert.equal(noteOn.midiNumber, 60)
+  assert.equal(noteOn.noteName, 'C4')
+  assert.equal(noteOn.velocity, 100)
+  assert.equal(noteOn.timestamp, 5000)
+
+  const velocityZero = midiMessages.parseMidiMessage([0x90, 60, 0], 'FP-30X', 2, 5001)
+  assert.equal(velocityZero.type, 'noteOff')
+  assert.equal(velocityZero.velocity, 0)
+
+  const noteOff = midiMessages.parseMidiMessage([0x80, 62, 0], 'FP-30X', 3, 5002)
+  assert.equal(noteOff.type, 'noteOff')
+
+  const cc64 = midiMessages.parseMidiMessage([0xb0, 64, 127], 'FP-30X', 4, 5003)
+  assert.equal(cc64.type, 'controlChange')
+  assert.equal(cc64.controllerNumber, 64)
+  assert.equal(cc64.sustainPedalDown, true)
+  assert.equal(cc64.midiNumber, undefined)
+
+  assert.equal(midiMessages.parseMidiMessage([0x90], 'FP-30X', 5), null)
+  assert.equal(midiMessages.parseMidiMessage([0xe0, 60, 100], 'FP-30X', 6), null)
+
+  const received = []
+  const unsubscribe = midiEventBus.subscribeMidiEvents((event) => received.push([event.id, event.midiNumber]))
+  midiEventBus.publishMidiEvent(noteOn)
+  midiEventBus.publishMidiEvent(velocityZero)
+  midiEventBus.publishMidiEvent(cc64)
+  assert.deepEqual(received, [[1, 60], [2, 60], [4, undefined]])
+  unsubscribe()
+})
+
+test('同 timestamp 双音、三音、四音经逐事件层全部送达', () => {
+  midiEventBus.resetMidiEventBusForTests()
+  const seen = []
+  const unsubscribe = midiEventBus.subscribeMidiEvents((event) => {
+    if (event.type === 'noteOn' && typeof event.midiNumber === 'number') seen.push(event.midiNumber)
+  })
+
+  const chords = [
+    [60, 64],
+    [60, 64, 67],
+    [60, 64, 67, 71]
+  ]
+  let eventId = 0
+  for (const chord of chords) {
+    const before = seen.length
+    for (const midiNumber of chord) {
+      eventId += 1
+      const event = midiMessages.parseMidiMessage([0x90, midiNumber, 100], 'FP-30X', eventId, 9000)
+      midiEventBus.publishMidiEvent(event)
+    }
+    assert.equal(seen.length - before, chord.length, `同 timestamp ${chord.length} 音必须全部送达`)
+    assert.deepEqual(seen.slice(-chord.length), chord)
+  }
+  unsubscribe()
+})
+
+test('极快速 MIDI 序列与快速重复音逐条按顺序消费', () => {
+  midiEventBus.resetMidiEventBusForTests()
+  const seen = []
+  const unsubscribe = midiEventBus.subscribeMidiEvents((event) => seen.push(`${event.type}:${event.midiNumber}`))
+  const sequence = [
+    [0x90, 60, 100], [0x90, 62, 100], [0x90, 64, 100], [0x90, 65, 100],
+    [0x90, 67, 100], [0x90, 69, 100], [0x90, 71, 100], [0x90, 72, 100],
+    [0x90, 60, 0], [0x90, 60, 100], [0x90, 60, 0]
+  ]
+  sequence.forEach((data, index) => {
+    const event = midiMessages.parseMidiMessage(data, 'FP-30X', index + 1, 10000 + index)
+    midiEventBus.publishMidiEvent(event)
+  })
+  assert.deepEqual(seen, [
+    'noteOn:60', 'noteOn:62', 'noteOn:64', 'noteOn:65', 'noteOn:67', 'noteOn:69', 'noteOn:71', 'noteOn:72',
+    'noteOff:60', 'noteOn:60', 'noteOff:60'
+  ])
+  unsubscribe()
+})
+
+test('订阅期间暂停、卸载与重入均隔离 MIDI 事件', () => {
+  midiEventBus.resetMidiEventBusForTests()
+  const collected = []
+  let paused = false
+  let baseline = midiEventBus.getLastMidiEventId()
+  const listener = (event) => {
+    if (event.id <= baseline || paused) return
+    collected.push(event.id)
+  }
+  const unsubscribe = midiEventBus.subscribeMidiEvents(listener)
+  const publish = (id, midiNumber) => midiEventBus.publishMidiEvent({
+    id,
+    type: 'noteOn',
+    midiNumber,
+    velocity: 100,
+    timestamp: 20000 + id,
+    deviceName: 'Regression MIDI'
+  })
+
+  publish(1, 60)
+  publish(2, 62)
+  paused = true
+  publish(3, 64)
+  paused = false
+  publish(4, 65)
+  unsubscribe()
+  publish(5, 67)
+  assert.deepEqual(collected, [1, 2, 4], '暂停期间事件不得恢复后污染，卸载后不得继续收到事件')
+
+  const reentered = []
+  baseline = midiEventBus.getLastMidiEventId()
+  const unsubscribeReentered = midiEventBus.subscribeMidiEvents((event) => {
+    if (event.id <= baseline) return
+    reentered.push(event.id)
+  })
+  publish(6, 69)
+  assert.deepEqual(reentered, [6], '重新进入不得重放上一次遗留事件')
+  unsubscribeReentered()
+})
+
+test('音阶核心按目标时间点判定 8 音全对且无漏音错音', () => {
+  const scale = scalePatterns.getMajorScaleByKey('C')
+  const targets = scalePatterns.createScaleTargets(scale, 'right-ascending', 1000, { notesPerBeat: 1 })
+  const core = new scalePracticeCore.ScalePracticeCore(targets, 'standard')
+  core.reset(0)
+  const start = 10000
+
+  targets.forEach((target, index) => {
+    core.processMidiEvent({
+      id: index + 1,
+      type: 'noteOn',
+      midiNumber: target.notes[0],
+      velocity: 100,
+      timestamp: start + target.timeMs,
+      deviceName: 'Regression MIDI'
+    }, start)
+  })
+
+  assert.equal(core.isComplete, true)
+  assert.equal(core.results.filter((result) => result.type === 'correct').length, 8)
+  assert.equal(core.results.filter((result) => result.type === 'missing_note').length, 0)
+  assert.equal(core.results.filter((result) => result.type === 'wrong_note').length, 0)
+  assert.equal(core.results.filter((result) => result.type === 'early' || result.type === 'late').length, 0)
+})
+
+test('音阶一个音不弹只产生 1 个漏音', () => {
+  const scale = scalePatterns.getMajorScaleByKey('C')
+  const targets = scalePatterns.createScaleTargets(scale, 'right-ascending', 1000, { notesPerBeat: 1 })
+  const core = new scalePracticeCore.ScalePracticeCore(targets, 'standard')
+  core.reset(0)
+  const start = 10000
+
+  targets.forEach((target, index) => {
+    if (index === 3) return
+    core.processMidiEvent({
+      id: index + 1,
+      type: 'noteOn',
+      midiNumber: target.notes[0],
+      velocity: 100,
+      timestamp: start + target.timeMs,
+      deviceName: 'Regression MIDI'
+    }, start)
+  })
+
+  assert.equal(core.results.filter((result) => result.type === 'missing_note').length, 1)
+  assert.equal(core.results.filter((result) => result.type === 'correct').length, 7)
+  assert.equal(core.results.filter((result) => result.type === 'wrong_note').length, 0)
+})
+
+test('音阶窗口真正结束且无匹配输入才记漏音并推进', () => {
+  const scale = scalePatterns.getMajorScaleByKey('C')
+  const targets = scalePatterns.createScaleTargets(scale, 'right-ascending', 1000, { notesPerBeat: 1 })
+  const core = new scalePracticeCore.ScalePracticeCore(targets, 'standard')
+  core.reset(0)
+
+  core.advanceElapsed(241)
+  assert.equal(core.results[0].type, 'missing_note')
+  assert.equal(core.currentStepIndex, 1)
+  core.advanceElapsed(1241)
+  assert.equal(core.results[1].type, 'missing_note')
+  assert.equal(core.currentStepIndex, 2)
+})
+
+test('音阶提前与迟到合法窗口内被接受并记录正负偏移', () => {
+  const scale = scalePatterns.getMajorScaleByKey('C')
+  const targets = scalePatterns.createScaleTargets(scale, 'right-ascending', 1000, { notesPerBeat: 1 })
+  const core = new scalePracticeCore.ScalePracticeCore(targets, 'standard')
+  core.reset(0)
+  const start = 10000
+
+  core.processMidiEvent({
+    id: 1, type: 'noteOn', midiNumber: 60, velocity: 100,
+    timestamp: start, deviceName: 'Regression MIDI'
+  }, start)
+  assert.equal(core.results[0].type, 'correct')
+
+  core.processMidiEvent({
+    id: 2, type: 'noteOn', midiNumber: 62, velocity: 100,
+    timestamp: start + 800, deviceName: 'Regression MIDI'
+  }, start)
+  assert.equal(core.results[1].type, 'early')
+  assert.equal(core.results[1].timeOffsetMs, -200)
+
+  core.processMidiEvent({
+    id: 3, type: 'noteOn', midiNumber: 64, velocity: 100,
+    timestamp: start + 2150, deviceName: 'Regression MIDI'
+  }, start)
+  assert.equal(core.results[2].type, 'late')
+  assert.equal(core.results[2].timeOffsetMs, 150)
+})
+
+test('音阶超过合法窗口的输入按漏音处理且不误判下一目标', () => {
+  const scale = scalePatterns.getMajorScaleByKey('C')
+  const targets = scalePatterns.createScaleTargets(scale, 'right-ascending', 1000, { notesPerBeat: 1 })
+  const core = new scalePracticeCore.ScalePracticeCore(targets, 'standard')
+  core.reset(0)
+  const start = 10000
+
+  core.processMidiEvent({
+    id: 1, type: 'noteOn', midiNumber: 60, velocity: 100,
+    timestamp: start + 250, deviceName: 'Regression MIDI'
+  }, start)
+  assert.equal(core.results[0].type, 'missing_note')
+  assert.equal(core.currentStepIndex, 1)
+  assert.equal(core.results.filter((result) => result.type === 'wrong_note').length, 0)
+})
+
+test('每拍 2 音与每拍 4 音时间换算正确且全对', () => {
+  const scale = scalePatterns.getMajorScaleByKey('C')
+  assert.equal(scalePatterns.createScaleTargets(scale, 'right-speed', 1000, { notesPerBeat: 2 })[1].timeMs, 500)
+  assert.equal(scalePatterns.createScaleTargets(scale, 'right-speed', 1000, { notesPerBeat: 4 })[1].timeMs, 250)
+
+  for (const notesPerBeat of [2, 4]) {
+    const targets = scalePatterns.createScaleTargets(scale, 'right-speed', 1000, { notesPerBeat })
+    const core = new scalePracticeCore.ScalePracticeCore(targets, 'standard')
+    core.reset(0)
+    const start = 20000
+    targets.forEach((target, index) => {
+      core.processMidiEvent({
+        id: index + 1, type: 'noteOn', midiNumber: target.notes[0], velocity: 100,
+        timestamp: start + target.timeMs, deviceName: 'Regression MIDI'
+      }, start)
+    })
+    assert.equal(core.results.filter((result) => result.type === 'correct').length, targets.length)
+    assert.equal(core.results.filter((result) => result.type === 'missing_note').length, 0)
+  }
+})
+
+test('和弦柱式旧模块 D4 F4 A4 收集与缺失/多音语义', () => {
+  const target = { id: 'D-major', notes: [62, 65, 69], label: 'D' }
+  const collectChordNotes = (events, windowMs) => {
+    const notes = []
+    let firstTime = null
+    for (const event of events) {
+      if (event.type !== 'noteOn' || typeof event.midiNumber !== 'number') continue
+      if (firstTime === null || event.timestamp - firstTime <= windowMs) {
+        firstTime = firstTime ?? event.timestamp
+        notes.push(event.midiNumber)
+      }
+    }
+    return chordFeedback.normalizeNotes(notes)
+  }
+  const noteOn = (id, midiNumber, timestamp) => ({
+    id, type: 'noteOn', midiNumber, velocity: 100, timestamp, deviceName: 'Regression MIDI'
+  })
+
+  const sameTimestamp = collectChordNotes([
+    noteOn(1, 62, 3000),
+    noteOn(2, 65, 3000),
+    noteOn(3, 69, 3000)
+  ], 150)
+  assert.deepEqual(sameTimestamp, [62, 65, 69])
+  assert.equal(chordFeedback.createChordFeedback(target, sameTimestamp).type, 'correct')
+
+  const fewMsApart = collectChordNotes([
+    noteOn(4, 62, 3000),
+    noteOn(5, 65, 3007),
+    noteOn(6, 69, 3015)
+  ], 150)
+  assert.deepEqual(fewMsApart, [62, 65, 69])
+  assert.equal(chordFeedback.createChordFeedback(target, fewMsApart).type, 'correct')
+
+  const onlyA4 = chordFeedback.createChordFeedback(target, [69])
+  assert.equal(onlyA4.type, 'missing_note')
+  assert.deepEqual(onlyA4.missingNotes, [62, 65])
+  assert.match(onlyA4.message, /缺少 D4 \/ F4/)
+
+  const withExtraC5 = chordFeedback.createChordFeedback(target, [62, 65, 69, 72])
+  assert.equal(withExtraC5.type, 'extra_note')
+  assert.deepEqual(withExtraC5.extraNotes, [72])
+  assert.equal(chordFeedback.createChordFeedback(target, [62, 65, 72]).type, 'wrong_note')
+})
+
+test('练习 Hook 与页面不再把 latestEvent 当作判定事件队列', () => {
+  const hookFiles = [
+    'useScalePractice.ts',
+    'useChordPractice.ts',
+    'useRhythmPractice.ts',
+    'useCoordinationPractice.ts',
+    'useSightReadingPractice.ts',
+    'usePracticeEngine.ts'
+  ]
+  for (const file of hookFiles) {
+    const source = fs.readFileSync(require.resolve(`../src/renderer/src/hooks/${file}`), 'utf8')
+    assert.doesNotMatch(source, /latestMidiEvent/, `${file} 不应再消费 latestMidiEvent`)
+    assert.match(source, /useMidiEventSubscription/, `${file} 应订阅逐事件分发层`)
+  }
+
+  const appSource = fs.readFileSync(require.resolve('../src/renderer/src/App.tsx'), 'utf8')
+  assert.doesNotMatch(appSource, /latestMidiEvent=\{midi\.latestEvent\}/, 'App 不应再向练习页面传递 latestEvent')
+
+  for (const page of [
+    'SightReadingPage.tsx',
+    'RhythmPracticePage.tsx',
+    'ScalePracticePage.tsx',
+    'ChordPracticePage.tsx',
+    'CoordinationPracticePage.tsx'
+  ]) {
+    const source = fs.readFileSync(require.resolve(`../src/renderer/src/components/${page}`), 'utf8')
+    assert.doesNotMatch(source, /latestMidiEvent/, `${page} 不应再传递 latestMidiEvent`)
+  }
+})
+
+test('结果报告返回行为统一且识谱报告精简', () => {
+  const reportModal = fs.readFileSync(require.resolve('../src/renderer/src/components/PracticeReportModal.tsx'), 'utf8')
+  assert.match(reportModal, />返回</)
+  assert.match(reportModal, /aria-label="关闭报告"/)
+  assert.doesNotMatch(reportModal, /返回首页/)
+
+  for (const page of [
+    'SightReadingPage.tsx',
+    'RhythmPracticePage.tsx',
+    'ScalePracticePage.tsx',
+    'ChordPracticePage.tsx',
+    'CoordinationPracticePage.tsx'
+  ]) {
+    const source = fs.readFileSync(require.resolve(`../src/renderer/src/components/${page}`), 'utf8')
+    assert.doesNotMatch(source, /返回首页/, `${page} 不应再提供返回首页行为`)
+    assert.match(source, /onBack=\{/, `${page} 应通过共享报告弹窗接入返回行为`)
+  }
+
+  const sightPage = fs.readFileSync(require.resolve('../src/renderer/src/components/SightReadingPage.tsx'), 'utf8')
+  assert.doesNotMatch(sightPage, /练习名称|ClefReportCard|sight-clef-report-grid/, '识谱主报告不得再包含配置项与谱表拆分卡')
+  assert.match(sightPage, /查看详情/)
+  assert.match(sightPage, /本次没有错误或超时/)
+  assert.match(sightPage, /显示全部音符/)
+
+  const componentCss = fs.readFileSync(require.resolve('../src/renderer/src/components.css'), 'utf8')
+  const themesCss = fs.readFileSync(require.resolve('../src/renderer/src/styles/themes.css'), 'utf8')
+  assert.doesNotMatch(componentCss, /sight-clef-report-grid/)
+  assert.doesNotMatch(themesCss, /sight-clef-report-grid/)
 })
 
 let failed = 0

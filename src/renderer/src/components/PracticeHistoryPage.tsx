@@ -10,6 +10,8 @@ import {
 } from '../utils/practiceRecordTypes'
 import { AppButton } from './AppButton'
 import { PracticeReportPanel } from './PracticeReportPanel'
+import { getMajorKeySignature } from '../utils/musicKeySignatures'
+import { SIGHT_READING_NOTE_POOL_MODE_LABELS } from '../utils/sightReadingSettings'
 
 interface PracticeHistoryPageProps {
   onBackHome: () => void
@@ -34,6 +36,10 @@ const settingLabels: Record<string, string> = {
   questionCount: '题数',
   answerTimeLimitSeconds: '每题时限',
   noteNameVisible: '音名提示',
+  noteCount: '题型',
+  notePoolMode: '音符内容',
+  keySignature: '调性',
+  keyName: '调性名称',
   pattern: '模板',
   bpm: 'BPM',
   tolerance: '宽容度',
@@ -55,7 +61,8 @@ const detailLabels: Record<string, string> = {
   mostTimedOutNote: '最容易超时的音',
   weakestNote: '综合薄弱音',
   fastestReactionMs: '最快反应时间',
-  slowestReactionMs: '最慢反应时间'
+  slowestReactionMs: '最慢反应时间',
+  fixedRange: '固定音域'
 }
 
 type HistoryValue = string | number | boolean | null
@@ -71,6 +78,14 @@ function formatSettingValue(value: HistoryValue, key = ''): string {
   if (key === 'rangeMode' || key === 'range') {
     if (value === 'common' || value === 'basic') return '常用'
     if (value === 'extended') return '扩展'
+    if (value === 'fixed') return '固定音域'
+  }
+  if (key === 'noteCount') return value === 1 ? '单音' : value === 2 ? '双音' : value === 3 ? '三音' : String(value)
+  if (key === 'notePoolMode' && (value === 'diatonic' || value === 'chromatic')) {
+    return SIGHT_READING_NOTE_POOL_MODE_LABELS[value]
+  }
+  if ((key === 'keySignature' || key === 'key') && typeof value === 'string') {
+    return getMajorKeySignature(value).displayName
   }
   if (key === 'answerTimeLimitSeconds') return `${value} 秒`
   if (key.endsWith('ReactionMs') && typeof value === 'number') return `${value} ms`
@@ -80,8 +95,17 @@ function formatSettingValue(value: HistoryValue, key = ''): string {
 function getSettingsEntries(record: PracticeSessionRecord): Array<[string, HistoryValue]> {
   if (record.module !== 'sight-reading') return Object.entries(record.settings)
 
+  const notePoolMode = record.settings.notePoolMode
+  const notePoolEntries: Array<[string, HistoryValue]> =
+    notePoolMode === 'diatonic' || notePoolMode === 'chromatic'
+      ? [['notePoolMode', notePoolMode]]
+      : []
+
   return [
     ['staffMode', record.settings.staffMode ?? record.settings.clef ?? null],
+    ['keySignature', record.settings.keySignature ?? record.keySignature ?? 'C'],
+    ...notePoolEntries,
+    ['noteCount', record.settings.noteCount ?? 1],
     ['rangeMode', record.settings.rangeMode ?? record.settings.range ?? null],
     ['questionCount', record.settings.questionCount ?? null],
     ['answerTimeLimitSeconds', record.settings.answerTimeLimitSeconds ?? null],

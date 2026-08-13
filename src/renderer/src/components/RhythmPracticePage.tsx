@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ActiveMidiNote, MidiEventRecord } from '../types'
+import type { ActiveMidiNote } from '../types'
 import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { useRhythmPractice } from '../hooks/useRhythmPractice'
 import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
@@ -23,8 +23,6 @@ import { PracticeStatBar } from './PracticeStatBar'
 interface RhythmPracticePageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
-  latestMidiEvent: MidiEventRecord | null
-  onBackHome: () => void
   onPracticeRunningChange: (running: boolean) => void
 }
 
@@ -48,11 +46,9 @@ function formatLatestResult(result: JudgementResult | null): string {
 export function RhythmPracticePage({
   activeNotes,
   exitPromptOpen,
-  latestMidiEvent,
-  onBackHome,
   onPracticeRunningChange
 }: RhythmPracticePageProps): JSX.Element {
-  const rhythm = useRhythmPractice(latestMidiEvent)
+  const rhythm = useRhythmPractice()
   const { showVirtualKeyboard, setShowVirtualKeyboard } = useDisplayPreferences('rhythm')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draftPatternId, setDraftPatternId] = useState(rhythm.selectedPatternId)
@@ -277,7 +273,7 @@ export function RhythmPracticePage({
       </PracticeSettingsDrawer>
 
       {rhythm.isComplete ? (
-        <PracticeReportModal title="节奏练习完成">
+        <PracticeReportModal title="节奏练习完成" onBack={rhythm.reset} onRepeat={restartPractice}>
           <p className="practice-report-summary">{settingsSummary}</p>
           <div className="report-grid">
             <div><span>总节奏事件</span><strong>{rhythm.report.totalTargets}</strong></div>
@@ -289,10 +285,6 @@ export function RhythmPracticePage({
             <div><span>多余输入</span><strong>{rhythm.report.extraInput}</strong></div>
             <div><span>平均偏移</span><strong>{rhythm.report.averageOffsetMs}ms</strong></div>
             <div><span>节奏准确率</span><strong>{rhythm.report.accuracy}%</strong></div>
-          </div>
-          <div className="practice-report-actions">
-            <AppButton onClick={restartPractice}>再练一次</AppButton>
-            <AppButton variant="secondary" onClick={onBackHome}>返回首页</AppButton>
           </div>
         </PracticeReportModal>
       ) : null}

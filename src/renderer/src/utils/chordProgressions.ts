@@ -1,6 +1,8 @@
-import { midiNumberToNoteName } from './midiNotes'
 import type { PracticeDifficulty } from './practiceContentTypes'
 import type { ChordInputStyle, ChordKeySignature, ChordTarget } from './chordTypes'
+import { CHORD_QUALITY_NAMES } from './chordPatterns'
+import { getMajorKeySignature } from './musicKeySignatures'
+import { spellMidiPitch } from './musicPitchSpelling'
 
 export interface ChordProgressionDefinition {
   id: string
@@ -17,9 +19,14 @@ export const CHORD_PROGRESSION_DEFINITIONS: ChordProgressionDefinition[] = [
   { id: '4536251', name: '4536251', degrees: [4, 5, 3, 6, 2, 5, 1], difficulty: 'challenge' }
 ]
 
-const KEY_ROOT_MIDI: Record<ChordKeySignature, number> = { C: 60, G: 55, F: 53 }
 const MAJOR_SCALE_OFFSETS = [0, 2, 4, 5, 7, 9, 11]
-const DEGREE_QUALITIES = ['major', 'minor', 'minor', 'major', 'major', 'minor', 'minor'] as const
+const DEGREE_QUALITIES = ['major', 'minor', 'minor', 'major', 'major', 'minor', 'diminished'] as const
+
+function getKeyRootMidi(keySignature: ChordKeySignature): number {
+  const pitchClass = getMajorKeySignature(keySignature).tonicPitchClass
+  const midi = 60 + pitchClass
+  return midi > 65 ? midi - 12 : midi
+}
 
 export function getChordProgressionById(id: string): ChordProgressionDefinition {
   return CHORD_PROGRESSION_DEFINITIONS.find((progression) => progression.id === id) ?? CHORD_PROGRESSION_DEFINITIONS[0]
@@ -31,27 +38,30 @@ export function createProgressionTargets(
   inputStyle: ChordInputStyle = 'block'
 ): ChordTarget[] {
   const progression = getChordProgressionById(progressionId)
-  const keyRoot = KEY_ROOT_MIDI[keySignature]
+  const key = getMajorKeySignature(keySignature)
+  const keyRoot = getKeyRootMidi(keySignature)
 
   return progression.degrees.map((degree, index) => {
     const rootMidi = keyRoot + MAJOR_SCALE_OFFSETS[degree - 1]
     const quality = DEGREE_QUALITIES[degree - 1]
-    const intervals = quality === 'major' ? [0, 4, 7] : [0, 3, 7]
+    const intervals = quality === 'major' ? [0, 4, 7] : quality === 'minor' ? [0, 3, 7] : [0, 3, 6]
     const notes = intervals.map((interval) => rootMidi + interval)
     const degreeLabel = progression.name === '4536251' ? `${degree}` : progression.name.split('–')[index] ?? `${degree}`
-    const name = `${keySignature} 大调 ${degreeLabel} 级${quality === 'major' ? '大' : '小'}三和弦`
+    const rootSpelling = key.scaleDegrees[degree - 1].spelling
+    const qualityName = CHORD_QUALITY_NAMES[quality]
+    const name = `${key.displayName} ${degreeLabel} 级 ${rootSpelling} ${qualityName}`
 
     return {
       id: `${keySignature}-${progression.id}-${index + 1}-${inputStyle}`,
       baseId: `${keySignature}-${degree}`,
       name,
-      root: midiNumberToNoteName(rootMidi).replace(/-?\d+$/, ''),
+      root: rootSpelling,
       quality,
-      qualityName: quality === 'major' ? '大三和弦' : '小三和弦',
+      qualityName,
       inversion: 'root',
       inversionName: '原位',
       notes,
-      noteNames: notes.map(midiNumberToNoteName),
+      noteNames: notes.map((note) => spellMidiPitch(note, keySignature, 'grand').spelling),
       label: `${progression.name} · ${degreeLabel}级 · ${name}`,
       keySignature,
       degree,

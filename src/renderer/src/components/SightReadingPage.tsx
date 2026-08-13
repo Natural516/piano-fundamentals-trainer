@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ActiveMidiNote, MidiEventRecord } from '../types'
+import type { ActiveMidiNote } from '../types'
 import type {
+  MajorKeyId,
+  SightReadingNotePoolMode,
   SightReadingQuestionCount,
-  SightReadingRange,
   SightReadingStaffMode
 } from '../hooks/useSightReadingPractice'
 import {
-  RANGE_LABELS,
   STAFF_MODE_LABELS,
   useSightReadingPractice
 } from '../hooks/useSightReadingPractice'
 import { getRangeDescription } from '../utils/sightReadingNotes'
+import { MAJOR_KEY_DISPLAY_SIGNATURES, getMajorKeySignature } from '../utils/musicKeySignatures'
+import { SIGHT_READING_NOTE_POOL_MODE_LABELS } from '../utils/sightReadingSettings'
 import { createSightReadingRecord } from '../utils/practiceRecordAdapters'
 import type { PracticeSessionTiming } from '../utils/practiceRecordTypes'
 import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
@@ -22,50 +24,97 @@ import { PracticeSettingsDrawer } from './PracticeSettingsDrawer'
 import { PracticeStatBar } from './PracticeStatBar'
 import { SettingsIcon } from './SettingsIcon'
 import { SightReadingStaff } from './SightReadingStaff'
+import { SightReadingTimeBar } from './SightReadingTimeBar'
 
 interface SightReadingPageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
-  latestMidiEvent: MidiEventRecord | null
-  onBackHome: () => void
   onPracticeRunningChange: (running: boolean) => void
 }
 
-type TimeLimitOption = 3 | 5 | 10 | 'custom'
-
 const staffModeOptions: SightReadingStaffMode[] = ['treble', 'bass', 'grand']
-const rangeOptions: SightReadingRange[] = ['common', 'extended']
 const questionCountOptions: SightReadingQuestionCount[] = [10, 20, 50, 100]
-const fixedTimeLimitOptions: Array<3 | 5 | 10> = [3, 5, 10]
-
-function getTimeLimitOption(seconds: number): TimeLimitOption {
-  return seconds === 3 || seconds === 5 || seconds === 10 ? seconds : 'custom'
-}
+const noteCountLabels: Record<1 | 2 | 3, string> = { 1: '单音', 2: '双音', 3: '三音' }
+const notePoolOptions: Array<{
+  description: string
+  id: SightReadingNotePoolMode
+  suffix: string
+}> = [
+  {
+    id: 'diatonic',
+    suffix: '基础',
+    description: '只出现当前大调七个音级，适合熟悉调号和调内音。'
+  },
+  {
+    id: 'chromatic',
+    suffix: '进阶',
+    description: '题目可出现调外音，并按乐理显示升号、降号或还原号。'
+  }
+]
 
 function formatReactionTime(value: number | null): string {
   return value === null ? '暂无' : `${value} ms`
 }
 
-function ClefReportCard({
-  accuracy,
-  correct,
-  timeout,
-  title,
-  total,
-  wrong
+function SightNoteErrorDetails({
+  wrongNoteCounts,
+  timeoutNoteCounts
 }: {
-  accuracy: number
-  correct: number
-  timeout: number
-  title: string
-  total: number
-  wrong: number
+  wrongNoteCounts: Array<{ noteName: string; count: number }>
+  timeoutNoteCounts: Array<{ noteName: string; count: number }>
 }): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const timeoutByNote = new Map(timeoutNoteCounts.map((entry) => [entry.noteName, entry.count]))
+  const rows = wrongNoteCounts.map((entry) => ({
+    noteName: entry.noteName,
+    wrong: entry.count,
+    timeout: timeoutByNote.get(entry.noteName) ?? 0
+  }))
+  const problems = rows.filter((row) => row.wrong > 0 || row.timeout > 0)
+  const visibleRows = showAll ? rows : problems
+
   return (
-    <div>
-      <span>{title}</span>
-      <strong>{total} 题</strong>
-      <small>正确 {correct} / 错误 {wrong} / 超时 {timeout} / 正确率 {accuracy}%</small>
+    <div className="sight-error-table">
+      <div className="sight-error-table__header">
+        <h4>每个音的错误与超时次数</h4>
+        <button
+          className="sight-report-toggle"
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          {open ? '收起详情' : '查看详情 >'}
+        </button>
+      </div>
+      {open ? (
+        <>
+          {problems.length === 0 ? (
+            <p className="sight-error-table__empty">本次没有错误或超时</p>
+          ) : null}
+          {rows.length > 0 ? (
+            <div className="sight-error-table__actions">
+              <button
+                className="sight-report-toggle"
+                type="button"
+                onClick={() => setShowAll((value) => !value)}
+              >
+                {showAll ? '只显示问题音' : '显示全部音符'}
+              </button>
+            </div>
+          ) : null}
+          {visibleRows.length > 0 ? (
+            <div className="sight-error-table__grid">
+              {visibleRows.map((row) => (
+                <span key={row.noteName}>
+                  {row.noteName}
+                  <strong>错 {row.wrong} / 超时 {row.timeout}</strong>
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   )
 }
@@ -73,23 +122,17 @@ function ClefReportCard({
 export function SightReadingPage({
   activeNotes,
   exitPromptOpen,
-  latestMidiEvent,
-  onBackHome,
   onPracticeRunningChange
 }: SightReadingPageProps): JSX.Element {
-  const practice = useSightReadingPractice(latestMidiEvent)
+  const practice = useSightReadingPractice()
   const { showVirtualKeyboard, setShowVirtualKeyboard } = useDisplayPreferences('sight-reading')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draftStaffMode, setDraftStaffMode] = useState<SightReadingStaffMode>(practice.staffMode)
-  const [draftRange, setDraftRange] = useState<SightReadingRange>(practice.range)
+  const [draftKeySignature, setDraftKeySignature] = useState<MajorKeyId>(practice.keySignature)
+  const [draftNotePoolMode, setDraftNotePoolMode] = useState<SightReadingNotePoolMode>(practice.notePoolMode)
   const [draftQuestionCount, setDraftQuestionCount] = useState<SightReadingQuestionCount>(practice.questionCount)
   const [draftShowNoteName, setDraftShowNoteName] = useState(practice.showNoteName)
   const [draftShowVirtualKeyboard, setDraftShowVirtualKeyboard] = useState(showVirtualKeyboard)
-  const [draftTimeLimitOption, setDraftTimeLimitOption] = useState<TimeLimitOption>(
-    getTimeLimitOption(practice.answerTimeLimitSeconds)
-  )
-  const [draftCustomTimeLimit, setDraftCustomTimeLimit] = useState(String(practice.answerTimeLimitSeconds))
-  const [timeLimitError, setTimeLimitError] = useState('')
   const createRecord = useCallback(
     (timing: PracticeSessionTiming) => practice.report
       ? createSightReadingRecord({ timing, report: practice.report, showNoteName: practice.showNoteName })
@@ -118,44 +161,22 @@ export function SightReadingPage({
   }
 
   const openSettings = (): void => {
-    const option = getTimeLimitOption(practice.answerTimeLimitSeconds)
     setDraftStaffMode(practice.staffMode)
-    setDraftRange(practice.range)
+    setDraftKeySignature(practice.keySignature)
+    setDraftNotePoolMode(practice.notePoolMode)
     setDraftQuestionCount(practice.questionCount)
     setDraftShowNoteName(practice.showNoteName)
     setDraftShowVirtualKeyboard(showVirtualKeyboard)
-    setDraftTimeLimitOption(option)
-    setDraftCustomTimeLimit(String(practice.answerTimeLimitSeconds))
-    setTimeLimitError('')
     setSettingsOpen(true)
   }
 
   const saveSettings = (): void => {
-    let answerTimeLimitSeconds: number
-
-    if (draftTimeLimitOption === 'custom') {
-      const trimmed = draftCustomTimeLimit.trim()
-      if (!/^\d+$/.test(trimmed)) {
-        setTimeLimitError('请输入 1～60 之间的整数秒数。')
-        return
-      }
-
-      answerTimeLimitSeconds = Number(trimmed)
-      if (!Number.isInteger(answerTimeLimitSeconds) || answerTimeLimitSeconds < 1 || answerTimeLimitSeconds > 60) {
-        setTimeLimitError('自定义答题时限必须是 1～60 之间的整数。')
-        return
-      }
-    } else {
-      answerTimeLimitSeconds = draftTimeLimitOption
-    }
-
     practice.setStaffMode(draftStaffMode)
-    practice.setRange(draftRange)
+    practice.setKeySignature(draftKeySignature)
+    practice.setNotePoolMode(draftNotePoolMode)
     practice.setQuestionCount(draftQuestionCount)
-    practice.setAnswerTimeLimitSeconds(answerTimeLimitSeconds)
     practice.setShowNoteName(draftShowNoteName)
     setShowVirtualKeyboard(draftShowVirtualKeyboard)
-    setTimeLimitError('')
     setSettingsOpen(false)
   }
 
@@ -165,7 +186,7 @@ export function SightReadingPage({
   const wrongNotes = practice.result === 'wrong_note' && practice.currentInputMidiNumber !== null
     ? [practice.currentInputMidiNumber]
     : []
-  const settingsSummary = `C 大调 · ${STAFF_MODE_LABELS[practice.staffMode]} · ${RANGE_LABELS[practice.range]}音域 · ${practice.questionCount}题 · 每题 ${practice.answerTimeLimitSeconds} 秒 · ${practice.showNoteName ? '显示音名' : '隐藏音名'}`
+  const settingsSummary = `${getMajorKeySignature(practice.keySignature).displayName} · ${SIGHT_READING_NOTE_POOL_MODE_LABELS[practice.notePoolMode]} · ${STAFF_MODE_LABELS[practice.staffMode]} · ${noteCountLabels[practice.noteCount]} · ${practice.questionCount}题 · 每题固定 ${practice.answerTimeLimitSeconds} 秒 · ${practice.showNoteName ? '显示音名' : '隐藏音名'}`
   const feedbackLabel = practice.result === 'correct'
     ? '正确'
     : practice.result === 'wrong_note'
@@ -207,8 +228,16 @@ export function SightReadingPage({
             ) : null}
           </div>
 
+          <SightReadingTimeBar
+            getRemainingTimeMs={practice.getRemainingTimeMs}
+            isFeedback={practice.result !== null}
+            isPaused={practice.isPaused}
+            isRunning={isRunning}
+          />
+
           <SightReadingStaff
             feedback={practice.result}
+            keySignature={practice.keySignature}
             note={practice.currentNote}
             showNoteName={practice.showNoteName}
             staffMode={practice.staffMode}
@@ -296,21 +325,41 @@ export function SightReadingPage({
         </div>
 
         <div className="sight-setting-group">
-          <span>音域</span>
-          <div className="sight-segmented sight-segmented--two">
-            {rangeOptions.map((option) => (
+          <span>固定音域</span>
+          <small>{getRangeDescription(draftStaffMode)}</small>
+        </div>
+
+        <label className="midi-field" htmlFor="sight-reading-key-signature">
+          <span>调性</span>
+          <select
+            id="sight-reading-key-signature"
+            className="midi-select"
+            disabled={isRunning}
+            value={draftKeySignature}
+            onChange={(event) => setDraftKeySignature(event.target.value as MajorKeyId)}
+          >
+            {MAJOR_KEY_DISPLAY_SIGNATURES.map((key) => (
+              <option key={key.id} value={key.id}>{key.displayName}</option>
+            ))}
+          </select>
+        </label>
+
+        <div className="sight-setting-group">
+          <span>音符内容</span>
+          <div className="sight-segmented sight-segmented--two sight-note-pool-options">
+            {notePoolOptions.map((option) => (
               <button
-                key={option}
-                className={draftRange === option ? 'is-active' : ''}
+                key={option.id}
+                className={draftNotePoolMode === option.id ? 'is-active' : ''}
                 disabled={isRunning}
                 type="button"
-                onClick={() => setDraftRange(option)}
+                onClick={() => setDraftNotePoolMode(option.id)}
               >
-                {RANGE_LABELS[option]}
+                <strong>{SIGHT_READING_NOTE_POOL_MODE_LABELS[option.id]}（{option.suffix}）</strong>
+                <small>{option.description}</small>
               </button>
             ))}
           </div>
-          <small>{getRangeDescription(draftStaffMode, draftRange)}</small>
         </div>
 
         <div className="sight-setting-group">
@@ -328,55 +377,6 @@ export function SightReadingPage({
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="sight-setting-group">
-          <span>答题时限</span>
-          <div className="sight-segmented sight-segmented--four">
-            {fixedTimeLimitOptions.map((seconds) => (
-              <button
-                key={seconds}
-                className={draftTimeLimitOption === seconds ? 'is-active' : ''}
-                disabled={isRunning}
-                type="button"
-                onClick={() => {
-                  setDraftTimeLimitOption(seconds)
-                  setTimeLimitError('')
-                }}
-              >
-                {seconds} 秒
-              </button>
-            ))}
-            <button
-              className={draftTimeLimitOption === 'custom' ? 'is-active' : ''}
-              disabled={isRunning}
-              type="button"
-              onClick={() => {
-                setDraftTimeLimitOption('custom')
-                setTimeLimitError('')
-              }}
-            >
-              自定义
-            </button>
-          </div>
-          {draftTimeLimitOption === 'custom' ? (
-            <label className="sight-custom-time-limit">
-              <input
-                aria-invalid={Boolean(timeLimitError)}
-                disabled={isRunning}
-                inputMode="numeric"
-                maxLength={2}
-                type="text"
-                value={draftCustomTimeLimit}
-                onChange={(event) => {
-                  setDraftCustomTimeLimit(event.target.value)
-                  setTimeLimitError('')
-                }}
-              />
-              <span>秒（1～60 的整数）</span>
-            </label>
-          ) : null}
-          {timeLimitError ? <small className="sight-setting-error">{timeLimitError}</small> : null}
         </div>
 
         <div className="sight-setting-group">
@@ -424,16 +424,9 @@ export function SightReadingPage({
       </PracticeSettingsDrawer>
 
       {practice.status === 'finished' && practice.report ? (
-        <PracticeReportModal title="识谱练习完成">
-          <p className="practice-report-summary">
-            C 大调 · {STAFF_MODE_LABELS[practice.report.staffMode]} · {RANGE_LABELS[practice.report.range]}音域
-          </p>
+        <PracticeReportModal title="识谱练习完成" onBack={practice.reset} onRepeat={startPractice}>
           <div className="sight-report-grid">
-            <div><span>练习名称</span><strong>识谱练习</strong></div>
-            <div><span>谱表模式</span><strong>{STAFF_MODE_LABELS[practice.report.staffMode]}</strong></div>
-            <div><span>音域</span><strong>{RANGE_LABELS[practice.report.range]}</strong></div>
             <div><span>题数</span><strong>{practice.report.totalQuestions}</strong></div>
-            <div><span>每题时限</span><strong>{practice.report.answerTimeLimitSeconds} 秒</strong></div>
             <div><span>完成题数</span><strong>{practice.report.completedQuestions}</strong></div>
             <div><span>正确</span><strong>{practice.report.correct}</strong></div>
             <div><span>错误</span><strong>{practice.report.wrong}</strong></div>
@@ -446,27 +439,10 @@ export function SightReadingPage({
             <div><span>最快反应</span><strong>{formatReactionTime(practice.report.fastestReactionMs)}</strong></div>
             <div><span>最慢反应</span><strong>{formatReactionTime(practice.report.slowestReactionMs)}</strong></div>
           </div>
-          <div className="sight-clef-report-grid">
-            <ClefReportCard title="高音谱表" {...practice.report.treble} />
-            <ClefReportCard title="低音谱表" {...practice.report.bass} />
-          </div>
-          <div className="sight-error-table">
-            <h4>每个音的错误与超时次数</h4>
-            <div>
-              {practice.report.wrongNoteCounts.map((entry) => (
-                <span key={entry.noteName}>
-                  {entry.noteName}
-                  <strong>
-                    错 {entry.count} / 超时 {practice.report?.timeoutNoteCounts.find((item) => item.noteName === entry.noteName)?.count ?? 0}
-                  </strong>
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="practice-report-actions">
-            <AppButton onClick={startPractice}>再练一次</AppButton>
-            <AppButton variant="secondary" onClick={onBackHome}>返回首页</AppButton>
-          </div>
+          <SightNoteErrorDetails
+            wrongNoteCounts={practice.report.wrongNoteCounts}
+            timeoutNoteCounts={practice.report.timeoutNoteCounts}
+          />
           {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
         </PracticeReportModal>
       ) : null}

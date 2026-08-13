@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getLastMidiEventId } from '../midi/midiEventBus'
 import type { MidiEventRecord } from '../types'
 import {
   COORDINATION_GROUP_WINDOW_MS,
@@ -21,6 +22,7 @@ import { getToleranceMs } from '../utils/judgement'
 import type { ToleranceLevel } from '../utils/practiceTypes'
 import { useMetronome } from './useMetronome'
 import { useMetronomeSound } from './useMetronomeSound'
+import { useMidiEventSubscription } from './useMidiEvents'
 
 interface GroupedInputEvent {
   midiNumber: number
@@ -65,6 +67,7 @@ interface UseCoordinationPracticeResult {
   pause: () => void
   stop: () => void
   restart: () => void
+  reset: () => void
 }
 
 function normalizeNotes(notes: number[]): number[] {
@@ -264,7 +267,7 @@ function createReport(
   }
 }
 
-export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null): UseCoordinationPracticeResult {
+export function useCoordinationPractice(): UseCoordinationPracticeResult {
   const metronome = useMetronome(60)
   const metronomeSound = useMetronomeSound(metronome)
   const [selectedPatternId, setSelectedPatternIdState] = useState(COORDINATION_PATTERNS[0].id)
@@ -289,7 +292,7 @@ export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null)
     resultsRef.current = []
     finalizedTargetIdsRef.current = new Set()
     pendingInputsRef.current = new Map()
-    lastMidiEventIdRef.current = null
+    lastMidiEventIdRef.current = getLastMidiEventId()
     setResults([])
     setIsComplete(false)
   }, [])
@@ -376,6 +379,11 @@ export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null)
     metronome.restart()
   }, [metronome, metronomeSound, resetProgress])
 
+  const reset = useCallback(() => {
+    metronome.stop()
+    resetProgress()
+  }, [metronome, resetProgress])
+
   useEffect(() => {
     if (metronome.status !== 'running' || metronome.isCountingIn || isComplete) return
 
@@ -396,19 +404,45 @@ export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null)
     }
   }, [finalizeStep, isComplete, metronome.isCountingIn, metronome.practiceElapsedMs, metronome.status, timeline, toleranceLevel])
 
-  useEffect(() => {
-    if (!latestMidiEvent || latestMidiEvent.type !== 'noteOn' || (latestMidiEvent.velocity ?? 0) <= 0) return
-    if (!metronome.practiceStartTimestampMs || metronome.status !== 'running' || metronome.isCountingIn || isComplete) return
-    if (typeof latestMidiEvent.midiNumber !== 'number') return
+  const metronomeStateRef = useRef({
+    status: metronome.status,
+    isCountingIn: metronome.isCountingIn,
+    practiceStartTimestampMs: metronome.practiceStartTimestampMs
+  })
+  metronomeStateRef.current = {
+    status: metronome.status,
+    isCountingIn: metronome.isCountingIn,
+    practiceStartTimestampMs: metronome.practiceStartTimestampMs
+  }
+  const timelineRef = useRef(timeline)
+  timelineRef.current = timeline
+  const toleranceLevelRef = useRef(toleranceLevel)
+  toleranceLevelRef.current = toleranceLevel
+  const completeRef = useRef(isComplete)
+  completeRef.current = isComplete
 
-    if (lastMidiEventIdRef.current === latestMidiEvent.id) return
-    lastMidiEventIdRef.current = latestMidiEvent.id
+  const handleMidiEvent = useCallback((event: MidiEventRecord) => {
+    if (event.type !== 'noteOn' || (event.velocity ?? 0) <= 0) return
+    const metronomeState = metronomeStateRef.current
+    if (
+      !metronomeState.practiceStartTimestampMs ||
+      metronomeState.status !== 'running' ||
+      metronomeState.isCountingIn ||
+      completeRef.current
+    ) {
+      return
+    }
+    if (typeof event.midiNumber !== 'number') return
 
-    const relativeTimeMs = latestMidiEvent.timestamp - metronome.practiceStartTimestampMs
+    if (lastMidiEventIdRef.current !== null && event.id <= lastMidiEventIdRef.current) return
+    lastMidiEventIdRef.current = event.id
+
+    const relativeTimeMs = event.timestamp - metronomeState.practiceStartTimestampMs
     if (relativeTimeMs < 0) return
 
-    const toleranceMs = getToleranceMs(toleranceLevel)
-    const candidate = timeline
+    const toleranceMs = getToleranceMs(toleranceLevelRef.current)
+    const activeTimeline = timelineRef.current
+    const candidate = activeTimeline
       .filter((step) => {
         if (finalizedTargetIdsRef.current.has(step.id)) return false
         const pending = pendingInputsRef.current.get(step.id)
@@ -423,11 +457,11 @@ export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null)
     if (!candidate) return
 
     const pending = pendingInputsRef.current.get(candidate.id)
-    if (pending?.events.some((event) => event.midiNumber === latestMidiEvent.midiNumber)) return
+    if (pending?.events.some((midiEvent) => midiEvent.midiNumber === event.midiNumber)) return
 
     const inputEvent: GroupedInputEvent = {
-      midiNumber: latestMidiEvent.midiNumber,
-      timestamp: latestMidiEvent.timestamp,
+      midiNumber: event.midiNumber,
+      timestamp: event.timestamp,
       relativeTimeMs
     }
 
@@ -435,7 +469,9 @@ export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null)
       firstRelativeTimeMs: pending?.firstRelativeTimeMs ?? relativeTimeMs,
       events: [...(pending?.events ?? []), inputEvent]
     })
-  }, [isComplete, latestMidiEvent, metronome.isCountingIn, metronome.practiceStartTimestampMs, metronome.status, timeline, toleranceLevel])
+  }, [])
+
+  useMidiEventSubscription(handleMidiEvent)
 
   const currentStepIndex = useMemo(() => {
     if (metronome.status === 'idle' || metronome.isCountingIn || isComplete || timeline.length === 0) return -1
@@ -485,6 +521,7 @@ export function useCoordinationPractice(latestMidiEvent: MidiEventRecord | null)
     start,
     pause,
     stop,
-    restart
+    restart,
+    reset
   }
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getLastMidiEventId } from '../midi/midiEventBus'
 import type { MidiEventRecord } from '../types'
-import { midiNumberToNoteName } from '../utils/midiNotes'
 import {
   CHORD_INPUT_WINDOW_MS,
   CHORD_INVERSION_MODE_LABELS,
@@ -15,7 +15,6 @@ import { CHORD_TRAINING_CONTENTS, getChordTrainingContent } from '../utils/chord
 import type {
   ChordFeedback,
   ChordInversionMode,
-  ChordJudgementType,
   ChordPracticeReport,
   ChordPracticeStatus,
   ChordQualityFilter,
@@ -25,8 +24,15 @@ import type {
   ChordTrainingContent,
   SeventhChordQualityFilter
 } from '../utils/chordTypes'
+import {
+  createArpeggioFeedback,
+  createChordFeedback,
+  normalizeNotes
+} from '../utils/chordFeedback'
 import { useMetronome } from './useMetronome'
 import { useMetronomeSound } from './useMetronomeSound'
+import { normalizeMajorKeyId } from '../utils/musicKeySignatures'
+import { useMidiEventSubscription } from './useMidiEvents'
 
 interface UseChordPracticeResult {
   status: ChordPracticeStatus
@@ -90,79 +96,9 @@ const EMPTY_REPORT: ChordPracticeReport = {
   mostMissedChord: '暂无',
   mostMissedNote: '暂无',
   averageAttempts: 0,
-  contentName: 'C大调自然三和弦',
+  contentName: '调内自然三和弦',
   keySignature: 'C',
   roundCount: 1
-}
-
-function normalizeNotes(notes: number[]): number[] {
-  return Array.from(new Set(notes)).sort((left, right) => left - right)
-}
-
-function getMissingNotes(expectedNotes: number[], inputNotes: number[]): number[] {
-  const inputSet = new Set(inputNotes)
-  return expectedNotes.filter((note) => !inputSet.has(note))
-}
-
-function getExtraNotes(expectedNotes: number[], inputNotes: number[]): number[] {
-  const expectedSet = new Set(expectedNotes)
-  return inputNotes.filter((note) => !expectedSet.has(note))
-}
-
-function getJudgementType(missingNotes: number[], extraNotes: number[]): ChordJudgementType {
-  if (missingNotes.length === 0 && extraNotes.length === 0) {
-    return 'correct'
-  }
-
-  if (missingNotes.length > 0 && extraNotes.length > 0) {
-    return 'wrong_note'
-  }
-
-  if (missingNotes.length > 0) {
-    return 'missing_note'
-  }
-
-  return 'extra_note'
-}
-
-function createFeedback(target: ChordTarget, inputNotes: number[]): ChordFeedback {
-  const expectedNotes = normalizeNotes(target.notes)
-  const cleanInputNotes = normalizeNotes(inputNotes)
-  const missingNotes = getMissingNotes(expectedNotes, cleanInputNotes)
-  const extraNotes = getExtraNotes(expectedNotes, cleanInputNotes)
-  const type = getJudgementType(missingNotes, extraNotes)
-  const missingText = missingNotes.length > 0 ? `缺少 ${missingNotes.map(midiNumberToNoteName).join(' / ')}` : ''
-  const extraText = extraNotes.length > 0 ? `多出 ${extraNotes.map(midiNumberToNoteName).join(' / ')}` : ''
-  const message = type === 'correct'
-    ? '正确'
-    : [missingText, extraText].filter(Boolean).join('，')
-
-  return {
-    type,
-    target,
-    inputNotes: cleanInputNotes,
-    inputNoteNames: cleanInputNotes.map(midiNumberToNoteName),
-    missingNotes,
-    missingNoteNames: missingNotes.map(midiNumberToNoteName),
-    extraNotes,
-    extraNoteNames: extraNotes.map(midiNumberToNoteName),
-    message
-  }
-}
-
-function createArpeggioFeedback(target: ChordTarget, inputNotes: number[], correct: boolean): ChordFeedback {
-  const cleanInputNotes = normalizeNotes(inputNotes)
-  return {
-    type: correct ? 'correct' : 'wrong_note',
-    target,
-    inputNotes: cleanInputNotes,
-    inputNoteNames: cleanInputNotes.map(midiNumberToNoteName),
-    missingNotes: correct ? [] : target.notes.filter((note) => !cleanInputNotes.includes(note)),
-    missingNoteNames: correct ? [] : target.notes.filter((note) => !cleanInputNotes.includes(note)).map(midiNumberToNoteName),
-    extraNotes: correct ? [] : cleanInputNotes.filter((note) => !target.notes.includes(note)),
-    extraNoteNames: correct ? [] : cleanInputNotes.filter((note) => !target.notes.includes(note)).map(midiNumberToNoteName),
-    message: correct ? '分解和弦顺序正确' : '顺序错误，请从当前目标音继续'
-  }
 }
 
 function getTopEntryLabel(entries: Map<string, number>): string {
@@ -219,7 +155,7 @@ function createReport({
   }
 }
 
-export function useChordPractice(latestMidiEvent: MidiEventRecord | null): UseChordPracticeResult {
+export function useChordPractice(): UseChordPracticeResult {
   const metronome = useMetronome(60)
   const metronomeSound = useMetronomeSound(metronome)
   const [status, setStatus] = useState<ChordPracticeStatus>('idle')
@@ -257,6 +193,10 @@ export function useChordPractice(latestMidiEvent: MidiEventRecord | null): UseCh
   const advanceRemainingMsRef = useRef(CHORD_ADVANCE_DELAY_MS)
   const inputWindowNotesRef = useRef<number[]>([])
   const isPausedRef = useRef(false)
+  const statusRef = useRef(status)
+  statusRef.current = status
+  const isLockedRef = useRef(isLocked)
+  isLockedRef.current = isLocked
   const practiceStartedAtRef = useRef<number | null>(null)
   const lastHandledEventIdRef = useRef<number | null>(null)
   const currentHadErrorRef = useRef(false)
@@ -274,11 +214,13 @@ export function useChordPractice(latestMidiEvent: MidiEventRecord | null): UseCh
 
   const selectedContent = useMemo(() => getChordTrainingContent(selectedContentId), [selectedContentId])
   const chordPool = useMemo(() => {
-    if (selectedContent.category === 'seventh') return getSeventhChordTargets(inversionMode, seventhQualityFilter)
+    if (selectedContent.category === 'seventh') {
+      return getSeventhChordTargets(inversionMode, seventhQualityFilter, keySignature)
+    }
     if (selectedContent.progressionId) {
       return createProgressionTargets(selectedContent.progressionId, keySignature, selectedContent.inputStyle)
     }
-    return getChordTargets(qualityFilter, inversionMode)
+    return getChordTargets(qualityFilter, inversionMode, keySignature)
   }, [inversionMode, keySignature, qualityFilter, selectedContent, seventhQualityFilter])
 
   const clearInputWindow = useCallback(() => {
@@ -470,7 +412,7 @@ export function useChordPractice(latestMidiEvent: MidiEventRecord | null): UseCh
     inputWindowNotesRef.current = []
     totalAttemptsRef.current += 1
 
-    const nextFeedback = createFeedback(target, inputNotes)
+    const nextFeedback = createChordFeedback(target, inputNotes)
     setFeedback(nextFeedback)
     setCurrentInputNotes(inputNotes)
 
@@ -518,7 +460,7 @@ export function useChordPractice(latestMidiEvent: MidiEventRecord | null): UseCh
 
   const setKeySignature = useCallback((nextKeySignature: ChordKeySignature) => {
     if (status === 'running') return
-    setKeySignatureState(nextKeySignature)
+    setKeySignatureState(normalizeMajorKeyId(nextKeySignature))
   }, [status])
 
   const setRoundCount = useCallback((nextRoundCount: number) => {
@@ -547,7 +489,7 @@ export function useChordPractice(latestMidiEvent: MidiEventRecord | null): UseCh
     activeSequenceRef.current = nextSequence
     activeTargetCountRef.current = nextTargetCount
     practiceStartedAtRef.current = Date.now()
-    lastHandledEventIdRef.current = latestMidiEvent?.id ?? null
+    lastHandledEventIdRef.current = getLastMidiEventId()
     isPausedRef.current = false
     resetCounters()
     setStatus('running')
@@ -571,7 +513,6 @@ export function useChordPractice(latestMidiEvent: MidiEventRecord | null): UseCh
     clearAdvanceTimer,
     clearInputWindow,
     chordPool,
-    latestMidiEvent,
     metronome,
     metronomeEnabled,
     metronomeSound,
@@ -642,7 +583,7 @@ export function useChordPractice(latestMidiEvent: MidiEventRecord | null): UseCh
     const advanceDelayMs = advanceRemainingMsRef.current
     isPausedRef.current = false
     setIsPaused(false)
-    lastHandledEventIdRef.current = latestMidiEvent?.id ?? lastHandledEventIdRef.current
+    lastHandledEventIdRef.current = getLastMidiEventId()
 
     if (inputWindowNotesRef.current.length > 0) {
       scheduleInputWindow(inputWindowDelayMs)
@@ -655,7 +596,7 @@ export function useChordPractice(latestMidiEvent: MidiEventRecord | null): UseCh
     if (metronomeEnabled && metronome.status === 'paused') {
       metronome.start()
     }
-  }, [isLocked, latestMidiEvent, metronome, metronomeEnabled, scheduleInputWindow, scheduleNextTarget, status])
+  }, [isLocked, metronome, metronomeEnabled, scheduleInputWindow, scheduleNextTarget, status])
 
   useEffect(() => {
     return () => {
@@ -664,60 +605,74 @@ export function useChordPractice(latestMidiEvent: MidiEventRecord | null): UseCh
     }
   }, [clearAdvanceTimer, clearInputWindow])
 
-  useEffect(() => {
-    if (!latestMidiEvent || latestMidiEvent.type !== 'noteOn' || (latestMidiEvent.velocity ?? 0) <= 0) {
+  const completeQuestionRef = useRef(completeQuestion)
+  completeQuestionRef.current = completeQuestion
+  const recordFirstErrorRef = useRef(recordFirstError)
+  recordFirstErrorRef.current = recordFirstError
+  const scheduleInputWindowRef = useRef(scheduleInputWindow)
+  scheduleInputWindowRef.current = scheduleInputWindow
+
+  const handleMidiEvent = useCallback((event: MidiEventRecord) => {
+    if (event.type !== 'noteOn' || (event.velocity ?? 0) <= 0) {
       return
     }
 
-    if (status !== 'running' || isPausedRef.current || isLocked || !currentTargetRef.current) {
+    if (
+      statusRef.current !== 'running' ||
+      isPausedRef.current ||
+      isLockedRef.current ||
+      !currentTargetRef.current
+    ) {
       return
     }
 
-    if (practiceStartedAtRef.current !== null && latestMidiEvent.timestamp < practiceStartedAtRef.current) {
+    if (practiceStartedAtRef.current !== null && event.timestamp < practiceStartedAtRef.current) {
       return
     }
 
-    if (typeof latestMidiEvent.midiNumber !== 'number') {
+    if (typeof event.midiNumber !== 'number') {
       return
     }
 
-    if (lastHandledEventIdRef.current === latestMidiEvent.id) {
+    if (lastHandledEventIdRef.current !== null && event.id <= lastHandledEventIdRef.current) {
       return
     }
 
-    lastHandledEventIdRef.current = latestMidiEvent.id
+    lastHandledEventIdRef.current = event.id
 
     const target = currentTargetRef.current
     if (target.inputStyle === 'arpeggio') {
       const sequence = target.sequenceNotes ?? target.notes
       const expectedNote = sequence[arpeggioInputRef.current.length]
 
-      if (latestMidiEvent.midiNumber !== expectedNote) {
-        const nextFeedback = createArpeggioFeedback(target, [latestMidiEvent.midiNumber], false)
+      if (event.midiNumber !== expectedNote) {
+        const nextFeedback = createArpeggioFeedback(target, [event.midiNumber], false)
         setFeedback(nextFeedback)
-        setCurrentInputNotes([latestMidiEvent.midiNumber])
-        recordFirstError(nextFeedback)
+        setCurrentInputNotes([event.midiNumber])
+        recordFirstErrorRef.current(nextFeedback)
         return
       }
 
-      arpeggioInputRef.current = [...arpeggioInputRef.current, latestMidiEvent.midiNumber]
+      arpeggioInputRef.current = [...arpeggioInputRef.current, event.midiNumber]
       setCurrentInputNotes(arpeggioInputRef.current)
       setFeedback(null)
 
       if (arpeggioInputRef.current.length >= sequence.length) {
         totalAttemptsRef.current += 1
         setFeedback(createArpeggioFeedback(target, arpeggioInputRef.current, true))
-        completeQuestion(!currentHadErrorRef.current)
+        completeQuestionRef.current(!currentHadErrorRef.current)
       }
       return
     }
 
-    inputWindowNotesRef.current = normalizeNotes([...inputWindowNotesRef.current, latestMidiEvent.midiNumber])
+    inputWindowNotesRef.current = normalizeNotes([...inputWindowNotesRef.current, event.midiNumber])
 
     if (inputWindowTimerRef.current === null) {
-      scheduleInputWindow(CHORD_INPUT_WINDOW_MS)
+      scheduleInputWindowRef.current(CHORD_INPUT_WINDOW_MS)
     }
-  }, [completeQuestion, isLocked, isPaused, latestMidiEvent, recordFirstError, scheduleInputWindow, status])
+  }, [])
+
+  useMidiEventSubscription(handleMidiEvent)
 
   const activeReport = report ?? (status === 'running' ? buildReport() : EMPTY_REPORT)
   const correctNotes = feedback?.type === 'correct' ? feedback.target.notes : []

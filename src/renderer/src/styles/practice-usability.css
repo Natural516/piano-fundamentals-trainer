@@ -159,9 +159,12 @@
   top: 0;
   right: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  box-sizing: border-box;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(380px, calc(100vw - 32px));
   height: 100%;
+  max-height: 100%;
+  overflow: hidden;
   border-left: 1px solid var(--border-soft);
   color: var(--text-primary);
   background: var(--bg-elevated);
@@ -206,7 +209,7 @@
 }
 
 .practice-settings-locked {
-  margin: 14px 20px 0;
+  margin: 14px 0 0;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--warning) 38%, transparent);
   border-radius: 10px;
@@ -217,8 +220,9 @@
 
 .practice-settings-drawer__body {
   min-height: 0;
-  padding: 2px 20px 22px;
+  padding: 2px 20px 24px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .practice-settings-drawer__footer {
@@ -361,16 +365,40 @@
   padding: 10px 14px;
 }
 
-.practice-primary-panel .sight-staff {
+.practice-primary-panel .music-staff-renderer {
   height: clamp(178px, 24vh, 214px);
   min-height: 178px;
 }
 
-.sight-treble-clef {
-  fill: var(--staff-symbol);
-  font-family: "Segoe UI Symbol", "Noto Music", "Bravura Text", serif;
-  font-size: 96px;
-  font-weight: 400;
+.practice-primary-panel .music-staff-renderer.is-grand {
+  height: clamp(218px, 30vh, 252px);
+}
+
+.sight-reading-time-bar {
+  position: relative;
+  height: 6px;
+  margin: 8px 0 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-primary) 10%, var(--bg-input));
+}
+
+.sight-reading-time-bar > span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent-primary);
+  transform-origin: left center;
+  will-change: transform;
+}
+
+.sight-reading-time-bar.is-warning > span {
+  background: var(--warning);
+}
+
+.sight-reading-time-bar.is-inactive > span {
+  opacity: 0.42;
 }
 
 .practice-live-strip,
@@ -539,7 +567,7 @@
 
 .practice-report-modal {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(720px, calc(100vw - 48px));
   max-height: 80vh;
   border: 1px solid var(--border-soft);
@@ -551,13 +579,17 @@
 }
 
 .practice-report-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   padding: 18px 22px;
   border-bottom: 1px solid var(--border-soft);
 }
 
 .practice-report-modal__body {
   min-height: 0;
-  padding: 4px 22px 22px;
+  padding: 4px 22px 18px;
   overflow-y: auto;
 }
 
@@ -567,17 +599,22 @@
 }
 
 .practice-report-modal .practice-report-actions {
-  position: sticky;
-  bottom: -22px;
-  margin: 18px -22px -22px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0;
   padding: 14px 22px;
   border-top: 1px solid var(--border-soft);
   background: var(--bg-panel);
 }
 
 @media (max-width: 1439px) {
-  .practice-primary-panel .sight-staff {
+  .practice-primary-panel .music-staff-renderer {
     height: 178px;
+  }
+
+  .practice-primary-panel .music-staff-renderer.is-grand {
+    height: 218px;
   }
 
   .practice-live-strip > div,
@@ -604,26 +641,6 @@
 
 .sight-page .practice-stat-bar {
   grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-
-.sight-clef-glyph {
-  fill: var(--staff-symbol);
-  font-family: "Segoe UI Symbol", "Noto Music", "Bravura Text", serif;
-  font-weight: 400;
-}
-
-.sight-treble-clef {
-  font-size: 96px;
-}
-
-.sight-bass-clef-glyph {
-  font-size: 72px;
-}
-
-.sight-grand-staff-connector line {
-  stroke: var(--staff-line);
-  stroke-linecap: round;
-  stroke-width: 2;
 }
 
 .sight-staff-card {
@@ -686,32 +703,30 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.sight-custom-time-limit {
-  display: flex;
+.practice-settings-drawer .sight-note-pool-options > button {
+  min-height: 82px;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  color: var(--text-secondary);
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 12px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.sight-note-pool-options strong,
+.sight-note-pool-options small {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.sight-note-pool-options strong {
   font-size: 13px;
 }
 
-.sight-custom-time-limit input {
-  width: 76px;
-  height: 38px;
-  padding: 0 10px;
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  outline: none;
-  color: var(--text-primary);
-  background: var(--bg-input);
-  font: inherit;
-}
-
-.sight-custom-time-limit input:focus {
-  border-color: var(--accent-primary);
-}
-
-.sight-custom-time-limit input[aria-invalid="true"] {
-  border-color: var(--danger);
+.sight-note-pool-options small {
+  font-weight: 600;
 }
 
 .sight-setting-group .sight-setting-error {
@@ -753,6 +768,48 @@
 .sight-pause-overlay span {
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+.numeric-stepper {
+  display: block;
+  width: min(100%, 112px);
+  margin-inline: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-input);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-primary) 5%, transparent);
+  overflow: hidden;
+}
+
+.numeric-stepper input {
+  appearance: none;
+  width: 100%;
+  height: 42px;
+  border: 0;
+  border-radius: 11px;
+  color: var(--text-primary);
+  padding: 0 8px;
+  outline: none;
+  background: var(--bg-input);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.numeric-stepper:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.numeric-stepper input:focus-visible {
+  outline: none;
+}
+
+.numeric-stepper input:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .practice-exit-backdrop {

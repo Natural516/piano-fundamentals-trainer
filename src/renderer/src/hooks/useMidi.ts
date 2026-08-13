@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   ActiveMidiNote,
   MidiEventRecord,
-  MidiEventType,
   MidiInputDevice,
   MidiPermissionStatus,
   MidiSidebarStatus
 } from '../types'
+import { publishMidiEvent } from '../midi/midiEventBus'
+import { parseMidiMessage } from '../midi/midiMessages'
 import { midiNumberToNoteName } from '../utils/midiNotes'
 
 interface MidiMessageEventLike {
@@ -230,51 +231,15 @@ export function useMidi(): UseMidiResult {
   }, [syncInputs])
 
   const handleMidiMessage = useCallback((event: MidiMessageEventLike, input: MidiInputLike) => {
-    const [statusByte, data1, data2 = 0] = Array.from(event.data)
-
-    if (!Number.isFinite(statusByte) || !Number.isFinite(data1)) {
-      return
-    }
-
-    const command = statusByte & 0xf0
     const deviceName = input.name || input.manufacturer || '未命名 MIDI 设备'
     const eventId = ++eventSequenceRef.current
-    let record: MidiEventRecord | null = null
-
-    if (command === 0x90 || command === 0x80) {
-      const midiNumber = data1
-      const velocity = data2
-      const eventType: MidiEventType = command === 0x90 && velocity > 0 ? 'noteOn' : 'noteOff'
-      const noteName = midiNumberToNoteName(midiNumber)
-
-      record = {
-        id: eventId,
-        type: eventType,
-        midiNumber,
-        noteName,
-        velocity,
-        timestamp: Date.now(),
-        deviceName
-      }
-    } else if (command === 0xb0 && data1 === 64) {
-      const value = data2
-      const sustainPedalDown = value >= 64
-
-      record = {
-        id: eventId,
-        type: 'controlChange',
-        controllerNumber: 64,
-        controllerName: '延音踏板',
-        value,
-        sustainPedalDown,
-        timestamp: Date.now(),
-        deviceName
-      }
-    }
+    const record = parseMidiMessage(event.data, deviceName, eventId)
 
     if (!record) {
       return
     }
+
+    publishMidiEvent(record)
 
     setRecentEvents((currentEvents) => [record, ...currentEvents].slice(0, 20))
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getLastMidiEventId } from '../midi/midiEventBus'
 import type { MidiEventRecord } from '../types'
 import {
   CHORD_GROUP_WINDOW_MS,
@@ -20,6 +21,7 @@ import type {
   ToleranceLevel
 } from '../utils/practiceTypes'
 import type { UseMetronomeResult } from './useMetronome'
+import { useMidiEventSubscription } from './useMidiEvents'
 
 interface PendingChordInput {
   targetId: string
@@ -30,7 +32,6 @@ interface PendingChordInput {
 
 interface UsePracticeEngineOptions {
   targets: TargetEvent[]
-  latestMidiEvent: MidiEventRecord | null
   metronome: UseMetronomeResult
   toleranceLevel: ToleranceLevel
 }
@@ -63,7 +64,6 @@ function sortTargets(targets: TargetEvent[]): TargetEvent[] {
 
 export function usePracticeEngine({
   targets,
-  latestMidiEvent,
   metronome,
   toleranceLevel
 }: UsePracticeEngineOptions): UsePracticeEngineResult {
@@ -83,7 +83,7 @@ export function usePracticeEngine({
     pendingChordRef.current = null
     finalizedTargetIdsRef.current = new Set()
     resultsRef.current = []
-    lastMidiEventIdRef.current = null
+    lastMidiEventIdRef.current = getLastMidiEventId()
     setResults([])
   }, [])
 
@@ -135,23 +135,45 @@ export function usePracticeEngine({
     reset()
   }, [reset, targetKey, toleranceLevel])
 
-  useEffect(() => {
-    if (!latestMidiEvent || latestMidiEvent.type !== 'noteOn' || (latestMidiEvent.velocity ?? 0) <= 0) {
+  const metronomeStateRef = useRef({
+    status: metronome.status,
+    isCountingIn: metronome.isCountingIn,
+    practiceStartTimestampMs: metronome.practiceStartTimestampMs
+  })
+  metronomeStateRef.current = {
+    status: metronome.status,
+    isCountingIn: metronome.isCountingIn,
+    practiceStartTimestampMs: metronome.practiceStartTimestampMs
+  }
+  const sortedTargetsRef = useRef(sortedTargets)
+  sortedTargetsRef.current = sortedTargets
+  const toleranceMsRef = useRef(toleranceMs)
+  toleranceMsRef.current = toleranceMs
+
+  const handleMidiEvent = useCallback((event: MidiEventRecord) => {
+    if (event.type !== 'noteOn' || (event.velocity ?? 0) <= 0) {
       return
     }
 
-    if (!metronome.practiceStartTimestampMs || metronome.isCountingIn || metronome.status !== 'running') {
+    const metronomeState = metronomeStateRef.current
+    if (!metronomeState.practiceStartTimestampMs || metronomeState.isCountingIn || metronomeState.status !== 'running') {
       return
     }
 
-    const midiEvent = toPracticeMidiEvent(latestMidiEvent)
-    if (lastMidiEventIdRef.current === latestMidiEvent.id || typeof midiEvent.midiNumber !== 'number') {
+    const midiEvent = toPracticeMidiEvent(event)
+    if (lastMidiEventIdRef.current !== null && event.id <= lastMidiEventIdRef.current) {
       return
     }
 
-    lastMidiEventIdRef.current = latestMidiEvent.id
+    if (typeof midiEvent.midiNumber !== 'number') {
+      return
+    }
 
-    const relativeTimeMs = midiEvent.timestamp - metronome.practiceStartTimestampMs
+    lastMidiEventIdRef.current = event.id
+    const activeTargets = sortedTargetsRef.current
+    const activeToleranceMs = toleranceMsRef.current
+
+    const relativeTimeMs = midiEvent.timestamp - metronomeState.practiceStartTimestampMs
 
     if (relativeTimeMs < 0) {
       return
@@ -163,7 +185,7 @@ export function usePracticeEngine({
       finalizePendingChord()
     }
 
-    for (const target of sortedTargets) {
+    for (const target of activeTargets) {
       if (finalizedTargetIdsRef.current.has(target.id)) {
         continue
       }
@@ -176,22 +198,22 @@ export function usePracticeEngine({
       }
     }
 
-    const chordTarget = sortedTargets.find((target) => {
+    const chordTarget = activeTargets.find((target) => {
       if (target.type !== 'chord' || finalizedTargetIdsRef.current.has(target.id)) {
         return false
       }
 
       return (
-        isInOnTimeWindow(target, relativeTimeMs, toleranceMs) ||
-        isInEarlyWindow(target, relativeTimeMs, toleranceMs) ||
-        isInLateWindow(target, relativeTimeMs, toleranceMs)
+        isInOnTimeWindow(target, relativeTimeMs, activeToleranceMs) ||
+        isInEarlyWindow(target, relativeTimeMs, activeToleranceMs) ||
+        isInLateWindow(target, relativeTimeMs, activeToleranceMs)
       )
     })
 
     if (chordTarget) {
-      if (!isInOnTimeWindow(chordTarget, relativeTimeMs, toleranceMs)) {
+      if (!isInOnTimeWindow(chordTarget, relativeTimeMs, activeToleranceMs)) {
         if (chordTarget.notes.includes(midiEvent.midiNumber)) {
-          addResult(judgeChordTarget(chordTarget, [midiEvent.midiNumber], relativeTimeMs, midiEvent.timestamp, toleranceMs))
+          addResult(judgeChordTarget(chordTarget, [midiEvent.midiNumber], relativeTimeMs, midiEvent.timestamp, activeToleranceMs))
         }
         return
       }
@@ -213,35 +235,28 @@ export function usePracticeEngine({
       return
     }
 
-    const noteTarget = sortedTargets.find((target) => {
+    const noteTarget = activeTargets.find((target) => {
       if (target.type !== 'note' || finalizedTargetIdsRef.current.has(target.id)) {
         return false
       }
 
       return (
-        isInOnTimeWindow(target, relativeTimeMs, toleranceMs) ||
-        isInEarlyWindow(target, relativeTimeMs, toleranceMs) ||
-        isInLateWindow(target, relativeTimeMs, toleranceMs)
+        isInOnTimeWindow(target, relativeTimeMs, activeToleranceMs) ||
+        isInEarlyWindow(target, relativeTimeMs, activeToleranceMs) ||
+        isInLateWindow(target, relativeTimeMs, activeToleranceMs)
       )
     })
 
     if (noteTarget) {
-      const result = judgeSingleNoteTarget(noteTarget, midiEvent, relativeTimeMs, toleranceMs)
+      const result = judgeSingleNoteTarget(noteTarget, midiEvent, relativeTimeMs, activeToleranceMs)
 
       if (result) {
         addResult(result)
       }
     }
-  }, [
-    addResult,
-    finalizePendingChord,
-    latestMidiEvent,
-    metronome.isCountingIn,
-    metronome.practiceStartTimestampMs,
-    metronome.status,
-    sortedTargets,
-    toleranceMs
-  ])
+  }, [addResult, finalizePendingChord])
+
+  useMidiEventSubscription(handleMidiEvent)
 
   useEffect(() => {
     if (metronome.status !== 'running' || metronome.isCountingIn) {

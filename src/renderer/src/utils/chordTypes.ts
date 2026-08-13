@@ -1,6 +1,7 @@
 import type { PracticeDifficulty } from './practiceContentTypes'
+import type { MajorKeyId } from './musicKeySignatures'
 
-export type ChordQuality = 'major' | 'minor' | 'major7' | 'dominant7' | 'minor7' | 'half-diminished7'
+export type ChordQuality = 'major' | 'minor' | 'diminished' | 'major7' | 'dominant7' | 'minor7' | 'half-diminished7'
 export type ChordQualityFilter = 'major' | 'minor' | 'both'
 export type SeventhChordQuality = Extract<ChordQuality, 'major7' | 'dominant7' | 'minor7' | 'half-diminished7'>
 export type SeventhChordQualityFilter = SeventhChordQuality | 'all'
@@ -10,7 +11,7 @@ export type ChordQuestionCount = 10 | 20 | 50
 export type ChordPracticeStatus = 'idle' | 'running' | 'finished'
 export type ChordJudgementType = 'correct' | 'missing_note' | 'extra_note' | 'wrong_note'
 export type ChordContentCategory = 'triad' | 'seventh' | 'progression' | 'arpeggio' | '4536251'
-export type ChordKeySignature = 'C' | 'G' | 'F'
+export type ChordKeySignature = MajorKeyId
 export type ChordInputStyle = 'block' | 'arpeggio'
 
 export interface ChordTrainingContent {

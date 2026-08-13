@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { MidiEventRecord } from '../types'
-import { createJudgementResult, getToleranceMs, isSameNoteSet } from '../utils/judgement'
-import type { JudgementResult, JudgementType, TargetEvent, ToleranceLevel } from '../utils/practiceTypes'
+import { getLastMidiEventId } from '../midi/midiEventBus'
+import type { JudgementResult, ToleranceLevel } from '../utils/practiceTypes'
 import {
   MAJOR_SCALE_PATTERNS,
   SCALE_PRACTICE_MODES,
@@ -10,6 +9,7 @@ import {
   getMajorScaleByKey,
   getScalePracticeModeName
 } from '../utils/scalePatterns'
+import { ScalePracticeCore } from '../utils/scalePracticeCore'
 import type {
   MajorScaleKey,
   MajorScalePattern,
@@ -21,17 +21,7 @@ import type {
 } from '../utils/scaleTypes'
 import { useMetronome } from './useMetronome'
 import { useMetronomeSound } from './useMetronomeSound'
-
-interface TargetFlags {
-  wrongRecorded: boolean
-  missingRecorded: boolean
-}
-
-interface PendingInput {
-  notes: number[]
-  firstRelativeTimeMs: number
-  timestamp: number
-}
+import { useMidiEventSubscription } from './useMidiEvents'
 
 interface UseScalePracticeResult {
   scales: MajorScalePattern[]
@@ -69,9 +59,8 @@ interface UseScalePracticeResult {
   pause: () => void
   stop: () => void
   restart: () => void
+  reset: () => void
 }
-
-const CHORD_INPUT_WINDOW_MS = 120
 
 function createEmptyReport(
   keyName: string,
@@ -108,19 +97,9 @@ function createEmptyReport(
   }
 }
 
-function createTargetFlagMap(targets: TargetEvent[]): Record<string, TargetFlags> {
-  return Object.fromEntries(targets.map((target) => [
-    target.id,
-    {
-      wrongRecorded: false,
-      missingRecorded: false
-    }
-  ]))
-}
-
 function buildScaleReport(
   results: JudgementResult[],
-  targets: TargetEvent[],
+  targets: ReturnType<typeof createScaleTargets>,
   keyName: string,
   modeName: string,
   bpm: number,
@@ -191,11 +170,7 @@ function buildScaleReport(
   return report
 }
 
-function isExpectedComplete(inputNotes: number[], targetNotes: number[]): boolean {
-  return isSameNoteSet(inputNotes, targetNotes)
-}
-
-export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseScalePracticeResult {
+export function useScalePractice(): UseScalePracticeResult {
   const metronome = useMetronome(60)
   const metronomeSound = useMetronomeSound(metronome)
   const [selectedKey, setSelectedKeyState] = useState<MajorScaleKey>('C')
@@ -204,16 +179,7 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
   const [loopCount, setLoopCountState] = useState(1)
   const [notesPerBeat, setNotesPerBeatState] = useState<ScaleNotesPerBeat>(1)
   const [toleranceLevel, setToleranceLevelState] = useState<ToleranceLevel>('standard')
-  const [currentStepIndex, setCurrentStepIndex] = useState(0)
-  const [results, setResults] = useState<JudgementResult[]>([])
-  const [isComplete, setIsComplete] = useState(false)
-  const [wrongNotes, setWrongNotes] = useState<number[]>([])
-
-  const currentStepIndexRef = useRef(0)
-  const resultsRef = useRef<JudgementResult[]>([])
-  const targetFlagsRef = useRef<Record<string, TargetFlags>>({})
-  const pendingInputRef = useRef<PendingInput | null>(null)
-  const lastMidiEventIdRef = useRef<number | null>(null)
+  const [coreEpoch, setCoreEpoch] = useState(0)
 
   const selectedScale = useMemo(() => getMajorScaleByKey(selectedKey), [selectedKey])
   const selectedModeName = useMemo(() => getScalePracticeModeName(selectedMode), [selectedMode])
@@ -227,88 +193,36 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
     [metronome.beatDurationMs, selectedMode, selectedScale, sequenceOptions]
   )
 
+  const core = useMemo(() => {
+    const created = new ScalePracticeCore(targets, toleranceLevel)
+    created.onChange = () => setCoreEpoch((value) => value + 1)
+    created.reset(getLastMidiEventId())
+    return created
+  }, [targets, toleranceLevel])
+  const coreRef = useRef(core)
+  coreRef.current = core
+
+  const metronomeRef = useRef({
+    status: metronome.status,
+    isCountingIn: metronome.isCountingIn,
+    practiceStartTimestampMs: metronome.practiceStartTimestampMs
+  })
+  metronomeRef.current = {
+    status: metronome.status,
+    isCountingIn: metronome.isCountingIn,
+    practiceStartTimestampMs: metronome.practiceStartTimestampMs
+  }
+
   const resetProgress = useCallback(() => {
-    currentStepIndexRef.current = 0
-    resultsRef.current = []
-    targetFlagsRef.current = createTargetFlagMap(targets)
-    pendingInputRef.current = null
-    lastMidiEventIdRef.current = null
-    setCurrentStepIndex(0)
-    setResults([])
-    setWrongNotes([])
-    setIsComplete(false)
-  }, [targets])
-
-  const addResult = useCallback((result: JudgementResult) => {
-    resultsRef.current = [...resultsRef.current, result]
-    setResults(resultsRef.current)
+    const activeCore = coreRef.current
+    if (!activeCore) return
+    activeCore.reset(getLastMidiEventId())
+    setCoreEpoch((value) => value + 1)
   }, [])
-
-  const recordTargetResult = useCallback(
-    (
-      target: TargetEvent,
-      type: JudgementType,
-      inputNotes: number[],
-      timestamp: number,
-      timeOffsetMs?: number
-    ) => {
-      if (type === 'wrong_note') {
-        const flags = targetFlagsRef.current[target.id]
-
-        if (flags?.wrongRecorded) {
-          return
-        }
-
-        targetFlagsRef.current = {
-          ...targetFlagsRef.current,
-          [target.id]: {
-            ...(flags ?? { missingRecorded: false, wrongRecorded: false }),
-            wrongRecorded: true
-          }
-        }
-      }
-
-      if (type === 'missing_note') {
-        const flags = targetFlagsRef.current[target.id]
-
-        if (flags?.missingRecorded) {
-          return
-        }
-
-        targetFlagsRef.current = {
-          ...targetFlagsRef.current,
-          [target.id]: {
-            ...(flags ?? { missingRecorded: false, wrongRecorded: false }),
-            missingRecorded: true
-          }
-        }
-      }
-
-      addResult(createJudgementResult(type, target, inputNotes, timestamp, timeOffsetMs))
-    },
-    [addResult]
-  )
-
-  const advanceStep = useCallback(() => {
-    pendingInputRef.current = null
-    setWrongNotes([])
-
-    const nextIndex = currentStepIndexRef.current + 1
-    currentStepIndexRef.current = nextIndex
-    setCurrentStepIndex(nextIndex)
-
-    if (nextIndex >= targets.length) {
-      setIsComplete(true)
-      metronome.pause()
-    }
-  }, [metronome, targets.length])
 
   const setSelectedKey = useCallback(
     (key: MajorScaleKey) => {
-      if (metronome.status === 'running') {
-        return
-      }
-
+      if (metronome.status === 'running') return
       setSelectedKeyState(key)
       metronome.stop()
     },
@@ -317,10 +231,7 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
 
   const setSelectedMode = useCallback(
     (mode: ScalePracticeMode) => {
-      if (metronome.status === 'running') {
-        return
-      }
-
+      if (metronome.status === 'running') return
       setSelectedModeState(mode)
       metronome.stop()
     },
@@ -348,10 +259,7 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
 
   const setBpm = useCallback(
     (bpm: number) => {
-      if (metronome.status === 'running') {
-        return
-      }
-
+      if (metronome.status === 'running') return
       metronome.setBpm(bpm)
     },
     [metronome]
@@ -359,10 +267,7 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
 
   const setToleranceLevel = useCallback(
     (level: ToleranceLevel) => {
-      if (metronome.status === 'running') {
-        return
-      }
-
+      if (metronome.status === 'running') return
       setToleranceLevelState(level)
     },
     [metronome.status]
@@ -394,152 +299,41 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
     metronome.restart()
   }, [metronome, metronomeSound, resetProgress])
 
+  const reset = useCallback(() => {
+    metronome.stop()
+    resetProgress()
+  }, [metronome, resetProgress])
+
+  useMidiEventSubscription((event) => {
+    const activeCore = coreRef.current
+    const metronomeState = metronomeRef.current
+
+    if (!activeCore || activeCore.isComplete) return
+    if (metronomeState.status !== 'running' || metronomeState.isCountingIn) return
+    if (metronomeState.practiceStartTimestampMs === null) return
+
+    activeCore.processMidiEvent(event, metronomeState.practiceStartTimestampMs)
+  })
+
   useEffect(() => {
     resetProgress()
   }, [resetProgress])
 
   useEffect(() => {
-    if (metronome.status === 'idle') {
-      pendingInputRef.current = null
-      return
-    }
+    const activeCore = coreRef.current
+    if (!activeCore) return
+    if (metronome.status === 'idle') return
+    if (metronome.status !== 'running' || metronome.isCountingIn || activeCore.isComplete) return
 
-    if (metronome.status !== 'running' || metronome.isCountingIn || isComplete) {
-      return
-    }
+    activeCore.advanceElapsed(metronome.practiceElapsedMs)
+  }, [core, metronome.isCountingIn, metronome.practiceElapsedMs, metronome.status])
 
-    const target = targets[currentStepIndexRef.current]
-
-    if (!target) {
-      return
-    }
-
-    const toleranceMs = getToleranceMs(toleranceLevel)
-    const flags = targetFlagsRef.current[target.id]
-
-    if (!flags?.missingRecorded && metronome.practiceElapsedMs > target.timeMs + toleranceMs * 2) {
-      pendingInputRef.current = null
-      recordTargetResult(target, 'missing_note', [], Date.now())
-    }
-  }, [
-    isComplete,
-    metronome.isCountingIn,
-    metronome.practiceElapsedMs,
-    metronome.status,
-    recordTargetResult,
-    targets,
-    toleranceLevel
-  ])
-
-  useEffect(() => {
-    if (!latestMidiEvent || latestMidiEvent.type !== 'noteOn' || (latestMidiEvent.velocity ?? 0) <= 0) {
-      return
-    }
-
-    if (!metronome.practiceStartTimestampMs || metronome.isCountingIn || metronome.status !== 'running' || isComplete) {
-      return
-    }
-
-    if (typeof latestMidiEvent.midiNumber !== 'number') {
-      return
-    }
-
-    if (lastMidiEventIdRef.current === latestMidiEvent.id) {
-      return
-    }
-
-    lastMidiEventIdRef.current = latestMidiEvent.id
-
-    const target = targets[currentStepIndexRef.current]
-
-    if (!target) {
-      return
-    }
-
-    const relativeTimeMs = latestMidiEvent.timestamp - metronome.practiceStartTimestampMs
-
-    if (relativeTimeMs < 0) {
-      return
-    }
-
-    const inputNote = latestMidiEvent.midiNumber
-    const isExpectedNote = target.notes.includes(inputNote)
-
-    if (!isExpectedNote) {
-      pendingInputRef.current = null
-      setWrongNotes([inputNote])
-      recordTargetResult(target, 'wrong_note', [inputNote], latestMidiEvent.timestamp, Math.round(relativeTimeMs - target.timeMs))
-      return
-    }
-
-    const currentPending = pendingInputRef.current
-    const pendingInput = currentPending && relativeTimeMs - currentPending.firstRelativeTimeMs <= CHORD_INPUT_WINDOW_MS
-      ? {
-          ...currentPending,
-          notes: Array.from(new Set([...currentPending.notes, inputNote])),
-          timestamp: latestMidiEvent.timestamp
-        }
-      : {
-          notes: [inputNote],
-          firstRelativeTimeMs: relativeTimeMs,
-          timestamp: latestMidiEvent.timestamp
-        }
-
-    pendingInputRef.current = pendingInput
-    setWrongNotes([])
-
-    if (!isExpectedComplete(pendingInput.notes, target.notes)) {
-      return
-    }
-
-    const flags = targetFlagsRef.current[target.id]
-    const toleranceMs = getToleranceMs(toleranceLevel)
-    const offset = Math.round(pendingInput.firstRelativeTimeMs - target.timeMs)
-
-    if (pendingInput.firstRelativeTimeMs > target.timeMs + toleranceMs * 2) {
-      if (!flags?.missingRecorded) {
-        recordTargetResult(target, 'missing_note', [], pendingInput.timestamp)
-      }
-
-      advanceStep()
-      return
-    }
-
-    const hasPriorError = Boolean(flags?.wrongRecorded || flags?.missingRecorded)
-
-    if (hasPriorError) {
-      advanceStep()
-      return
-    }
-
-    if (pendingInput.firstRelativeTimeMs < target.timeMs - toleranceMs) {
-      recordTargetResult(target, 'early', pendingInput.notes, pendingInput.timestamp, offset)
-      advanceStep()
-      return
-    }
-
-    if (pendingInput.firstRelativeTimeMs > target.timeMs + toleranceMs) {
-      recordTargetResult(target, 'late', pendingInput.notes, pendingInput.timestamp, offset)
-      advanceStep()
-      return
-    }
-
-    recordTargetResult(target, 'correct', pendingInput.notes, pendingInput.timestamp, offset)
-    advanceStep()
-  }, [
-    advanceStep,
-    isComplete,
-    latestMidiEvent,
-    metronome.isCountingIn,
-    metronome.practiceStartTimestampMs,
-    metronome.status,
-    recordTargetResult,
-    targets,
-    toleranceLevel
-  ])
-
+  const currentStepIndex = core.currentStepIndex
+  const results = core.results
+  const isComplete = core.isComplete
+  const wrongNotes = core.wrongNotes
   const currentStep = isComplete ? null : steps[currentStepIndex] ?? null
-  const latestResult = results[results.length - 1] ?? null
+  const latestResult = core.latestResult
   const report = useMemo(
     () => buildScaleReport(
       results,
@@ -592,6 +386,7 @@ export function useScalePractice(latestMidiEvent: MidiEventRecord | null): UseSc
     start,
     pause,
     stop,
-    restart
+    restart,
+    reset
   }
 }

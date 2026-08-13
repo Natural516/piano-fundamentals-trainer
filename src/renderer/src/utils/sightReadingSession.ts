@@ -4,6 +4,11 @@ import type { SightReadingClef, SightReadingNote } from './sightReadingNotes'
 export type SightReadingQuestionPhase = 'idle' | 'display' | 'answering' | 'feedback'
 export type SightReadingRecordedOutcome = 'correct' | 'wrong_note' | 'timeout'
 
+export function getSightReadingAnswerProgress(remainingTimeMs: number, totalTimeMs: number): number {
+  if (totalTimeMs <= 0) return 0
+  return Math.min(1, Math.max(0, remainingTimeMs / totalTimeMs))
+}
+
 export interface SightReadingSessionCounters {
   completed: number
   correct: number
@@ -157,6 +162,7 @@ export class SightReadingSessionCore {
     if (this.questionStartedAtMs === null || event.timestamp < this.questionStartedAtMs) return null
 
     this.lastHandledEventId = event.id
+    this.remainingQuestionMs = this.getRemainingQuestionMs(event.timestamp)
     const reactionTimeMs = Math.max(0, Math.round(event.timestamp - this.questionStartedAtMs))
     const outcome: SightReadingRecordedOutcome = event.midiNumber === this.currentNote.midiNumber
       ? 'correct'
@@ -167,7 +173,15 @@ export class SightReadingSessionCore {
 
   recordTimeout(): SightReadingOutcomeRecord | null {
     if (this.paused || this.phase !== 'answering' || this.inputLocked || !this.currentNote) return null
+    this.remainingQuestionMs = 0
     return this.recordOutcome('timeout', null, '', null)
+  }
+
+  getRemainingQuestionMs(now: number): number {
+    if (!this.paused && this.phase === 'answering' && this.questionDeadlineMs !== null) {
+      return Math.max(0, this.questionDeadlineMs - now)
+    }
+    return Math.max(0, this.remainingQuestionMs)
   }
 
   pause(now: number): void {
@@ -216,6 +230,7 @@ export class SightReadingSessionCore {
     this.practiceStartedAtMs = null
     this.questionStartedAtMs = null
     this.questionDeadlineMs = null
+    this.remainingQuestionMs = 0
     this.pauseStartedAtMs = null
     this.currentNote = null
   }

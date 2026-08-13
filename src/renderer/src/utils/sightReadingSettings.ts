@@ -1,25 +1,39 @@
-import type { SightReadingRange, SightReadingStaffMode } from './sightReadingNotes'
+import { isMajorKeyId, type MajorKeyId } from './musicKeySignatures'
+import type { SightReadingStaffMode } from './sightReadingNotes'
 
 export type SightReadingQuestionCount = 10 | 20 | 50 | 100
+export type SightReadingNoteCount = 1 | 2 | 3
+export type SightReadingNotePoolMode = 'diatonic' | 'chromatic'
+
+export const SIGHT_READING_NOTE_POOL_MODE_LABELS: Record<SightReadingNotePoolMode, string> = {
+  diatonic: '仅调内音',
+  chromatic: '包含临时变音'
+}
+
+export const SIGHT_READING_ANSWER_TIMEOUT_MS = 5000
 
 export interface SightReadingSettings {
   staffMode: SightReadingStaffMode
-  range: SightReadingRange
+  noteCount: SightReadingNoteCount
   questionCount: SightReadingQuestionCount
-  answerTimeLimitSeconds: number
+  keySignature: MajorKeyId
+  notePoolMode: SightReadingNotePoolMode
   noteNameVisible: boolean
 }
 
 export const DEFAULT_SIGHT_READING_SETTINGS: SightReadingSettings = {
   staffMode: 'treble',
-  range: 'common',
+  noteCount: 1,
   questionCount: 20,
-  answerTimeLimitSeconds: 5,
+  keySignature: 'C',
+  notePoolMode: 'diatonic',
   noteNameVisible: true
 }
 
-const STORAGE_KEY = 'piano-trainer.sight-reading-settings.v2'
+const STORAGE_KEY = 'piano-trainer.sight-reading-settings.v4'
 const LEGACY_STORAGE_KEYS = [
+  'piano-trainer.sight-reading-settings.v3',
+  'piano-trainer.sight-reading-settings.v2',
   'piano-trainer.sight-reading-settings.v1',
   'piano-trainer.sight-reading-settings'
 ]
@@ -28,8 +42,8 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function normalizeSettings(value: unknown): SightReadingSettings {
-  if (!isObject(value)) return DEFAULT_SIGHT_READING_SETTINGS
+export function migrateSightReadingSettings(value: unknown): SightReadingSettings {
+  if (!isObject(value)) return { ...DEFAULT_SIGHT_READING_SETTINGS }
 
   const rawStaffMode = value.staffMode ?? value.clefMode ?? value.clef
   const staffMode: SightReadingStaffMode = rawStaffMode === 'bass'
@@ -37,29 +51,28 @@ function normalizeSettings(value: unknown): SightReadingSettings {
     : rawStaffMode === 'grand' || rawStaffMode === 'mixed'
       ? 'grand'
       : 'treble'
-  const rawRange = value.rangeMode ?? value.range
-  const range: SightReadingRange = rawRange === 'extended' ? 'extended' : 'common'
   const rawQuestionCount = Number(value.questionCount)
   const questionCount: SightReadingQuestionCount = rawQuestionCount === 10 || rawQuestionCount === 50 || rawQuestionCount === 100
     ? rawQuestionCount
     : 20
-  const rawTimeLimit = Number(value.answerTimeLimitSeconds ?? value.timeLimitSeconds)
-  const answerTimeLimitSeconds = Number.isInteger(rawTimeLimit) && rawTimeLimit >= 1 && rawTimeLimit <= 60
-    ? rawTimeLimit
-    : 5
   const rawNoteNameVisible = value.noteNameVisible ?? value.showNoteName
+  const rawKeySignature = value.keySignature ?? value.key
+  const notePoolMode: SightReadingNotePoolMode = value.notePoolMode === 'chromatic'
+    ? 'chromatic'
+    : 'diatonic'
 
   return {
     staffMode,
-    range,
+    noteCount: 1,
     questionCount,
-    answerTimeLimitSeconds,
+    keySignature: isMajorKeyId(rawKeySignature) ? rawKeySignature : 'C',
+    notePoolMode,
     noteNameVisible: typeof rawNoteNameVisible === 'boolean' ? rawNoteNameVisible : true
   }
 }
 
 export function readSightReadingSettings(): SightReadingSettings {
-  if (typeof window === 'undefined') return DEFAULT_SIGHT_READING_SETTINGS
+  if (typeof window === 'undefined') return { ...DEFAULT_SIGHT_READING_SETTINGS }
 
   try {
     const currentValue = window.localStorage.getItem(STORAGE_KEY)
@@ -68,14 +81,14 @@ export function readSightReadingSettings(): SightReadingSettings {
       .find((value) => value !== null)
     const stored = currentValue ?? legacyValue
 
-    if (!stored) return DEFAULT_SIGHT_READING_SETTINGS
+    if (!stored) return { ...DEFAULT_SIGHT_READING_SETTINGS }
 
-    const normalized = normalizeSettings(JSON.parse(stored))
+    const normalized = migrateSightReadingSettings(JSON.parse(stored))
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
     return normalized
   } catch (error) {
     console.warn('[sight-reading] 读取练习设置失败，已使用默认设置。', error)
-    return DEFAULT_SIGHT_READING_SETTINGS
+    return { ...DEFAULT_SIGHT_READING_SETTINGS }
   }
 }
 
@@ -83,7 +96,7 @@ export function writeSightReadingSettings(settings: SightReadingSettings): void 
   if (typeof window === 'undefined') return
 
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeSettings(settings)))
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(migrateSightReadingSettings(settings)))
   } catch (error) {
     console.warn('[sight-reading] 保存练习设置失败。', error)
   }

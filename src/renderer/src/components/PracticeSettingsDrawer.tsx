@@ -76,9 +76,10 @@ export function PracticeSettingsDrawer({
           </button>
         </header>
 
-        {isLocked ? <p className="practice-settings-locked">请结束当前练习后修改设置。</p> : null}
-
-        <div className="practice-settings-drawer__body">{children}</div>
+        <div className="practice-settings-drawer__body">
+          {isLocked ? <p className="practice-settings-locked">请结束当前练习后修改设置。</p> : null}
+          {children}
+        </div>
 
         <footer className="practice-settings-drawer__footer">
           <AppButton variant="secondary" onClick={onClose}>取消</AppButton>

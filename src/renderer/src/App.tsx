@@ -230,44 +230,34 @@ function App(): JSX.Element {
           <SightReadingPage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
-            latestMidiEvent={midi.latestEvent}
-            onBackHome={() => handleNavigate('home')}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'rhythm' ? (
           <RhythmPracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
-            latestMidiEvent={midi.latestEvent}
-            onBackHome={() => handleNavigate('home')}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'scales' ? (
           <ScalePracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
-            latestMidiEvent={midi.latestEvent}
-            onBackHome={() => handleNavigate('home')}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'chords' ? (
           <ChordPracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
-            latestMidiEvent={midi.latestEvent}
-            onBackHome={() => handleNavigate('home')}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'coordination' ? (
           <CoordinationPracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
-            latestMidiEvent={midi.latestEvent}
-            onBackHome={() => handleNavigate('home')}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'metronome' ? (
-          <JudgementTestPage latestMidiEvent={midi.latestEvent} />
+          <JudgementTestPage />
         ) : (
           <PlaceholderPage title={currentTitle} onBackHome={() => handleNavigate('home')} />
         )}

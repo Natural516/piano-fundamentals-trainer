@@ -50,18 +50,6 @@
   --module-coordination: #e75ca8;
   --module-free-practice: #6978ff;
 
-  --staff-background: #0f172a;
-  --staff-line: rgba(203, 213, 225, 0.58);
-  --staff-symbol: #a7b0cc;
-  --staff-note: #f4f7ff;
-  --keyboard-shell: rgba(15, 23, 42, 0.86);
-  --white-key-top: #f7f9ff;
-  --white-key-bottom: #c9d3ea;
-  --white-key-border: rgba(203, 213, 225, 0.72);
-  --black-key-top: #202b43;
-  --black-key-bottom: #080d18;
-  --black-key-border: #0a1020;
-
   --scrollbar-track: rgba(7, 11, 22, 0.58);
   --scrollbar-thumb: rgba(129, 140, 248, 0.42);
   --shadow-card: 0 12px 30px rgba(0, 0, 0, 0.24);
@@ -120,18 +108,6 @@
   --module-coordination: #b53e79;
   --module-free-practice: #5356c8;
 
-  --staff-background: #ffffff;
-  --staff-line: #596274;
-  --staff-symbol: #242b3a;
-  --staff-note: #242b3a;
-  --keyboard-shell: #e9edf4;
-  --white-key-top: #ffffff;
-  --white-key-bottom: #edf1f7;
-  --white-key-border: #cbd3e1;
-  --black-key-top: #283247;
-  --black-key-bottom: #111827;
-  --black-key-border: #111827;
-
   --scrollbar-track: #e8ecf3;
   --scrollbar-thumb: #aeb8cb;
   --shadow-card: 0 8px 24px rgba(52, 66, 99, 0.08);
@@ -182,8 +158,7 @@ body {
 .sight-feedback-card,
 .sight-stat-grid div,
 .sight-report-grid div,
-.sight-clef-report-grid div,
-.sight-error-table span,
+.sight-error-table__grid span,
 .chord-target-view,
 .chord-feedback-box,
 .coordination-status-grid > div,
@@ -417,47 +392,30 @@ select option {
   color: var(--danger);
 }
 
-.sight-staff {
-  background: var(--staff-background);
+.keyboard-preview {
+  border-color: #11110f;
+  background: linear-gradient(180deg, #343432 0%, #20201e 22%, #11110f 100%);
 }
 
-.sight-staff-lines line,
-.sight-ledger {
-  stroke: var(--staff-line);
+.full-keyboard-shell {
+  border-color: #10100f;
+  background: linear-gradient(180deg, #363634 0%, #242422 12%, #11110f 100%);
 }
 
-.sight-clef,
-.sight-bass-clef {
-  stroke: var(--staff-symbol);
-}
-
-.sight-clef circle,
-.sight-bass-clef circle {
-  fill: var(--staff-symbol);
-}
-
-.sight-note {
-  fill: var(--staff-note);
-  stroke: var(--staff-note);
-}
-
-.keyboard-preview,
-.full-keyboard-shell,
 .keyboard-scroll {
-  border-color: var(--border-soft);
-  background: var(--keyboard-shell);
+  background: linear-gradient(180deg, #242422 0%, #151513 100%);
 }
 
 .keyboard-preview .white-key,
 .full-white-key {
-  border-color: var(--white-key-border);
-  background: linear-gradient(180deg, var(--white-key-top), var(--white-key-bottom));
+  border-color: #a9a294;
+  background: linear-gradient(180deg, #fffefa 0%, #f8f4e9 70%, #e5dece 91%, #c9c0ad 100%);
 }
 
 .keyboard-preview .black-key,
 .full-black-key {
-  border-color: var(--black-key-border);
-  background: linear-gradient(180deg, var(--black-key-top), var(--black-key-bottom));
+  border-color: #050505;
+  background: linear-gradient(105deg, #30302e 0%, #171715 38%, #050505 100%);
 }
 
 .rhythm-grid-row span,

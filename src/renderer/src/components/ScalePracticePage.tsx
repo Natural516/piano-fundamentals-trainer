@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ActiveMidiNote, MidiEventRecord } from '../types'
+import type { ActiveMidiNote } from '../types'
 import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { useScalePractice } from '../hooks/useScalePractice'
 import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
@@ -21,8 +21,6 @@ import { PracticeStatBar } from './PracticeStatBar'
 interface ScalePracticePageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
-  latestMidiEvent: MidiEventRecord | null
-  onBackHome: () => void
   onPracticeRunningChange: (running: boolean) => void
 }
 
@@ -44,11 +42,9 @@ function formatLatestMessage(result: JudgementResult | null): string {
 export function ScalePracticePage({
   activeNotes,
   exitPromptOpen,
-  latestMidiEvent,
-  onBackHome,
   onPracticeRunningChange
 }: ScalePracticePageProps): JSX.Element {
-  const scale = useScalePractice(latestMidiEvent)
+  const scale = useScalePractice()
   const { showVirtualKeyboard, setShowVirtualKeyboard } = useDisplayPreferences('scales')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draftKey, setDraftKey] = useState<MajorScaleKey>(scale.selectedKey)
@@ -240,12 +236,9 @@ export function ScalePracticePage({
           {[1, 2, 4].map((count) => <button key={count} className={draftLoopCount === count ? 'is-active' : ''} disabled={settingsLocked} type="button" onClick={() => setDraftLoopCount(count)}>{count}次</button>)}
         </div><label className="midi-field" htmlFor="scale-loop-count"><span>自定义 1 - 20 次</span><input id="scale-loop-count" className="midi-select" disabled={settingsLocked} max="20" min="1" type="number" value={draftLoopCount} onChange={(event) => setDraftLoopCount(Math.min(20, Math.max(1, Number(event.target.value) || 1)))} /></label></div>
         <div className="tolerance-control"><span>每拍音符数</span><div className="segmented-control">
-          {([1, 2, 4] as ScaleNotesPerBeat[]).map((count) => <button key={count} className={draftNotesPerBeat === count ? 'is-active' : ''} disabled={settingsLocked} type="button" onClick={() => setDraftNotesPerBeat(count)}>每拍{count}音（{count === 1 ? '四分音符' : count === 2 ? '八分音符' : '十六分音符'}）</button>)}
+          {([1, 2, 4] as ScaleNotesPerBeat[]).map((count) => <button key={count} className={draftNotesPerBeat === count ? 'is-active' : ''} disabled={settingsLocked} type="button" onClick={() => setDraftNotesPerBeat(count)}>每拍{count}音</button>)}
         </div></div>
-        <div className="tolerance-control"><span>目标速度</span><div className="segmented-control">
-          {[60, 80, 100].map((value) => <button key={value} className={draftBpm === value ? 'is-active' : ''} disabled={settingsLocked} type="button" onClick={() => setDraftBpm(value)}>{value} BPM</button>)}
-        </div></div>
-        <label className="bpm-control" htmlFor="scale-bpm-input"><div><span>BPM</span><strong>{draftBpm}</strong></div>
+        <label className="bpm-control" htmlFor="scale-bpm-input"><div><span>目标速度</span><strong>{draftBpm} BPM</strong></div>
           <input id="scale-bpm-input" type="range" min="40" max="200" disabled={settingsLocked} value={draftBpm} onChange={(event) => setDraftBpm(Number(event.target.value))} />
         </label>
         <div className="tolerance-control"><span>节拍器声音</span><div className="segmented-control">
@@ -259,7 +252,7 @@ export function ScalePracticePage({
       </PracticeSettingsDrawer>
 
       {scale.isComplete ? (
-        <PracticeReportModal title="音阶练习完成">
+        <PracticeReportModal title="音阶练习完成" onBack={scale.reset} onRepeat={restartPractice}>
           <p className="practice-report-summary">{settingsSummary}</p>
           <div className="report-grid">
             <div><span>调性</span><strong>{scale.report.keyName}</strong></div><div><span>模式</span><strong>{scale.report.modeName}</strong></div><div><span>BPM</span><strong>{scale.report.bpm}</strong></div>
@@ -269,7 +262,6 @@ export function ScalePracticePage({
             <div><span>晚弹数量</span><strong>{scale.report.late}</strong></div><div><span>平均偏移</span><strong>{scale.report.averageOffsetMs}ms</strong></div><div><span>正确率</span><strong>{scale.report.accuracy}%</strong></div>
             <div><span>最高连续正确</span><strong>{scale.report.bestStreak}</strong></div><div><span>最容易错的音</span><strong>{scale.report.mostMissedNote}</strong></div>
           </div>
-          <div className="practice-report-actions"><AppButton onClick={restartPractice}>再练一次</AppButton><AppButton variant="secondary" onClick={onBackHome}>返回首页</AppButton></div>
         </PracticeReportModal>
       ) : null}
     </section>

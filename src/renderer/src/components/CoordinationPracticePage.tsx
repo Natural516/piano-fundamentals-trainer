@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ActiveMidiNote, MidiEventRecord } from '../types'
+import type { ActiveMidiNote } from '../types'
 import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { useCoordinationPractice } from '../hooks/useCoordinationPractice'
 import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
@@ -13,6 +13,7 @@ import { AppButton } from './AppButton'
 import { CoordinationGridView } from './CoordinationGridView'
 import { FullKeyboard } from './FullKeyboard'
 import { MetronomeVolumeControl } from './MetronomeVolumeControl'
+import { NumericStepper } from './NumericStepper'
 import { PracticeReportModal } from './PracticeReportModal'
 import { PracticeFeedbackNotice } from './PracticeFeedbackNotice'
 import { PracticePageHeader } from './PracticePageHeader'
@@ -21,8 +22,6 @@ import { PracticeStatBar } from './PracticeStatBar'
 
 interface CoordinationPracticePageProps {
   activeNotes: ActiveMidiNote[]
-  latestMidiEvent: MidiEventRecord | null
-  onBackHome: () => void
   exitPromptOpen: boolean
   onPracticeRunningChange: (isRunning: boolean) => void
 }
@@ -40,11 +39,9 @@ function formatOffset(offset: number | undefined): string {
 export function CoordinationPracticePage({
   activeNotes,
   exitPromptOpen,
-  latestMidiEvent,
-  onBackHome,
   onPracticeRunningChange
 }: CoordinationPracticePageProps): JSX.Element {
-  const coordination = useCoordinationPractice(latestMidiEvent)
+  const coordination = useCoordinationPractice()
   const { showVirtualKeyboard, setShowVirtualKeyboard } = useDisplayPreferences('coordination')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draftPatternId, setDraftPatternId] = useState(coordination.selectedPatternId)
@@ -203,8 +200,8 @@ export function CoordinationPracticePage({
           </select>
         </label>
         <div className="coordination-setting-group"><span>BPM</span><div className="bpm-control">
-          <input disabled={settingsLocked} max="120" min="40" type="number" value={draftBpm} onChange={(event) => setDraftBpm(Number(event.target.value))} />
-          <input aria-label="协调练习 BPM" disabled={settingsLocked} max="120" min="40" type="range" value={draftBpm} onChange={(event) => setDraftBpm(Number(event.target.value))} />
+          <NumericStepper disabled={settingsLocked} max={120} min={40} step={1} value={draftBpm} onChange={setDraftBpm} />
+          <input aria-label="协调练习 BPM" disabled={settingsLocked} max="120" min="40" step="1" type="range" value={draftBpm} onChange={(event) => setDraftBpm(Number(event.target.value))} />
         </div></div>
         <div className="coordination-setting-group"><span>小节数</span><div className="segmented-control">
           {coordination.measureOptions.map((count) => <button key={count} className={draftMeasureCount === count ? 'is-active' : ''} disabled={settingsLocked} type="button" onClick={() => setDraftMeasureCount(count)}>{count} 小节</button>)}
@@ -220,7 +217,7 @@ export function CoordinationPracticePage({
       </PracticeSettingsDrawer>
 
       {coordination.isComplete ? (
-        <PracticeReportModal title="左右手协调练习完成">
+        <PracticeReportModal title="左右手协调练习完成" onBack={coordination.reset} onRepeat={startPractice}>
           <p className="practice-report-summary">{settingsSummary}</p>
           <div className="report-grid coordination-report-grid">
             <div><span>模板</span><strong>{coordination.report.patternName}</strong></div><div><span>BPM</span><strong>{coordination.report.bpm}</strong></div><div><span>小节数</span><strong>{coordination.report.measureCount}</strong></div>
@@ -232,7 +229,6 @@ export function CoordinationPracticePage({
             <div><span>左手错误</span><strong>{coordination.report.leftWrongCount}</strong></div><div><span>右手错误</span><strong>{coordination.report.rightWrongCount}</strong></div><div><span>未归属多音</span><strong>{coordination.report.generalExtraCount}</strong></div>
             <div><span>最易错位置</span><strong>{coordination.report.hardestPosition}</strong></div>
           </div>
-          <div className="practice-report-actions"><AppButton onClick={startPractice}>再练一次</AppButton><AppButton variant="secondary" onClick={onBackHome}>返回首页</AppButton></div>
         </PracticeReportModal>
       ) : null}
     </section>

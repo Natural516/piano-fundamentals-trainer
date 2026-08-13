@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getLastMidiEventId } from '../midi/midiEventBus'
 import type { MidiEventRecord } from '../types'
 import {
   createJudgementResult,
@@ -20,6 +21,7 @@ import type { RhythmDisplayResult, RhythmGridCell, RhythmPattern, RhythmPractice
 import { useMetronome } from './useMetronome'
 import { useMetronomeSound } from './useMetronomeSound'
 import { usePracticeEngine } from './usePracticeEngine'
+import { useMidiEventSubscription } from './useMidiEvents'
 
 interface UseRhythmPracticeResult {
   patterns: RhythmPattern[]
@@ -45,6 +47,7 @@ interface UseRhythmPracticeResult {
   pause: () => void
   stop: () => void
   restart: () => void
+  reset: () => void
 }
 
 function buildRhythmReport(baseReport: PracticeReport, extraInput: number): RhythmPracticeReport {
@@ -78,7 +81,7 @@ function createExtraInputResult(event: MidiEventRecord, relativeTimeMs: number):
   return createJudgementResult('extra_note', target, [event.midiNumber], event.timestamp)
 }
 
-export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseRhythmPracticeResult {
+export function useRhythmPractice(): UseRhythmPracticeResult {
   const metronome = useMetronome(60)
   const metronomeSound = useMetronomeSound(metronome)
   const [selectedPatternId, setSelectedPatternIdState] = useState(RHYTHM_PATTERNS[0].id)
@@ -95,14 +98,13 @@ export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseR
   )
   const practice = usePracticeEngine({
     targets,
-    latestMidiEvent,
     metronome,
     toleranceLevel
   })
 
   const resetExtraResults = useCallback(() => {
     extraResultsRef.current = []
-    lastExtraEventIdRef.current = null
+    lastExtraEventIdRef.current = getLastMidiEventId()
     setExtraResults([])
   }, [])
 
@@ -170,45 +172,79 @@ export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseR
     metronome.restart()
   }, [metronome, metronomeSound, practice, resetExtraResults])
 
+  const reset = useCallback(() => {
+    metronome.stop()
+    practice.reset()
+    resetExtraResults()
+  }, [metronome, practice, resetExtraResults])
+
   useEffect(() => {
     if (practice.isComplete && metronome.isRunning) {
       metronome.pause()
     }
   }, [metronome, practice.isComplete])
 
-  useEffect(() => {
-    if (!latestMidiEvent || latestMidiEvent.type !== 'noteOn' || (latestMidiEvent.velocity ?? 0) <= 0) {
+  const metronomeStateRef = useRef({
+    status: metronome.status,
+    isCountingIn: metronome.isCountingIn,
+    practiceStartTimestampMs: metronome.practiceStartTimestampMs,
+    beatDurationMs: metronome.beatDurationMs
+  })
+  metronomeStateRef.current = {
+    status: metronome.status,
+    isCountingIn: metronome.isCountingIn,
+    practiceStartTimestampMs: metronome.practiceStartTimestampMs,
+    beatDurationMs: metronome.beatDurationMs
+  }
+  const toleranceLevelRef = useRef(toleranceLevel)
+  toleranceLevelRef.current = toleranceLevel
+  const targetsRef = useRef(targets)
+  targetsRef.current = targets
+  const practiceCompleteRef = useRef(practice.isComplete)
+  practiceCompleteRef.current = practice.isComplete
+  const practiceResultsRef = useRef(practice.results)
+  practiceResultsRef.current = practice.results
+
+  const handleExtraInput = useCallback((event: MidiEventRecord) => {
+    if (event.type !== 'noteOn' || (event.velocity ?? 0) <= 0) {
       return
     }
 
-    if (!metronome.practiceStartTimestampMs || metronome.isCountingIn || metronome.status !== 'running' || practice.isComplete) {
+    const metronomeState = metronomeStateRef.current
+    if (
+      !metronomeState.practiceStartTimestampMs ||
+      metronomeState.isCountingIn ||
+      metronomeState.status !== 'running' ||
+      practiceCompleteRef.current
+    ) {
       return
     }
 
-    if (typeof latestMidiEvent.midiNumber !== 'number') {
+    if (typeof event.midiNumber !== 'number') {
       return
     }
 
-    if (lastExtraEventIdRef.current === latestMidiEvent.id) {
+    if (lastExtraEventIdRef.current !== null && event.id <= lastExtraEventIdRef.current) {
       return
     }
 
-    lastExtraEventIdRef.current = latestMidiEvent.id
+    lastExtraEventIdRef.current = event.id
 
-    const relativeTimeMs = latestMidiEvent.timestamp - metronome.practiceStartTimestampMs
+    const relativeTimeMs = event.timestamp - metronomeState.practiceStartTimestampMs
 
     if (relativeTimeMs < 0) {
       return
     }
 
-    const toleranceMs = getToleranceMs(toleranceLevel)
-    const restTarget = targets.find((target) => isInsideRest(target, relativeTimeMs))
+    const toleranceMs = getToleranceMs(toleranceLevelRef.current)
+    const activeTargets = targetsRef.current
+    const restTarget = activeTargets.find((target) => isInsideRest(target, relativeTimeMs))
 
     if (restTarget) {
       return
     }
 
-    const noteTarget = targets.find((target) => {
+    const noteTarget = activeTargets.find((target) => {
       if (target.type !== 'note') {
         return false
       }
@@ -220,22 +256,22 @@ export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseR
       )
     })
 
-    if (noteTarget && !isTargetFinalized(practice.results, noteTarget.id)) {
-      const isExpectedNote = noteTarget.notes.includes(latestMidiEvent.midiNumber)
+    if (noteTarget && !isTargetFinalized(practiceResultsRef.current, noteTarget.id)) {
+      const isExpectedNote = noteTarget.notes.includes(event.midiNumber)
 
       if (isExpectedNote || isInOnTimeWindow(noteTarget, relativeTimeMs, toleranceMs)) {
         return
       }
     }
 
-    const finalTarget = targets[targets.length - 1]
-    const exerciseEndMs = finalTarget ? finalTarget.timeMs + (finalTarget.durationMs ?? metronome.beatDurationMs) : 0
+    const finalTarget = activeTargets[activeTargets.length - 1]
+    const exerciseEndMs = finalTarget ? finalTarget.timeMs + (finalTarget.durationMs ?? metronomeState.beatDurationMs) : 0
 
     if (relativeTimeMs > exerciseEndMs) {
       return
     }
 
-    const result = createExtraInputResult(latestMidiEvent, relativeTimeMs)
+    const result = createExtraInputResult(event, relativeTimeMs)
 
     if (!result) {
       return
@@ -243,17 +279,9 @@ export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseR
 
     extraResultsRef.current = [...extraResultsRef.current, result]
     setExtraResults(extraResultsRef.current)
-  }, [
-    latestMidiEvent,
-    metronome.beatDurationMs,
-    metronome.isCountingIn,
-    metronome.practiceStartTimestampMs,
-    metronome.status,
-    practice.isComplete,
-    practice.results,
-    targets,
-    toleranceLevel
-  ])
+  }, [])
+
+  useMidiEventSubscription(handleExtraInput)
 
   const currentCellIndex = useMemo(() => {
     if (metronome.status === 'idle' || metronome.isCountingIn || cells.length === 0) {
@@ -302,6 +330,7 @@ export function useRhythmPractice(latestMidiEvent: MidiEventRecord | null): UseR
     start,
     pause,
     stop,
-    restart
+    restart,
+    reset
   }
 }

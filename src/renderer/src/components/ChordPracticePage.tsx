@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ActiveMidiNote, MidiEventRecord } from '../types'
+import type { ActiveMidiNote } from '../types'
 import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { useChordPractice, CHORD_INVERSION_MODE_LABELS, CHORD_QUALITY_LABELS } from '../hooks/useChordPractice'
 import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
@@ -9,6 +9,7 @@ import { SEVENTH_CHORD_QUALITY_LABELS } from '../utils/chordDefinitions'
 import { PRACTICE_DIFFICULTY_LABELS } from '../utils/practiceContentTypes'
 import { CHORD_CONTENT_CATEGORY_LABELS } from '../utils/chordTrainingContents'
 import { createChordRecord } from '../utils/practiceRecordAdapters'
+import { MAJOR_KEY_DISPLAY_SIGNATURES, getMajorKeySignature } from '../utils/musicKeySignatures'
 import type { PracticeSessionTiming } from '../utils/practiceRecordTypes'
 import { AppButton } from './AppButton'
 import { ChordTargetView } from './ChordTargetView'
@@ -21,8 +22,6 @@ import { PracticeStatBar } from './PracticeStatBar'
 
 interface ChordPracticePageProps {
   activeNotes: ActiveMidiNote[]
-  latestMidiEvent: MidiEventRecord | null
-  onBackHome: () => void
   exitPromptOpen: boolean
   onPracticeRunningChange: (isRunning: boolean) => void
 }
@@ -30,17 +29,14 @@ interface ChordPracticePageProps {
 const qualityOptions: ChordQualityFilter[] = ['major', 'minor', 'both']
 const seventhQualityOptions: SeventhChordQualityFilter[] = ['all', 'major7', 'dominant7', 'minor7', 'half-diminished7']
 const inversionOptions: ChordInversionMode[] = ['root', 'first', 'second', 'third', 'root-first', 'all', 'random']
-const keyOptions: ChordKeySignature[] = ['C', 'G', 'F']
 const contentCategories = Object.keys(CHORD_CONTENT_CATEGORY_LABELS) as ChordContentCategory[]
 
 export function ChordPracticePage({
   activeNotes,
   exitPromptOpen,
-  latestMidiEvent,
-  onBackHome,
   onPracticeRunningChange
 }: ChordPracticePageProps): JSX.Element {
-  const chord = useChordPractice(latestMidiEvent)
+  const chord = useChordPractice()
   const { showVirtualKeyboard, setShowVirtualKeyboard } = useDisplayPreferences('chords')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draftQuestionCount, setDraftQuestionCount] = useState<ChordQuestionCount>(chord.questionCount)
@@ -71,7 +67,7 @@ export function ChordPracticePage({
       difficulty: chord.selectedContent.difficulty,
       category: chord.selectedContent.category,
       inputStyle: chord.selectedContent.inputStyle,
-      keySignature: chord.selectedContent.progressionId ? chord.keySignature : undefined,
+      keySignature: chord.keySignature,
       roundCount: chord.selectedContent.progressionId ? chord.roundCount : undefined
     }),
     [chord.inversionMode, chord.keySignature, chord.qualityFilter, chord.questionCount, chord.report, chord.roundCount, chord.selectedContent.category, chord.selectedContent.difficulty, chord.selectedContent.inputStyle, chord.selectedContent.name, chord.selectedContent.progressionId, chord.selectedContentId, chord.seventhQualityFilter]
@@ -146,7 +142,7 @@ export function ChordPracticePage({
     ? SEVENTH_CHORD_QUALITY_LABELS[chord.seventhQualityFilter]
     : CHORD_QUALITY_LABELS[chord.qualityFilter]
   const inputStyleLabel = chord.selectedContent.inputStyle === 'arpeggio' ? '分解' : '柱式'
-  const settingsSummary = `${chord.selectedContent.name} · ${isProgression ? `${chord.keySignature}大调 · ${chord.roundCount}轮 · ${inputStyleLabel}` : `${chordTypeSummary} · ${CHORD_INVERSION_MODE_LABELS[chord.inversionMode]} · ${chord.questionCount}题`} · ${PRACTICE_DIFFICULTY_LABELS[chord.selectedContent.difficulty]}`
+  const settingsSummary = `${chord.selectedContent.name} · ${getMajorKeySignature(chord.keySignature).displayName} · ${isProgression ? `${chord.roundCount}轮 · ${inputStyleLabel}` : `${chordTypeSummary} · ${CHORD_INVERSION_MODE_LABELS[chord.inversionMode]} · ${chord.questionCount}题`} · ${PRACTICE_DIFFICULTY_LABELS[chord.selectedContent.difficulty]}`
   const judgedCount = chord.completedQuestions
 
   return (
@@ -214,11 +210,13 @@ export function ChordPracticePage({
           ))}
         </select></label>
         <p className="judgement-help">{draftSelectedContent.description}</p>
+        <label className="midi-field" htmlFor="chord-key-signature"><span>调性</span>
+          <select id="chord-key-signature" className="midi-select" disabled={chord.isRunning} value={draftKeySignature} onChange={(event) => setDraftKeySignature(event.target.value as ChordKeySignature)}>
+            {MAJOR_KEY_DISPLAY_SIGNATURES.map((key) => <option key={key.id} value={key.id}>{key.displayName}</option>)}
+          </select>
+        </label>
         {draftIsProgression ? (
           <>
-            <div className="chord-setting-group"><span>调性</span><div className="segmented-control">
-              {keyOptions.map((key) => <button key={key} className={draftKeySignature === key ? 'is-active' : ''} disabled={chord.isRunning} type="button" onClick={() => setDraftKeySignature(key)}>{key} 大调</button>)}
-            </div></div>
             <div className="chord-setting-group"><span>进行轮数</span><div className="segmented-control">
               {[1, 2, 4].map((count) => <button key={count} className={draftRoundCount === count ? 'is-active' : ''} disabled={chord.isRunning} type="button" onClick={() => setDraftRoundCount(count)}>{count}轮</button>)}
             </div></div>
@@ -258,21 +256,20 @@ export function ChordPracticePage({
       </PracticeSettingsDrawer>
 
       {chord.status === 'finished' ? (
-        <PracticeReportModal title="和弦练习完成">
+        <PracticeReportModal title="和弦练习完成" onBack={chord.stop} onRepeat={startPractice}>
           <p className="practice-report-summary">{settingsSummary}</p>
           <div className="report-grid">
             <div><span>总题数</span><strong>{chord.report.totalQuestions}</strong></div><div><span>正确数</span><strong>{chord.report.correct}</strong></div><div><span>错误数</span><strong>{chord.report.wrong}</strong></div>
             <div><span>训练内容</span><strong>{chord.report.contentName}</strong></div>
             {isProgression ? (
-              <><div><span>调性</span><strong>{chord.report.keySignature} 大调</strong></div><div><span>进行轮数</span><strong>{chord.report.roundCount}</strong></div><div><span>演奏形式</span><strong>{inputStyleLabel}</strong></div></>
+              <><div><span>调性</span><strong>{getMajorKeySignature(chord.report.keySignature).displayName}</strong></div><div><span>进行轮数</span><strong>{chord.report.roundCount}</strong></div><div><span>演奏形式</span><strong>{inputStyleLabel}</strong></div></>
             ) : (
-              <><div><span>和弦类型</span><strong>{chordTypeSummary}</strong></div><div><span>转位</span><strong>{CHORD_INVERSION_MODE_LABELS[chord.inversionMode]}</strong></div></>
+              <><div><span>调性</span><strong>{getMajorKeySignature(chord.report.keySignature).displayName}</strong></div><div><span>和弦类型</span><strong>{chordTypeSummary}</strong></div><div><span>转位</span><strong>{CHORD_INVERSION_MODE_LABELS[chord.inversionMode]}</strong></div></>
             )}
             <div><span>漏音次数</span><strong>{chord.report.missingNote}</strong></div><div><span>多音次数</span><strong>{chord.report.extraNote}</strong></div><div><span>错音次数</span><strong>{chord.report.wrongNote}</strong></div>
             <div><span>正确率</span><strong>{chord.report.accuracy}%</strong></div><div><span>最高连对</span><strong>{chord.report.bestStreak}</strong></div><div><span>最容易错的和弦</span><strong>{chord.report.mostMissedChord}</strong></div>
             <div><span>最容易漏的音</span><strong>{chord.report.mostMissedNote}</strong></div><div><span>平均尝试次数</span><strong>{chord.report.averageAttempts}</strong></div>
           </div>
-          <div className="practice-report-actions"><AppButton onClick={startPractice}>再练一次</AppButton><AppButton variant="secondary" onClick={onBackHome}>返回首页</AppButton></div>
         </PracticeReportModal>
       ) : null}
     </section>

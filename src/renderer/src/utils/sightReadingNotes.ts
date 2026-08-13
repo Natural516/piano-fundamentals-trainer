@@ -1,4 +1,8 @@
 import { midiNumberToNoteName } from './midiNotes'
+import { getMajorKeySignature, type MajorKeyId } from './musicKeySignatures'
+import { spellMidiPitch } from './musicPitchSpelling'
+import type { MusicNotationPitch } from './musicNotationTypes'
+import type { SightReadingNotePoolMode } from './sightReadingSettings'
 import { getStaffPosition } from './staffPosition'
 
 export type SightReadingClef = 'treble' | 'bass'
@@ -14,11 +18,15 @@ export interface SightReadingNote {
   staffPosition: number
   ledgerLines?: number
   label?: string
+  notation: MusicNotationPitch
 }
 
 export interface SightReadingPoolOptions {
   staffMode: SightReadingStaffMode
-  range: SightReadingRange
+  keySignature?: MajorKeyId
+  notePoolMode?: SightReadingNotePoolMode
+  /** Kept only so older callers can migrate without failing; fixed ranges ignore it. */
+  range?: SightReadingRange
 }
 
 export const STAFF_MODE_LABELS: Record<SightReadingStaffMode, string> = {
@@ -33,69 +41,91 @@ export const CLEF_LABELS: Record<SightReadingClef, string> = {
 }
 
 export const RANGE_LABELS: Record<SightReadingRange, string> = {
-  common: '常用',
-  extended: '扩展'
+  common: '固定',
+  extended: '固定'
 }
 
-const SIGHT_READING_RANGES: Record<SightReadingClef, Record<SightReadingRange, number[]>> = {
-  treble: {
-    common: [55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79],
-    extended: [48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84]
-  },
-  bass: {
-    common: [41, 43, 45, 47, 48, 50, 52, 53, 55, 57, 59, 60],
-    extended: [36, 38, 40, 41, 43, 45, 47, 48, 50, 52, 53, 55, 57, 59, 60]
-  }
+export const SIGHT_READING_MIDI_RANGES: Record<SightReadingStaffMode, readonly [number, number]> = {
+  treble: [60, 88],
+  bass: [36, 64],
+  grand: [36, 88]
 }
 
-function createNote(clef: SightReadingClef, midiNumber: number): SightReadingNote {
-  const noteName = midiNumberToNoteName(midiNumber)
-  const pitchClass = noteName.replace(/\d/g, '')
-  const octave = Number(noteName.match(/\d+$/)?.[0] ?? 4)
-  const staffPosition = getStaffPosition(clef, midiNumber)
+function createNumberRange(start: number, end: number): number[] {
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index)
+}
+
+function isDiatonicMidiNumber(midiNumber: number, keySignature: MajorKeyId): boolean {
+  const pitchClass = ((midiNumber % 12) + 12) % 12
+  return getMajorKeySignature(keySignature).scaleDegrees.some((degree) => degree.pitchClass === pitchClass)
+}
+
+function createNotePool(
+  staffMode: SightReadingStaffMode,
+  keySignature: MajorKeyId,
+  notePoolMode: SightReadingNotePoolMode
+): SightReadingNote[] {
+  const [start, end] = SIGHT_READING_MIDI_RANGES[staffMode]
+  return createNumberRange(start, end)
+    .filter((midiNumber) => notePoolMode === 'chromatic' || isDiatonicMidiNumber(midiNumber, keySignature))
+    .map((midiNumber) => createNote(staffMode, midiNumber, keySignature))
+}
+
+function createNote(
+  staffMode: SightReadingStaffMode,
+  midiNumber: number,
+  keySignature: MajorKeyId
+): SightReadingNote {
+  const notation = spellMidiPitch(midiNumber, keySignature, staffMode)
+  const staffPosition = getStaffPosition(notation.clef, midiNumber)
 
   return {
     midiNumber,
-    noteName,
-    pitchClass,
-    octave,
-    clef,
+    noteName: notation.spelling,
+    pitchClass: `${notation.letter}${notation.accidental ?? ''}`,
+    octave: notation.octave,
+    clef: notation.clef,
     staffPosition,
     ledgerLines: Math.max(0, Math.ceil(Math.abs(staffPosition) / 2) - 4),
-    label: `${CLEF_LABELS[clef]} ${noteName}`
+    label: `${CLEF_LABELS[notation.clef]} ${notation.spelling}`,
+    notation
   }
 }
 
-export function getSightReadingNotesForClef(clef: SightReadingClef, range: SightReadingRange): SightReadingNote[] {
-  return SIGHT_READING_RANGES[clef][range].map((midiNumber) => createNote(clef, midiNumber))
+export function getSightReadingNotesForClef(
+  clef: SightReadingClef,
+  _range: SightReadingRange = 'extended',
+  keySignature: MajorKeyId = 'C',
+  notePoolMode: SightReadingNotePoolMode = 'chromatic'
+): SightReadingNote[] {
+  return createNotePool(clef, keySignature, notePoolMode)
 }
 
-export function getSightReadingNotes({ staffMode, range }: SightReadingPoolOptions): SightReadingNote[] {
-  if (staffMode !== 'grand') {
-    return getSightReadingNotesForClef(staffMode, range)
-  }
-
-  const midiNumbers = Array.from(new Set([
-    ...SIGHT_READING_RANGES.bass[range],
-    ...SIGHT_READING_RANGES.treble[range]
-  ])).sort((left, right) => left - right)
-
-  return midiNumbers.map((midiNumber) => createNote(midiNumber >= 60 ? 'treble' : 'bass', midiNumber))
+export function getSightReadingNotes({
+  staffMode,
+  keySignature = 'C',
+  notePoolMode = 'chromatic'
+}: SightReadingPoolOptions): SightReadingNote[] {
+  return createNotePool(staffMode, keySignature, notePoolMode)
 }
 
-export const SIGHT_READING_NOTES = getSightReadingNotes({ staffMode: 'treble', range: 'common' })
+export const SIGHT_READING_NOTES = getSightReadingNotes({ staffMode: 'treble' })
 export const SIGHT_READING_NOTE_NUMBERS = SIGHT_READING_NOTES.map((note) => note.midiNumber)
 
 export function getSightReadingNoteByMidi(
   midiNumber: number,
   clef?: SightReadingClef,
-  range: SightReadingRange = 'extended'
+  _range: SightReadingRange = 'extended',
+  keySignature: MajorKeyId = 'C',
+  notePoolMode: SightReadingNotePoolMode = 'chromatic'
 ): SightReadingNote | null {
-  const notes = clef
-    ? getSightReadingNotesForClef(clef, range)
-    : getSightReadingNotes({ staffMode: 'grand', range })
-
-  return notes.find((note) => note.midiNumber === midiNumber) ?? null
+  const staffMode = clef ?? 'grand'
+  const [start, end] = SIGHT_READING_MIDI_RANGES[staffMode]
+  return midiNumber >= start && midiNumber <= end && (
+    notePoolMode === 'chromatic' || isDiatonicMidiNumber(midiNumber, keySignature)
+  )
+    ? createNote(staffMode, midiNumber, keySignature)
+    : null
 }
 
 export function createShuffledSightReadingBag(
@@ -120,23 +150,21 @@ export function createShuffledSightReadingBag(
   return bag
 }
 
-export function getMostMissedNote(errorCounts: Record<number, number>): string {
+export function getMostMissedNote(
+  errorCounts: Record<number, number>,
+  keySignature?: MajorKeyId
+): string {
   const entries = Object.entries(errorCounts)
     .map(([midiNumber, count]) => ({ midiNumber: Number(midiNumber), count }))
     .filter((entry) => entry.count > 0)
     .sort((left, right) => right.count - left.count)
 
-  if (entries.length === 0) {
-    return '暂无'
-  }
-
-  return midiNumberToNoteName(entries[0].midiNumber)
+  if (entries.length === 0) return '暂无'
+  if (!keySignature) return midiNumberToNoteName(entries[0].midiNumber)
+  return spellMidiPitch(entries[0].midiNumber, keySignature, 'grand').spelling
 }
 
-export function getRangeDescription(staffMode: SightReadingStaffMode, range: SightReadingRange): string {
-  const notes = getSightReadingNotes({ staffMode, range })
-  const first = notes[0]?.noteName ?? '-'
-  const last = notes[notes.length - 1]?.noteName ?? '-'
-
-  return `${first} - ${last}`
+export function getRangeDescription(staffMode: SightReadingStaffMode): string {
+  const [start, end] = SIGHT_READING_MIDI_RANGES[staffMode]
+  return `${midiNumberToNoteName(start)} - ${midiNumberToNoteName(end)}`
 }

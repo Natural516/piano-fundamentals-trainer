@@ -1,8 +1,10 @@
-import { midiNumberToNoteName } from './midiNotes'
+import { getMajorKeySignature } from './musicKeySignatures'
+import { spellMidiPitch } from './musicPitchSpelling'
 import type {
   BaseTriad,
   ChordInversion,
   ChordInversionMode,
+  ChordKeySignature,
   ChordQuality,
   ChordQualityFilter,
   ChordTarget
@@ -15,7 +17,7 @@ export const CHORD_QUESTION_COUNTS = [10, 20, 50] as const
 export const CHORD_QUALITY_LABELS: Record<ChordQualityFilter, string> = {
   major: '大三和弦',
   minor: '小三和弦',
-  both: '大三 + 小三'
+  both: '调内三和弦'
 }
 
 export const CHORD_INVERSION_MODE_LABELS: Record<ChordInversionMode, string> = {
@@ -38,6 +40,7 @@ export const CHORD_INVERSION_LABELS: Record<ChordInversion, string> = {
 export const CHORD_QUALITY_NAMES: Record<ChordQuality, string> = {
   major: '大三和弦',
   minor: '小三和弦',
+  diminished: '减三和弦',
   major7: '大七和弦',
   dominant7: '属七和弦',
   minor7: '小七和弦',
@@ -95,6 +98,39 @@ export const BASE_TRIADS: BaseTriad[] = [
   }
 ]
 
+const MAJOR_SCALE_OFFSETS = [0, 2, 4, 5, 7, 9, 11] as const
+const DIATONIC_TRIAD_QUALITIES: readonly ChordQuality[] = [
+  'major', 'minor', 'minor', 'major', 'major', 'minor', 'diminished'
+]
+
+function getKeyRootMidi(keySignature: ChordKeySignature): number {
+  const pitchClass = getMajorKeySignature(keySignature).tonicPitchClass
+  const midi = 60 + pitchClass
+  return midi > 65 ? midi - 12 : midi
+}
+
+export function createDiatonicTriads(keySignature: ChordKeySignature): BaseTriad[] {
+  const key = getMajorKeySignature(keySignature)
+  const keyRootMidi = getKeyRootMidi(keySignature)
+
+  return key.scaleDegrees.map((degree, index) => {
+    const quality = DIATONIC_TRIAD_QUALITIES[index]
+    const intervals = quality === 'major' ? [0, 4, 7] : quality === 'minor' ? [0, 3, 7] : [0, 3, 6]
+    const rootMidi = keyRootMidi + MAJOR_SCALE_OFFSETS[index]
+    const notes = intervals.map((interval) => rootMidi + interval)
+    const qualityName = CHORD_QUALITY_NAMES[quality]
+
+    return {
+      id: `${keySignature}-${index + 1}-${quality}`,
+      root: degree.spelling,
+      name: `${degree.spelling} ${qualityName}`,
+      quality,
+      notes,
+      noteNames: notes.map((note) => spellMidiPitch(note, keySignature, 'grand').spelling)
+    }
+  })
+}
+
 export function getEnabledInversions(mode: ChordInversionMode, noteCount = 3): ChordInversion[] {
   if (mode === 'root') {
     return ['root']
@@ -117,7 +153,11 @@ export function invertChordNotes(notes: number[], inversion: ChordInversion): nu
   return [...notes.slice(rotation), ...notes.slice(0, rotation).map((note) => note + 12)]
 }
 
-function createChordTarget(base: BaseTriad, inversion: ChordInversion): ChordTarget {
+function createChordTarget(
+  base: BaseTriad,
+  inversion: ChordInversion,
+  keySignature: ChordKeySignature
+): ChordTarget {
   const notes = invertChordNotes(base.notes, inversion)
   const inversionName = CHORD_INVERSION_LABELS[inversion]
 
@@ -131,21 +171,23 @@ function createChordTarget(base: BaseTriad, inversion: ChordInversion): ChordTar
     inversion,
     inversionName,
     notes,
-    noteNames: notes.map(midiNumberToNoteName),
-    label: `${base.name} · ${inversionName}`
+    noteNames: notes.map((note) => spellMidiPitch(note, keySignature, 'grand').spelling),
+    label: `${base.name} · ${inversionName}`,
+    keySignature
   }
 }
 
 export function getChordTargets(
   qualityFilter: ChordQualityFilter,
-  inversionMode: ChordInversionMode
+  inversionMode: ChordInversionMode,
+  keySignature: ChordKeySignature = 'C'
 ): ChordTarget[] {
-  const qualities: ChordQuality[] = qualityFilter === 'both' ? ['major', 'minor'] : [qualityFilter]
+  const qualities: ChordQuality[] = qualityFilter === 'both' ? ['major', 'minor', 'diminished'] : [qualityFilter]
   const inversions = getEnabledInversions(inversionMode)
 
-  return BASE_TRIADS
+  return createDiatonicTriads(keySignature)
     .filter((triad) => qualities.includes(triad.quality))
-    .flatMap((triad) => inversions.map((inversion) => createChordTarget(triad, inversion)))
+    .flatMap((triad) => inversions.map((inversion) => createChordTarget(triad, inversion, keySignature)))
 }
 
 export function getRandomChordTarget(pool: ChordTarget[], previousTarget?: ChordTarget | null): ChordTarget {

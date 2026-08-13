@@ -14,6 +14,8 @@ import type { PracticeSessionRecord, PracticeSessionTiming } from './practiceRec
 import type { RhythmPracticeReport } from './rhythmTypes'
 import type { MajorScaleKey, ScalePracticeMode, ScalePracticeReport } from './scaleTypes'
 import type { PracticeDifficulty } from './practiceContentTypes'
+import { getMajorKeySignature } from './musicKeySignatures'
+import { getRangeDescription } from './sightReadingNotes'
 
 function createBaseRecord(
   timing: PracticeSessionTiming,
@@ -44,22 +46,28 @@ export function createSightReadingRecord(input: {
   showNoteName: boolean
 }): PracticeSessionRecord {
   const { report } = input
+  const noteCountLabel = report.noteCount === 1 ? '单音' : report.noteCount === 2 ? '双音' : '三音'
 
   return {
     ...createBaseRecord(input.timing, {
       module: 'sight-reading',
       moduleName: '识谱练习',
-      title: `${STAFF_MODE_LABELS[report.staffMode]} · 单音识别`,
-      subtitle: 'C 大调识谱',
+      title: `${STAFF_MODE_LABELS[report.staffMode]} · ${noteCountLabel}识别`,
+      subtitle: `${report.keyName}识谱`,
       totalEvents: report.completedQuestions,
       correctEvents: report.correct,
       accuracy: report.accuracy
     }),
     wrongNoteCount: report.wrong,
     missingNoteCount: report.timeout,
+    keySignature: report.keySignature,
     settings: {
       staffMode: report.staffMode,
-      rangeMode: report.range,
+      rangeMode: 'fixed',
+      noteCount: report.noteCount,
+      keySignature: report.keySignature,
+      keyName: report.keyName,
+      notePoolMode: report.notePoolMode,
       questionCount: report.totalQuestions,
       answerTimeLimitSeconds: report.answerTimeLimitSeconds,
       noteNameVisible: input.showNoteName
@@ -75,7 +83,8 @@ export function createSightReadingRecord(input: {
       mostTimedOutNote: report.mostTimedOutNote,
       weakestNote: report.weakestNote,
       fastestReactionMs: report.fastestReactionMs,
-      slowestReactionMs: report.slowestReactionMs
+      slowestReactionMs: report.slowestReactionMs,
+      fixedRange: getRangeDescription(report.staffMode)
     },
     mistakes: [
       ...report.wrongNoteCounts
@@ -216,9 +225,10 @@ export function createChordRecord(input: {
   const { report } = input
   const isIdentification = input.category === 'triad' || input.category === 'seventh'
   const inputStyleLabel = input.inputStyle === 'arpeggio' ? '分解' : '柱式'
+  const keyName = getMajorKeySignature(input.keySignature).displayName
   const subtitle = isIdentification
-    ? `${input.questionCount} 题 · ${inputStyleLabel}和弦`
-    : `${input.keySignature ?? ''}大调 · ${input.roundCount ?? 1}轮 · ${inputStyleLabel}`
+    ? `${keyName} · ${input.questionCount} 题 · ${inputStyleLabel}和弦`
+    : `${keyName} · ${input.roundCount ?? 1}轮 · ${inputStyleLabel}`
 
   return {
     ...createBaseRecord(input.timing, {

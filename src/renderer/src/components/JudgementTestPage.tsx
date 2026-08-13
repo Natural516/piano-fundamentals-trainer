@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { MidiEventRecord } from '../types'
 import { useMetronome } from '../hooks/useMetronome'
 import { useMetronomeSound } from '../hooks/useMetronomeSound'
 import { usePracticeEngine } from '../hooks/usePracticeEngine'
@@ -10,10 +9,6 @@ import { AppButton } from './AppButton'
 import { MetronomeVolumeControl } from './MetronomeVolumeControl'
 import { PracticeSettingsDrawer } from './PracticeSettingsDrawer'
 import { SettingsIcon } from './SettingsIcon'
-
-interface JudgementTestPageProps {
-  latestMidiEvent: MidiEventRecord | null
-}
 
 function createTestExercises(beatMs: number): TestExercise[] {
   return [
@@ -112,7 +107,7 @@ function formatOffset(offset?: number): string {
   return `${offset > 0 ? '+' : ''}${offset}ms`
 }
 
-export function JudgementTestPage({ latestMidiEvent }: JudgementTestPageProps): JSX.Element {
+export function JudgementTestPage(): JSX.Element {
   const metronome = useMetronome(60)
   const metronomeSound = useMetronomeSound(metronome)
   const [selectedExerciseId, setSelectedExerciseId] = useState('single-c4')
@@ -124,7 +119,6 @@ export function JudgementTestPage({ latestMidiEvent }: JudgementTestPageProps): 
   const selectedExercise = exercises.find((exercise) => exercise.id === selectedExerciseId) ?? exercises[0]
   const practice = usePracticeEngine({
     targets: selectedExercise.targets,
-    latestMidiEvent,
     metronome,
     toleranceLevel
   })

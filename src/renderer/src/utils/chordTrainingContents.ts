@@ -9,8 +9,8 @@ export const CHORD_CONTENT_CATEGORY_LABELS: Record<ChordContentCategory, string>
 }
 
 export const CHORD_TRAINING_CONTENTS: ChordTrainingContent[] = [
-  { id: 'triad-identification', name: 'C大调自然三和弦', description: '保留原有三和弦与转位随机练习。', difficulty: 'basic', category: 'triad', inputStyle: 'block' },
-  { id: 'seventh-identification', name: '七和弦识别', description: '随机根音的大七、属七、小七与半减七和弦。', difficulty: 'intermediate', category: 'seventh', inputStyle: 'block' },
+  { id: 'triad-identification', name: '调内自然三和弦', description: '当前大调内的七个自然三和弦与转位随机练习。', difficulty: 'basic', category: 'triad', inputStyle: 'block' },
+  { id: 'seventh-identification', name: '调内七和弦识别', description: '当前大调内的大七、属七、小七与半减七和弦。', difficulty: 'intermediate', category: 'seventh', inputStyle: 'block' },
   { id: 'progression-1451', name: 'I–IV–V–I', description: '基础主功能和弦连接。', difficulty: 'intermediate', category: 'progression', inputStyle: 'block', progressionId: 'I-IV-V-I' },
   { id: 'progression-1564', name: 'I–V–vi–IV', description: '常见流行和声进行。', difficulty: 'intermediate', category: 'progression', inputStyle: 'block', progressionId: 'I-V-vi-IV' },
   { id: 'progression-251', name: 'ii–V–I', description: '属功能解决连接。', difficulty: 'intermediate', category: 'progression', inputStyle: 'block', progressionId: 'ii-V-I' },

@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { MidiEventRecord } from '../types'
+import { getLastMidiEventId } from '../midi/midiEventBus'
 import { midiNumberToNoteName } from '../utils/midiNotes'
 import {
   CLEF_LABELS,
-  RANGE_LABELS,
   STAFF_MODE_LABELS,
   createShuffledSightReadingBag,
   getMostMissedNote,
   getSightReadingNotes,
   type SightReadingClef,
   type SightReadingNote,
-  type SightReadingRange,
   type SightReadingStaffMode
 } from '../utils/sightReadingNotes'
 import {
@@ -20,11 +18,16 @@ import {
   type SightReadingSessionCounters
 } from '../utils/sightReadingSession'
 import {
+  SIGHT_READING_ANSWER_TIMEOUT_MS,
   readSightReadingSettings,
   writeSightReadingSettings,
+  type SightReadingNoteCount,
+  type SightReadingNotePoolMode,
   type SightReadingQuestionCount,
   type SightReadingSettings
 } from '../utils/sightReadingSettings'
+import { getMajorKeySignature, type MajorKeyId } from '../utils/musicKeySignatures'
+import { useMidiEventSubscription } from './useMidiEvents'
 
 export type SightReadingStatus = 'idle' | 'running' | 'finished'
 export type SightReadingResult = 'correct' | 'wrong_note' | 'timeout' | null
@@ -54,7 +57,10 @@ export interface SightReadingReport {
   wrongNoteCounts: Array<{ noteName: string; count: number }>
   timeoutNoteCounts: Array<{ noteName: string; count: number }>
   staffMode: SightReadingStaffMode
-  range: SightReadingRange
+  noteCount: SightReadingNoteCount
+  keySignature: MajorKeyId
+  keyName: string
+  notePoolMode: SightReadingNotePoolMode
   answerTimeLimitSeconds: number
   treble: SightReadingClefStats
   bass: SightReadingClefStats
@@ -63,7 +69,9 @@ export interface SightReadingReport {
 export interface UseSightReadingPracticeResult {
   status: SightReadingStatus
   staffMode: SightReadingStaffMode
-  range: SightReadingRange
+  noteCount: SightReadingNoteCount
+  keySignature: MajorKeyId
+  notePoolMode: SightReadingNotePoolMode
   questionCount: SightReadingQuestionCount
   answerTimeLimitSeconds: number
   showNoteName: boolean
@@ -81,10 +89,11 @@ export interface UseSightReadingPracticeResult {
   accuracy: number
   availableNotes: SightReadingNote[]
   report: SightReadingReport | null
+  getRemainingTimeMs: () => number
   setStaffMode: (staffMode: SightReadingStaffMode) => void
-  setRange: (range: SightReadingRange) => void
+  setKeySignature: (keySignature: MajorKeyId) => void
+  setNotePoolMode: (notePoolMode: SightReadingNotePoolMode) => void
   setQuestionCount: (questionCount: SightReadingQuestionCount) => void
-  setAnswerTimeLimitSeconds: (seconds: number) => void
   setShowNoteName: (showNoteName: boolean) => void
   start: () => void
   reset: () => void
@@ -135,9 +144,9 @@ function createReport(
     timeout: counters.timeout,
     accuracy: calculateAccuracy(counters.correct, counters.completed),
     bestStreak: counters.bestStreak,
-    mostWrongNote: getMostMissedNote(counters.wrongNoteCounts),
-    mostTimedOutNote: getMostMissedNote(counters.timeoutNoteCounts),
-    weakestNote: getMostMissedNote(weakestNoteCounts),
+    mostWrongNote: getMostMissedNote(counters.wrongNoteCounts, settings.keySignature),
+    mostTimedOutNote: getMostMissedNote(counters.timeoutNoteCounts, settings.keySignature),
+    weakestNote: getMostMissedNote(weakestNoteCounts, settings.keySignature),
     ...reactionSummary,
     wrongNoteCounts: uniqueNotes.map((note) => ({
       noteName: note.noteName,
@@ -148,14 +157,17 @@ function createReport(
       count: counters.timeoutNoteCounts[note.midiNumber] ?? 0
     })),
     staffMode: settings.staffMode,
-    range: settings.range,
-    answerTimeLimitSeconds: settings.answerTimeLimitSeconds,
+    noteCount: settings.noteCount,
+    keySignature: settings.keySignature,
+    keyName: getMajorKeySignature(settings.keySignature).displayName,
+    notePoolMode: settings.notePoolMode,
+    answerTimeLimitSeconds: SIGHT_READING_ANSWER_TIMEOUT_MS / 1000,
     treble: calculateClefStats('treble', counters),
     bass: calculateClefStats('bass', counters)
   }
 }
 
-export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null): UseSightReadingPracticeResult {
+export function useSightReadingPractice(): UseSightReadingPracticeResult {
   const initialSettingsRef = useRef<SightReadingSettings | null>(null)
   if (initialSettingsRef.current === null) initialSettingsRef.current = readSightReadingSettings()
 
@@ -174,7 +186,6 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
   const [bestStreak, setBestStreak] = useState(0)
   const [report, setReport] = useState<SightReadingReport | null>(null)
 
-  const latestMidiEventRef = useRef(latestMidiEvent)
   const statusRef = useRef<SightReadingStatus>('idle')
   const manualPauseRef = useRef(false)
   const advanceDeadlineRef = useRef<number | null>(null)
@@ -189,11 +200,13 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
   const previousMidiNumberRef = useRef<number | null>(null)
   const applyOutcomeRef = useRef<(record: SightReadingOutcomeRecord) => void>(() => undefined)
 
-  latestMidiEventRef.current = latestMidiEvent
-
   const availableNotes = useMemo(
-    () => getSightReadingNotes({ staffMode: settings.staffMode, range: settings.range }),
-    [settings.range, settings.staffMode]
+    () => getSightReadingNotes({
+      staffMode: settings.staffMode,
+      keySignature: settings.keySignature,
+      notePoolMode: settings.notePoolMode
+    }),
+    [settings.keySignature, settings.notePoolMode, settings.staffMode]
   )
   const accuracy = useMemo(
     () => calculateAccuracy(correctCount, completedQuestions),
@@ -276,8 +289,8 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
     if (statusRef.current !== 'running' || session.paused || session.phase !== 'display') return
 
     const now = Date.now()
-    const timeLimitMs = activeSettingsRef.current.answerTimeLimitSeconds * 1000
-    session.unlockQuestion(now, latestMidiEventRef.current?.id ?? null, timeLimitMs)
+    const timeLimitMs = SIGHT_READING_ANSWER_TIMEOUT_MS
+    session.unlockQuestion(now, getLastMidiEventId(), timeLimitMs)
     scheduleQuestionTimeout(timeLimitMs)
   }, [scheduleQuestionTimeout])
 
@@ -344,7 +357,7 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
     if (statusRef.current !== 'running' || !session.paused || manualPauseRef.current) return
 
     const now = Date.now()
-    session.resume(now, latestMidiEventRef.current?.id ?? null)
+    session.resume(now, getLastMidiEventId())
     setIsPaused(false)
 
     if (session.phase === 'display') {
@@ -383,7 +396,11 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
 
   const reset = useCallback(() => {
     clearAllTimers()
-    const notes = getSightReadingNotes({ staffMode: settings.staffMode, range: settings.range })
+    const notes = getSightReadingNotes({
+      staffMode: settings.staffMode,
+      keySignature: settings.keySignature,
+      notePoolMode: settings.notePoolMode
+    })
 
     statusRef.current = 'idle'
     manualPauseRef.current = false
@@ -398,19 +415,23 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
     setResult(null)
     setReport(null)
     syncCounters(sessionRef.current.counters)
-  }, [clearAllTimers, settings.range, settings.staffMode, syncCounters])
+  }, [clearAllTimers, settings.keySignature, settings.notePoolMode, settings.staffMode, syncCounters])
 
   const start = useCallback(() => {
     clearAllTimers()
     const activeSettings = { ...settings }
-    const notes = getSightReadingNotes({ staffMode: activeSettings.staffMode, range: activeSettings.range })
+    const notes = getSightReadingNotes({
+      staffMode: activeSettings.staffMode,
+      keySignature: activeSettings.keySignature,
+      notePoolMode: activeSettings.notePoolMode
+    })
 
     activeSettingsRef.current = activeSettings
     activeNotesRef.current = notes
     sessionRef.current = new SightReadingSessionCore(notes)
     bagRef.current = []
     previousMidiNumberRef.current = null
-    sessionRef.current.start(Date.now(), latestMidiEventRef.current?.id ?? null)
+    sessionRef.current.start(Date.now(), getLastMidiEventId())
     statusRef.current = 'running'
     manualPauseRef.current = false
     setStatus('running')
@@ -426,6 +447,17 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
   ) => {
     if (statusRef.current === 'running') return
     setSettings((current) => ({ ...current, [key]: value }))
+  }, [])
+
+  const getRemainingTimeMs = useCallback((): number => {
+    const session = sessionRef.current
+    if (statusRef.current !== 'running' || session.phase === 'display') {
+      return SIGHT_READING_ANSWER_TIMEOUT_MS
+    }
+    return Math.min(
+      SIGHT_READING_ANSWER_TIMEOUT_MS,
+      session.getRemainingQuestionMs(Date.now())
+    )
   }, [])
 
   useEffect(() => {
@@ -455,19 +487,21 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
 
   useEffect(() => () => clearAllTimers(), [clearAllTimers])
 
-  useEffect(() => {
-    if (status !== 'running' || isPaused || !latestMidiEvent) return
+  useMidiEventSubscription((event) => {
+    if (statusRef.current !== 'running' || sessionRef.current.paused) return
 
-    const outcome = sessionRef.current.processMidiEvent(latestMidiEvent)
-    if (outcome) applyOutcome(outcome)
-  }, [applyOutcome, isPaused, latestMidiEvent, status])
+    const outcome = sessionRef.current.processMidiEvent(event)
+    if (outcome) applyOutcomeRef.current(outcome)
+  })
 
   return {
     status,
     staffMode: settings.staffMode,
-    range: settings.range,
+    noteCount: settings.noteCount,
+    keySignature: settings.keySignature,
+    notePoolMode: settings.notePoolMode,
     questionCount: settings.questionCount,
-    answerTimeLimitSeconds: settings.answerTimeLimitSeconds,
+    answerTimeLimitSeconds: SIGHT_READING_ANSWER_TIMEOUT_MS / 1000,
     showNoteName: settings.noteNameVisible,
     isPaused,
     currentNote,
@@ -483,12 +517,11 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
     accuracy,
     availableNotes,
     report,
+    getRemainingTimeMs,
     setStaffMode: (value) => updateSetting('staffMode', value),
-    setRange: (value) => updateSetting('range', value),
+    setKeySignature: (value) => updateSetting('keySignature', value),
+    setNotePoolMode: (value) => updateSetting('notePoolMode', value),
     setQuestionCount: (value) => updateSetting('questionCount', value),
-    setAnswerTimeLimitSeconds: (value) => {
-      if (Number.isInteger(value) && value >= 1 && value <= 60) updateSetting('answerTimeLimitSeconds', value)
-    },
     setShowNoteName: (value) => updateSetting('noteNameVisible', value),
     start,
     reset,
@@ -497,5 +530,11 @@ export function useSightReadingPractice(latestMidiEvent: MidiEventRecord | null)
   }
 }
 
-export { CLEF_LABELS, RANGE_LABELS, STAFF_MODE_LABELS }
-export type { SightReadingQuestionCount, SightReadingRange, SightReadingStaffMode }
+export { CLEF_LABELS, STAFF_MODE_LABELS }
+export type {
+  MajorKeyId,
+  SightReadingNoteCount,
+  SightReadingNotePoolMode,
+  SightReadingQuestionCount,
+  SightReadingStaffMode
+}
