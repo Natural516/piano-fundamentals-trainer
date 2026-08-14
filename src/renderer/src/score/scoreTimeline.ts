@@ -5,6 +5,7 @@ import type {
   ScoreTimeline
 } from './musicXmlTypes'
 import { buildScoreTimeV2 } from './scoreTimeV2'
+import { buildPracticeSegment } from './practiceSegmentBuilder'
 
 /**
  * Builds expected units using integer score ticks (divisions * duration).
@@ -67,36 +68,30 @@ export interface ScoreSegmentOptions {
  * dropped so the segment starts cleanly.
  */
 export function buildSegmentTimeline(score: ScoreDocument, options: ScoreSegmentOptions = {}): ScoreTimeline {
-  const full = buildScoreTimeline(score)
-  const startMeasure = Math.max(1, options.startMeasure ?? 1)
-  const endMeasure = Math.max(startMeasure, options.endMeasure ?? Number.MAX_SAFE_INTEGER)
-  const handMode = options.handMode ?? 'both'
-
-  const units = full.units
-    .map((unit) => {
-      const measureNumber = unit.measure
-      if (measureNumber < startMeasure || measureNumber > endMeasure) return null
-      const notes = unit.notes.filter((note) => {
-        if (handMode === 'both') return true
-        const staff = note.staff ?? 1
-        return handMode === 'right' ? staff === 1 : staff === 2
-      })
-      if (notes.length === 0) return null
-      const expectedMidi = notes
-        .filter((note) => note.type === 'note' && note.midiNumber !== null && !(note.tieStop && !note.tieStart))
-        .map((note) => note.midiNumber as number)
-        .sort((left, right) => left - right)
-      if (expectedMidi.length === 0 && !notes.every((note) => note.type === 'rest')) return null
-      return {
-        ...unit,
-        notes,
-        rest: notes.every((note) => note.type === 'rest'),
-        tieStart: notes.some((note) => note.tieStart),
-        expectedMidi: [...new Set(expectedMidi)]
-      }
-    })
-    .filter((unit): unit is NonNullable<typeof unit> => unit !== null)
-    .map((unit, index) => ({ ...unit, onsetIndex: index }))
-
+  const segment = buildPracticeSegment(score, options)
+  const units: ScoreExpectedUnit[] = segment.expectedUnits.map((unit, index) => ({
+    id: `seg-${unit.originalMeasure}-${unit.practiceTick}`,
+    onsetIndex: index,
+    expectedTick: unit.practiceTick,
+    measure: unit.originalMeasure,
+    notes: unit.events.map((event) => ({
+      id: `seg-${index}-${event.midiPitch ?? 'rest'}`,
+      type: event.midiPitch === null ? 'rest' : 'note',
+      midiNumber: event.midiPitch,
+      step: '',
+      alter: 0,
+      octave: 4,
+      duration: event.duration,
+      voice: event.voice,
+      staff: event.staff,
+      isChordTone: event.type === 'chord',
+      tieStart: event.tieStart,
+      tieStop: event.tieStop,
+      accidental: null
+    })),
+    tieStart: unit.tieStart,
+    rest: unit.rest,
+    expectedMidi: unit.expectedMidi
+  }))
   return { units }
 }

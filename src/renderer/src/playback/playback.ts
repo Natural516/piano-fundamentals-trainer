@@ -1,5 +1,6 @@
 import type { ScoreDocument } from '../score/musicXmlTypes'
-import { INTERNAL_PPQ, mergeTiedPerformanceEvents, buildScoreTimeV2 } from '../score/scoreTimeV2'
+import { INTERNAL_PPQ, mergeTiedPerformanceEvents } from '../score/scoreTimeV2'
+import { buildPracticeSegment, eventToScoreV2Like } from '../score/practiceSegmentBuilder'
 
 export interface PlaybackEvent {
   timeMs: number
@@ -43,23 +44,17 @@ export function buildPlaybackPlan(score: ScoreDocument, options: PlaybackPlanOpt
   const handMode = options.handMode ?? 'both'
   const loop = Boolean(options.loop)
 
-  const { events: scoreEvents } = buildScoreTimeV2(score)
-  const segmentEvents = scoreEvents.filter((event) => {
-    if (event.measureNumber < startMeasure || event.measureNumber > endMeasure) return false
-    if (handMode === 'both') return true
-    return handMode === 'right' ? event.staff === 1 : event.staff === 2
-  })
-  const baseTick = Math.min(...segmentEvents.map((event) => event.absoluteOnset), 0)
-  const tied = mergeTiedPerformanceEvents(segmentEvents)
+  const segment = buildPracticeSegment(score, { startMeasure, endMeasure, handMode })
+  const tied = mergeTiedPerformanceEvents(segment.events.map(eventToScoreV2Like))
   const events: PlaybackEvent[] = tied.flatMap((tiedEvent) => [
     {
-      timeMs: (tiedEvent.attackTick - baseTick) * msPerTick,
+      timeMs: tiedEvent.attackTick * msPerTick,
       type: 'noteOn' as const,
       midiNumber: tiedEvent.midiPitch,
       velocity: 90
     },
     {
-      timeMs: (tiedEvent.releaseTick - baseTick) * msPerTick,
+      timeMs: tiedEvent.releaseTick * msPerTick,
       type: 'noteOff' as const,
       midiNumber: tiedEvent.midiPitch,
       velocity: 0

@@ -65,6 +65,7 @@ const playback = require('../src/renderer/src/playback/playback.ts')
 const platformAdapters = require('../src/renderer/src/platform/adapters.ts')
 const scoreTimeV2 = require('../src/renderer/src/score/scoreTimeV2.ts')
 const zlib = require('node:zlib')
+const practiceSegmentBuilder = require('../src/renderer/src/score/practiceSegmentBuilder.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -3598,6 +3599,66 @@ test('标准 MXL：container rootfile 严格选主谱 + 真实 raw DEFLATE + 安
     { name: 'Scores/main.musicxml', content: bigEntry }
   ])
   await assert.rejects(() => zipReader.extractMxlContainerAsync(bigZip), /大小上限/)
+})
+
+test('PracticeSegment：rebase、映射保留、手别过滤与 tie 边界', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/e2e-core-loop.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  // 选区 measure 3–4：第一可演奏事件必须 rebase 为 0
+  const segment = practiceSegmentBuilder.buildPracticeSegment(score, { startMeasure: 3, endMeasure: 4, handMode: 'both' })
+  assert.ok(segment.expectedUnits.length >= 4)
+  assert.equal(segment.expectedUnits[0].practiceTick, 0, '选区第一事件必须 rebase 为 0')
+  assert.equal(segment.expectedUnits[0].originalMeasure, 3)
+  assert.equal(segment.expectedUnits[0].originalAbsoluteTick, 2 * 1920, '原谱 absolute tick 必须保留')
+  assert.equal(segment.events[0].originalAbsoluteTick, 2 * 1920)
+  assert.equal(segment.sourceStartAbsoluteTick, 2 * 1920)
+  assert.deepEqual(segment.displayMeasures, [3, 4])
+
+  const firstMeasure = practiceSegmentBuilder.buildPracticeSegment(score, { startMeasure: 1, endMeasure: 1 })
+  assert.equal(firstMeasure.expectedUnits.length, 1)
+  assert.equal(firstMeasure.expectedUnits[0].practiceTick, 0)
+  assert.deepEqual(firstMeasure.expectedUnits[0].expectedMidi, [48, 60])
+
+  const restOnly = practiceSegmentBuilder.buildPracticeSegment(score, { startMeasure: 1, endMeasure: 1, handMode: 'left' })
+  assert.equal(restOnly.expectedUnits.length, 1, '左手有事件时选区保留左手事件')
+  assert.deepEqual(restOnly.expectedUnits[0].expectedMidi, [48])
+})
+
+test('PracticeSegment：跨选区 tie 进入与离开的语义', () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>P</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1"><attributes><divisions>1</divisions></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><tie type="start"/></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><tie type="stop"/><tie type="start"/></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><tie type="stop"/></note>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice></note>
+    </measure>
+  </part>
+</score-partwise>`
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  // 只练 M3：进入选区的 C4 是 tie stop（延续），默认不要求重击 → expectedMidi 不含 C4
+  const m3 = practiceSegmentBuilder.buildPracticeSegment(score, { startMeasure: 3, endMeasure: 3 })
+  assert.equal(m3.expectedUnits[0].expectedMidi.length, 0, 'tie 延续进入选区默认不要求重击')
+  assert.equal(m3.expectedUnits[0].rest, false)
+  // 开启 segmentBoundaryRetrigger 则明确要求重击
+  const m3Retrigger = practiceSegmentBuilder.buildPracticeSegment(score, {
+    startMeasure: 3,
+    endMeasure: 3,
+    segmentBoundaryRetrigger: true
+  })
+  assert.deepEqual(m3Retrigger.expectedUnits[0].expectedMidi, [60])
+  // 从 M2 开始：M2 stop+start 链 → 需要重击（新 attack）
+  const m2 = practiceSegmentBuilder.buildPracticeSegment(score, { startMeasure: 2, endMeasure: 2 })
+  assert.deepEqual(m2.expectedUnits[0].expectedMidi, [60])
+  // 从 M1 开始：tie 离开选区不影响
+  const m1 = practiceSegmentBuilder.buildPracticeSegment(score, { startMeasure: 1, endMeasure: 2 })
+  assert.equal(m1.expectedUnits.length, 2)
 })
 
 let failed = 0

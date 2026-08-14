@@ -3,6 +3,8 @@ import type { ScoreDocument } from '../score/musicXmlTypes'
 import { buildScoreTimeline } from '../score/scoreTimeline'
 import { buildSegmentTimeline, type ScoreSegmentOptions } from '../score/scoreTimeline'
 import { INTERNAL_PPQ } from '../score/scoreTimeV2'
+import { buildPracticeSegment } from '../score/practiceSegmentBuilder'
+import type { ScoreExpectedUnit, ScoreNoteModel } from '../score/musicXmlTypes'
 import { WaitScoreCore } from '../score/waitScoreCore'
 import { RealtimeScoreCore, type RealtimeStepResult } from '../score/realtimeScoreCore'
 import { FollowScoreCore, type FollowStepResult } from '../score/followScoreCore'
@@ -48,10 +50,39 @@ export function useScorePractice(
   mode: ScorePracticeMode = 'wait',
   options: ScorePracticeOptions = {}
 ): UseScorePracticeResult {
-  const timeline = useMemo(
-    () => (score ? (options.segment ? buildSegmentTimeline(score, options.segment) : buildScoreTimeline(score)) : { units: [] }),
-    [options.segment, score]
-  )
+  const timeline = useMemo(() => {
+    if (!score) return { units: [] }
+    if (!options.segment) return buildScoreTimeline(score)
+    const segment = buildPracticeSegment(score, options.segment)
+    const units: ScoreExpectedUnit[] = segment.expectedUnits.map((unit, index) => {
+      const notes: ScoreNoteModel[] = unit.events.map((event) => ({
+        id: `seg-${index}-${event.midiPitch ?? 'rest'}`,
+        type: event.midiPitch === null ? 'rest' : 'note',
+        midiNumber: event.midiPitch,
+        step: '',
+        alter: 0,
+        octave: 4,
+        duration: event.duration,
+        voice: event.voice,
+        staff: event.staff,
+        isChordTone: event.type === 'chord',
+        tieStart: event.tieStart,
+        tieStop: event.tieStop,
+        accidental: null
+      }))
+      return {
+        id: `seg-${unit.originalMeasure}-${unit.practiceTick}`,
+        onsetIndex: index,
+        expectedTick: unit.practiceTick,
+        measure: unit.originalMeasure,
+        notes,
+        tieStart: unit.tieStart,
+        rest: unit.rest,
+        expectedMidi: unit.expectedMidi
+      }
+    })
+    return { units }
+  }, [options.segment, score])
   const loop = options.loop ?? false
   const countInMs = options.countInMs ?? 0
   const tempoRatio = Math.min(2, Math.max(0.25, options.tempoRatio ?? 1))

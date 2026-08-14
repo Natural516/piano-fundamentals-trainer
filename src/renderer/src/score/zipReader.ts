@@ -176,8 +176,8 @@ function buildZipEntries(
     writeUint16(localHeader, 4, 20)
     writeUint16(localHeader, 8, 0)
     writeUint16(localHeader, 10, method)
-    writeUint16(localHeader, 18, compressed.length)
-    writeUint16(localHeader, 22, content.length)
+    writeUint32(localHeader, 18, compressed.length)
+    writeUint32(localHeader, 22, content.length)
     writeUint16(localHeader, 26, nameBytes.length)
 
     const central = new Uint8Array(46)
@@ -185,8 +185,8 @@ function buildZipEntries(
     writeUint16(central, 4, 20)
     writeUint16(central, 6, 20)
     writeUint16(central, 10, method)
-    writeUint16(central, 20, compressed.length)
-    writeUint16(central, 24, content.length)
+    writeUint32(central, 20, compressed.length)
+    writeUint32(central, 24, content.length)
     writeUint16(central, 28, nameBytes.length)
     writeUint32(central, 42, offset)
 
