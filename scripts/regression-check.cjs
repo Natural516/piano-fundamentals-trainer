@@ -56,6 +56,10 @@ const appInfo = require('../src/renderer/src/appInfo.ts')
 const chordValidator = require('../src/renderer/src/chordV2/chordValidator.ts')
 const midiFileParser = require('../src/renderer/src/midiFile/midiFileParser.ts')
 const featureFlags = require('../src/renderer/src/featureFlags.ts')
+const practiceRecordV2 = require('../src/renderer/src/records/practiceRecordV2.ts')
+const abilityModel = require('../src/renderer/src/ability/abilityModel.ts')
+const exerciseLibrary = require('../src/renderer/src/prescription/exerciseLibrary.ts')
+const planner = require('../src/renderer/src/plan/planner.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -3061,6 +3065,202 @@ test('Feature flags：实验功能默认关闭且可从 UI 隐藏', () => {
   assert.match(chordPage, /isExperimentalFeatureVisible\('FEATURE_EXPERIMENTAL_HARMONY_GENERATOR'\)/)
   assert.match(scorePage, /Experimental feature disabled/)
   assert.match(scorePage, /followVisible/)
+})
+
+test('PracticeRecord 2.0：统一模型、迁移、序列化与 MIDI 不可观测边界', () => {
+  const legacy = {
+    id: 'rec-1',
+    schemaVersion: 1,
+    module: 'scale',
+    moduleName: '音阶练习',
+    title: 'C 大调',
+    startedAt: '2026-08-13T00:00:00.000Z',
+    endedAt: '2026-08-13T00:01:00.000Z',
+    durationMs: 60000,
+    status: 'completed',
+    totalEvents: 8,
+    correctEvents: 6,
+    accuracy: 75,
+    wrongNoteCount: 1,
+    missingNoteCount: 1,
+    extraNoteCount: 0,
+    earlyCount: 0,
+    lateCount: 0,
+    restErrorCount: 0,
+    syncWarningCount: 0,
+    averageOffsetMs: 12,
+    contentId: 'C-right-ascending-one-octave',
+    settings: { key: 'C' },
+    details: { hardestNote: 'D4' },
+    mistakes: [{ label: 'D4', count: 2, type: 'pitch' }]
+  }
+  const v2 = practiceRecordV2.fromLegacyRecord(legacy)
+  assert.equal(v2.schemaVersion, 2)
+  assert.equal(v2.practiceType, 'scale')
+  assert.equal(v2.metrics.find((metric) => metric.key === 'accuracy').value, 75)
+  assert.equal(v2.metrics.find((metric) => metric.key === 'averageOffsetMs').value, 12)
+  assert.equal(v2.errorEvents.length, 1)
+  assert.equal(v2.evidenceRefs.length, 1)
+  assert.equal(v2.evidenceRefs[0].errorEventId, v2.errorEvents[0].id)
+  assert.equal(v2.metadata.key, 'C')
+
+  const serialized = practiceRecordV2.serializePracticeRecordV2(v2)
+  const parsed = practiceRecordV2.parsePracticeRecordV2(serialized)
+  assert.equal(parsed.id, 'rec-1')
+  assert.equal(parsed.metrics.length, v2.metrics.length)
+  assert.equal(practiceRecordV2.parsePracticeRecordV2('{bad'), null)
+
+  const exported = practiceRecordV2.exportRecordsToJson([legacy])
+  assert.match(exported, /schemaVersion/)
+  assert.match(exported, /rec-1/)
+
+  assert.equal(practiceRecordV2.isUnobservableFromMidi('指法错误'), true)
+  assert.equal(practiceRecordV2.isUnobservableFromMidi('手腕僵硬'), true)
+  assert.equal(practiceRecordV2.isUnobservableFromMidi('时序偏差'), false)
+})
+
+test('Ability Model：样本/置信度/趋势/证据与问题回答', () => {
+  const record = (id, module, accuracy, endedAt) => ({
+    id,
+    schemaVersion: 1,
+    module,
+    moduleName: module,
+    title: 't',
+    startedAt: endedAt,
+    endedAt,
+    durationMs: 1000,
+    status: 'completed',
+    totalEvents: 10,
+    correctEvents: Math.round(10 * accuracy / 100),
+    accuracy,
+    wrongNoteCount: 0,
+    missingNoteCount: 0,
+    extraNoteCount: 0,
+    earlyCount: 0,
+    lateCount: 0,
+    restErrorCount: 0,
+    syncWarningCount: 0,
+    settings: {},
+    details: {},
+    mistakes: []
+  })
+  const records = [
+    record('a1', 'scale', 60, '2026-08-10T00:00:00.000Z'),
+    record('a2', 'scale', 65, '2026-08-11T00:00:00.000Z'),
+    record('a3', 'scale', 80, '2026-08-12T00:00:00.000Z'),
+    record('a4', 'scale', 85, '2026-08-13T00:00:00.000Z'),
+    record('b1', 'chord', 90, '2026-08-13T00:00:00.000Z')
+  ]
+  const model = abilityModel.computeAbilityModel(records, new Date('2026-08-14T00:00:00.000Z'))
+  const scale = model.skills.scale
+  assert.equal(scale.sampleCount, 4)
+  assert.equal(scale.confidence, 'medium')
+  assert.equal(scale.score, 73)
+  assert.equal(scale.trend, 'up')
+  assert.equal(scale.evidenceRefs.length, 4)
+  assert.equal(model.skills['sight-reading'].sampleCount, 0)
+  assert.equal(model.skills['sight-reading'].confidence, 'low')
+  assert.equal(model.skills['sight-reading'].score, null)
+
+  const answers = abilityModel.answerAbilityQuestions(model)
+  assert.deepEqual(answers.improved, ['scale'])
+  assert.ok(answers.insufficient.includes('sight-reading'))
+
+  const weakest = abilityModel.getWeakestReliableSkills(model, 3)
+  assert.deepEqual(weakest, ['scale'], '只考虑置信度非 low 且非空分数')
+})
+
+test('Exercise Prescription Library：Practice Ready 真实性、技能映射与 Micro Drill 校验', () => {
+  assert.ok(exerciseLibrary.getPracticeReadyCount() >= 5)
+  assert.ok(exerciseLibrary.EXERCISE_LIBRARY.every((definition) => {
+    if (definition.practiceReady) return definition.verified && (definition.scoreAsset || definition.sourceType === 'builtin')
+    return true
+  }), 'Practice Ready 必须 verified 且有真实资产/内置确定性来源')
+
+  const hanon = exerciseLibrary.EXERCISE_LIBRARY.find((definition) => definition.id === 'hanon-1')
+  assert.equal(hanon, undefined, '哈农无真实乐谱，不得进入 Practice Ready 库')
+
+  const scaleExercises = exerciseLibrary.getExercisesForSkill('scale')
+  assert.ok(scaleExercises.length > 0)
+  assert.ok(scaleExercises.every((definition) => definition.practiceReady))
+
+  const validDrill = exerciseLibrary.createMicroDrill({
+    skillId: 'scale',
+    measureCount: 2,
+    range: { lowest: 48, highest: 84 },
+    hand: 'right'
+  })
+  assert.equal(validDrill.validation.valid, true)
+  assert.ok(validDrill.notes.length >= 8)
+
+  const invalidDrill = exerciseLibrary.createMicroDrill({
+    skillId: 'scale',
+    measureCount: 3,
+    range: { lowest: 60, highest: 61 },
+    hand: 'both'
+  })
+  assert.equal(invalidDrill.validation.valid, false)
+})
+
+test('Training Plan 2.0：弱项优先、平衡、成功标准与证据引用', () => {
+  const record = (id, module, accuracy, endedAt) => ({
+    id,
+    schemaVersion: 1,
+    module,
+    moduleName: module,
+    title: 't',
+    startedAt: endedAt,
+    endedAt,
+    durationMs: 1000,
+    status: 'completed',
+    totalEvents: 10,
+    correctEvents: Math.round(10 * accuracy / 100),
+    accuracy,
+    wrongNoteCount: 0,
+    missingNoteCount: 0,
+    extraNoteCount: 0,
+    earlyCount: 0,
+    lateCount: 0,
+    restErrorCount: 0,
+    syncWarningCount: 0,
+    settings: {},
+    details: {},
+    mistakes: []
+  })
+  const records = [
+    record('s1', 'scale', 55, '2026-08-12T00:00:00.000Z'),
+    record('s2', 'scale', 58, '2026-08-12T01:00:00.000Z'),
+    record('s3', 'scale', 60, '2026-08-13T00:00:00.000Z'),
+    record('s4', 'scale', 62, '2026-08-13T01:00:00.000Z')
+  ]
+  const ability = abilityModel.computeAbilityModel(records)
+  const plan = planner.buildDailyPlan({
+    ability,
+    records,
+    goal: '准备考级',
+    availableMinutes: 60,
+    library: exerciseLibrary.EXERCISE_LIBRARY
+  })
+
+  assert.ok(plan.items.length >= 1)
+  assert.ok(plan.totalTargetMinutes <= 60)
+  assert.ok(plan.rationale.some((line) => line.includes('scale')))
+  assert.ok(plan.items.every((item) => item.successCriteria.length > 4))
+  assert.ok(plan.items.every((item) => item.whyThis.length > 4))
+  assert.ok(plan.items.every((item) => item.evidenceRefs.length >= 0))
+
+  const categories = plan.items.map((item) => item.exerciseId.split('-')[0])
+  const maxCategoryRatio = Math.max(...categories.map((category) => categories.filter((entry) => entry === category).length)) / Math.max(1, categories.length)
+  assert.ok(maxCategoryRatio <= 0.6, '一天不能全练同一种能力')
+
+  const emptyPlan = planner.buildDailyPlan({
+    ability: abilityModel.computeAbilityModel([]),
+    records: [],
+    goal: '',
+    availableMinutes: 30,
+    library: exerciseLibrary.EXERCISE_LIBRARY
+  })
+  assert.ok(emptyPlan.items.length >= 1, '无弱项时也要给出均衡练习')
 })
 
 let failed = 0
