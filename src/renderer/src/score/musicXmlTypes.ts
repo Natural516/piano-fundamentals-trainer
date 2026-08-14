@@ -22,6 +22,11 @@ export interface ScoreMeasure {
   number: number
   implicit: boolean
   notes: ScoreNoteModel[]
+  timeEvents: Array<
+    { kind: 'note'; noteIndex: number } |
+    { kind: 'backup'; duration: number } |
+    { kind: 'forward'; duration: number }
+  >
   keySignature: number | null
   timeBeats: number | null
   timeBeatType: number | null
@@ -44,6 +49,7 @@ export interface ScoreDocument {
 export interface ScoreExpectedUnit {
   id: string
   onsetIndex: number
+  expectedTick: number
   notes: ScoreNoteModel[]
   tieStart: boolean
   rest: boolean

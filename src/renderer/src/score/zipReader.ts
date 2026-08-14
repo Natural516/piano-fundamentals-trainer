@@ -2,13 +2,20 @@ const EOCD_SIGNATURE = 0x06054b50
 const CENTRAL_SIGNATURE = 0x02014b50
 const LOCAL_SIGNATURE = 0x04034b50
 
+interface ZipEntryInfo {
+  name: string
+  method: number
+  data: Uint8Array
+  uncompressedSize: number
+}
+
 /**
  * Minimal ZIP reader for MXL containers. Supports stored (method 0) entries
  * and skips deflated entries with a clear error. Not a general ZIP library.
  */
-export function readZipEntries(buffer: Uint8Array): Map<string, Uint8Array> {
+export function readZipEntries(buffer: Uint8Array): Map<string, ZipEntryInfo> {
   const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
-  const entries = new Map<string, Uint8Array>()
+  const entries = new Map<string, ZipEntryInfo>()
 
   const eocdOffset = findEocd(view)
   if (eocdOffset < 0) {
@@ -34,15 +41,12 @@ export function readZipEntries(buffer: Uint8Array): Map<string, Uint8Array> {
     const nameBytes = new Uint8Array(buffer.buffer, buffer.byteOffset + cursor + 46, nameLength)
     const name = new TextDecoder().decode(nameBytes)
 
-    if (method !== 0) {
-      throw new Error(`Unsupported ZIP compression method ${method} for ${name}`)
-    }
-
     const local = localHeaderOffset
     const localNameLength = view.getUint16(local + 26, true)
     const localExtraLength = view.getUint16(local + 28, true)
     const dataOffset = local + 30 + localNameLength + localExtraLength
-    entries.set(name, new Uint8Array(buffer.buffer, buffer.byteOffset + dataOffset, uncompressedSize))
+    const data = new Uint8Array(buffer.buffer, buffer.byteOffset + dataOffset, compressedSize)
+    entries.set(name, { name, method, data, uncompressedSize })
 
     cursor += 46 + nameLength + extraLength + commentLength
     void compressedSize
@@ -53,14 +57,127 @@ export function readZipEntries(buffer: Uint8Array): Map<string, Uint8Array> {
 
 export function extractMxlContainer(data: Uint8Array): { fileName: string; xmlText: string } | null {
   const entries = readZipEntries(data)
-  const xmlEntry = [...entries.entries()]
-    .find(([name]) => name.toLowerCase().endsWith('.xml') || name.toLowerCase().endsWith('.musicxml'))
+  const xmlEntry = pickXmlEntry(entries)
   if (!xmlEntry) return null
+  if (xmlEntry[1].method !== 0) {
+    throw new Error(`MXL entry uses unsupported method ${xmlEntry[1].method}; use extractMxlContainerAsync`)
+  }
 
   return {
-    fileName: xmlEntry[0],
-    xmlText: new TextDecoder().decode(xmlEntry[1])
+    fileName: xmlEntry[1].name,
+    xmlText: new TextDecoder().decode(xmlEntry[1].data)
   }
+}
+
+export async function inflateEntry(entry: ZipEntryInfo): Promise<Uint8Array> {
+  if (entry.method === 0) {
+    return entry.data
+  }
+  if (entry.method !== 8) {
+    throw new Error(`Unsupported ZIP compression method ${entry.method}`)
+  }
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('当前环境不支持 DEFLATE 解压（DecompressionStream 不可用）')
+  }
+
+  const stream = new DecompressionStream('deflate')
+  const response = new Response(new Blob([new Uint8Array(entry.data)]).stream().pipeThrough(stream))
+  return new Uint8Array(await response.arrayBuffer())
+}
+
+export async function extractMxlContainerAsync(data: Uint8Array): Promise<{ fileName: string; xmlText: string } | null> {
+  const entries = readZipEntries(data)
+  const xmlEntry = pickXmlEntry(entries)
+  if (!xmlEntry) return null
+
+  const info = xmlEntry[1]
+  const xmlBytes = await inflateEntry(info)
+  return {
+    fileName: info.name,
+    xmlText: new TextDecoder().decode(xmlBytes)
+  }
+}
+
+function pickXmlEntry(entries: Map<string, ZipEntryInfo>): [string, ZipEntryInfo] | null {
+  const candidates = [...entries.entries()]
+    .filter(([name]) => name.toLowerCase().endsWith('.xml') || name.toLowerCase().endsWith('.musicxml'))
+  return candidates.find(([name]) => name.toLowerCase().endsWith('.musicxml'))
+    ?? candidates.find(([name]) => !name.toLowerCase().endsWith('container.xml'))
+    ?? candidates[0]
+    ?? null
+}
+
+function writeUint32(target: Uint8Array, offset: number, value: number): void {
+  target[offset] = value & 0xff
+  target[offset + 1] = (value >>> 8) & 0xff
+  target[offset + 2] = (value >>> 16) & 0xff
+  target[offset + 3] = (value >>> 24) & 0xff
+}
+
+function writeUint16(target: Uint8Array, offset: number, value: number): void {
+  target[offset] = value & 0xff
+  target[offset + 1] = (value >>> 8) & 0xff
+}
+
+function concatBytes(chunks: Uint8Array[]): Uint8Array {
+  const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+  const result = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    result.set(chunk, offset)
+    offset += chunk.length
+  }
+  return result
+}
+
+function buildZipEntries(
+  entries: Array<{ name: string; content: string }>,
+  method: number,
+  getCompressed: (content: Uint8Array, index: number) => Uint8Array
+): Uint8Array {
+  const parts: Uint8Array[] = []
+  const centralParts: Uint8Array[] = []
+  let offset = 0
+
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index]
+    const content = new TextEncoder().encode(entry.content)
+    const compressed = getCompressed(content, index)
+    const nameBytes = new TextEncoder().encode(entry.name)
+    const localHeader = new Uint8Array(30)
+    writeUint32(localHeader, 0, LOCAL_SIGNATURE)
+    writeUint16(localHeader, 4, 20)
+    writeUint16(localHeader, 8, 0)
+    writeUint16(localHeader, 10, method)
+    writeUint16(localHeader, 18, compressed.length)
+    writeUint16(localHeader, 22, content.length)
+    writeUint16(localHeader, 26, nameBytes.length)
+
+    const central = new Uint8Array(46)
+    writeUint32(central, 0, CENTRAL_SIGNATURE)
+    writeUint16(central, 4, 20)
+    writeUint16(central, 6, 20)
+    writeUint16(central, 10, method)
+    writeUint16(central, 20, compressed.length)
+    writeUint16(central, 24, content.length)
+    writeUint16(central, 28, nameBytes.length)
+    writeUint32(central, 42, offset)
+
+    parts.push(localHeader, nameBytes, compressed)
+    centralParts.push(central, nameBytes)
+    offset += 30 + nameBytes.length + compressed.length
+  }
+
+  const centralOffset = offset
+  const centralBuffer = concatBytes(centralParts)
+  const eocd = new Uint8Array(22)
+  writeUint32(eocd, 0, EOCD_SIGNATURE)
+  writeUint16(eocd, 8, entries.length)
+  writeUint16(eocd, 10, entries.length)
+  writeUint32(eocd, 12, centralBuffer.length)
+  writeUint32(eocd, 16, centralOffset)
+
+  return concatBytes([...parts, centralBuffer, eocd])
 }
 
 /**
@@ -68,46 +185,28 @@ export function extractMxlContainer(data: Uint8Array): { fileName: string; xmlTe
  * and fixtures; not a general archive writer.
  */
 export function createStoredZip(entries: Array<{ name: string; content: string }>): Uint8Array {
-  const parts: Buffer[] = []
-  const centralParts: Buffer[] = []
-  let offset = 0
+  return buildZipEntries(entries, 0, (content) => content)
+}
 
-  for (const entry of entries) {
-    const content = Buffer.from(entry.content, 'utf8')
-    const nameBuffer = Buffer.from(entry.name, 'utf8')
-    const localHeader = Buffer.alloc(30)
-    localHeader.writeUInt32LE(LOCAL_SIGNATURE, 0)
-    localHeader.writeUInt16LE(20, 4)
-    localHeader.writeUInt16LE(0, 8)
-    localHeader.writeUInt16LE(content.length, 18)
-    localHeader.writeUInt16LE(content.length, 22)
-    localHeader.writeUInt16LE(nameBuffer.length, 26)
-
-    const central = Buffer.alloc(46)
-    central.writeUInt32LE(CENTRAL_SIGNATURE, 0)
-    central.writeUInt16LE(20, 4)
-    central.writeUInt16LE(20, 6)
-    central.writeUInt16LE(0, 10)
-    central.writeUInt16LE(content.length, 20)
-    central.writeUInt16LE(content.length, 24)
-    central.writeUInt16LE(nameBuffer.length, 28)
-    central.writeUInt32LE(offset, 42)
-
-    parts.push(localHeader, nameBuffer, content)
-    centralParts.push(central, nameBuffer)
-    offset += 30 + nameBuffer.length + content.length
+/**
+ * Creates a DEFLATE-compressed ZIP archive. Used by tests to exercise the
+ * MXL deflate path without external dependencies.
+ */
+export async function createDeflatedZip(entries: Array<{ name: string; content: string }>): Promise<Uint8Array> {
+  const compress = async (content: Uint8Array): Promise<Uint8Array> => {
+    if (typeof CompressionStream === 'undefined') {
+      throw new Error('当前环境不支持 DEFLATE 压缩（CompressionStream 不可用）')
+    }
+    const stream = new CompressionStream('deflate')
+    const response = new Response(new Blob([new Uint8Array(content)]).stream().pipeThrough(stream))
+    return new Uint8Array(await response.arrayBuffer())
   }
 
-  const centralOffset = offset
-  const centralBuffer = Buffer.concat(centralParts)
-  const eocd = Buffer.alloc(22)
-  eocd.writeUInt32LE(EOCD_SIGNATURE, 0)
-  eocd.writeUInt16LE(entries.length, 8)
-  eocd.writeUInt16LE(entries.length, 10)
-  eocd.writeUInt32LE(centralBuffer.length, 12)
-  eocd.writeUInt32LE(centralOffset, 16)
-
-  return new Uint8Array(Buffer.concat([...parts, centralBuffer, eocd]))
+  const compressedByEntry: Uint8Array[] = []
+  for (const entry of entries) {
+    compressedByEntry.push(await compress(new TextEncoder().encode(entry.content)))
+  }
+  return buildZipEntries(entries, 8, (_, index) => compressedByEntry[index])
 }
 
 function findEocd(view: DataView): number {

@@ -5,56 +5,97 @@ import type {
   ScoreTimeline
 } from './musicXmlTypes'
 
+function voiceKey(note: ScoreNoteModel): string {
+  return `${note.voice}-s${note.staff}`
+}
+
 /**
- * Builds expected units from a score. Notes sharing the same onset (chord /
- * simultaneous voices) inside a measure are grouped into one unit; rests are
- * units that auto-advance; tie starts keep their pitch sounding.
+ * Builds expected units using integer score ticks (divisions * duration).
+ * - per-voice tick cursors handle independent voices;
+ * - <backup>/<forward> move cursors without emitting notes;
+ * - chord tones share the previous note's onset in the same voice;
+ * - multi-part measures merge by (measure number, onset tick) instead of
+ *   being serialized part-by-part.
  */
 export function buildScoreTimeline(score: ScoreDocument): ScoreTimeline {
-  const units: ScoreExpectedUnit[] = []
-  let onsetCounter = 0
+  const unitGroups = new Map<string, { expectedTick: number; notes: ScoreNoteModel[]; tieStart: boolean; rest: boolean }>()
 
   for (const part of score.parts) {
-    for (const measure of part.measures) {
-      const grouped = new Map<number, ScoreNoteModel[]>()
-      let currentOnset = -1
+    let measureStartTick = 0
 
-      for (const note of measure.notes) {
-        if (note.isGrace) continue
-        if (note.isChordTone) {
-          if (currentOnset < 0) currentOnset = onsetCounter
-        } else {
-          currentOnset = onsetCounter
-          onsetCounter += 1
+    for (const measure of part.measures) {
+      const voiceCursors = new Map<string, number>()
+      let lastNoteOnset: number | null = null
+
+      for (const event of measure.timeEvents) {
+        if (event.kind === 'backup') {
+          for (const [key, cursor] of voiceCursors) {
+            voiceCursors.set(key, Math.max(0, cursor - event.duration))
+          }
+          continue
         }
 
-        const list = grouped.get(currentOnset) ?? []
-        list.push(note)
-        grouped.set(currentOnset, list)
+        if (event.kind === 'forward') {
+          for (const [key, cursor] of voiceCursors) {
+            voiceCursors.set(key, cursor + event.duration)
+          }
+          continue
+        }
+
+        const note = measure.notes[event.noteIndex]
+        if (!note) continue
+
+        const key = voiceKey(note)
+        const cursor = voiceCursors.get(key) ?? 0
+        const onset: number = note.isChordTone
+          ? lastNoteOnset ?? cursor
+          : cursor
+
+        if (!note.isChordTone) {
+          voiceCursors.set(key, onset + note.duration)
+          lastNoteOnset = onset
+        }
+
+        const unitKey = `${measure.number}:${onset}`
+        const group = unitGroups.get(unitKey) ?? {
+          expectedTick: measureStartTick + onset,
+          notes: [],
+          tieStart: false,
+          rest: true
+        }
+        group.notes.push(note)
+        group.tieStart = group.tieStart || note.tie === 'start'
+        group.rest = group.rest && note.type === 'rest'
+        unitGroups.set(unitKey, group)
       }
 
-      const onsets = [...grouped.keys()].sort((left, right) => left - right)
-
-      for (const onset of onsets) {
-        const notes = grouped.get(onset) ?? []
-        const expectedMidi = notes
-          .filter((note) => note.type === 'note' && note.midiNumber !== null && note.tie !== 'stop' && note.tie !== 'continue')
-          .map((note) => note.midiNumber as number)
-          .sort((left, right) => left - right)
-        const rest = notes.every((note) => note.type === 'rest')
-        const tieStart = notes.some((note) => note.tie === 'start')
-
-        units.push({
-          id: `${part.id}-m${measure.number}-o${onset}`,
-          onsetIndex: onset,
-          notes,
-          tieStart,
-          rest,
-          expectedMidi: [...new Set(expectedMidi)]
-        })
-      }
+      const measureLength = Math.max(
+        0,
+        ...voiceCursors.values()
+      )
+      measureStartTick += measureLength
     }
   }
+
+  const units: ScoreExpectedUnit[] = [...unitGroups.entries()]
+    .map(([unitKey, group]) => {
+      const expectedMidi = group.notes
+        .filter((note) => note.type === 'note' && note.midiNumber !== null && note.tie !== 'stop' && note.tie !== 'continue')
+        .map((note) => note.midiNumber as number)
+        .sort((left, right) => left - right)
+
+      return {
+        id: `unit-${unitKey}`,
+        onsetIndex: 0,
+        expectedTick: group.expectedTick,
+        notes: group.notes,
+        tieStart: group.tieStart,
+        rest: group.rest,
+        expectedMidi: [...new Set(expectedMidi)]
+      }
+    })
+    .sort((left, right) => left.expectedTick - right.expectedTick)
+    .map((unit, index) => ({ ...unit, onsetIndex: index }))
 
   return { units }
 }

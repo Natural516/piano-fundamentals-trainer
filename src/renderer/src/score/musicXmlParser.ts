@@ -48,6 +48,7 @@ function parseMeasure(element: XmlElement): ScoreMeasure {
     number: Number(element.attributes.number) || 0,
     implicit: element.attributes.implicit === 'yes',
     notes: [],
+    timeEvents: [],
     keySignature: null,
     timeBeats: null,
     timeBeatType: null,
@@ -82,12 +83,28 @@ function parseMeasure(element: XmlElement): ScoreMeasure {
 
     if (child.tag === 'note') {
       const note = parseNote(child, measure.notes.length)
-      if (note) measure.notes.push(note)
+      if (note) {
+        measure.timeEvents.push({ kind: 'note', noteIndex: measure.notes.length })
+        measure.notes.push(note)
+      }
       continue
     }
 
-    // backup/forward are ignored: the timeline groups notes by onset order
-    // within each measure, which is sufficient for the Wait practice subset.
+    if (child.tag === 'backup') {
+      const duration = childNumber(child, 'duration')
+      if (duration !== null) {
+        measure.timeEvents.push({ kind: 'backup', duration })
+      }
+      continue
+    }
+
+    if (child.tag === 'forward') {
+      const duration = childNumber(child, 'duration')
+      if (duration !== null) {
+        measure.timeEvents.push({ kind: 'forward', duration })
+      }
+      continue
+    }
   }
 
   return measure

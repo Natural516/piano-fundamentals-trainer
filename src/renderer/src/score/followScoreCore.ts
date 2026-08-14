@@ -3,7 +3,7 @@ import type { ScoreExpectedUnit, ScoreTimeline } from './musicXmlTypes'
 interface FollowCandidate {
   index: number
   cost: number
-  lastMatchedIndex: number
+  pressed: number[]
 }
 
 export interface FollowStepResult {
@@ -13,6 +13,7 @@ export interface FollowStepResult {
 
 export interface FollowCoreOptions {
   beatDurationMs?: number
+  msPerTick?: number
   timeCostWeight?: number
   pitchCost?: number
   skipCost?: number
@@ -20,26 +21,28 @@ export interface FollowCoreOptions {
 }
 
 /**
- * Follow-Me alignment: a small beam of position candidates is advanced by each
- * observed note. Candidates that match the current unit get low cost; wrong
- * notes, skips and time drift add cost. The best candidate wins, so stopping,
- * slight slow/fast, one skipped note or one extra note do not permanently
- * misalign the piece.
+ * Follow-Me alignment:
+ * - a chord unit advances only when the FULL expected pitch set has been
+ *   played (partial chords accumulate without advancing);
+ * - rest / tie-only units auto-skip so they never deadlock;
+ * - wrong/extra notes cost but stay; a skip candidate recovers position;
+ * - reset clears every candidate and recorded result.
  */
 export class FollowScoreCore {
   private readonly units: ScoreExpectedUnit[]
-  private readonly beatDurationMs: number
+  private readonly msPerTick: number
   private readonly timeCostWeight: number
   private readonly pitchCost: number
   private readonly skipCost: number
   private readonly beamSize: number
-  private candidates: FollowCandidate[] = [{ index: 0, cost: 0, lastMatchedIndex: -1 }]
+  private candidates: FollowCandidate[] = [{ index: 0, cost: 0, pressed: [] }]
   private readonly stepResults: FollowStepResult[] = []
+  private readonly recordedUnitIds = new Set<string>()
   private complete = false
 
   constructor(timeline: ScoreTimeline, options: FollowCoreOptions = {}) {
     this.units = timeline.units
-    this.beatDurationMs = options.beatDurationMs ?? 500
+    this.msPerTick = options.msPerTick ?? options.beatDurationMs ?? 500
     this.timeCostWeight = options.timeCostWeight ?? 0.6
     this.pitchCost = options.pitchCost ?? 2
     this.skipCost = options.skipCost ?? 3
@@ -55,7 +58,8 @@ export class FollowScoreCore {
   }
 
   get currentUnit(): ScoreExpectedUnit | null {
-    return this.complete ? null : this.units[Math.min(...this.candidates.map((candidate) => candidate.index))] ?? null
+    if (this.complete || this.candidates.length === 0) return null
+    return this.units[Math.min(...this.candidates.map((candidate) => candidate.index))] ?? null
   }
 
   get results(): FollowStepResult[] {
@@ -63,8 +67,9 @@ export class FollowScoreCore {
   }
 
   reset(): void {
-    this.candidates = [{ index: 0, cost: 0, lastMatchedIndex: -1 }]
+    this.candidates = [{ index: 0, cost: 0, pressed: [] }]
     this.stepResults.length = 0
+    this.recordedUnitIds.clear()
     this.complete = false
   }
 
@@ -75,33 +80,53 @@ export class FollowScoreCore {
     let advanced = false
 
     for (const candidate of this.candidates) {
-      const unit = this.units[candidate.index]
-      if (!unit) continue
+      let working = { ...candidate, pressed: [...candidate.pressed] }
+      working = this.skipAutoUnits(working)
 
-      const expectedTime = unit.onsetIndex * this.beatDurationMs
+      const unit = this.units[working.index]
+      if (!unit) {
+        nextCandidates.push(working)
+        continue
+      }
+
+      const expectedTime = unit.expectedTick * this.msPerTick
       const timeCost = Math.abs(elapsedMs - expectedTime) * this.timeCostWeight
 
       if (unit.expectedMidi.includes(midiNumber)) {
-        const nextIndex = candidate.index + 1
-        nextCandidates.push({
-          index: nextIndex,
-          cost: candidate.cost + timeCost,
-          lastMatchedIndex: candidate.index
-        })
-        advanced = true
-      } else {
-        // Wrong note for the current unit: record cost but stay.
-        nextCandidates.push({ ...candidate, cost: candidate.cost + this.pitchCost })
-        // Alternative: skip this unit and try matching the next one.
-        const nextUnit = this.units[candidate.index + 1]
-        if (nextUnit && nextUnit.expectedMidi.includes(midiNumber)) {
-          nextCandidates.push({
-            index: candidate.index + 2,
-            cost: candidate.cost + this.skipCost + timeCost,
-            lastMatchedIndex: candidate.index + 1
-          })
+        const pressed = Array.from(new Set([...working.pressed, midiNumber]))
+        const satisfied = unit.expectedMidi.every((note) => pressed.includes(note))
+
+        if (satisfied) {
+          this.recordCorrect(unit, working.index)
+          nextCandidates.push({ index: working.index + 1, cost: working.cost + timeCost, pressed: [] })
+          advanced = true
+        } else {
+          // Partial chord: accumulate without advancing.
+          nextCandidates.push({ ...working, pressed, cost: working.cost + timeCost * 0.4 })
           advanced = true
         }
+        continue
+      }
+
+      // Wrong/extra note: stay with a pitch cost.
+      nextCandidates.push({ ...working, cost: working.cost + this.pitchCost })
+      // Alternative: skip this unit and try the next one.
+      const skipped = this.skipAutoUnits({ index: working.index + 1, cost: working.cost + this.skipCost + timeCost, pressed: [] })
+      const nextUnit = this.units[skipped.index]
+      if (nextUnit && nextUnit.expectedMidi.includes(midiNumber)) {
+        const pressed = [midiNumber]
+        const satisfied = nextUnit.expectedMidi.every((note) => pressed.includes(note))
+        if (satisfied) {
+          this.recordCorrect(nextUnit, skipped.index)
+          nextCandidates.push({ index: skipped.index + 1, cost: skipped.cost, pressed: [] })
+          advanced = true
+        } else {
+          nextCandidates.push({ ...skipped, pressed, cost: skipped.cost + timeCost * 0.4 })
+          advanced = true
+        }
+      } else if (nextUnit) {
+        nextCandidates.push(skipped)
+        advanced = true
       }
     }
 
@@ -111,19 +136,6 @@ export class FollowScoreCore {
       .sort((left, right) => left.cost - right.cost)
       .slice(0, this.beamSize)
 
-    const best = this.candidates[0]
-    if (best.lastMatchedIndex > this.lastRecordedIndex) {
-      for (let index = this.lastRecordedIndex + 1; index <= best.lastMatchedIndex; index += 1) {
-        const unit = this.units[index]
-        if (!unit) continue
-        this.stepResults.push({
-          unitId: unit.id,
-          outcome: index === best.lastMatchedIndex ? 'correct' : 'skip'
-        })
-      }
-      this.lastRecordedIndex = best.lastMatchedIndex
-    }
-
     if (this.candidates.some((candidate) => candidate.index >= this.units.length)) {
       this.complete = true
       return 'complete'
@@ -132,5 +144,28 @@ export class FollowScoreCore {
     return advanced ? 'correct' : 'wrong'
   }
 
-  private lastRecordedIndex = -1
+  private skipAutoUnits(candidate: FollowCandidate): FollowCandidate {
+    let working = candidate
+    while (working.index < this.units.length) {
+      const unit = this.units[working.index]
+      if (!unit.rest && unit.expectedMidi.length > 0) break
+      this.recordSkip(unit, working.index)
+      working = { ...working, index: working.index + 1, pressed: [] }
+    }
+    return working
+  }
+
+  private recordCorrect(unit: ScoreExpectedUnit, index: number): void {
+    const unitId = unit?.id ?? `unit-${index}`
+    if (this.recordedUnitIds.has(unitId)) return
+    this.recordedUnitIds.add(unitId)
+    this.stepResults.push({ unitId, outcome: 'correct' })
+  }
+
+  private recordSkip(unit: ScoreExpectedUnit, index: number): void {
+    const unitId = unit?.id ?? `unit-${index}`
+    if (this.recordedUnitIds.has(unitId)) return
+    this.recordedUnitIds.add(unitId)
+    this.stepResults.push({ unitId, outcome: 'skip' })
+  }
 }

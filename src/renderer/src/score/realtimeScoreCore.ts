@@ -9,6 +9,7 @@ export interface RealtimeStepResult {
 export interface RealtimeCoreOptions {
   toleranceMs?: number
   beatDurationMs?: number
+  msPerTick?: number
   skipWindowMs?: number
 }
 
@@ -23,6 +24,7 @@ export class RealtimeScoreCore {
   private readonly units: ScoreExpectedUnit[]
   private readonly toleranceMs: number
   private readonly beatDurationMs: number
+  private readonly msPerTick: number
   private readonly skipWindowMs: number
   private index = 0
   private pressed = new Set<number>()
@@ -32,6 +34,7 @@ export class RealtimeScoreCore {
     this.units = timeline.units
     this.toleranceMs = options.toleranceMs ?? 180
     this.beatDurationMs = options.beatDurationMs ?? 500
+    this.msPerTick = options.msPerTick ?? this.beatDurationMs
     this.skipWindowMs = options.skipWindowMs ?? this.toleranceMs * 2
   }
 
@@ -121,7 +124,7 @@ export class RealtimeScoreCore {
   }
 
   private expectedTimeFor(unit: ScoreExpectedUnit): number {
-    return unit.onsetIndex * this.beatDurationMs
+    return unit.expectedTick * this.msPerTick
   }
 
   private unitSatisfied(unit: ScoreExpectedUnit): boolean {

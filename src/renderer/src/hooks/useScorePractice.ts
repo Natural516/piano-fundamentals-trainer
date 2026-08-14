@@ -39,13 +39,23 @@ export function useScorePractice(
   mode: ScorePracticeMode = 'wait'
 ): UseScorePracticeResult {
   const timeline = useMemo(() => (score ? buildScoreTimeline(score) : { units: [] }), [score])
+  const msPerTick = useMemo(() => {
+    if (!score) return 500
+    const divisions = score.parts[0]?.measures.find((measure) => measure.divisions !== null)?.divisions ?? 1
+    const bpm = score.defaultTempoBpm ?? 60
+    return 60000 / Math.max(1, bpm) / Math.max(1, divisions ?? 1)
+  }, [score])
   const waitCoreRef = useRef<WaitScoreCore | null>(null)
   const realtimeCoreRef = useRef<RealtimeScoreCore | null>(null)
   const followCoreRef = useRef<FollowScoreCore | null>(null)
 
   if (waitCoreRef.current === null) waitCoreRef.current = new WaitScoreCore(timeline)
-  if (realtimeCoreRef.current === null) realtimeCoreRef.current = new RealtimeScoreCore(timeline)
-  if (followCoreRef.current === null) followCoreRef.current = new FollowScoreCore(timeline)
+  if (realtimeCoreRef.current === null) {
+    realtimeCoreRef.current = new RealtimeScoreCore(timeline, { beatDurationMs: 500, msPerTick })
+  }
+  if (followCoreRef.current === null) {
+    followCoreRef.current = new FollowScoreCore(timeline, { beatDurationMs: 500, msPerTick })
+  }
 
   const [status, setStatus] = useState<'idle' | 'running' | 'finished'>('idle')
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -56,17 +66,18 @@ export function useScorePractice(
   statusRef.current = status
   const startTimeRef = useRef(0)
   const tickerRef = useRef<number | null>(null)
+  const lastEventIdRef = useRef<number | null>(null)
 
   useEffect(() => {
     waitCoreRef.current = new WaitScoreCore(timeline)
-    realtimeCoreRef.current = new RealtimeScoreCore(timeline)
-    followCoreRef.current = new FollowScoreCore(timeline)
+    realtimeCoreRef.current = new RealtimeScoreCore(timeline, { beatDurationMs: 500, msPerTick })
+    followCoreRef.current = new FollowScoreCore(timeline, { beatDurationMs: 500, msPerTick })
     setCurrentIndex(0)
     setResults([])
     setFeedback(null)
     setElapsedMs(0)
     setStatus('idle')
-  }, [timeline])
+  }, [msPerTick, timeline])
 
   const sync = useCallback(() => {
     const core = mode === 'wait'
@@ -132,6 +143,8 @@ export function useScorePractice(
 
   useMidiEventSubscription((event) => {
     if (statusRef.current !== 'running' || event.type !== 'noteOn' || typeof event.midiNumber !== 'number') return
+    if (lastEventIdRef.current !== null && event.id <= lastEventIdRef.current) return
+    lastEventIdRef.current = event.id
     const midiNumber = event.midiNumber
 
     if (mode === 'wait') {

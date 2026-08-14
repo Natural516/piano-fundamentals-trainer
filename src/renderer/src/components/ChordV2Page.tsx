@@ -9,6 +9,7 @@ import { PracticeReportModal } from './PracticeReportModal'
 import { PracticeSettingsDrawer } from './PracticeSettingsDrawer'
 import { PracticeStatBar } from './PracticeStatBar'
 import { ProgressionPracticePanel } from './ProgressionPracticePanel'
+import { isExperimentalFeatureVisible } from '../featureFlags'
 
 interface ChordV2PageProps {
   activeNotes: ActiveMidiNote[]
@@ -43,6 +44,7 @@ export function ChordV2Page({
   const [draftJudgeMode, setDraftJudgeMode] = useState<ChordV2JudgeMode>(chord.judgeMode)
   const [draftInversionMode, setDraftInversionMode] = useState<ChordV2InversionMode>(chord.inversionMode)
   const [draftTexture, setDraftTexture] = useState<ChordV2Texture>(chord.texture)
+  const [draftSpacing, setDraftSpacing] = useState<'close' | 'open'>(chord.spacing)
   const [draftDifficulty, setDraftDifficulty] = useState<ChordV2Difficulty>(chord.difficulty)
   const [draftQuestionCount, setDraftQuestionCount] = useState(chord.questionCount)
   const pausedForExitRef = useRef(false)
@@ -71,6 +73,7 @@ export function ChordV2Page({
     setDraftJudgeMode(chord.judgeMode)
     setDraftInversionMode(chord.inversionMode)
     setDraftTexture(chord.texture)
+    setDraftSpacing(chord.spacing)
     setDraftDifficulty(chord.difficulty)
     setDraftQuestionCount(chord.questionCount)
     setSettingsOpen(true)
@@ -80,6 +83,7 @@ export function ChordV2Page({
     chord.setJudgeMode(draftJudgeMode)
     chord.setInversionMode(draftInversionMode)
     chord.setTexture(draftTexture)
+    chord.setSpacing(draftSpacing)
     chord.setDifficulty(draftDifficulty)
     chord.setQuestionCount(draftQuestionCount)
     setSettingsOpen(false)
@@ -99,10 +103,12 @@ export function ChordV2Page({
       />
 
       <div className="practice-single-column">
-        <div className="practice-content-toggle">
-          <button className={content === 'chord' ? 'is-active' : ''} type="button" onClick={() => setContent('chord')}>单和弦</button>
-          <button className={content === 'progression' ? 'is-active' : ''} type="button" onClick={() => setContent('progression')}>进行训练</button>
-        </div>
+        {isExperimentalFeatureVisible('FEATURE_EXPERIMENTAL_HARMONY_GENERATOR') ? (
+          <div className="practice-content-toggle">
+            <button className={content === 'chord' ? 'is-active' : ''} type="button" onClick={() => setContent('chord')}>单和弦</button>
+            <button className={content === 'progression' ? 'is-active' : ''} type="button" onClick={() => setContent('progression')}>进行训练（Experimental）</button>
+          </div>
+        ) : null}
 
         {content === 'progression' ? (
           <ProgressionPracticePanel
@@ -192,6 +198,10 @@ export function ChordV2Page({
               {option.label}
             </button>
           ))}
+        </div></div>
+        <div className="tolerance-control"><span>声部疏密</span><div className="segmented-control">
+          <button className={draftSpacing === 'close' ? 'is-active' : ''} disabled={chord.isRunning} type="button" onClick={() => setDraftSpacing('close')}>密集</button>
+          <button className={draftSpacing === 'open' ? 'is-active' : ''} disabled={chord.isRunning} type="button" onClick={() => setDraftSpacing('open')}>开放</button>
         </div></div>
         <div className="tolerance-control"><span>难度</span><div className="segmented-control chord-v2-difficulty">
           {([1, 2, 3, 4, 5, 6, 7] as ChordV2Difficulty[]).map((level) => (

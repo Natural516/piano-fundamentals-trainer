@@ -77,7 +77,11 @@ export const STANDARD_SYMBOL_QUALITIES: Array<{ symbol: string; quality: ChordV2
   { symbol: 'C6/9', quality: '6/9' }
 ]
 
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+const NOTE_NAMES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+const NOTE_NAMES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
+const NOTE_NAME_TO_PITCH_CLASS: Record<string, number> = {}
+NOTE_NAMES_SHARP.forEach((name, index) => { NOTE_NAME_TO_PITCH_CLASS[name] = index })
+NOTE_NAMES_FLAT.forEach((name, index) => { NOTE_NAME_TO_PITCH_CLASS[name] = index })
 const QUALITY_SYMBOL_SUFFIX: Record<ChordV2Quality, string> = {
   major: '',
   minor: 'm',
@@ -99,10 +103,16 @@ const QUALITY_SYMBOL_SUFFIX: Record<ChordV2Quality, string> = {
   '6/9': '6/9'
 }
 
-export function formatChordSymbol(rootPitchClass: number, quality: ChordV2Quality, slashBass?: number): string {
+export function formatChordSymbol(
+  rootPitchClass: number,
+  quality: ChordV2Quality,
+  slashBass?: number,
+  spelling: 'sharp' | 'flat' = 'sharp'
+): string {
   const normalizedRoot = ((rootPitchClass % 12) + 12) % 12
-  const base = `${NOTE_NAMES[normalizedRoot]}${QUALITY_SYMBOL_SUFFIX[quality]}`
-  return typeof slashBass === 'number' ? `${base}/${NOTE_NAMES[((slashBass % 12) + 12) % 12]}` : base
+  const names = spelling === 'flat' ? NOTE_NAMES_FLAT : NOTE_NAMES_SHARP
+  const base = `${names[normalizedRoot]}${QUALITY_SYMBOL_SUFFIX[quality]}`
+  return typeof slashBass === 'number' ? `${base}/${names[((slashBass % 12) + 12) % 12]}` : base
 }
 
 export function parseChordSymbol(symbol: string): { rootPitchClass: number; quality: ChordV2Quality; slashBass: number | null } | null {
@@ -110,8 +120,8 @@ export function parseChordSymbol(symbol: string): { rootPitchClass: number; qual
   const noteMatch = trimmed.match(/^([A-G](?:#|b)?)(.*)$/)
   if (!noteMatch) return null
 
-  const rootIndex = NOTE_NAMES.indexOf(noteMatch[1])
-  if (rootIndex < 0) return null
+  const rootIndex = NOTE_NAME_TO_PITCH_CLASS[noteMatch[1]]
+  if (typeof rootIndex !== 'number') return null
 
   const suffix = noteMatch[2]
   const fullEntry = STANDARD_SYMBOL_QUALITIES.find((candidate) =>
@@ -134,9 +144,9 @@ export function parseChordSymbol(symbol: string): { rootPitchClass: number; qual
     const slashMatch = slashPart.match(/^([A-G](?:#|b)?)$/)
     if (!baseMatch || !slashMatch) return null
 
-    const baseRoot = NOTE_NAMES.indexOf(baseMatch[1])
-    const slashRoot = NOTE_NAMES.indexOf(slashMatch[1])
-    if (baseRoot < 0 || slashRoot < 0) return null
+    const baseRoot = NOTE_NAME_TO_PITCH_CLASS[baseMatch[1]]
+    const slashRoot = NOTE_NAME_TO_PITCH_CLASS[slashMatch[1]]
+    if (typeof baseRoot !== 'number' || typeof slashRoot !== 'number') return null
 
     const baseEntry = STANDARD_SYMBOL_QUALITIES.find((candidate) =>
       candidate.symbol.replace(/^C/, '') === baseMatch[2]

@@ -2,8 +2,12 @@ import { midiNumberToFrequency } from '../utils/audioNotes'
 import { getVelocityGain, selectSampleAndRate } from './samplePackLoader'
 import type { PianoSamplerStatus, SampleAnchor, SelectedSample } from './pianoAudioTypes'
 import {
-  collectSustainedVoices,
+  createPedalVoiceState,
   pickVoiceToSteal,
+  pedalAllNotesOff,
+  pedalKeyDown,
+  pedalKeyUp,
+  pedalPedalUp,
   type VoiceDescriptor
 } from './voicePolicy'
 
@@ -104,6 +108,7 @@ export class PianoSampler {
   private samplePackLoaded = false
   private nextVoiceId = 1
   private volume = 70
+  private pedalDown = false
 
   constructor(audioContext: AudioContext, options: PianoSamplerOptions = {}) {
     this.audioContext = audioContext
@@ -162,8 +167,7 @@ export class PianoSampler {
     const descriptor: VoiceDescriptor = {
       id: this.nextVoiceId++,
       midiNumber,
-      released: false,
-      sustained: false,
+      ...pedalKeyDown(createPedalVoiceState()),
       startedAt: this.audioContext.currentTime
     }
     const selected = selectSampleAndRate(this.anchors, midiNumber)
@@ -218,40 +222,50 @@ export class PianoSampler {
 
   noteOff(midiNumber: number): void {
     const voice = this.voices.get(midiNumber)
-    if (!voice || voice.descriptor.released || voice.descriptor.sustained) return
+    if (!voice || voice.descriptor.released || !voice.descriptor.physicalKeyDown) return
 
-    voice.descriptor.released = true
-    voice.release(220)
-    this.voices.delete(midiNumber)
+    const next = pedalKeyUp(voice.descriptor, this.pedalDown)
+    voice.descriptor = { ...voice.descriptor, ...next }
+
+    if (next.released) {
+      voice.release(220)
+      this.voices.delete(midiNumber)
+    }
   }
 
   setSustain(down: boolean): void {
+    this.pedalDown = down
+
     if (down) {
-      for (const voice of this.voices.values()) {
-        if (!voice.descriptor.released) {
-          voice.descriptor.sustained = true
-        }
-      }
       return
     }
 
-    const sustained = collectSustainedVoices([...this.voices.values()].map((voice) => voice.descriptor))
-    for (const descriptor of sustained) {
-      const voice = this.voices.get(descriptor.midiNumber)
-      if (!voice) continue
-      voice.descriptor.sustained = false
-      voice.descriptor.released = true
-      voice.release(260)
-      this.voices.delete(descriptor.midiNumber)
+    for (const voice of [...this.voices.values()]) {
+      const next = pedalPedalUp(voice.descriptor)
+      voice.descriptor = { ...voice.descriptor, ...next }
+      if (next.released) {
+        voice.release(260)
+        this.voices.delete(voice.descriptor.midiNumber)
+      }
     }
   }
 
   allNotesOff(): void {
     for (const voice of this.voices.values()) {
-      voice.descriptor.released = true
+      const next = pedalAllNotesOff(voice.descriptor)
+      voice.descriptor = { ...voice.descriptor, ...next }
       voice.release(180)
     }
     this.voices.clear()
+  }
+
+  panic(): void {
+    this.allNotesOff()
+    this.pedalDown = false
+  }
+
+  get isPedalDown(): boolean {
+    return this.pedalDown
   }
 
   setVolume(volume: number): void {
@@ -296,6 +310,7 @@ export class PianoSampler {
     this.buffers.clear()
     this.anchors = []
     this.samplePackLoaded = false
+    this.pedalDown = false
     try {
       this.masterGain.disconnect()
     } catch {

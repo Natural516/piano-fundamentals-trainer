@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChordV2Difficulty, ChordV2InversionMode, ChordV2JudgeMode, ChordV2Quality, ChordV2Texture, VoicingSpec } from '../chordV2/chordV2Types'
 import { CHORD_V2_DIFFICULTY_QUALITIES, type ChordV2Result } from '../chordV2/chordV2Types'
-import { getChordV2Identity, formatChordSymbol, getQualityDefinition } from '../chordV2/chordIdentity'
+import { getChordV2Identity, formatChordSymbol } from '../chordV2/chordIdentity'
 import { createArpeggioSequence, judgeVoicing, normalizeNotes, ArpeggioStateMachine, createDefaultVoicing } from '../chordV2/voicing'
+import { getBassCandidates, validateVoicing } from '../chordV2/chordValidator'
 import { useMidiEventSubscription } from './useMidiEvents'
 
 type ChordV2Status = 'idle' | 'running' | 'finished'
@@ -45,6 +46,8 @@ export interface UseChordV2PracticeResult {
   setInversionMode: (mode: ChordV2InversionMode) => void
   texture: ChordV2Texture
   setTexture: (texture: ChordV2Texture) => void
+  spacing: 'close' | 'open'
+  setSpacing: (spacing: 'close' | 'open') => void
   difficulty: ChordV2Difficulty
   setDifficulty: (difficulty: ChordV2Difficulty) => void
   currentQuestion: ChordV2Question | null
@@ -70,23 +73,22 @@ function createQuestion(
   judgeMode: ChordV2JudgeMode,
   inversionMode: ChordV2InversionMode,
   texture: ChordV2Texture,
+  spacing: 'close' | 'open',
   index: number
 ): ChordV2Question {
   const quality = pickRandom(CHORD_V2_DIFFICULTY_QUALITIES[difficulty])
   const root = Math.floor(Math.random() * 12)
   const identity = getChordV2Identity(root, quality)
-  const definition = getQualityDefinition(quality)
-  const inversionNotes = definition.intervals.slice(1)
-  const inversionModeActive = judgeMode === 'inversion' && inversionMode !== 'root'
-  const bassConstraint = inversionModeActive && inversionNotes.length > 0
-    ? (root + pickRandom(inversionNotes)) % 12
+  const inversionCandidates = getBassCandidates(root, quality, inversionMode)
+  const bassConstraint = judgeMode === 'inversion' && inversionCandidates.length > 0
+    ? (root + pickRandom(inversionCandidates)) % 12
     : root
   const registerLowest = judgeMode === 'identity' ? 48 + Math.floor(Math.random() * 12) : 48
   const voicing = createDefaultVoicing(identity, {
     registerLowest,
     registerHighest: 84,
-    bassConstraint: inversionMode === 'inversions' ? bassConstraint : (inversionMode === 'root' ? root : bassConstraint),
-    spacing: texture === 'arpeggio' ? 'close' : 'close'
+    bassConstraint,
+    spacing
   })
   const activeTexture = texture === 'composite' ? (index % 2 === 0 ? 'block' : 'arpeggio') : texture
 
@@ -100,6 +102,46 @@ function createQuestion(
     arpeggioSequence: activeTexture === 'arpeggio'
       ? createArpeggioSequence(voicing, 'up')
       : null
+  }
+}
+
+/**
+ * Fail-closed question creation: every voicing must pass the Chord Identity
+ * validator before entering UI/playback/judgment. If generation fails after
+ * retries, a deterministic root-position close voicing is used instead of
+ * ever presenting an invalid target.
+ */
+function createValidatedQuestion(
+  difficulty: ChordV2Difficulty,
+  judgeMode: ChordV2JudgeMode,
+  inversionMode: ChordV2InversionMode,
+  texture: ChordV2Texture,
+  spacing: 'close' | 'open',
+  index: number
+): ChordV2Question {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const question = createQuestion(difficulty, judgeMode, inversionMode, texture, spacing, index)
+    if (validateVoicing(question.identity, question.voicing).valid) {
+      return question
+    }
+  }
+
+  const quality = (CHORD_V2_DIFFICULTY_QUALITIES[difficulty] ?? ['major'])[0]
+  const identity = getChordV2Identity(0, quality)
+  const voicing = createDefaultVoicing(identity, {
+    registerLowest: 48,
+    registerHighest: 84,
+    bassConstraint: 0,
+    spacing: 'close'
+  })
+  return {
+    id: `chord-v2-${index}-0-${quality}`,
+    symbol: formatChordSymbol(0, quality),
+    identity,
+    voicing,
+    judgeMode,
+    texture: texture === 'composite' ? 'block' : texture,
+    arpeggioSequence: null
   }
 }
 
@@ -125,6 +167,7 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
   const [judgeMode, setJudgeModeState] = useState<ChordV2JudgeMode>('identity')
   const [inversionMode, setInversionModeState] = useState<ChordV2InversionMode>('all')
   const [texture, setTextureState] = useState<ChordV2Texture>('block')
+  const [spacing, setSpacingState] = useState<'close' | 'open'>('close')
   const [difficulty, setDifficultyState] = useState<ChordV2Difficulty>(1)
   const [currentQuestion, setCurrentQuestion] = useState<ChordV2Question | null>(null)
   const [feedback, setFeedback] = useState<ChordV2Feedback | null>(null)
@@ -197,8 +240,8 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
       return
     }
 
-    setCurrentQuestion(createQuestion(difficulty, judgeMode, inversionMode, texture, questionIndexRef.current))
-  }, [difficulty, inversionMode, judgeMode, questionCount, texture])
+    setCurrentQuestion(createValidatedQuestion(difficulty, judgeMode, inversionMode, texture, spacing, questionIndexRef.current))
+  }, [difficulty, inversionMode, judgeMode, questionCount, spacing, texture])
 
   const evaluateBlock = useCallback(() => {
     blockTimerRef.current = null
@@ -230,8 +273,8 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
     setStatus('running')
     setFeedback(null)
     setInputNotes([])
-    setCurrentQuestion(createQuestion(difficulty, judgeMode, inversionMode, texture, 0))
-  }, [clearTimers, difficulty, inversionMode, judgeMode, texture])
+    setCurrentQuestion(createValidatedQuestion(difficulty, judgeMode, inversionMode, texture, spacing, 0))
+  }, [clearTimers, difficulty, inversionMode, judgeMode, spacing, texture])
 
   const stop = useCallback(() => {
     clearTimers()
@@ -312,6 +355,11 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
     setTextureState(nextTexture)
   }, [])
 
+  const setSpacing = useCallback((nextSpacing: 'close' | 'open') => {
+    if (statusRef.current === 'running') return
+    setSpacingState(nextSpacing)
+  }, [])
+
   const setDifficulty = useCallback((nextDifficulty: ChordV2Difficulty) => {
     if (statusRef.current === 'running') return
     setDifficultyState(nextDifficulty)
@@ -327,6 +375,8 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
     setInversionMode,
     texture,
     setTexture,
+    spacing,
+    setSpacing,
     difficulty,
     setDifficulty,
     currentQuestion,

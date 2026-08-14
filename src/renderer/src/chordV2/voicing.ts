@@ -48,23 +48,33 @@ export function createDefaultVoicing(identity: ChordV2Identity, options: Voicing
     cursor = candidate
   }
 
-  // Doubling: add root an octave above the top to reach 4 voices for triads.
+  // Doubling: add chord tones only (never derived by fixed intervals).
   const voiceCount = requiredPitchClasses.length >= 4 ? requiredPitchClasses.length : 4
   while (notes.length < voiceCount) {
     const top = notes[notes.length - 1]
-    const doubled = top + 12 - (identity.requiredPitchClasses.length === 3 ? 7 : 5)
+    const candidates = identity.requiredPitchClasses
+      .map((pc) => top + ((pc - pitchClass(top) + 12) % 12))
+      .sort((left, right) => left - right)
+    const doubled = candidates.find((candidate) => candidate > top && candidate <= highest)
+      ?? candidates.map((candidate) => candidate - 12).find((candidate) => candidate > (notes[0] ?? lowest - 1))
+    if (doubled === undefined) {
+      break
+    }
     notes.push(doubled)
   }
 
-  if (spacing === 'open') {
-    // Simple open-voicing heuristic: lower the middle voices by an octave when possible.
-    const opened = [notes[0]]
-    for (let index = 1; index < notes.length - 1; index += 1) {
-      const lowered = notes[index] - 12
-      opened.push(lowered > opened[opened.length - 1] ? lowered : notes[index])
+  if (spacing === 'open' && notes.length >= 3) {
+    // Open voicing: raise the second-lowest voice by an octave (still a chord
+    // tone), or lower the top voice when the range forbids raising.
+    const raised = notes[1] + 12
+    if (raised <= highest && raised > notes[0]) {
+      notes[1] = raised
+    } else {
+      const lowered = notes[notes.length - 1] - 12
+      if (lowered > notes[0]) {
+        notes[notes.length - 1] = lowered
+      }
     }
-    opened.push(notes[notes.length - 1])
-    notes.splice(0, notes.length, ...opened)
   }
 
   const finalNotes = normalizeNotes(notes.filter((note) => note >= lowest && note <= highest))

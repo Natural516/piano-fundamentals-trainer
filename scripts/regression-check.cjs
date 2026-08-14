@@ -53,6 +53,9 @@ const musicAi = require('../src/renderer/src/ai/musicAi.ts')
 const backup = require('../src/renderer/src/storage/backup.ts')
 const firstRun = require('../src/renderer/src/storage/firstRun.ts')
 const appInfo = require('../src/renderer/src/appInfo.ts')
+const chordValidator = require('../src/renderer/src/chordV2/chordValidator.ts')
+const midiFileParser = require('../src/renderer/src/midiFile/midiFileParser.ts')
+const featureFlags = require('../src/renderer/src/featureFlags.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -1844,9 +1847,9 @@ test('钢琴音频模式设置默认内置并安全读写', () => {
 
 test('采样器复音策略：重复音、抢声部与延音集合', () => {
   const voices = [
-    { id: 1, midiNumber: 60, released: false, sustained: false, startedAt: 100 },
-    { id: 2, midiNumber: 64, released: true, sustained: false, startedAt: 200 },
-    { id: 3, midiNumber: 67, released: false, sustained: true, startedAt: 300 }
+    { id: 1, midiNumber: 60, physicalKeyDown: true, sustainedByPedal: false, released: false, startedAt: 100 },
+    { id: 2, midiNumber: 64, physicalKeyDown: false, sustainedByPedal: false, released: true, startedAt: 200 },
+    { id: 3, midiNumber: 67, physicalKeyDown: false, sustainedByPedal: true, released: false, startedAt: 300 }
   ]
 
   assert.equal(voicePolicy.findVoiceForNote(voices, 60)?.id, 1)
@@ -1860,8 +1863,8 @@ test('采样器复音策略：重复音、抢声部与延音集合', () => {
   assert.equal(voicePolicy.countReleasedVoices(voices), 1)
 
   const allActive = [
-    { id: 1, midiNumber: 60, released: false, sustained: false, startedAt: 100 },
-    { id: 2, midiNumber: 62, released: false, sustained: false, startedAt: 200 }
+    { id: 1, midiNumber: 60, physicalKeyDown: true, sustainedByPedal: false, released: false, startedAt: 100 },
+    { id: 2, midiNumber: 62, physicalKeyDown: true, sustainedByPedal: false, released: false, startedAt: 200 }
   ]
   assert.equal(voicePolicy.pickVoiceToSteal(allActive, 1)?.id, 1, '无已释放声部时偷最旧活动声部')
 })
@@ -2491,8 +2494,9 @@ test('Follow 核心：跟弹、漏一个音恢复、多弹不永久错位', () =
   const extra = new followScoreCore.FollowScoreCore(timeline, { beatDurationMs: 500 })
   extra.observeNoteOn(60, 0)
   extra.observeNoteOn(70, 300)
+  assert.equal(extra.currentIndex, 1, '多弹一个音不得推进当前单元')
   extra.observeNoteOn(62, 500)
-  assert.equal(extra.currentIndex >= 2, true)
+  assert.equal(extra.currentIndex >= 2, true, '恢复正确输入后应继续')
 })
 
 test('训练计划 2.0：v1 迁移保留遗留数据且损坏回退', () => {
@@ -2770,6 +2774,293 @@ test('产品化接线：设置页含数据/关于、应用含首次启动、版�
   assert.match(appSource, /FirstRunWelcome/)
   assert.match(welcomeSource, /开始使用/)
   assert.equal(packageJson.version, '1.0.0-rc.1')
+})
+
+test('Chord V2 10,000 组属性测试：无非法音级、音域与跨度', () => {
+  const qualities = [
+    'major', 'minor', 'dim', 'aug', 'sus2', 'sus4', '6', 'm6', 'maj7', '7', 'm7', 'm7b5',
+    'dim7', 'add9', '9', 'm9', 'maj9', '6/9'
+  ]
+  let seed = 20260814
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0
+    return seed / 0x100000000
+  }
+
+  for (let index = 0; index < 10000; index += 1) {
+    const quality = qualities[Math.floor(rand() * qualities.length)]
+    const root = Math.floor(rand() * 12)
+    const registerLowest = 36 + Math.floor(rand() * 25)
+    const spacing = rand() > 0.5 ? 'open' : 'close'
+    const identity = chordIdentity.getChordV2Identity(root, quality)
+    const bassCandidates = chordValidator.getBassCandidates(root, quality, 'all')
+    const bassConstraint = rand() > 0.2 ? bassCandidates[Math.floor(rand() * bassCandidates.length)] : null
+    const createdVoicing = voicing.createDefaultVoicing(identity, {
+      registerLowest,
+      registerHighest: 88,
+      spacing,
+      bassConstraint
+    })
+    const validation = chordValidator.validateVoicing(identity, createdVoicing, { maxHandSpan: 26 })
+    assert.equal(validation.valid, true, `#${index} ${quality} root=${root} reg=${registerLowest} ${spacing}: ${validation.reasons.join(';')}`)
+    for (const note of createdVoicing.exactNotes) {
+      assert.equal(
+        chordValidator.isChordTonePitchClass(identity, note),
+        true,
+        `#${index} 非和弦音 ${note}（${quality} root=${root}）`
+      )
+    }
+  }
+})
+
+test('Chord V2：flat root / 同音异名拼写保留', () => {
+  assert.deepEqual(chordIdentity.parseChordSymbol('Db'), { rootPitchClass: 1, quality: 'major', slashBass: null })
+  assert.deepEqual(chordIdentity.parseChordSymbol('Dbmaj7'), { rootPitchClass: 1, quality: 'maj7', slashBass: null })
+  assert.deepEqual(chordIdentity.parseChordSymbol('Bb7'), { rootPitchClass: 10, quality: '7', slashBass: null })
+  assert.deepEqual(chordIdentity.parseChordSymbol('Eb'), { rootPitchClass: 3, quality: 'major', slashBass: null })
+  assert.deepEqual(chordIdentity.parseChordSymbol('Abm7'), { rootPitchClass: 8, quality: 'm7', slashBass: null })
+  assert.deepEqual(chordIdentity.parseChordSymbol('Gb'), { rootPitchClass: 6, quality: 'major', slashBass: null })
+  assert.deepEqual(chordIdentity.parseChordSymbol('Cm7♭5'), { rootPitchClass: 0, quality: 'm7b5', slashBass: null })
+
+  assert.equal(chordIdentity.formatChordSymbol(1, 'major', undefined, 'flat'), 'Db')
+  assert.equal(chordIdentity.formatChordSymbol(10, '7', undefined, 'flat'), 'Bb7')
+  assert.equal(chordIdentity.formatChordSymbol(1, 'major'), 'C#')
+  assert.equal(chordIdentity.formatChordSymbol(10, '7'), 'A#7')
+})
+
+test('Chord V2：inversionMode all 包含 root 与全部转位，open/close 真实不同', () => {
+  assert.deepEqual(chordValidator.getBassCandidates(0, 'major', 'all'), [0, 4, 7])
+  assert.deepEqual(chordValidator.getBassCandidates(0, 'major', 'inversions'), [4, 7])
+  assert.deepEqual(chordValidator.getBassCandidates(0, 'major', 'root'), [0])
+  assert.deepEqual(chordValidator.getBassCandidates(0, '7', 'all'), [0, 4, 7, 10])
+  assert.deepEqual(chordValidator.getBassCandidates(0, '7', 'inversions'), [4, 7, 10])
+  assert.deepEqual(chordValidator.getBassCandidates(4, 'maj7', 'all'), [4, 8, 11, 3])
+  assert.deepEqual(chordValidator.getBassCandidates(4, 'maj7', 'inversions'), [8, 11, 3])
+
+  const identity = chordIdentity.getChordV2Identity(0, 'major')
+  const close = voicing.createDefaultVoicing(identity, {
+    registerLowest: 48, registerHighest: 84, bassConstraint: 0, spacing: 'close'
+  })
+  const open = voicing.createDefaultVoicing(identity, {
+    registerLowest: 48, registerHighest: 84, bassConstraint: 0, spacing: 'open'
+  })
+  assert.notDeepEqual(close.exactNotes, open.exactNotes, 'open/close 必须产生真实不同的 spacing')
+  assert.equal(chordValidator.validateVoicing(identity, open).valid, true)
+})
+
+test('CC64 踏板状态机：先踩后弹、先弹后踩、按住不释放、重复音与清理', () => {
+  const vp = voicePolicy
+  // 先踩踏板再弹
+  let state = vp.createPedalVoiceState()
+  state = vp.pedalKeyDown(state)
+  state = vp.pedalKeyUp(state, true)
+  assert.deepEqual(state, { physicalKeyDown: false, sustainedByPedal: true, released: false })
+  state = vp.pedalPedalUp(state)
+  assert.equal(state.released, true)
+
+  // 先弹再踩踏板（KeyUp 时踏板已按下 → 延音）
+  let noteFirst = vp.createPedalVoiceState()
+  noteFirst = vp.pedalKeyDown(noteFirst)
+  noteFirst = vp.pedalKeyUp(noteFirst, true)
+  assert.equal(noteFirst.sustainedByPedal, true)
+
+  // 琴键仍按住时松踏板 → 不得释放
+  let held = vp.createPedalVoiceState()
+  held = vp.pedalKeyDown(held)
+  const afterPedalUpWhileHeld = vp.pedalPedalUp(held)
+  assert.equal(afterPedalUpWhileHeld.released, false)
+  assert.equal(afterPedalUpWhileHeld.physicalKeyDown, true)
+
+  // 重复同音：旧延音声部被新按下替代
+  let first = vp.createPedalVoiceState()
+  first = vp.pedalKeyDown(first)
+  first = vp.pedalKeyUp(first, true)
+  const repeated = vp.pedalKeyDown(vp.createPedalVoiceState())
+  assert.equal(repeated.physicalKeyDown, true)
+  assert.equal(repeated.sustainedByPedal, false)
+
+  // 清理 / all notes off
+  const cleaned = vp.pedalAllNotesOff(first)
+  assert.deepEqual(cleaned, { physicalKeyDown: false, sustainedByPedal: false, released: true })
+})
+
+function buildSmfFixture() {
+  const chunks = []
+  const push = (data) => chunks.push(Buffer.from(data))
+  const header = Buffer.alloc(14)
+  header.write('MThd', 0, 'ascii')
+  header.writeUInt32BE(6, 4)
+  header.writeUInt16BE(1, 8)
+  header.writeUInt16BE(2, 10)
+  header.writeUInt16BE(480, 12)
+  push(header)
+
+  const track = (name, events) => {
+    const body = []
+    const write = (data) => body.push(Buffer.from(data))
+    // meta: track name
+    write([0x00, 0xff, 0x03, name.length])
+    write(Buffer.from(name, 'ascii'))
+    for (const event of events) {
+      write(event)
+    }
+    write([0x00, 0xff, 0x2f, 0x00])
+    const bodyBuffer = Buffer.concat(body)
+    const trackHeader = Buffer.alloc(8)
+    trackHeader.write('MTrk', 0, 'ascii')
+    trackHeader.writeUInt32BE(bodyBuffer.length, 4)
+    push(trackHeader)
+    push(bodyBuffer)
+  }
+
+  // RH: C4 on, E4 on via running status (0x90), C4 off, E4 off via running status (0x80)
+  track('RH', [
+    [0x00, 0x90, 60, 100],
+    [0x00, 64, 90],
+    [0x60, 0x80, 60, 0],
+    [0x00, 64, 0]
+  ])
+  // LH: C3 on/off, same channel 0 as RH
+  track('LH', [
+    [0x00, 0x90, 48, 100],
+    [0x60, 0x80, 48, 0]
+  ])
+  return Buffer.concat(chunks)
+}
+
+test('SMF Format 1：多轨解析、running status、velocity0 与合并计数', () => {
+  const bytes = buildSmfFixture()
+  const smf = midiFileParser.parseMidiFile(new Uint8Array(bytes))
+  assert.equal(smf.format, 1)
+  assert.equal(smf.division, 480)
+  assert.equal(smf.tracks.length, 2)
+  assert.deepEqual(smf.tracks.map((track) => track.name), ['RH', 'LH'])
+
+  const notes = smf.mergedEvents.filter((event) => event.type === 'noteOn' || event.type === 'noteOff')
+  assert.equal(notes.length, 6, '两轨事件合并计数必须为 A+B')
+  assert.equal(notes.filter((event) => event.type === 'noteOn').length, 3)
+  assert.ok(notes.every((event) => event.channel === 0), '不同 track 的同 channel 事件必须保留')
+
+  const rhNotes = smf.tracks[0].events.filter((event) => event.type === 'noteOn' || event.type === 'noteOff')
+  assert.deepEqual(rhNotes.map((event) => [event.type, event.midiNumber]), [
+    ['noteOn', 60], ['noteOn', 64], ['noteOff', 60], ['noteOff', 64]
+  ])
+
+  const velocityZero = midiFileParser.parseMidiFile(new Uint8Array(buildSmfWithVelocityZero()))
+  const velocityZeroNoteOff = velocityZero.tracks[0].events.find((event) => event.type === 'noteOff' && event.midiNumber === 60)
+  assert.ok(velocityZeroNoteOff !== undefined, 'velocity=0 的 noteOn 必须转换为 noteOff')
+  assert.equal(velocityZeroNoteOff.velocity, 0)
+})
+
+function buildSmfWithVelocityZero() {
+  const chunks = []
+  const header = Buffer.alloc(14)
+  header.write('MThd', 0, 'ascii')
+  header.writeUInt32BE(6, 4)
+  header.writeUInt16BE(0, 8)
+  header.writeUInt16BE(1, 10)
+  header.writeUInt16BE(480, 12)
+  chunks.push(header)
+  const body = Buffer.from([0x00, 0x90, 60, 100, 0x60, 0x90, 60, 0, 0x00, 0xff, 0x2f, 0x00])
+  const trackHeader = Buffer.alloc(8)
+  trackHeader.write('MTrk', 0, 'ascii')
+  trackHeader.writeUInt32BE(body.length, 4)
+  chunks.push(trackHeader, body)
+  return Buffer.concat(chunks)
+}
+
+test('MusicXML 时间轴：backup 合并、多声部、rest 与 tie 链', () => {
+  const backupXml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>P</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions><key><fifths>0</fifths></key></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>C</step><octave>3</octave></pitch><duration>16</duration><voice>1</voice></note>
+    </measure>
+  </part>
+</score-partwise>`
+  const backupScore = musicXmlParser.loadMusicXmlDocument(backupXml)
+  const backupTimeline = scoreTimeline.buildScoreTimeline(backupScore)
+  assert.equal(backupTimeline.units.length, 1)
+  assert.deepEqual(backupTimeline.units[0].expectedMidi, [48, 60])
+  assert.equal(backupTimeline.units[0].expectedTick, 0)
+
+  const multiVoiceXml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>P</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note>
+      <note><pitch><step>E</step><octave>3</octave></pitch><duration>8</duration><voice>2</voice></note>
+      <note><rest/><duration>4</duration><voice>2</voice></note>
+    </measure>
+  </part>
+</score-partwise>`
+  const multiVoiceTimeline = scoreTimeline.buildScoreTimeline(musicXmlParser.loadMusicXmlDocument(multiVoiceXml))
+  assert.deepEqual(multiVoiceTimeline.units.map((unit) => [unit.expectedTick, unit.expectedMidi]), [
+    [0, [52, 60]],
+    [4, [62]],
+    [8, []]
+  ])
+})
+
+test('MXL DEFLATE：压缩容器可解出 MusicXML', async () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/single-melody.xml'), 'utf8')
+  const zipBuffer = await zipReader.createDeflatedZip([{ name: 'META-INF/container.xml', content: '<container/>' }, { name: 'score.musicxml', content: xml }])
+  const container = await zipReader.extractMxlContainerAsync(zipBuffer)
+  assert.ok(container !== null)
+  assert.equal(container.fileName, 'score.musicxml')
+  assert.match(container.xmlText, /Single Melody/)
+})
+
+test('Follow：完整和弦才推进、部分和弦累积、休止/延音不死锁、reset 清空', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/chord-tie-rest.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const timeline = scoreTimeline.buildScoreTimeline(score)
+  const core = new followScoreCore.FollowScoreCore(timeline, { beatDurationMs: 500 })
+
+  core.observeNoteOn(60, 0)
+  core.observeNoteOn(64, 500)
+  core.observeNoteOn(67, 1000)
+  assert.equal(core.currentIndex, 2, '部分和弦（仅 G4）不得推进')
+  core.observeNoteOn(72, 1100)
+  assert.ok(core.currentIndex >= 3, '补上 C5 后整和弦才推进')
+  core.observeNoteOn(65, 2500)
+  assert.ok(core.currentIndex >= 6, '休止与延音单元自动跳过，不得死锁')
+  core.observeNoteOn(69, 3000)
+  assert.equal(core.isComplete, true)
+
+  core.reset()
+  assert.equal(core.currentIndex, 0)
+  assert.equal(core.results.length, 0)
+  assert.equal(core.isComplete, false)
+})
+
+test('Feature flags：实验功能默认关闭且可从 UI 隐藏', () => {
+  assert.equal(featureFlags.FEATURE_FLAGS.FEATURE_EXPERIMENTAL_HARMONY_GENERATOR, false)
+  assert.equal(featureFlags.FEATURE_FLAGS.FEATURE_AI_MUSIC_GENERATOR, false)
+  assert.equal(featureFlags.FEATURE_FLAGS.FEATURE_SCORE_FOLLOWING, false)
+  assert.equal(featureFlags.isFeatureEnabled('FEATURE_SCORE_FOLLOWING'), false)
+
+  const values = new Map()
+  const storage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) }
+  }
+  assert.equal(featureFlags.isExperimentalAccessEnabled(storage), false)
+  featureFlags.setExperimentalAccess(true, storage)
+  assert.equal(featureFlags.isExperimentalAccessEnabled(storage), true)
+
+  const chordPage = fs.readFileSync(require.resolve('../src/renderer/src/components/ChordV2Page.tsx'), 'utf8')
+  const scorePage = fs.readFileSync(require.resolve('../src/renderer/src/components/ScorePracticePage.tsx'), 'utf8')
+  assert.match(chordPage, /isExperimentalFeatureVisible\('FEATURE_EXPERIMENTAL_HARMONY_GENERATOR'\)/)
+  assert.match(scorePage, /Experimental feature disabled/)
+  assert.match(scorePage, /followVisible/)
 })
 
 let failed = 0
