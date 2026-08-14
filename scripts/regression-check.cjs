@@ -64,6 +64,7 @@ const coach2 = require('../src/renderer/src/ai/coach2.ts')
 const playback = require('../src/renderer/src/playback/playback.ts')
 const platformAdapters = require('../src/renderer/src/platform/adapters.ts')
 const scoreTimeV2 = require('../src/renderer/src/score/scoreTimeV2.ts')
+const zlib = require('node:zlib')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -2378,16 +2379,6 @@ test('Wait 模式：单旋律全部正确与错误计数', () => {
   assert.equal(core.results.filter((entry) => entry.outcome === 'correct').length, 8)
 })
 
-test('MXL 容器：存储型 ZIP 可解出 MusicXML 文本', () => {
-  const xml = fs.readFileSync(require.resolve('./score-fixtures/single-melody.xml'), 'utf8')
-  const zipBuffer = zipReader.createStoredZip([{ name: 'container.xml', content: xml }])
-  const container = zipReader.extractMxlContainer(zipBuffer)
-  assert.ok(container !== null)
-  assert.equal(container.fileName, 'container.xml')
-  assert.match(container.xmlText, /score-partwise/)
-  assert.match(container.xmlText, /Single Melody/)
-})
-
 test('练习片段存储：损坏回退、净化与 upsert', () => {
   const values = new Map()
   const storage = {
@@ -3018,15 +3009,6 @@ test('MusicXML 时间轴：backup 合并、多声部、rest 与 tie 链', () => 
   ])
 })
 
-test('MXL DEFLATE：压缩容器可解出 MusicXML', async () => {
-  const xml = fs.readFileSync(require.resolve('./score-fixtures/single-melody.xml'), 'utf8')
-  const zipBuffer = await zipReader.createDeflatedZip([{ name: 'META-INF/container.xml', content: '<container/>' }, { name: 'score.musicxml', content: xml }])
-  const container = await zipReader.extractMxlContainerAsync(zipBuffer)
-  assert.ok(container !== null)
-  assert.equal(container.fileName, 'score.musicxml')
-  assert.match(container.xmlText, /Single Melody/)
-})
-
 test('Follow：完整和弦才推进、部分和弦累积、休止/延音不死锁、reset 清空', () => {
   const xml = fs.readFileSync(require.resolve('./score-fixtures/chord-tie-rest.xml'), 'utf8')
   const score = musicXmlParser.loadMusicXmlDocument(xml)
@@ -3581,6 +3563,41 @@ test('Score Time V2：multipart 并行、score-timewise 明确拒绝', () => {
     () => musicXmlParser.loadMusicXmlDocument('<score-timewise version="4.0"><part-list/></score-timewise>'),
     (error) => error instanceof scoreTimeV2.UnsupportedScoreFormatError
   )
+})
+
+test('标准 MXL：container rootfile 严格选主谱 + 真实 raw DEFLATE + 安全限制', async () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/single-melody.xml'), 'utf8')
+  const containerXml = '<?xml version="1.0"?><container><rootfiles><rootfile full-path="Scores/main.musicxml"/></rootfiles></container>'
+  const entries = [
+    { name: 'META-INF/container.xml', content: containerXml },
+    { name: 'Scores/main.musicxml', content: xml },
+    { name: 'extra.xml', content: '<score-partwise/>' }
+  ]
+
+  const storedZip = zipReader.createStoredZip(entries)
+  const storedContainer = await zipReader.extractMxlContainerAsync(storedZip)
+  assert.equal(storedContainer.fileName, 'Scores/main.musicxml', '必须按 container rootfile 选择主谱，而不是第一个 xml')
+  assert.match(storedContainer.xmlText, /Single Melody/)
+
+  const deflateZip = zipReader.buildZip(entries, 8, (content) => zlib.deflateRawSync(content))
+  const deflatedContainer = await zipReader.extractMxlContainerAsync(deflateZip, {
+    inflate: async (data) => zlib.inflateRawSync(data)
+  })
+  assert.equal(deflatedContainer.fileName, 'Scores/main.musicxml')
+  assert.match(deflatedContainer.xmlText, /Single Melody/)
+
+  const evilZip = zipReader.createStoredZip([
+    { name: 'META-INF/container.xml', content: '<container><rootfiles><rootfile full-path="../evil.xml"/></rootfiles></container>' },
+    { name: 'evil.xml', content: xml }
+  ])
+  await assert.rejects(() => zipReader.extractMxlContainerAsync(evilZip), /路径穿越|非法/)
+
+  const bigEntry = 'x'.repeat(9 * 1024 * 1024)
+  const bigZip = zipReader.createStoredZip([
+    { name: 'META-INF/container.xml', content: containerXml },
+    { name: 'Scores/main.musicxml', content: bigEntry }
+  ])
+  await assert.rejects(() => zipReader.extractMxlContainerAsync(bigZip), /大小上限/)
 })
 
 let failed = 0

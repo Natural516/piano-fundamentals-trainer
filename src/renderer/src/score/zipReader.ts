@@ -1,6 +1,9 @@
 const EOCD_SIGNATURE = 0x06054b50
 const CENTRAL_SIGNATURE = 0x02014b50
 const LOCAL_SIGNATURE = 0x04034b50
+const MAX_ENTRIES = 64
+const MAX_ENTRY_BYTES = 8 * 1024 * 1024
+const MAX_TOTAL_BYTES = 32 * 1024 * 1024
 
 interface ZipEntryInfo {
   name: string
@@ -55,56 +58,80 @@ export function readZipEntries(buffer: Uint8Array): Map<string, ZipEntryInfo> {
   return entries
 }
 
-export function extractMxlContainer(data: Uint8Array): { fileName: string; xmlText: string } | null {
-  const entries = readZipEntries(data)
-  const xmlEntry = pickXmlEntry(entries)
-  if (!xmlEntry) return null
-  if (xmlEntry[1].method !== 0) {
-    throw new Error(`MXL entry uses unsupported method ${xmlEntry[1].method}; use extractMxlContainerAsync`)
-  }
+export type InflateFn = (data: Uint8Array) => Promise<Uint8Array> | Uint8Array
 
-  return {
-    fileName: xmlEntry[1].name,
-    xmlText: new TextDecoder().decode(xmlEntry[1].data)
-  }
-}
-
-export async function inflateEntry(entry: ZipEntryInfo): Promise<Uint8Array> {
+export async function inflateEntry(entry: ZipEntryInfo, inflate?: InflateFn): Promise<Uint8Array> {
   if (entry.method === 0) {
     return entry.data
   }
   if (entry.method !== 8) {
     throw new Error(`Unsupported ZIP compression method ${entry.method}`)
   }
-  if (typeof DecompressionStream === 'undefined') {
-    throw new Error('当前环境不支持 DEFLATE 解压（DecompressionStream 不可用）')
+  if (inflate) {
+    return new Uint8Array(await inflate(entry.data))
   }
-
-  const stream = new DecompressionStream('deflate')
-  const response = new Response(new Blob([new Uint8Array(entry.data)]).stream().pipeThrough(stream))
-  return new Uint8Array(await response.arrayBuffer())
+  if (typeof DecompressionStream !== 'undefined') {
+    const stream = new DecompressionStream('deflate')
+    const response = new Response(new Blob([new Uint8Array(entry.data)]).stream().pipeThrough(stream))
+    return new Uint8Array(await response.arrayBuffer())
+  }
+  throw new Error('当前环境不支持 DEFLATE 解压，请通过 FileImportAdapter 提供 inflate 实现')
 }
 
-export async function extractMxlContainerAsync(data: Uint8Array): Promise<{ fileName: string; xmlText: string } | null> {
-  const entries = readZipEntries(data)
-  const xmlEntry = pickXmlEntry(entries)
-  if (!xmlEntry) return null
+export interface MxlExtractOptions {
+  inflate?: InflateFn
+  maxEntries?: number
+  maxEntryBytes?: number
+  maxTotalBytes?: number
+}
 
-  const info = xmlEntry[1]
-  const xmlBytes = await inflateEntry(info)
+export async function extractMxlContainerAsync(
+  data: Uint8Array,
+  options: MxlExtractOptions = {}
+): Promise<{ fileName: string; xmlText: string } | null> {
+  const entries = readZipEntries(data)
+  const maxEntries = options.maxEntries ?? MAX_ENTRIES
+  const maxEntryBytes = options.maxEntryBytes ?? MAX_ENTRY_BYTES
+  const maxTotalBytes = options.maxTotalBytes ?? MAX_TOTAL_BYTES
+
+  if (entries.size > maxEntries) {
+    throw new Error('MXL 条目数超过安全上限')
+  }
+  let totalBytes = 0
+  for (const entry of entries.values()) {
+    if (entry.uncompressedSize > maxEntryBytes) {
+      throw new Error(`MXL 条目 ${entry.name} 超过单文件大小上限`)
+    }
+    totalBytes += entry.uncompressedSize
+  }
+  if (totalBytes > maxTotalBytes) {
+    throw new Error('MXL 解压总量超过安全上限')
+  }
+
+  const container = entries.get('META-INF/container.xml')
+  if (!container) {
+    throw new Error('MXL 缺少 META-INF/container.xml')
+  }
+  const containerText = new TextDecoder().decode(await inflateEntry(container, options.inflate))
+  const containerRoot = parseContainerXml(containerText)
+  if (!containerRoot || containerRoot.includes('..') || containerRoot.startsWith('/')) {
+    throw new Error('MXL container rootfile 路径非法或包含路径穿越')
+  }
+
+  const xmlEntry = entries.get(containerRoot)
+  if (!xmlEntry) {
+    throw new Error(`MXL container 指向的主 MusicXML 不存在: ${containerRoot}`)
+  }
+  const xmlBytes = await inflateEntry(xmlEntry, options.inflate)
   return {
-    fileName: info.name,
+    fileName: xmlEntry.name,
     xmlText: new TextDecoder().decode(xmlBytes)
   }
 }
 
-function pickXmlEntry(entries: Map<string, ZipEntryInfo>): [string, ZipEntryInfo] | null {
-  const candidates = [...entries.entries()]
-    .filter(([name]) => name.toLowerCase().endsWith('.xml') || name.toLowerCase().endsWith('.musicxml'))
-  return candidates.find(([name]) => name.toLowerCase().endsWith('.musicxml'))
-    ?? candidates.find(([name]) => !name.toLowerCase().endsWith('container.xml'))
-    ?? candidates[0]
-    ?? null
+function parseContainerXml(text: string): string | null {
+  const root = text.match(/<rootfile[^>]*full-path\s*=\s*"([^"]+)"/)
+  return root ? root[1] : null
 }
 
 function writeUint32(target: Uint8Array, offset: number, value: number): void {
@@ -189,24 +216,15 @@ export function createStoredZip(entries: Array<{ name: string; content: string }
 }
 
 /**
- * Creates a DEFLATE-compressed ZIP archive. Used by tests to exercise the
- * MXL deflate path without external dependencies.
+ * Creates a ZIP archive with a caller-provided compression function (e.g.
+ * Node zlib.deflateRawSync for method 8). Used by tests and adapters.
  */
-export async function createDeflatedZip(entries: Array<{ name: string; content: string }>): Promise<Uint8Array> {
-  const compress = async (content: Uint8Array): Promise<Uint8Array> => {
-    if (typeof CompressionStream === 'undefined') {
-      throw new Error('当前环境不支持 DEFLATE 压缩（CompressionStream 不可用）')
-    }
-    const stream = new CompressionStream('deflate')
-    const response = new Response(new Blob([new Uint8Array(content)]).stream().pipeThrough(stream))
-    return new Uint8Array(await response.arrayBuffer())
-  }
-
-  const compressedByEntry: Uint8Array[] = []
-  for (const entry of entries) {
-    compressedByEntry.push(await compress(new TextEncoder().encode(entry.content)))
-  }
-  return buildZipEntries(entries, 8, (_, index) => compressedByEntry[index])
+export function buildZip(
+  entries: Array<{ name: string; content: string }>,
+  method: number,
+  compress: (content: Uint8Array, index: number) => Uint8Array
+): Uint8Array {
+  return buildZipEntries(entries, method, compress)
 }
 
 function findEocd(view: DataView): number {
