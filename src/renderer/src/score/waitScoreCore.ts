@@ -3,7 +3,10 @@ import type { ScoreExpectedUnit, ScoreTimeline } from './musicXmlTypes'
 export interface WaitStepResult {
   unitId: string
   outcome: 'correct' | 'wrong' | 'skip'
+  measure: number
   expectedMidi: number[]
+  actualMidi: number | null
+  sourceEventIds: string[]
 }
 
 /**
@@ -45,7 +48,7 @@ export class WaitScoreCore {
     this.stepResults.length = 0
   }
 
-  processNoteOn(midiNumber: number): 'none' | 'wrong' | 'complete' {
+  processNoteOn(midiNumber: number, sourceEventId?: string): 'none' | 'wrong' | 'complete' {
     this.advanceSkippable()
 
     const unit = this.currentUnit
@@ -58,13 +61,27 @@ export class WaitScoreCore {
     }
 
     if (!required.includes(midiNumber)) {
-      this.stepResults.push({ unitId: unit.id, outcome: 'wrong', expectedMidi: required })
+      this.stepResults.push({
+        unitId: unit.id,
+        outcome: 'wrong',
+        measure: unit.measure,
+        expectedMidi: required,
+        actualMidi: midiNumber,
+        sourceEventIds: sourceEventId ? [sourceEventId] : []
+      })
       return 'wrong'
     }
 
     this.pressed.add(midiNumber)
     if (required.every((note) => this.pressed.has(note))) {
-      this.stepResults.push({ unitId: unit.id, outcome: 'correct', expectedMidi: required })
+      this.stepResults.push({
+        unitId: unit.id,
+        outcome: 'correct',
+        measure: unit.measure,
+        expectedMidi: required,
+        actualMidi: midiNumber,
+        sourceEventIds: sourceEventId ? [sourceEventId] : []
+      })
       this.applyTies(unit)
       this.index += 1
       this.pressed.clear()
@@ -91,7 +108,14 @@ export class WaitScoreCore {
       const unit = this.units[this.index]
 
       if (unit.rest || unit.expectedMidi.length === 0) {
-        this.stepResults.push({ unitId: unit.id, outcome: 'skip', expectedMidi: [] })
+        this.stepResults.push({
+          unitId: unit.id,
+          outcome: 'skip',
+          measure: unit.measure,
+          expectedMidi: [],
+          actualMidi: null,
+          sourceEventIds: []
+        })
         this.index += 1
         this.pressed.clear()
         continue

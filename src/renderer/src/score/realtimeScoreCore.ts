@@ -5,6 +5,12 @@ export interface RealtimeStepResult {
   unitId: string
   outcome: 'correct' | 'wrong' | 'missing' | 'extra' | 'early' | 'late'
   offsetMs: number
+  measure: number
+  beat: number
+  expectedMidi: number[]
+  actualMidi: number | null
+  hand: 'left' | 'right' | 'both' | null
+  sourceEventIds: string[]
 }
 
 export interface RealtimeCoreOptions {
@@ -65,7 +71,17 @@ export class RealtimeScoreCore {
     while (!this.isComplete) {
       const unit = this.units[this.index]
       if (unit.rest) {
-        this.stepResults.push({ unitId: unit.id, outcome: 'correct', offsetMs: 0 })
+        this.stepResults.push({
+          unitId: unit.id,
+          outcome: 'correct',
+          offsetMs: 0,
+          measure: unit.measure,
+          beat: unit.expectedTick / 480 + 1,
+          expectedMidi: [],
+          actualMidi: null,
+          hand: null,
+          sourceEventIds: []
+        })
         this.index += 1
         continue
       }
@@ -79,7 +95,13 @@ export class RealtimeScoreCore {
         this.stepResults.push({
           unitId: unit.id,
           outcome: this.pressed.size === 0 ? 'missing' : 'wrong',
-          offsetMs: Math.round(elapsedMs - expectedTime)
+          offsetMs: Math.round(elapsedMs - expectedTime),
+          measure: unit.measure,
+          beat: unit.expectedTick / 480 + 1,
+          expectedMidi: unit.expectedMidi,
+          actualMidi: null,
+          hand: null,
+          sourceEventIds: []
         })
         this.index += 1
         this.pressed.clear()
@@ -89,7 +111,7 @@ export class RealtimeScoreCore {
     }
   }
 
-  processNoteOn(midiNumber: number, elapsedMs: number): 'correct' | 'wrong' | 'early' | 'late' | 'none' | 'complete' {
+  processNoteOn(midiNumber: number, elapsedMs: number, sourceEventId?: string): 'correct' | 'wrong' | 'early' | 'late' | 'none' | 'complete' {
     this.advanceTo(elapsedMs)
     const unit = this.currentUnit
     if (!unit || unit.rest || unit.expectedMidi.length === 0) return 'none'
@@ -98,7 +120,17 @@ export class RealtimeScoreCore {
     const offset = elapsedMs - expectedTime
 
     if (!unit.expectedMidi.includes(midiNumber)) {
-      this.stepResults.push({ unitId: unit.id, outcome: 'extra', offsetMs: Math.round(offset) })
+      this.stepResults.push({
+        unitId: unit.id,
+        outcome: 'extra',
+        offsetMs: Math.round(offset),
+        measure: unit.measure,
+        beat: unit.expectedTick / 480 + 1,
+        expectedMidi: unit.expectedMidi,
+        actualMidi: midiNumber,
+        hand: null,
+        sourceEventIds: sourceEventId ? [sourceEventId] : []
+      })
       return 'wrong'
     }
 
@@ -106,7 +138,17 @@ export class RealtimeScoreCore {
     if (Math.abs(offset) > this.toleranceMs) {
       if (this.unitSatisfied(unit)) {
         const outcome = offset < 0 ? 'early' : 'late'
-        this.stepResults.push({ unitId: unit.id, outcome, offsetMs: Math.round(offset) })
+        this.stepResults.push({
+          unitId: unit.id,
+          outcome,
+          offsetMs: Math.round(offset),
+          measure: unit.measure,
+          beat: unit.expectedTick / 480 + 1,
+          expectedMidi: unit.expectedMidi,
+          actualMidi: midiNumber,
+          hand: null,
+          sourceEventIds: sourceEventId ? [sourceEventId] : []
+        })
         this.index += 1
         this.pressed.clear()
         return this.isComplete ? 'complete' : outcome
@@ -115,7 +157,17 @@ export class RealtimeScoreCore {
     }
 
     if (this.unitSatisfied(unit)) {
-      this.stepResults.push({ unitId: unit.id, outcome: 'correct', offsetMs: Math.round(offset) })
+      this.stepResults.push({
+        unitId: unit.id,
+        outcome: 'correct',
+        offsetMs: Math.round(offset),
+        measure: unit.measure,
+        beat: unit.expectedTick / 480 + 1,
+        expectedMidi: unit.expectedMidi,
+        actualMidi: midiNumber,
+        hand: null,
+        sourceEventIds: sourceEventId ? [sourceEventId] : []
+      })
       this.index += 1
       this.pressed.clear()
       return this.isComplete ? 'complete' : 'correct'

@@ -131,6 +131,7 @@ export function ScorePracticePage({
   const [countIn, setCountIn] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const savedRecordIdRef = useRef('')
+  const pausedForExitRef = useRef(false)
   const followVisible = isExperimentalFeatureVisible('FEATURE_SCORE_FOLLOWING')
   const effectiveMode: ScorePracticeMode = mode === 'follow' && !followVisible ? 'wait' : mode
   const bpm = score?.defaultTempoBpm ?? 60
@@ -173,7 +174,16 @@ export function ScorePracticePage({
   }, [onPracticeRunningChange, practice.isRunning])
 
   useEffect(() => {
-    if (practice.status === 'finished' && score) {
+    if (exitPromptOpen) {
+      practice.pause()
+    } else if (practice.phase === 'paused' && pausedForExitRef.current) {
+      pausedForExitRef.current = false
+      practice.resume()
+    }
+  }, [exitPromptOpen, practice.phase, practice.pause, practice.resume])
+
+  useEffect(() => {
+    if (practice.phase === 'finished' && score) {
       const key = `${score.title}-${Date.now()}`
       if (savedRecordIdRef.current === key) return
       savedRecordIdRef.current = key
@@ -198,7 +208,7 @@ export function ScorePracticePage({
           { key: 'missing', value: practice.report.missing },
           { key: 'extra', value: practice.report.extra }
         ],
-        errorEvents: practice.results
+        errorEvents: practice.facts
           .filter((entry) => entry.outcome === 'wrong' || entry.outcome === 'missing' || entry.outcome === 'extra')
           .map((entry, index) => ({
             id: `${key}-error-${index}`,
@@ -210,7 +220,7 @@ export function ScorePracticePage({
       }
       saveScorePracticeRecord(record)
     }
-  }, [bpm, effectiveMode, handMode, importTier, practice.elapsedMs, practice.report, practice.results, practice.status, score, startMeasure, endMeasure])
+  }, [bpm, effectiveMode, handMode, importTier, practice.elapsedMs, practice.facts, practice.phase, practice.report, score, startMeasure, endMeasure])
 
   const handleFile = async (file: File): Promise<void> => {
     setLoadError('')
@@ -272,13 +282,13 @@ export function ScorePracticePage({
 
   const weakestMeasures = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const entry of practice.results) {
+    for (const entry of practice.facts) {
       if (entry.outcome === 'correct' || entry.outcome === 'skip') continue
-      const measure = String(entry.unitId).split('-')[1]?.replace('m', '') ?? '?'
-      counts.set(measure, (counts.get(measure) ?? 0) + 1)
+      const measure = entry.measure ?? '?'
+      counts.set(String(measure), (counts.get(String(measure)) ?? 0) + 1)
     }
     return [...counts.entries()].sort((left, right) => right[1] - left[1]).slice(0, 3)
-  }, [practice.results])
+  }, [practice.facts])
 
   return (
     <section className="score-practice-page practice-workspace-page">
@@ -302,7 +312,7 @@ export function ScorePracticePage({
               </p>
             </div>
             <span className={`audio-status-badge status-${practice.isRunning ? 'ready' : 'suspended'}`}>
-              {practice.status === 'running' ? '练习中' : practice.status === 'finished' ? '已完成' : '未开始'}
+              {practice.phase === 'running' ? '练习中' : practice.phase === 'paused' ? '已暂停' : practice.phase === 'count-in' ? '预备拍' : practice.phase === 'finished' ? '已完成' : '未开始'}
             </span>
           </div>
 
@@ -386,7 +396,7 @@ export function ScorePracticePage({
               </>
             ) : (
               <div className="score-practice-empty">
-                <strong>{practice.status === 'finished' ? '曲谱完成' : practice.expectedMidi.length === 0 && practice.isRunning ? '当前为休止或延音，自动推进' : `开始后按 ${effectiveMode === 'wait' ? 'Wait' : effectiveMode === 'realtime' ? 'Realtime' : 'Follow'} 模式弹奏`}</strong>
+                <strong>{practice.phase === 'finished' ? '曲谱完成' : practice.expectedMidi.length === 0 && practice.isRunning ? '当前为休止或延音，自动推进' : `开始后按 ${effectiveMode === 'wait' ? 'Wait' : effectiveMode === 'realtime' ? 'Realtime' : 'Follow'} 模式弹奏`}</strong>
               </div>
             )}
           </div>
@@ -399,10 +409,16 @@ export function ScorePracticePage({
 
           <div className="practice-primary-actions">
             {!practice.isRunning ? (
-              <AppButton onClick={practice.start}>{practice.status === 'finished' ? '再练一次' : '开始练习'}</AppButton>
+              <AppButton onClick={practice.start}>{practice.phase === 'finished' ? '再练一次' : '开始练习'}</AppButton>
             ) : (
-              <AppButton variant="secondary" onClick={practice.stop}>停止</AppButton>
+              <AppButton variant="secondary" onClick={practice.pause}>暂停</AppButton>
             )}
+            {practice.phase === 'paused' ? (
+              <AppButton onClick={practice.resume}>继续</AppButton>
+            ) : null}
+            {practice.isRunning || practice.phase === 'paused' ? (
+              <AppButton variant="ghost" onClick={practice.stop}>停止</AppButton>
+            ) : null}
           </div>
 
           <div className="score-practice-segment">
@@ -451,7 +467,7 @@ export function ScorePracticePage({
         ) : null}
       </div>
 
-      {practice.status === 'finished' ? (
+      {practice.phase === 'finished' ? (
         <PracticeReportModal title="曲谱练习完成" onBack={practice.reset} onRepeat={practice.start}>
           <div className="report-grid">
             <div><span>练习小节</span><strong>{startMeasure}–{endMeasure}</strong></div>

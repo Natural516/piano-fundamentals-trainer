@@ -2360,8 +2360,12 @@ test('Wait 模式核心：正确推进、错误不推进、休止/延音自动�
   assert.equal(core.results.filter((entry) => entry.outcome === 'wrong').length, 0)
 
   const wrongCore = new waitScoreCore.WaitScoreCore(timeline)
-  wrongCore.processNoteOn(61)
+  wrongCore.processNoteOn(61, 'ev-1')
   assert.equal(wrongCore.results[0].outcome, 'wrong')
+  assert.equal(wrongCore.results[0].measure, 1)
+  assert.deepEqual(wrongCore.results[0].expectedMidi, [60])
+  assert.equal(wrongCore.results[0].actualMidi, 61)
+  assert.deepEqual(wrongCore.results[0].sourceEventIds, ['ev-1'])
   assert.equal(wrongCore.currentIndex, 0, '错误输入不得推进')
   wrongCore.processNoteOn(60)
   assert.equal(wrongCore.currentIndex, 1)
@@ -2454,7 +2458,11 @@ test('Realtime 核心：准时正确、早/晚偏移、漏音与多音且不永�
   core.processNoteOn(70, 1500)
   assert.equal(core.currentIndex, 3)
   // 单元3：正确音
-  core.processNoteOn(65, 1500)
+  core.processNoteOn(65, 1500, 'ev-3')
+  const extraFact = core.results.find((result) => result.outcome === 'extra')
+  assert.equal(extraFact.measure, 1)
+  assert.equal(extraFact.actualMidi, 70)
+  assert.deepEqual(extraFact.expectedMidi, [65])
   // 单元4：跳过（直接推进到窗口结束）
   core.advanceTo(2000 + 400)
   assert.equal(core.results.filter((result) => result.outcome === 'missing').length, 1)
@@ -3447,6 +3455,22 @@ test('曲谱练习 1.0 接线：导入分级、选区/循环/速度/预备拍、
   assert.match(css, /@media \(max-width: 1100px\)/)
   assert.match(css, /min-height: 44px/)
   assert.match(appSource, /practiceRecords=\{practiceHistory\.records\}/)
+})
+
+test('Score Practice 状态机：COUNT_IN/RUNNING/PAUSED、循环轮次与逐事件事实接线', () => {
+  const hookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useScorePractice.ts'), 'utf8')
+  const pageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ScorePracticePage.tsx'), 'utf8')
+  assert.match(hookSource, /'count-in'/)
+  assert.match(hookSource, /'paused'/)
+  assert.match(hookSource, /const pause = useCallback/)
+  assert.match(hookSource, /const resume = useCallback/)
+  assert.match(hookSource, /loopIterations/)
+  assert.match(hookSource, /sourceEventIds/)
+  assert.match(pageSource, /practice\.pause\(\)/)
+  assert.match(pageSource, /practice\.resume\(\)/)
+  assert.match(pageSource, />暂停</)
+  assert.match(pageSource, />继续</)
+  assert.match(pageSource, /practice\.facts/)
 })
 
 test('Score Time V2：divisions 中途变更仍保持相同时值', () => {
