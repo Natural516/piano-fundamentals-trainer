@@ -50,6 +50,7 @@ export interface ScoreExpectedUnit {
   id: string
   onsetIndex: number
   expectedTick: number
+  measure: number
   notes: ScoreNoteModel[]
   tieStart: boolean
   rest: boolean

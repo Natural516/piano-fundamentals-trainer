@@ -58,6 +58,14 @@ export function HomePage({ onNavigate }: HomePageProps): JSX.Element {
           {practiceModules.map((module) => (
             <PracticeCard key={module.id} module={module} onNavigate={onNavigate} />
           ))}
+          <button className="home-action-card" type="button" onClick={() => onNavigate('training-plan')}>
+            <strong>今日训练</strong>
+            <small>查看并执行今日计划</small>
+          </button>
+          <button className="home-action-card" type="button" onClick={() => onNavigate('analytics')}>
+            <strong>AI 钢琴助理</strong>
+            <small>基于记录的解释、建议与复盘</small>
+          </button>
         </div>
 
       </section>

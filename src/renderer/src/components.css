@@ -1138,6 +1138,113 @@ body::before {
   display: inline-flex;
 }
 
+.score-practice-tier {
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.score-practice-selection {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.score-ai-panel {
+  margin-top: 18px;
+}
+
+.coach-summary {
+  margin: 12px 0 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.coach-diagnosis,
+.coach-recommendation {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.score-demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.score-demo-controls > span {
+  flex: 1;
+  min-width: 180px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.home-action-card {
+  appearance: none;
+  display: grid;
+  gap: 6px;
+  min-height: 44px;
+  padding: 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.home-action-card strong {
+  font-size: 15px;
+}
+
+.home-action-card small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* Tablet / touch adaptation */
+@media (max-width: 1100px) {
+  .score-practice-selection {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .practice-single-column {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .practice-primary-actions .app-button,
+  .practice-report-actions .app-button,
+  .settings-audio__actions .app-button,
+  .segmented-control > button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 860px) {
+  .coach-report,
+  .analytics-report {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .progression-panel-controls,
+  .score-practice-selection {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .analytics-period {
   margin-top: 12px;
 }

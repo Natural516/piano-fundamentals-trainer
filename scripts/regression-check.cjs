@@ -60,6 +60,9 @@ const practiceRecordV2 = require('../src/renderer/src/records/practiceRecordV2.t
 const abilityModel = require('../src/renderer/src/ability/abilityModel.ts')
 const exerciseLibrary = require('../src/renderer/src/prescription/exerciseLibrary.ts')
 const planner = require('../src/renderer/src/plan/planner.ts')
+const coach2 = require('../src/renderer/src/ai/coach2.ts')
+const playback = require('../src/renderer/src/playback/playback.ts')
+const platformAdapters = require('../src/renderer/src/platform/adapters.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -2437,7 +2440,7 @@ test('曲谱 Wait 练习 Hook 与页面接入逐事件总线且路由存在', ()
   assert.doesNotMatch(hookSource, /latestMidiEvent|latestEvent/)
   assert.match(pageSource, /loadMusicXmlDocument/)
   assert.match(pageSource, /extractMxlContainer/)
-  assert.match(pageSource, /accept="\.xml,\.musicxml,\.mxl"/)
+  assert.match(pageSource, /accept="\.xml,\.musicxml,\.mxl,\.mid,\.midi,\.png,\.jpg,\.jpeg,\.pdf"/)
   assert.match(appSource, /ScorePracticePage/)
   assert.doesNotMatch(pageSource, /返回首页/)
 })
@@ -3261,6 +3264,202 @@ test('Training Plan 2.0：弱项优先、平衡、成功标准与证据引用', 
     library: exerciseLibrary.EXERCISE_LIBRARY
   })
   assert.ok(emptyPlan.items.length >= 1, '无弱项时也要给出均衡练习')
+})
+
+test('AI Coach 2.0：证据接地、选区示范请求与不可观测声称过滤', () => {
+  const empty = coach2.buildDeterministicCoachResponse({
+    selectedMeasures: null,
+    recentRecords: [],
+    ability: abilityModel.computeAbilityModel([]),
+    plan: null,
+    userQuestion: '我该怎么练？'
+  })
+  assert.equal(empty.confidence, 'low')
+  assert.ok(empty.uncertainty.length > 0)
+  assert.equal(coach2.validateDiagnosisGrounding(empty), true)
+
+  const record = (id, module, accuracy, endedAt) => ({
+    id,
+    schemaVersion: 1,
+    module,
+    moduleName: module,
+    title: 't',
+    startedAt: endedAt,
+    endedAt,
+    durationMs: 60000,
+    status: 'completed',
+    totalEvents: 10,
+    correctEvents: Math.round(10 * accuracy / 100),
+    accuracy,
+    wrongNoteCount: 0,
+    missingNoteCount: 0,
+    extraNoteCount: 0,
+    earlyCount: 0,
+    lateCount: 0,
+    restErrorCount: 0,
+    syncWarningCount: 0,
+    settings: {},
+    details: {},
+    mistakes: []
+  })
+  const records = [
+    record('s1', 'scale', 55, '2026-08-12T00:00:00.000Z'),
+    record('s2', 'scale', 60, '2026-08-12T01:00:00.000Z'),
+    record('s3', 'scale', 62, '2026-08-13T00:00:00.000Z')
+  ]
+  const ability = abilityModel.computeAbilityModel(records)
+  const response = coach2.buildDeterministicCoachResponse({
+    selectedMeasures: { start: 13, end: 16 },
+    recentRecords: records,
+    ability,
+    plan: null,
+    userQuestion: '第13-16小节总弹错怎么办？'
+  })
+  assert.match(response.summary, /13.*16/)
+  assert.equal(response.demoRequests.length, 1)
+  assert.equal(response.demoRequests[0].measureStart, 13)
+  assert.equal(response.demoRequests[0].tempoRatio, 0.6)
+  assert.equal(response.demoRequests[0].loop, true)
+  assert.ok(response.diagnoses.some((diagnosis) => diagnosis.evidenceRefs.length > 0))
+
+  const grounded = {
+    ...response,
+    diagnoses: [{ text: '测试', evidenceRefs: [{ practiceRecordId: 's1' }], confidence: 'high' }]
+  }
+  assert.equal(coach2.validateDiagnosisGrounding(grounded), true)
+  assert.equal(coach2.validateDiagnosisGrounding({
+    ...response,
+    diagnoses: [{ text: '无证据诊断', evidenceRefs: [], confidence: 'low' }]
+  }), false)
+
+  const filtered = coach2.filterUnobservableClaims({
+    ...response,
+    diagnoses: [{ text: '手腕僵硬导致错音', evidenceRefs: [{ practiceRecordId: 's1' }], confidence: 'low' }]
+  })
+  assert.match(filtered.diagnoses[0].text, /需要额外 Ground Truth/)
+  assert.ok(filtered.uncertainty.length > 0)
+})
+
+test('Teaching Playback：PlaybackPlan 只来自谱面、选区/手别/速度正确', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/single-melody.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const plan = playback.buildPlaybackPlan(score, { tempoRatio: 1, handMode: 'both' })
+  assert.ok(plan !== null)
+  assert.equal(plan.handMode, 'both')
+  assert.equal(plan.tempoRatio, 1)
+  assert.equal(plan.events.filter((event) => event.type === 'noteOn').length, 8)
+  assert.equal(plan.events.filter((event) => event.type === 'noteOff').length, 8)
+  assert.ok(plan.events.every((event) => event.midiNumber >= 60 && event.midiNumber <= 72))
+
+  const slow = playback.buildPlaybackPlan(score, { tempoRatio: 0.5 })
+  assert.equal(slow.msPerTick, plan.msPerTick * 2)
+
+  const measuresOnly = playback.buildPlaybackPlan(score, { startMeasure: 1, endMeasure: 1 })
+  assert.equal(measuresOnly.events.length, plan.events.length)
+
+  const scheduled = playback.createPlaybackSchedule(plan)
+  assert.equal(scheduled.length, 16)
+  assert.equal(plan.durationMs > 0, true)
+})
+
+test('Platform adapters：接口存在、Storage/Secret 适配器可用、MIDI Out 默认不支持', () => {
+  assert.equal(platformAdapters.UNSUPPORTED_MIDI_OUTPUT_ADAPTER.isSupported, false)
+  platformAdapters.UNSUPPORTED_MIDI_OUTPUT_ADAPTER.panic()
+
+  const values = new Map()
+  const storage = {
+    getItem: (key) => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key)
+  }
+  const fileAdapter = platformAdapters.browserFileImportAdapter
+  assert.equal(typeof fileAdapter.readTextFile, 'function')
+  assert.equal(typeof fileAdapter.readArrayBuffer, 'function')
+
+  const secret = platformAdapters.browserSecretStore
+  assert.equal(typeof secret.getSecret, 'function')
+  assert.equal(typeof secret.setSecret, 'function')
+  assert.equal(typeof secret.clearSecret, 'function')
+})
+
+test('统一备份：manifest includedKeys 与恢复失败回滚', () => {
+  const state = { 'piano-volume.v1': '70', 'practice-records': '[]' }
+  const document = backup.buildBackup(state, '1.0.0-rc.1')
+  assert.deepEqual(document.includedKeys, ['piano-volume.v1', 'practice-records'])
+  assert.equal(backup.validateBackup(document), true)
+
+  const values = new Map([['piano-volume.v1', '50']])
+  let writeCount = 0
+  const failingStorage = {
+    getItem: (key) => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => {
+      writeCount += 1
+      if (writeCount === 2) throw new Error('disk full')
+      values.set(key, String(value))
+    },
+    removeItem: (key) => values.delete(key)
+  }
+  const result = backup.restoreFromBackup(document, failingStorage)
+  assert.equal(result.ok, false)
+  assert.equal(values.get('piano-volume.v1'), '50', '失败后必须回滚原值')
+})
+
+test('曲谱选区：按小节与手别过滤时间线', () => {
+  const twoHandsXml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>P</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><staff>1</staff></note>
+      <note><pitch><step>C</step><octave>3</octave></pitch><duration>4</duration><voice>2</voice><staff>2</staff></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><staff>1</staff></note>
+      <note><pitch><step>D</step><octave>3</octave></pitch><duration>4</duration><voice>2</voice><staff>2</staff></note>
+    </measure>
+  </part>
+</score-partwise>`
+  const score = musicXmlParser.loadMusicXmlDocument(twoHandsXml)
+  const both = scoreTimeline.buildSegmentTimeline(score, { startMeasure: 1, endMeasure: 2, handMode: 'both' })
+  assert.equal(both.units.length, 2)
+  assert.deepEqual(both.units[0].expectedMidi, [48, 60])
+  assert.deepEqual(both.units[1].expectedMidi, [50, 62])
+
+  const right = scoreTimeline.buildSegmentTimeline(score, { startMeasure: 2, endMeasure: 2, handMode: 'right' })
+  assert.equal(right.units.length, 1)
+  assert.deepEqual(right.units[0].expectedMidi, [62])
+
+  const left = scoreTimeline.buildSegmentTimeline(score, { startMeasure: 1, endMeasure: 1, handMode: 'left' })
+  assert.deepEqual(left.units[0].expectedMidi, [48])
+})
+
+test('曲谱练习 1.0 接线：导入分级、选区/循环/速度/预备拍、AI 示范与首页入口', () => {
+  const pageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ScorePracticePage.tsx'), 'utf8')
+  const hookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useScorePractice.ts'), 'utf8')
+  const homeSource = fs.readFileSync(require.resolve('../src/renderer/src/components/HomePage.tsx'), 'utf8')
+  const css = fs.readFileSync(require.resolve('../src/renderer/src/components.css'), 'utf8')
+  const appSource = fs.readFileSync(require.resolve('../src/renderer/src/App.tsx'), 'utf8')
+
+  assert.match(pageSource, /TIER_LABELS/)
+  assert.match(pageSource, /\.mid|\.midi/)
+  assert.match(pageSource, /\.pdf/)
+  assert.match(pageSource, /起始小节/)
+  assert.match(pageSource, /手别/)
+  assert.match(pageSource, /循环/)
+  assert.match(pageSource, /预备拍/)
+  assert.match(pageSource, /正确示范/)
+  assert.match(pageSource, /最薄弱小节/)
+  assert.match(pageSource, /buildDeterministicCoachResponse/)
+  assert.match(hookSource, /buildSegmentTimeline/)
+  assert.match(hookSource, /tempoRatio/)
+  assert.match(hookSource, /countInMs/)
+  assert.match(hookSource, /loop/)
+  assert.match(homeSource, /今日训练/)
+  assert.match(homeSource, /AI 钢琴助理/)
+  assert.match(css, /@media \(max-width: 1100px\)/)
+  assert.match(css, /min-height: 44px/)
+  assert.match(appSource, /practiceRecords=\{practiceHistory\.records\}/)
 })
 
 let failed = 0

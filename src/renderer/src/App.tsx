@@ -275,6 +275,8 @@ function App(): JSX.Element {
           <ScorePracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
+            pianoAudio={pianoAudio}
+            practiceRecords={practiceHistory.records}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'analytics' ? (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ScoreDocument } from '../score/musicXmlTypes'
 import { buildScoreTimeline } from '../score/scoreTimeline'
+import { buildSegmentTimeline, type ScoreSegmentOptions } from '../score/scoreTimeline'
 import { WaitScoreCore } from '../score/waitScoreCore'
 import { RealtimeScoreCore, type RealtimeStepResult } from '../score/realtimeScoreCore'
 import { FollowScoreCore, type FollowStepResult } from '../score/followScoreCore'
@@ -34,17 +35,31 @@ export interface UseScorePracticeResult {
   reset: () => void
 }
 
+export interface ScorePracticeOptions {
+  segment?: ScoreSegmentOptions
+  loop?: boolean
+  countInMs?: number
+  tempoRatio?: number
+}
+
 export function useScorePractice(
   score: ScoreDocument | null,
-  mode: ScorePracticeMode = 'wait'
+  mode: ScorePracticeMode = 'wait',
+  options: ScorePracticeOptions = {}
 ): UseScorePracticeResult {
-  const timeline = useMemo(() => (score ? buildScoreTimeline(score) : { units: [] }), [score])
+  const timeline = useMemo(
+    () => (score ? (options.segment ? buildSegmentTimeline(score, options.segment) : buildScoreTimeline(score)) : { units: [] }),
+    [options.segment, score]
+  )
+  const loop = options.loop ?? false
+  const countInMs = options.countInMs ?? 0
+  const tempoRatio = Math.min(2, Math.max(0.25, options.tempoRatio ?? 1))
   const msPerTick = useMemo(() => {
     if (!score) return 500
     const divisions = score.parts[0]?.measures.find((measure) => measure.divisions !== null)?.divisions ?? 1
     const bpm = score.defaultTempoBpm ?? 60
-    return 60000 / Math.max(1, bpm) / Math.max(1, divisions ?? 1)
-  }, [score])
+    return 60000 / Math.max(1, bpm) / Math.max(1, divisions ?? 1) / tempoRatio
+  }, [score, tempoRatio])
   const waitCoreRef = useRef<WaitScoreCore | null>(null)
   const realtimeCoreRef = useRef<RealtimeScoreCore | null>(null)
   const followCoreRef = useRef<FollowScoreCore | null>(null)
@@ -104,7 +119,7 @@ export function useScorePractice(
     setResults([])
     setFeedback(null)
     setElapsedMs(0)
-    startTimeRef.current = performance.now()
+    startTimeRef.current = performance.now() + countInMs
     setStatus('running')
     sync()
 
@@ -117,13 +132,16 @@ export function useScorePractice(
           realtimeCoreRef.current?.advanceTo(elapsed)
           sync()
           if (realtimeCoreRef.current?.isComplete) {
-            setStatus('finished')
-            stopTicker()
+            if (loop) start()
+            else {
+              setStatus('finished')
+              stopTicker()
+            }
           }
         }
       }, 40)
     }
-  }, [mode, stopTicker, sync])
+  }, [countInMs, mode, stopTicker, sync])
 
   const stop = useCallback(() => {
     stopTicker()
@@ -154,7 +172,8 @@ export function useScorePractice(
       setFeedback(outcome === 'wrong' ? 'wrong' : outcome === 'complete' ? 'correct' : null)
       sync()
       if (core.isComplete) {
-        setStatus('finished')
+        if (loop) start()
+        else setStatus('finished')
       }
       return
     }
@@ -167,8 +186,11 @@ export function useScorePractice(
       setFeedback(outcome === 'wrong' ? 'wrong' : outcome === 'complete' ? 'correct' : outcome === 'correct' ? 'correct' : null)
       sync()
       if (core.isComplete) {
-        setStatus('finished')
-        stopTicker()
+        if (loop) start()
+        else {
+          setStatus('finished')
+          stopTicker()
+        }
       }
       return
     }
@@ -180,8 +202,11 @@ export function useScorePractice(
     setFeedback(outcome === 'wrong' ? 'wrong' : outcome === 'complete' ? 'correct' : 'correct')
     sync()
     if (core.isComplete) {
-      setStatus('finished')
-      stopTicker()
+      if (loop) start()
+      else {
+        setStatus('finished')
+        stopTicker()
+      }
     }
   })
 
