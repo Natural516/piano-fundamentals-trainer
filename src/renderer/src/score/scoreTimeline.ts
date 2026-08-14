@@ -4,10 +4,7 @@ import type {
   ScoreNoteModel,
   ScoreTimeline
 } from './musicXmlTypes'
-
-function voiceKey(note: ScoreNoteModel): string {
-  return `${note.voice}-s${note.staff}`
-}
+import { buildScoreTimeV2 } from './scoreTimeV2'
 
 /**
  * Builds expected units using integer score ticks (divisions * duration).
@@ -18,80 +15,37 @@ function voiceKey(note: ScoreNoteModel): string {
  *   being serialized part-by-part.
  */
 export function buildScoreTimeline(score: ScoreDocument): ScoreTimeline {
-  const unitGroups = new Map<string, { expectedTick: number; notes: ScoreNoteModel[]; tieStart: boolean; rest: boolean }>()
+  const { events } = buildScoreTimeV2(score)
+  const unitGroups = new Map<string, { expectedTick: number; measure: number; notes: ScoreNoteModel[] }>()
 
-  for (const part of score.parts) {
-    let measureStartTick = 0
-
-    for (const measure of part.measures) {
-      const voiceCursors = new Map<string, number>()
-      let lastNoteOnset: number | null = null
-
-      for (const event of measure.timeEvents) {
-        if (event.kind === 'backup') {
-          for (const [key, cursor] of voiceCursors) {
-            voiceCursors.set(key, Math.max(0, cursor - event.duration))
-          }
-          continue
-        }
-
-        if (event.kind === 'forward') {
-          for (const [key, cursor] of voiceCursors) {
-            voiceCursors.set(key, cursor + event.duration)
-          }
-          continue
-        }
-
-        const note = measure.notes[event.noteIndex]
-        if (!note) continue
-
-        const key = voiceKey(note)
-        const cursor = voiceCursors.get(key) ?? 0
-        const onset: number = note.isChordTone
-          ? lastNoteOnset ?? cursor
-          : cursor
-
-        if (!note.isChordTone) {
-          voiceCursors.set(key, onset + note.duration)
-          lastNoteOnset = onset
-        }
-
-        const unitKey = `${measure.number}:${onset}`
-        const group = unitGroups.get(unitKey) ?? {
-          expectedTick: measureStartTick + onset,
-          notes: [],
-          tieStart: false,
-          rest: true
-        }
-        group.notes.push(note)
-        group.tieStart = group.tieStart || note.tie === 'start'
-        group.rest = group.rest && note.type === 'rest'
-        unitGroups.set(unitKey, group)
-      }
-
-      const measureLength = Math.max(
-        0,
-        ...voiceCursors.values()
-      )
-      measureStartTick += measureLength
+  for (const event of events) {
+    const note = score.parts[event.partIndex]?.measures[event.measureIndex]?.notes[event.noteIndex]
+    if (!note) continue
+    const unitKey = `${event.partIndex}-${event.measureNumber}:${event.onsetInMeasure}`
+    const group = unitGroups.get(unitKey) ?? {
+      expectedTick: event.absoluteOnset,
+      measure: event.measureNumber,
+      notes: []
     }
+    group.notes.push(note)
+    unitGroups.set(unitKey, group)
   }
 
   const units: ScoreExpectedUnit[] = [...unitGroups.entries()]
-    .map(([unitKey, group]) => {
+    .map(([, group]) => {
       const expectedMidi = group.notes
-        .filter((note) => note.type === 'note' && note.midiNumber !== null && note.tie !== 'stop' && note.tie !== 'continue')
+        .filter((note) => note.type === 'note' && note.midiNumber !== null && !(note.tieStop && !note.tieStart))
         .map((note) => note.midiNumber as number)
         .sort((left, right) => left - right)
 
       return {
-        id: `unit-${unitKey}`,
+        id: `unit-${group.measure}-${group.expectedTick}`,
         onsetIndex: 0,
         expectedTick: group.expectedTick,
-        measure: Number(unitKey.split(':')[0]) || 1,
+        measure: group.measure,
         notes: group.notes,
-        tieStart: group.tieStart,
-        rest: group.rest,
+        tieStart: group.notes.some((note) => note.tieStart),
+        rest: group.notes.every((note) => note.type === 'rest'),
         expectedMidi: [...new Set(expectedMidi)]
       }
     })
@@ -129,7 +83,7 @@ export function buildSegmentTimeline(score: ScoreDocument, options: ScoreSegment
       })
       if (notes.length === 0) return null
       const expectedMidi = notes
-        .filter((note) => note.type === 'note' && note.midiNumber !== null && note.tie !== 'stop' && note.tie !== 'continue')
+        .filter((note) => note.type === 'note' && note.midiNumber !== null && !(note.tieStop && !note.tieStart))
         .map((note) => note.midiNumber as number)
         .sort((left, right) => left - right)
       if (expectedMidi.length === 0 && !notes.every((note) => note.type === 'rest')) return null
@@ -137,7 +91,7 @@ export function buildSegmentTimeline(score: ScoreDocument, options: ScoreSegment
         ...unit,
         notes,
         rest: notes.every((note) => note.type === 'rest'),
-        tieStart: notes.some((note) => note.tie === 'start'),
+        tieStart: notes.some((note) => note.tieStart),
         expectedMidi: [...new Set(expectedMidi)]
       }
     })

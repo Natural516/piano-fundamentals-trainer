@@ -63,6 +63,7 @@ const planner = require('../src/renderer/src/plan/planner.ts')
 const coach2 = require('../src/renderer/src/ai/coach2.ts')
 const playback = require('../src/renderer/src/playback/playback.ts')
 const platformAdapters = require('../src/renderer/src/platform/adapters.ts')
+const scoreTimeV2 = require('../src/renderer/src/score/scoreTimeV2.ts')
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -2301,10 +2302,10 @@ test('MusicXML 解析：和弦、延音、休止、临时记号与调号变化',
   const chordScore = musicXmlParser.loadMusicXmlDocument(chordXml)
   const firstMeasure = chordScore.parts[0].measures[0]
   assert.equal(firstMeasure.notes.filter((note) => note.isChordTone).length, 1)
-  assert.equal(firstMeasure.notes.find((note) => note.midiNumber === 60)?.tie, 'start')
+  assert.equal(firstMeasure.notes.find((note) => note.midiNumber === 60)?.tieStart, true)
   assert.equal(firstMeasure.notes.some((note) => note.type === 'rest'), true)
   const secondMeasure = chordScore.parts[0].measures[1]
-  assert.equal(secondMeasure.notes.find((note) => note.midiNumber === 60)?.tie, 'stop')
+  assert.equal(secondMeasure.notes.find((note) => note.midiNumber === 60)?.tieStop, true)
 
   const accidentalXml = fs.readFileSync(require.resolve('./score-fixtures/accidental-key-change.xml'), 'utf8')
   const accidentalScore = musicXmlParser.loadMusicXmlDocument(accidentalXml)
@@ -3003,6 +3004,7 @@ test('MusicXML 时间轴：backup 合并、多声部、rest 与 tie 链', () => 
       <attributes><divisions>4</divisions></attributes>
       <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note>
       <note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note>
+      <backup><duration>8</duration></backup>
       <note><pitch><step>E</step><octave>3</octave></pitch><duration>8</duration><voice>2</voice></note>
       <note><rest/><duration>4</duration><voice>2</voice></note>
     </measure>
@@ -3011,8 +3013,8 @@ test('MusicXML 时间轴：backup 合并、多声部、rest 与 tie 链', () => 
   const multiVoiceTimeline = scoreTimeline.buildScoreTimeline(musicXmlParser.loadMusicXmlDocument(multiVoiceXml))
   assert.deepEqual(multiVoiceTimeline.units.map((unit) => [unit.expectedTick, unit.expectedMidi]), [
     [0, [52, 60]],
-    [4, [62]],
-    [8, []]
+    [480, [62]],
+    [960, []]
   ])
 })
 
@@ -3422,9 +3424,11 @@ test('曲谱选区：按小节与手别过滤时间线', () => {
 </score-partwise>`
   const score = musicXmlParser.loadMusicXmlDocument(twoHandsXml)
   const both = scoreTimeline.buildSegmentTimeline(score, { startMeasure: 1, endMeasure: 2, handMode: 'both' })
-  assert.equal(both.units.length, 2)
-  assert.deepEqual(both.units[0].expectedMidi, [48, 60])
-  assert.deepEqual(both.units[1].expectedMidi, [50, 62])
+  assert.equal(both.units.length, 4)
+  assert.deepEqual(both.units[0].expectedMidi, [60])
+  assert.deepEqual(both.units[1].expectedMidi, [48])
+  assert.deepEqual(both.units[2].expectedMidi, [62])
+  assert.deepEqual(both.units[3].expectedMidi, [50])
 
   const right = scoreTimeline.buildSegmentTimeline(score, { startMeasure: 2, endMeasure: 2, handMode: 'right' })
   assert.equal(right.units.length, 1)
@@ -3460,6 +3464,123 @@ test('曲谱练习 1.0 接线：导入分级、选区/循环/速度/预备拍、
   assert.match(css, /@media \(max-width: 1100px\)/)
   assert.match(css, /min-height: 44px/)
   assert.match(appSource, /practiceRecords=\{practiceHistory\.records\}/)
+})
+
+test('Score Time V2：divisions 中途变更仍保持相同时值', () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>P</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1"><attributes><divisions>1</divisions></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note>
+    </measure>
+    <measure number="2"><attributes><divisions>2</divisions></attributes>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>8</duration><voice>1</voice></note>
+    </measure>
+  </part>
+</score-partwise>`
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const model = scoreTimeV2.buildScoreTimeV2(score)
+  const [m1, m2] = model.events
+  assert.equal(m1.duration, 1920)
+  assert.equal(m2.duration, 1920)
+  assert.equal(m1.absoluteOnset, 0)
+  assert.equal(m2.absoluteOnset, 1920)
+  assert.equal(m1.sourceDivisions, 1)
+  assert.equal(m2.sourceDivisions, 2)
+})
+
+test('Score Time V2：backup/forward 文档 cursor、多 voice、chord、rest 与属性继承', () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>P</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions><key><fifths>1</fifths></key><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note><pitch><step>C</step><octave>3</octave></pitch><duration>16</duration><voice>1</voice><staff>2</staff></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><staff>1</staff></note>
+      <note><chord/><pitch><step>B</step><octave>4</octave></pitch><duration>4</duration><voice>2</voice><staff>1</staff></note>
+      <note><rest/><duration>4</duration><voice>1</voice><staff>1</staff></note>
+    </measure>
+  </part>
+</score-partwise>`
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const model = scoreTimeV2.buildScoreTimeV2(score)
+  const [rh, lh, g, b, rest] = model.events
+  assert.equal(rh.absoluteOnset, 0)
+  assert.equal(lh.absoluteOnset, 0, 'backup 后双手应同 onset')
+  assert.equal(g.absoluteOnset, 1920)
+  assert.equal(b.absoluteOnset, 1920, 'chord 与前一主音符共享 onset 且 cursor 不再前进')
+  assert.equal(rest.absoluteOnset, 2400, 'rest 推进 cursor')
+  assert.equal(rest.type, 'rest')
+  // 属性继承：M2 未写 attributes，沿用 M1 的 fifths=1
+  assert.equal(g.sourceDivisions, 4)
+  const secondMeasureStart = model.measureStartTicks.find((entry) => entry.measureNumber === 2)
+  assert.equal(secondMeasureStart.startTick, 1920)
+})
+
+test('Score Time V2：tie 链一次 attack 与一次 release', () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>P</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1"><attributes><divisions>1</divisions></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><tie type="start"/></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><tie type="stop"/><tie type="start"/></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><tie type="stop"/></note>
+    </measure>
+  </part>
+</score-partwise>`
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const model = scoreTimeV2.buildScoreTimeV2(score)
+  const [m1, m2, m3] = model.events
+  assert.equal(m1.tieStart, true)
+  assert.equal(m2.tieStop, true)
+  assert.equal(m2.tieStart, true, 'stop+start 中间节点必须同时保留')
+  assert.equal(m3.tieStop, true)
+
+  const merged = scoreTimeV2.mergeTiedPerformanceEvents(model.events)
+  assert.equal(merged.length, 1, '一条 tie 链只产生一次 attack')
+  assert.equal(merged[0].attackTick, 0)
+  assert.equal(merged[0].releaseTick, 3 * 480)
+})
+
+test('Score Time V2：multipart 并行、score-timewise 明确拒绝', () => {
+  const multipartXml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list>
+    <score-part id="P1"><part-name>RH</part-name></score-part>
+    <score-part id="P2"><part-name>LH</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1"><attributes><divisions>1</divisions></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1"><attributes><divisions>1</divisions></attributes>
+      <note><pitch><step>C</step><octave>3</octave></pitch><duration>4</duration><voice>1</voice></note>
+    </measure>
+  </part>
+</score-partwise>`
+  const multipart = musicXmlParser.loadMusicXmlDocument(multipartXml)
+  const model = scoreTimeV2.buildScoreTimeV2(multipart)
+  assert.equal(model.events.length, 2)
+  assert.equal(model.events[0].absoluteOnset, 0)
+  assert.equal(model.events[1].absoluteOnset, 0, '多 part 按 score time 并行，不得串联')
+
+  assert.throws(
+    () => musicXmlParser.loadMusicXmlDocument('<score-timewise version="4.0"><part-list/></score-timewise>'),
+    (error) => error instanceof scoreTimeV2.UnsupportedScoreFormatError
+  )
 })
 
 let failed = 0

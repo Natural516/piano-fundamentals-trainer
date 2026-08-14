@@ -1,6 +1,5 @@
 export type ScoreClefSign = 'G' | 'F' | 'C' | 'percussion' | 'TAB' | 'none'
 export type ScoreNoteType = 'note' | 'rest'
-export type ScoreTieKind = 'start' | 'stop' | 'continue' | null
 
 export interface ScoreNoteModel {
   id: string
@@ -13,7 +12,8 @@ export interface ScoreNoteModel {
   voice: string
   staff: number
   isChordTone: boolean
-  tie: ScoreTieKind
+  tieStart: boolean
+  tieStop: boolean
   accidental: string | null
   isGrace?: boolean
 }

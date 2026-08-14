@@ -5,6 +5,7 @@ import type {
   ScoreNoteModel,
   ScorePartModel
 } from './musicXmlTypes'
+import { UnsupportedScoreFormatError } from './scoreTimeV2'
 
 const STEP_OFFSET: Record<string, number> = {
   C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11
@@ -12,8 +13,11 @@ const STEP_OFFSET: Record<string, number> = {
 
 export function parseMusicXml(source: string): ScoreDocument {
   const root = parseXml(source)
-  if (root.tag !== 'score-partwise' && root.tag !== 'score-timewise') {
-    throw new Error(`Unsupported MusicXML root: ${root.tag}`)
+  if (root.tag === 'score-timewise') {
+    throw new UnsupportedScoreFormatError('score-timewise 暂不支持，请使用 score-partwise')
+  }
+  if (root.tag !== 'score-partwise') {
+    throw new UnsupportedScoreFormatError(`不支持的 MusicXML 根元素: ${root.tag}`)
   }
 
   const work = findChild(root, 'work')
@@ -119,8 +123,6 @@ function parseNote(element: XmlElement, index: number): ScoreNoteModel | null {
   const duration = childNumber(element, 'duration') ?? 0
   const voice = childText(element, 'voice') || '1'
   const staff = childNumber(element, 'staff') ?? 1
-  const tieStart = findChildren(element, 'tie').some((tie) => tie.attributes.type === 'start')
-  const tieStop = findChildren(element, 'tie').some((tie) => tie.attributes.type === 'stop')
   const tieContinue = findChildren(element, 'tie').some((tie) => tie.attributes.type === 'continue')
   const accidental = findChild(element, 'accidental')?.text ?? null
   const grace = findChild(element, 'grace') !== null
@@ -138,7 +140,8 @@ function parseNote(element: XmlElement, index: number): ScoreNoteModel | null {
     voice,
     staff,
     isChordTone: findChild(element, 'chord') !== null,
-    tie: tieStart ? 'start' : tieStop ? 'stop' : tieContinue ? 'continue' : null,
+    tieStart: findChildren(element, 'tie').some((tie) => tie.attributes.type === 'start'),
+    tieStop: findChildren(element, 'tie').some((tie) => tie.attributes.type === 'stop') || tieContinue,
     accidental: accidental || null,
     isGrace: grace
   }

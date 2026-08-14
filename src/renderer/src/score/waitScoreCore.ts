@@ -77,10 +77,10 @@ export class WaitScoreCore {
 
   private applyTies(unit: ScoreExpectedUnit): void {
     for (const note of unit.notes) {
-      if (note.tie === 'start' && note.midiNumber !== null) {
+      if (note.tieStart && note.midiNumber !== null) {
         this.sounding.add(note.midiNumber)
       }
-      if ((note.tie === 'stop' || note.tie === 'continue') && note.midiNumber !== null) {
+      if (note.tieStop && note.midiNumber !== null) {
         this.sounding.delete(note.midiNumber)
       }
     }

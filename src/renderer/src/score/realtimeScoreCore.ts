@@ -1,4 +1,5 @@
 import type { ScoreExpectedUnit, ScoreTimeline } from './musicXmlTypes'
+import { INTERNAL_PPQ } from './scoreTimeV2'
 
 export interface RealtimeStepResult {
   unitId: string
@@ -34,7 +35,7 @@ export class RealtimeScoreCore {
     this.units = timeline.units
     this.toleranceMs = options.toleranceMs ?? 180
     this.beatDurationMs = options.beatDurationMs ?? 500
-    this.msPerTick = options.msPerTick ?? this.beatDurationMs
+    this.msPerTick = options.msPerTick ?? this.beatDurationMs / INTERNAL_PPQ
     this.skipWindowMs = options.skipWindowMs ?? this.toleranceMs * 2
   }
 

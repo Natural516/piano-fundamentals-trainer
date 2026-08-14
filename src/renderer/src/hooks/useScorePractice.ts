@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ScoreDocument } from '../score/musicXmlTypes'
 import { buildScoreTimeline } from '../score/scoreTimeline'
 import { buildSegmentTimeline, type ScoreSegmentOptions } from '../score/scoreTimeline'
+import { INTERNAL_PPQ } from '../score/scoreTimeV2'
 import { WaitScoreCore } from '../score/waitScoreCore'
 import { RealtimeScoreCore, type RealtimeStepResult } from '../score/realtimeScoreCore'
 import { FollowScoreCore, type FollowStepResult } from '../score/followScoreCore'
@@ -56,9 +57,8 @@ export function useScorePractice(
   const tempoRatio = Math.min(2, Math.max(0.25, options.tempoRatio ?? 1))
   const msPerTick = useMemo(() => {
     if (!score) return 500
-    const divisions = score.parts[0]?.measures.find((measure) => measure.divisions !== null)?.divisions ?? 1
     const bpm = score.defaultTempoBpm ?? 60
-    return 60000 / Math.max(1, bpm) / Math.max(1, divisions ?? 1) / tempoRatio
+    return 60000 / Math.max(1, bpm) / INTERNAL_PPQ / tempoRatio
   }, [score, tempoRatio])
   const waitCoreRef = useRef<WaitScoreCore | null>(null)
   const realtimeCoreRef = useRef<RealtimeScoreCore | null>(null)

@@ -1,5 +1,5 @@
-import type { ScoreDocument, ScoreNoteModel } from '../score/musicXmlTypes'
-import { buildScoreTimeline } from '../score/scoreTimeline'
+import type { ScoreDocument } from '../score/musicXmlTypes'
+import { INTERNAL_PPQ, mergeTiedPerformanceEvents, buildScoreTimeV2 } from '../score/scoreTimeV2'
 
 export interface PlaybackEvent {
   timeMs: number
@@ -29,18 +29,13 @@ export interface PlaybackPlanOptions {
   loop?: boolean
 }
 
-function noteMidi(note: ScoreNoteModel): number | null {
-  return note.type === 'note' ? note.midiNumber : null
-}
-
 /**
  * Builds a correct-playback plan strictly from the ScoreModel. AI only
  * chooses measures / hand / tempo; the notes come from the score.
  */
 export function buildPlaybackPlan(score: ScoreDocument, options: PlaybackPlanOptions = {}): PlaybackPlan | null {
-  const divisions = score.parts[0]?.measures.find((measure) => measure.divisions !== null)?.divisions ?? 1
   const bpm = score.defaultTempoBpm ?? 60
-  const baseMsPerTick = 60000 / Math.max(1, bpm) / Math.max(1, divisions)
+  const baseMsPerTick = 60000 / Math.max(1, bpm) / INTERNAL_PPQ
   const tempoRatio = Math.min(2, Math.max(0.25, options.tempoRatio ?? 1))
   const msPerTick = baseMsPerTick / tempoRatio
   const startMeasure = Math.max(1, options.startMeasure ?? 1)
@@ -48,36 +43,28 @@ export function buildPlaybackPlan(score: ScoreDocument, options: PlaybackPlanOpt
   const handMode = options.handMode ?? 'both'
   const loop = Boolean(options.loop)
 
-  const timeline = buildScoreTimeline(score)
-  const events: PlaybackEvent[] = []
-
-  for (const unit of timeline.units) {
-    const measureNumber = Number(unit.id.split('-')[1].replace('m', '')) || 1
-    if (measureNumber < startMeasure || measureNumber > endMeasure) continue
-
-    const filteredNotes = unit.notes.filter((note) => {
-      if (handMode === 'both') return true
-      const staff = note.staff ?? 1
-      return handMode === 'right' ? staff === 1 : staff === 2
-    })
-
-    for (const note of filteredNotes) {
-      const midiNumber = noteMidi(note)
-      if (midiNumber === null) continue
-      events.push({
-        timeMs: unit.expectedTick * msPerTick,
-        type: 'noteOn',
-        midiNumber,
-        velocity: 90
-      })
-      events.push({
-        timeMs: (unit.expectedTick + Math.max(1, note.duration)) * msPerTick,
-        type: 'noteOff',
-        midiNumber,
-        velocity: 0
-      })
+  const { events: scoreEvents } = buildScoreTimeV2(score)
+  const segmentEvents = scoreEvents.filter((event) => {
+    if (event.measureNumber < startMeasure || event.measureNumber > endMeasure) return false
+    if (handMode === 'both') return true
+    return handMode === 'right' ? event.staff === 1 : event.staff === 2
+  })
+  const baseTick = Math.min(...segmentEvents.map((event) => event.absoluteOnset), 0)
+  const tied = mergeTiedPerformanceEvents(segmentEvents)
+  const events: PlaybackEvent[] = tied.flatMap((tiedEvent) => [
+    {
+      timeMs: (tiedEvent.attackTick - baseTick) * msPerTick,
+      type: 'noteOn' as const,
+      midiNumber: tiedEvent.midiPitch,
+      velocity: 90
+    },
+    {
+      timeMs: (tiedEvent.releaseTick - baseTick) * msPerTick,
+      type: 'noteOff' as const,
+      midiNumber: tiedEvent.midiPitch,
+      velocity: 0
     }
-  }
+  ])
 
   events.sort((left, right) => left.timeMs - right.timeMs || left.type.localeCompare(right.type))
 
@@ -91,7 +78,7 @@ export function buildPlaybackPlan(score: ScoreDocument, options: PlaybackPlanOpt
     loop,
     msPerTick,
     events,
-    durationMs: events.length > 0 ? events[events.length - 1].timeMs : 0
+    durationMs: events.length > 0 ? Math.max(...events.map((event) => event.timeMs)) : 0
   }
 }
 

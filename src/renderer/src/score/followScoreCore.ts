@@ -1,4 +1,5 @@
 import type { ScoreExpectedUnit, ScoreTimeline } from './musicXmlTypes'
+import { INTERNAL_PPQ } from './scoreTimeV2'
 
 interface FollowCandidate {
   index: number
@@ -42,7 +43,7 @@ export class FollowScoreCore {
 
   constructor(timeline: ScoreTimeline, options: FollowCoreOptions = {}) {
     this.units = timeline.units
-    this.msPerTick = options.msPerTick ?? options.beatDurationMs ?? 500
+    this.msPerTick = options.msPerTick ?? (options.beatDurationMs ?? 500) / INTERNAL_PPQ
     this.timeCostWeight = options.timeCostWeight ?? 0.6
     this.pitchCost = options.pitchCost ?? 2
     this.skipCost = options.skipCost ?? 3
