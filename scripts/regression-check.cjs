@@ -4475,6 +4475,27 @@ test('AI observable boundary adversarial：句中限定词不得放行后续确�
   }
 })
 
+test('AI observable boundary 中文语义类别：自然指法与身体动作必须过滤，可观测错音不得误过滤', () => {
+  const unobservableClaims = [
+    '这里应该改用二指。',
+    '这里应该改用食指。',
+    '这里应该抬高手肘。',
+    '这里肩膀太紧。'
+  ]
+  const responseFor = (summary) => ({
+    intent: 'GENERAL', summary, observations: [], diagnoses: [], recommendations: [],
+    demoRequests: [], nextSteps: [], evidenceRefs: [], uncertainty: [], confidence: 'low'
+  })
+  for (const claim of unobservableClaims) {
+    const filtered = coach2.filterUnobservableClaims(responseFor(claim))
+    assert.match(filtered.summary, /^无法仅根据 MIDI 确认以下不可观测内容：/)
+    assert.notEqual(filtered.summary, claim)
+  }
+
+  const observable = '第2小节第1.5拍右手出现错音。'
+  assert.equal(coach2.filterUnobservableClaims(responseFor(observable)).summary, observable)
+})
+
 test('Evidence resolver persisted record：逐字段验证 measure/beat/hand/staff/error/source', () => {
   const record = {
     id: 'r', schemaVersion: 2, practiceType: 'score', sourceType: 'mxl', sourceId: 'S',

@@ -187,6 +187,6 @@ export function exportRecordsToJson(records: PracticeSessionRecord[]): string {
 }
 
 export function isUnobservableFromMidi(claim: string): boolean {
-  const unobservable = /指法|\d\s*指|手指|指头|手腕|手型|肌肉|坐姿|放松|紧张|触键动作|身体使用/
+  const unobservable = /[一二三四五1-5]\s*指|拇指|食指|中指|无名指|小指|指法|手指|指头|手腕|腕部|手型|手形|坐姿|姿势|肌肉|肩(?:膀)?|手臂|前臂|手?肘|紧张|僵硬|放松|触键动作|身体使用/
   return unobservable.test(claim)
 }
