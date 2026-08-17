@@ -22,6 +22,59 @@ const SELF_CLOSING_TAGS = new Set([
 export function parseXml(source: string): XmlElement {
   let index = 0
 
+  const skipProcessingInstruction = (): void => {
+    const end = source.indexOf('?>', index + 2)
+    if (end < 0) throw new Error('Unterminated processing instruction')
+    index = end + 2
+  }
+
+  const skipComment = (): void => {
+    const end = source.indexOf('-->', index + 4)
+    if (end < 0) throw new Error('Unterminated comment')
+    index = end + 3
+  }
+
+  // A MuseScore DOCTYPE may contain quoted '>' characters or an internal
+  // subset. Scan it structurally instead of stopping at the first '>'.
+  const skipDeclaration = (): void => {
+    let cursor = index + 2
+    let quote: '"' | "'" | null = null
+    let subsetDepth = 0
+    while (cursor < source.length) {
+      const character = source[cursor]
+      if (quote) {
+        if (character === quote) quote = null
+      } else if (character === '"' || character === "'") {
+        quote = character
+      } else if (character === '[') {
+        subsetDepth += 1
+      } else if (character === ']') {
+        subsetDepth = Math.max(0, subsetDepth - 1)
+      } else if (character === '>' && subsetDepth === 0) {
+        index = cursor + 1
+        return
+      }
+      cursor += 1
+    }
+    throw new Error('Unterminated declaration')
+  }
+
+  const skipNonSemanticNode = (): boolean => {
+    if (source.startsWith('<!--', index)) {
+      skipComment()
+      return true
+    }
+    if (source.startsWith('<?', index)) {
+      skipProcessingInstruction()
+      return true
+    }
+    if (source.startsWith('<!', index) && !source.startsWith('<![CDATA[', index)) {
+      skipDeclaration()
+      return true
+    }
+    return false
+  }
+
   const skipWhitespace = (): void => {
     while (index < source.length && /\s/.test(source[index])) {
       index += 1
@@ -67,12 +120,7 @@ export function parseXml(source: string): XmlElement {
     const textParts: string[] = []
 
     while (index < source.length) {
-      if (source.startsWith('<!--', index)) {
-        const commentEnd = source.indexOf('-->', index)
-        if (commentEnd < 0) throw new Error('Unterminated comment')
-        index = commentEnd + 3
-        continue
-      }
+      if (skipNonSemanticNode()) continue
 
       if (source.startsWith('<![CDATA[', index)) {
         const cdataEnd = source.indexOf(']]>', index)
@@ -82,17 +130,14 @@ export function parseXml(source: string): XmlElement {
         continue
       }
 
-      if (source.startsWith('<!', index) || source.startsWith('<?', index)) {
-        const declarationEnd = source.indexOf('>', index)
-        if (declarationEnd < 0) throw new Error('Unterminated declaration')
-        index = declarationEnd + 1
-        continue
-      }
-
       if (source[index] === '<') {
         if (source.startsWith('</', index)) {
           const closeEnd = source.indexOf('>', index)
           if (closeEnd < 0) throw new Error('Unterminated close tag')
+          const closeTag = source.slice(index + 2, closeEnd).trim()
+          if (closeTag !== tag) {
+            throw new Error(`Mismatched close tag: expected </${tag}> but found </${closeTag}>`)
+          }
           index = closeEnd + 1
           element.text = unescapeXml(textParts.join('').trim())
           return element
@@ -114,26 +159,12 @@ export function parseXml(source: string): XmlElement {
   skipWhitespace()
 
   while (index < source.length) {
-    if (source.startsWith('<?xml', index) || source.startsWith('<?', index)) {
-      const declarationEnd = source.indexOf('?>', index)
-      if (declarationEnd < 0) throw new Error('Unterminated processing instruction')
-      index = declarationEnd + 2
+    skipWhitespace()
+    if (source.charCodeAt(index) === 0xfeff) {
+      index += 1
       continue
     }
-
-    if (source.startsWith('<!--', index)) {
-      const commentEnd = source.indexOf('-->', index)
-      if (commentEnd < 0) throw new Error('Unterminated comment')
-      index = commentEnd + 3
-      continue
-    }
-
-    if (source.startsWith('<!', index)) {
-      const declarationEnd = source.indexOf('>', index)
-      if (declarationEnd < 0) throw new Error('Unterminated declaration')
-      index = declarationEnd + 1
-      continue
-    }
+    if (skipNonSemanticNode()) continue
 
     break
   }

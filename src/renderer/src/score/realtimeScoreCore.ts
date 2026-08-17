@@ -3,13 +3,17 @@ import { INTERNAL_PPQ } from './scoreTimeV2'
 
 export interface RealtimeStepResult {
   unitId: string
-  outcome: 'correct' | 'wrong' | 'missing' | 'extra' | 'early' | 'late'
+  outcome: 'correct' | 'wrong' | 'missing' | 'extra' | 'early' | 'late' | 'skip'
   offsetMs: number
   measure: number
+  originalMeasure: number
+  originalBeat: number
+  practiceTick: number
   beat: number
   expectedMidi: number[]
   actualMidi: number | null
   hand: 'left' | 'right' | 'both' | null
+  staff: number | null
   sourceEventIds: string[]
 }
 
@@ -73,14 +77,18 @@ export class RealtimeScoreCore {
       if (unit.rest) {
         this.stepResults.push({
           unitId: unit.id,
-          outcome: 'correct',
+          outcome: 'skip',
           offsetMs: 0,
           measure: unit.measure,
-          beat: unit.expectedTick / 480 + 1,
+          originalMeasure: unit.originalMeasure,
+          originalBeat: unit.originalBeat,
+          practiceTick: unit.practiceTick,
+          beat: unit.originalBeat,
           expectedMidi: [],
           actualMidi: null,
-          hand: null,
-          sourceEventIds: []
+          hand: unit.hand,
+          staff: unit.staff,
+          sourceEventIds: unit.sourceEventIds
         })
         this.index += 1
         continue
@@ -97,11 +105,15 @@ export class RealtimeScoreCore {
           outcome: this.pressed.size === 0 ? 'missing' : 'wrong',
           offsetMs: Math.round(elapsedMs - expectedTime),
           measure: unit.measure,
-          beat: unit.expectedTick / 480 + 1,
+          originalMeasure: unit.originalMeasure,
+          originalBeat: unit.originalBeat,
+          practiceTick: unit.practiceTick,
+          beat: unit.originalBeat,
           expectedMidi: unit.expectedMidi,
           actualMidi: null,
-          hand: null,
-          sourceEventIds: []
+          hand: unit.hand,
+          staff: unit.staff,
+          sourceEventIds: unit.sourceEventIds
         })
         this.index += 1
         this.pressed.clear()
@@ -119,17 +131,40 @@ export class RealtimeScoreCore {
     const expectedTime = this.expectedTimeFor(unit)
     const offset = elapsedMs - expectedTime
 
+    if (offset < -this.skipWindowMs) {
+      this.stepResults.push({
+        unitId: unit.id,
+        outcome: 'extra',
+        offsetMs: Math.round(offset),
+        measure: unit.measure,
+        originalMeasure: unit.originalMeasure,
+        originalBeat: unit.originalBeat,
+        practiceTick: unit.practiceTick,
+        beat: unit.originalBeat,
+        expectedMidi: unit.expectedMidi,
+        actualMidi: midiNumber,
+        hand: unit.hand,
+        staff: unit.staff,
+        sourceEventIds: unit.sourceEventIds
+      })
+      return 'wrong'
+    }
+
     if (!unit.expectedMidi.includes(midiNumber)) {
       this.stepResults.push({
         unitId: unit.id,
         outcome: 'extra',
         offsetMs: Math.round(offset),
         measure: unit.measure,
-        beat: unit.expectedTick / 480 + 1,
+        originalMeasure: unit.originalMeasure,
+        originalBeat: unit.originalBeat,
+        practiceTick: unit.practiceTick,
+        beat: unit.originalBeat,
         expectedMidi: unit.expectedMidi,
         actualMidi: midiNumber,
-        hand: null,
-        sourceEventIds: sourceEventId ? [sourceEventId] : []
+        hand: unit.hand,
+        staff: unit.staff,
+        sourceEventIds: unit.sourceEventIds
       })
       return 'wrong'
     }
@@ -143,11 +178,15 @@ export class RealtimeScoreCore {
           outcome,
           offsetMs: Math.round(offset),
           measure: unit.measure,
-          beat: unit.expectedTick / 480 + 1,
+          originalMeasure: unit.originalMeasure,
+          originalBeat: unit.originalBeat,
+          practiceTick: unit.practiceTick,
+          beat: unit.originalBeat,
           expectedMidi: unit.expectedMidi,
           actualMidi: midiNumber,
-          hand: null,
-          sourceEventIds: sourceEventId ? [sourceEventId] : []
+          hand: unit.hand,
+          staff: unit.staff,
+          sourceEventIds: unit.sourceEventIds
         })
         this.index += 1
         this.pressed.clear()
@@ -162,11 +201,15 @@ export class RealtimeScoreCore {
         outcome: 'correct',
         offsetMs: Math.round(offset),
         measure: unit.measure,
-        beat: unit.expectedTick / 480 + 1,
+        originalMeasure: unit.originalMeasure,
+        originalBeat: unit.originalBeat,
+        practiceTick: unit.practiceTick,
+        beat: unit.originalBeat,
         expectedMidi: unit.expectedMidi,
         actualMidi: midiNumber,
-        hand: null,
-        sourceEventIds: sourceEventId ? [sourceEventId] : []
+        hand: unit.hand,
+        staff: unit.staff,
+        sourceEventIds: unit.sourceEventIds
       })
       this.index += 1
       this.pressed.clear()

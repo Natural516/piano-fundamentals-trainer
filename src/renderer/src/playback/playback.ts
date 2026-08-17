@@ -103,3 +103,103 @@ export const UNSUPPORTED_EXTERNAL_MIDI_OUT: ExternalMidiOutAdapter = {
   sendControlChange: () => undefined,
   panic: () => undefined
 }
+
+export interface PlaybackAudioLike {
+  noteOn: (midiNumber: number, velocity: number) => void
+  noteOff: (midiNumber: number) => void
+  setSustain: (down: boolean) => void
+  allNotesOff: () => void
+}
+
+export interface PlaybackClock {
+  setTimeout: (callback: () => void, delayMs: number) => ReturnType<typeof globalThis.setTimeout>
+  clearTimeout: (timer: ReturnType<typeof globalThis.setTimeout>) => void
+}
+
+export interface TeachingPlaybackController {
+  play: (plan: PlaybackPlan) => void
+  stop: () => void
+  panic: () => void
+  isPlaying: () => boolean
+  activeVoiceCount: () => number
+}
+
+export function createTeachingPlaybackController(
+  audio: PlaybackAudioLike,
+  onPlayingChange: (playing: boolean) => void = () => undefined,
+  clock: PlaybackClock = globalThis
+): TeachingPlaybackController {
+  let timers: Array<ReturnType<typeof globalThis.setTimeout>> = []
+  let playing = false
+  const activeNotes = new Set<number>()
+
+  const setPlaying = (next: boolean): void => {
+    playing = next
+    onPlayingChange(next)
+  }
+  const clearTimers = (): void => {
+    for (const timer of timers) clock.clearTimeout(timer)
+    timers = []
+  }
+  const releaseAll = (): void => {
+    for (const midiNumber of activeNotes) audio.noteOff(midiNumber)
+    activeNotes.clear()
+    audio.setSustain(false)
+    audio.allNotesOff()
+  }
+  const stop = (): void => {
+    clearTimers()
+    releaseAll()
+    setPlaying(false)
+  }
+  const play = (plan: PlaybackPlan): void => {
+    if (playing || timers.length > 0 || activeNotes.size > 0) stop()
+    else clearTimers()
+    setPlaying(true)
+    const scheduleIteration = (): void => {
+      for (const event of plan.events) {
+        timers.push(clock.setTimeout(() => {
+          if (!playing) return
+          if (event.type === 'noteOn') {
+            activeNotes.add(event.midiNumber)
+            audio.noteOn(event.midiNumber, event.velocity)
+          } else {
+            activeNotes.delete(event.midiNumber)
+            audio.noteOff(event.midiNumber)
+          }
+        }, event.timeMs))
+      }
+      timers.push(clock.setTimeout(() => {
+        if (!playing) return
+        releaseAll()
+        if (plan.loop) scheduleIteration()
+        else setPlaying(false)
+      }, plan.durationMs + 80))
+    }
+    scheduleIteration()
+  }
+
+  return {
+    play,
+    stop,
+    panic: stop,
+    isPlaying: () => playing,
+    activeVoiceCount: () => activeNotes.size
+  }
+}
+
+/**
+ * Single-lifecycle playback scheduler. stop() clears every scheduled timer AND
+ * sends All Notes Off + sustain off, so a long note never hangs after stop.
+ */
+export function createPlaybackScheduler(
+  plan: PlaybackPlan,
+  audio: PlaybackAudioLike
+): { start: () => void; stop: () => void; isPlaying: () => boolean } {
+  const controller = createTeachingPlaybackController(audio)
+  return {
+    start: () => controller.play(plan),
+    stop: controller.stop,
+    isPlaying: controller.isPlaying
+  }
+}

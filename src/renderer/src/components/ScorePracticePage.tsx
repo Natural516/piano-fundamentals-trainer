@@ -1,30 +1,70 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ActiveMidiNote } from '../types'
 import { useScorePractice, type ScorePracticeMode } from '../hooks/useScorePractice'
 import type { UsePianoAudioResult } from '../hooks/usePianoAudio'
 import { loadMusicXmlDocument } from '../score/musicXmlParser'
-import { extractMxlContainerAsync } from '../score/zipReader'
+import { importMxlFile } from '../score/mxlImportService'
 import { parseMidiFile } from '../midiFile/midiFileParser'
-import { buildPlaybackPlan, type PlaybackPlan } from '../playback/playback'
-import { buildDeterministicCoachResponse, type CoachResponse } from '../ai/coach2'
-import { computeAbilityModel } from '../ability/abilityModel'
-import { fromLegacyRecord, type PracticeRecordV2 } from '../records/practiceRecordV2'
-import { saveScorePracticeRecord } from '../records/scorePracticeRecords'
+import {
+  buildPlaybackPlan,
+  createTeachingPlaybackController,
+  type PlaybackPlan,
+  type TeachingPlaybackController
+} from '../playback/playback'
+import { buildDeterministicCoachResponse, type CoachContext, type CoachResponse } from '../ai/coach2'
+import { createOpenAiCompatibleClient } from '../ai/aiProvider'
+import { readAiSettings } from '../ai/aiSettings'
+import { requestScoreCoachFromProvider } from '../ai/scoreCoachProvider'
+import type { TemporarySessionEvidence } from '../ai/evidenceResolver'
+import { computeAbilityModelV2 } from '../ability/abilityModel'
+import { computeScoreMastery } from '../ability/scoreMastery'
+import type { PracticeRecordV2 } from '../records/practiceRecordV2'
+import { practiceRecordRepository } from '../records/practiceRecordRepository'
 import { isExperimentalFeatureVisible } from '../featureFlags'
 import type { ScoreDocument } from '../score/musicXmlTypes'
 import type { PracticeSessionRecord } from '../utils/practiceRecordTypes'
+import {
+  getScoreImport,
+  readScoreImports,
+  upsertScoreImport,
+  writeScoreImports
+} from '../score/scoreImportRepository'
+import {
+  buildMidiReferenceNotes,
+  buildScoreReferenceNotes,
+  validateScoreAgainstMidi,
+  type ReferenceValidationReport
+} from '../score/referenceValidation'
+import {
+  readPracticeSegments,
+  upsertPracticeSegment,
+  writePracticeSegments,
+  type PracticeSegment
+} from '../score/practiceSegment'
 import { AppButton } from './AppButton'
 import { MiniKeyboard } from './MiniKeyboard'
 import { PracticePageHeader } from './PracticePageHeader'
 import { PracticeReportModal } from './PracticeReportModal'
 import { PracticeStatBar } from './PracticeStatBar'
+import { ScoreSheetRenderer } from './ScoreSheetRenderer'
+import { buildScoreTimeV2 } from '../score/scoreTimeV2'
+import { readDailyPlanV2 } from '../plan/dailyPlanV2Storage'
 
 interface ScorePracticePageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
+  initialSegment?: { scoreId: string; startMeasure: number; endMeasure: number } | null
   pianoAudio: UsePianoAudioResult
   practiceRecords: PracticeSessionRecord[]
   onPracticeRunningChange: (running: boolean) => void
+}
+
+interface DemoRequestSettings {
+  startMeasure: number
+  endMeasure: number
+  handMode: 'left' | 'right' | 'both'
+  tempoRatio: number
+  loop: boolean
 }
 
 type ImportTier = 'A' | 'B' | 'C' | 'D' | null
@@ -60,52 +100,31 @@ const TIER_LABELS: Record<NonNullable<ImportTier>, string> = {
 
 function usePlaybackDemo(
   plan: PlaybackPlan | null,
-  audio: Pick<UsePianoAudioResult, 'playNote' | 'stopNote' | 'setSustain'>
+  audio: Pick<UsePianoAudioResult, 'enableAudio' | 'playNote' | 'stopNote' | 'setSustain' | 'stopAllNotes'>
 ): { isPlaying: boolean; play: () => void; stop: () => void; panic: () => void } {
-  const timersRef = useRef<number[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
+  const controllerRef = useRef<TeachingPlaybackController | null>(null)
 
-  const clearTimers = (): void => {
-    for (const timer of timersRef.current) window.clearTimeout(timer)
-    timersRef.current = []
-  }
+  useEffect(() => {
+    const controller = createTeachingPlaybackController({
+      noteOn: audio.playNote,
+      noteOff: audio.stopNote,
+      setSustain: audio.setSustain,
+      allNotesOff: audio.stopAllNotes
+    }, setIsPlaying)
+    controllerRef.current = controller
+    return () => {
+      controller.stop()
+      controllerRef.current = null
+    }
+  }, [audio.playNote, audio.setSustain, audio.stopAllNotes, audio.stopNote])
 
   const play = (): void => {
-    clearTimers()
     if (!plan) return
-    setIsPlaying(true)
-    const schedule = (events: PlaybackPlan['events']): void => {
-      for (const event of events) {
-        const timer = window.setTimeout(() => {
-          if (event.type === 'noteOn') audio.playNote(event.midiNumber, event.velocity)
-          else audio.stopNote(event.midiNumber)
-        }, event.timeMs)
-        timersRef.current.push(timer)
-      }
-      const endTimer = window.setTimeout(() => {
-        audio.setSustain(false)
-        if (plan.loop) {
-          schedule(plan.events)
-        } else {
-          setIsPlaying(false)
-        }
-      }, plan.durationMs + 80)
-      timersRef.current.push(endTimer)
-    }
-    schedule(plan.events)
+    void audio.enableAudio().then(() => controllerRef.current?.play(plan))
   }
-
-  const stop = (): void => {
-    clearTimers()
-    audio.setSustain(false)
-    setIsPlaying(false)
-  }
-
-  const panic = (): void => {
-    stop()
-  }
-
-  useEffect(() => () => clearTimers(), [])
+  const stop = (): void => controllerRef.current?.stop()
+  const panic = (): void => controllerRef.current?.panic()
 
   return { isPlaying, play, stop, panic }
 }
@@ -113,6 +132,7 @@ function usePlaybackDemo(
 export function ScorePracticePage({
   activeNotes,
   exitPromptOpen,
+  initialSegment,
   pianoAudio,
   practiceRecords,
   onPracticeRunningChange
@@ -129,9 +149,22 @@ export function ScorePracticePage({
   const [loop, setLoop] = useState(false)
   const [tempoRatio, setTempoRatio] = useState(1)
   const [countIn, setCountIn] = useState(false)
+  const [savedSegments, setSavedSegments] = useState(() => readPracticeSegments().segments)
+  const [savedMessage, setSavedMessage] = useState('')
+  const [referenceMidiName, setReferenceMidiName] = useState('')
+  const [validationReport, setValidationReport] = useState<ReferenceValidationReport | null>(null)
+  const [coachQuestion, setCoachQuestion] = useState('')
+  const [coachResponse, setCoachResponse] = useState<CoachResponse | null>(null)
+  const [coachProviderStatus, setCoachProviderStatus] = useState('确定性 fallback')
+  const [activeDemo, setActiveDemo] = useState<DemoRequestSettings | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const midiInputRef = useRef<HTMLInputElement | null>(null)
+  const importedXmlRef = useRef('')
+  const importedSourceTypeRef = useRef<'musicxml' | 'mxl'>('musicxml')
   const savedRecordIdRef = useRef('')
+  const sessionRecordIdRef = useRef('')
   const pausedForExitRef = useRef(false)
+  const sessionStartedAtRef = useRef('')
   const followVisible = isExperimentalFeatureVisible('FEATURE_SCORE_FOLLOWING')
   const effectiveMode: ScorePracticeMode = mode === 'follow' && !followVisible ? 'wait' : mode
   const bpm = score?.defaultTempoBpm ?? 60
@@ -144,38 +177,167 @@ export function ScorePracticePage({
     tempoRatio
   })
 
+  const demoRequest: DemoRequestSettings = activeDemo ?? { startMeasure, endMeasure, handMode, tempoRatio, loop }
   const demoPlan = useMemo(() => (
-    score
-      ? buildPlaybackPlan(score, { startMeasure, endMeasure, handMode, tempoRatio, loop })
-      : null
-  ), [endMeasure, handMode, loop, score, startMeasure, tempoRatio])
+    score ? buildPlaybackPlan(score, demoRequest) : null
+  ), [demoRequest, score])
   const demo = usePlaybackDemo(demoPlan, pianoAudio)
 
-  const coachResponse: CoachResponse | null = useMemo(() => {
-    if (!score) return null
-    return buildDeterministicCoachResponse({
+  const refreshCoach = useCallback(async (question: string, allowProvider = true): Promise<void> => {
+    if (!score) return
+    const records = practiceRecordRepository.list()
+    const mastery = computeScoreMastery(records)
+    const ability = computeAbilityModelV2(records, mastery)
+    const storedPlan = readDailyPlanV2()
+    const plan = storedPlan ? {
+      date: storedPlan.date,
+      totalTargetMinutes: storedPlan.items.reduce((sum, item) => sum + item.minutes, 0),
+      rationale: [],
+      items: storedPlan.items
+    } : null
+    const currentPlanItem = storedPlan?.items.find((item) => {
+      const match = /^score:(.+):(\d+)$/.exec(item.exerciseId)
+      return Boolean(match && match[1] === score.title && Number(match[2]) >= startMeasure && Number(match[2]) <= endMeasure)
+    }) ?? null
+    const firstMeasure = score.parts[0]?.measures[0]
+    const timeEvents = buildScoreTimeV2(score).events
+      .filter((event) => event.measureNumber >= startMeasure && event.measureNumber <= endMeasure && event.midiPitch !== null)
+    const context: CoachContext = {
       selectedMeasures: { start: startMeasure, end: endMeasure },
       recentRecords: practiceRecords.slice(0, 5),
-      ability: computeAbilityModel(practiceRecords),
-      plan: null,
-      userQuestion: ''
-    })
-  }, [endMeasure, practiceRecords, score, startMeasure])
+      ability,
+      plan,
+      userQuestion: question,
+      scoreSession: practice.facts.length > 0 ? {
+        scoreId: score.title,
+        segment: `${startMeasure}-${endMeasure}`,
+        recordId: savedRecordIdRef.current,
+        sessionId: savedRecordIdRef.current ? undefined : sessionRecordIdRef.current || undefined,
+        mode: effectiveMode,
+        facts: practice.facts.map((entry) => ({
+          measure: entry.originalMeasure ?? entry.measure ?? null,
+          beat: entry.originalBeat ?? entry.beat ?? null,
+          hand: entry.hand === 'left' || entry.hand === 'right' || entry.hand === 'both' ? entry.hand : null,
+          staff: entry.staff ?? null,
+          outcome: entry.outcome,
+          expectedMidi: entry.expectedMidi,
+          actualMidi: entry.actualMidi,
+          sourceEventIds: entry.sourceEventIds
+        }))
+      } : null,
+      scoreRecords: records.filter((record) => record.scoreId === score.title).slice(0, 5),
+      scoreMastery: mastery,
+      currentPlanItem,
+      scoreFacts: {
+        title: score.title,
+        timeSignature: `${firstMeasure?.timeBeats ?? 4}/${firstMeasure?.timeBeatType ?? 4}`,
+        onsetPattern: [...new Set(timeEvents.map((event) => event.onsetInMeasure / 480 + 1))].slice(0, 32),
+        harmonyLabels: score.parts.flatMap((part) => part.measures)
+          .filter((measure) => measure.number >= startMeasure && measure.number <= endMeasure)
+          .flatMap((measure) => measure.harmonies.map((harmony) => `${harmony.rootStep}${harmony.kindText ?? harmony.kind}`))
+      }
+    }
+    const response = buildDeterministicCoachResponse(context)
+    setCoachResponse(response)
+    setCoachProviderStatus('确定性 fallback')
+    const demo = response.demoRequests[0]
+    if (demo) {
+      setActiveDemo({
+        startMeasure: demo.measureStart,
+        endMeasure: demo.measureEnd,
+        handMode: demo.handMode,
+        tempoRatio: demo.tempoRatio,
+        loop: demo.loop
+      })
+    }
+    if (!allowProvider) return
+    const settings = readAiSettings()
+    if (!settings.enabled || !settings.config.endpoint || !settings.config.apiKey || !settings.config.model) return
+    setCoachProviderStatus('AI provider 请求中…')
+    const temporary: TemporarySessionEvidence | null = context.scoreSession?.sessionId ? {
+      sessionId: context.scoreSession.sessionId,
+      scoreId: score.title,
+      facts: practice.facts.map((fact) => ({
+        originalMeasure: fact.originalMeasure,
+        originalBeat: fact.originalBeat,
+        hand: fact.hand,
+        outcome: fact.outcome,
+        sourceEventIds: fact.sourceEventIds
+      }))
+    } : null
+    const providerResult = await requestScoreCoachFromProvider(
+      context,
+      response,
+      createOpenAiCompatibleClient(settings.config),
+      {
+        getPracticeRecord: (id) => practiceRecordRepository.get(id),
+        getTemporarySession: (id) => temporary?.sessionId === id ? temporary : null
+      }
+    )
+    setCoachResponse(providerResult.response)
+    setCoachProviderStatus(providerResult.providerUsed ? 'OpenAI-compatible provider' : `确定性 fallback${providerResult.error ? `：${providerResult.error}` : ''}`)
+    const providerDemo = providerResult.response.demoRequests[0]
+    if (providerDemo) {
+      setActiveDemo({
+        startMeasure: providerDemo.measureStart,
+        endMeasure: providerDemo.measureEnd,
+        handMode: providerDemo.handMode,
+        tempoRatio: providerDemo.tempoRatio,
+        loop: providerDemo.loop
+      })
+    }
+  }, [effectiveMode, practice.facts, practiceRecords, score, startMeasure, endMeasure])
 
   useEffect(() => {
+    void refreshCoach('', false)
+  }, [refreshCoach])
+
+  useEffect(() => {
+    if (!savedMessage) return undefined
+    const timer = window.setTimeout(() => setSavedMessage(''), 2400)
+    return () => window.clearTimeout(timer)
+  }, [savedMessage])
+
+  useEffect(() => {
+    const initial = initialSegment
+    const imported = initial ? getScoreImport(initial.scoreId) : null
+    if (initial && imported) {
+      const document = loadMusicXmlDocument(imported.xml)
+      const measureCount = document.parts[0]?.measures.length ?? 1
+      importedXmlRef.current = imported.xml
+      setScore(document)
+      setScoreTitle(document.title)
+      setImportTier(imported.tier)
+      setStartMeasure(Math.min(Math.max(1, initial.startMeasure), measureCount))
+      setEndMeasure(Math.min(Math.max(initial.startMeasure, initial.endMeasure), measureCount))
+      return
+    }
     const demo = loadMusicXmlDocument(DEMO_SCORE_XML)
+    importedXmlRef.current = DEMO_SCORE_XML
     setScore(demo)
     setScoreTitle(demo.title)
     setImportTier('A')
-  }, [])
+    const state = readScoreImports()
+    writeScoreImports(upsertScoreImport(state, {
+      id: demo.title,
+      title: demo.title,
+      xml: DEMO_SCORE_XML,
+      sourceType: 'musicxml',
+      importedAt: new Date().toISOString(),
+      tier: 'A'
+    }))
+  }, [initialSegment])
 
   useEffect(() => {
-    onPracticeRunningChange(practice.isRunning)
-  }, [onPracticeRunningChange, practice.isRunning])
+    onPracticeRunningChange(practice.sessionActive)
+  }, [onPracticeRunningChange, practice.sessionActive])
 
   useEffect(() => {
     if (exitPromptOpen) {
-      practice.pause()
+      if (practice.phase === 'running' || practice.phase === 'count-in') {
+        pausedForExitRef.current = true
+        practice.pause()
+      }
     } else if (practice.phase === 'paused' && pausedForExitRef.current) {
       pausedForExitRef.current = false
       practice.resume()
@@ -184,16 +346,30 @@ export function ScorePracticePage({
 
   useEffect(() => {
     if (practice.phase === 'finished' && score) {
-      const key = `${score.title}-${Date.now()}`
-      if (savedRecordIdRef.current === key) return
+      if (savedRecordIdRef.current) return
+      const key = sessionRecordIdRef.current || `score-session-${Date.now()}`
       savedRecordIdRef.current = key
+      const startedAt = sessionStartedAtRef.current || new Date().toISOString()
+      const errorEvents = practice.facts
+        .filter((entry) => entry.outcome === 'wrong' || entry.outcome === 'missing' || entry.outcome === 'extra' || entry.outcome === 'late' || entry.outcome === 'early')
+        .map((entry, index) => ({
+          id: `${key}-error-${index}`,
+          type: String(entry.outcome),
+          measure: entry.measure ?? null,
+          beat: entry.originalBeat ?? entry.beat ?? null,
+          expected: entry.expectedMidi.length === 1 ? entry.expectedMidi[0] : null,
+          actual: entry.actualMidi,
+          hand: (entry.hand ?? null) as 'left' | 'right' | 'both' | null,
+          timingErrorMs: entry.offsetMs ?? null,
+          sourceEventIds: entry.sourceEventIds
+        }))
       const record: PracticeRecordV2 = {
         id: key,
         schemaVersion: 2,
         practiceType: 'score',
-        sourceType: importTier === 'A' || importTier === 'B' ? 'musicxml' : 'midi',
+        sourceType: importTier === 'A' || importTier === 'B' ? importedSourceTypeRef.current : 'midi',
         sourceId: score.title,
-        startedAt: new Date(Date.now() - practice.report.totalUnits * 500).toISOString(),
+        startedAt,
         endedAt: new Date().toISOString(),
         durationMs: Math.round(practice.elapsedMs),
         tempo: bpm,
@@ -206,21 +382,63 @@ export function ScorePracticePage({
           { key: 'correct', value: practice.report.correct },
           { key: 'wrong', value: practice.report.wrong },
           { key: 'missing', value: practice.report.missing },
-          { key: 'extra', value: practice.report.extra }
+          { key: 'extra', value: practice.report.extra },
+          { key: 'earlyCount', value: practice.report.earlyCount },
+          { key: 'lateCount', value: practice.report.lateCount },
+          ...(practice.report.averageSignedOffsetMs === null ? [] : [{ key: 'averageSignedOffsetMs', value: practice.report.averageSignedOffsetMs, unit: 'ms' }]),
+          ...(practice.report.medianAbsoluteOffsetMs === null ? [] : [{ key: 'medianAbsoluteOffsetMs', value: practice.report.medianAbsoluteOffsetMs, unit: 'ms' }]),
+          ...(practice.report.maxAbsoluteOffsetMs === null ? [] : [{ key: 'maxAbsoluteOffsetMs', value: practice.report.maxAbsoluteOffsetMs, unit: 'ms' }])
         ],
-        errorEvents: practice.facts
-          .filter((entry) => entry.outcome === 'wrong' || entry.outcome === 'missing' || entry.outcome === 'extra')
-          .map((entry, index) => ({
-            id: `${key}-error-${index}`,
-            type: String(entry.outcome),
-            measure: Number(String(entry.unitId).split('-')[1]?.replace('m', '')) || null
-          })),
-        evidenceRefs: [],
-        metadata: { importTier }
+        errorEvents,
+        evidenceRefs: errorEvents.map((event) => ({
+          practiceRecordId: key,
+          errorEventId: event.id,
+          measure: event.measure,
+          beat: event.beat
+        })),
+        perMeasureMetrics: practice.report.perMeasureMetrics.map((measure) => ({
+          ...measure,
+          evidenceRefs: errorEvents
+            .filter((event) => event.measure === measure.measureNumber)
+            .map((event) => ({
+              practiceRecordId: key,
+              errorEventId: event.id,
+              measure: event.measure,
+              beat: event.beat
+            }))
+        })),
+        metadata: {
+          importTier: importTier ?? 'A',
+          referenceMidi: referenceMidiName || null,
+          tempoRatio,
+          sessionId: sessionRecordIdRef.current
+        }
       }
-      saveScorePracticeRecord(record)
+      practiceRecordRepository.add(record)
     }
-  }, [bpm, effectiveMode, handMode, importTier, practice.elapsedMs, practice.facts, practice.phase, practice.report, score, startMeasure, endMeasure])
+  }, [bpm, effectiveMode, handMode, importTier, practice.elapsedMs, practice.facts, practice.phase, practice.report, referenceMidiName, score, startMeasure, endMeasure, tempoRatio])
+
+  useEffect(() => {
+    if (practice.phase === 'count-in' || (practice.phase === 'running' && !sessionStartedAtRef.current)) {
+      sessionStartedAtRef.current = new Date().toISOString()
+    }
+    if (practice.phase === 'idle' && savedRecordIdRef.current) {
+      savedRecordIdRef.current = ''
+      sessionRecordIdRef.current = ''
+    }
+  }, [practice.phase])
+
+  const persistScoreImport = (title: string, xml: string, sourceType: 'musicxml' | 'mxl', tier: 'A' | 'B'): void => {
+    const state = readScoreImports()
+    writeScoreImports(upsertScoreImport(state, {
+      id: title,
+      title,
+      xml,
+      sourceType,
+      importedAt: new Date().toISOString(),
+      tier
+    }))
+  }
 
   const handleFile = async (file: File): Promise<void> => {
     setLoadError('')
@@ -228,43 +446,57 @@ export function ScorePracticePage({
 
     try {
       if (extension === 'mxl') {
-        const arrayBuffer = await file.arrayBuffer()
-        const container = await extractMxlContainerAsync(new Uint8Array(arrayBuffer))
-        if (!container) {
-          setLoadError('MXL 中未找到 MusicXML 文件')
-          return
-        }
-        const document = loadMusicXmlDocument(container.xmlText)
+        const payload = await importMxlFile(file)
+        const document = payload.document
+        importedXmlRef.current = payload.xmlText
+        importedSourceTypeRef.current = 'mxl'
+        persistScoreImport(document.title, payload.xmlText, 'mxl', 'A')
         setScore(document)
         setScoreTitle(document.title)
         setImportTier('A')
+        setStartMeasure(1)
         setEndMeasure(document.parts[0]?.measures.length ?? 1)
+        setValidationReport(null)
+        setReferenceMidiName('')
         return
       }
 
       if (extension === 'xml' || extension === 'musicxml') {
         const text = await file.text()
         const document = loadMusicXmlDocument(text)
+        importedXmlRef.current = text
+        importedSourceTypeRef.current = 'musicxml'
+        persistScoreImport(document.title, text, 'musicxml', 'A')
         setScore(document)
         setScoreTitle(document.title)
         setImportTier('A')
+        setStartMeasure(1)
         setEndMeasure(document.parts[0]?.measures.length ?? 1)
+        setValidationReport(null)
+        setReferenceMidiName('')
         return
       }
 
       if (extension === 'mid' || extension === 'midi') {
         const arrayBuffer = await file.arrayBuffer()
-        const smf = parseMidiFile(new Uint8Array(arrayBuffer))
+        parseMidiFile(new Uint8Array(arrayBuffer))
+        setScore(null)
+        importedXmlRef.current = ''
         setScoreTitle(`${file.name}（MIDI only）`)
         setImportTier('C')
+        setValidationReport(null)
+        setReferenceMidiName('')
         setLoadError('C 级导入：仅可播放/有限练习，不作为完整谱面语义')
-        void smf
         return
       }
 
       if (['png', 'jpg', 'jpeg', 'pdf'].includes(extension)) {
+        setScore(null)
+        importedXmlRef.current = ''
         setScoreTitle(`${file.name}（图片材料）`)
         setImportTier('D')
+        setValidationReport(null)
+        setReferenceMidiName('')
         setLoadError('D 级导入：仅视觉辅助材料，默认不得作为严格音符判题 Ground Truth')
         return
       }
@@ -275,9 +507,86 @@ export function ScorePracticePage({
     }
   }
 
+  const handleReferenceMidi = async (file: File): Promise<void> => {
+    if (!score) return
+    setLoadError('')
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const smf = parseMidiFile(new Uint8Array(arrayBuffer))
+      const scoreNotes = buildScoreReferenceNotes(score)
+      const midiNotes = buildMidiReferenceNotes(smf)
+      const report = validateScoreAgainstMidi(scoreNotes, midiNotes, { tempoBpm: bpm })
+      setReferenceMidiName(file.name)
+      setValidationReport(report)
+      if (report.consistent) {
+        setImportTier('B')
+        if (importedXmlRef.current) {
+          persistScoreImport(scoreTitle || score.title, importedXmlRef.current, importedSourceTypeRef.current, 'B')
+        }
+      } else {
+        setLoadError('谱面与参考 MIDI 存在差异（MusicXML 未被修改），详见校验报告。')
+      }
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : '参考 MIDI 解析失败')
+    }
+  }
+
   const saveSegment = (): void => {
     if (!score) return
+    const now = new Date().toISOString()
+    const segment: PracticeSegment = {
+      id: `${score.title}-${startMeasure}-${endMeasure}-${handMode}-${Date.now()}`,
+      scoreId: score.title,
+      title: segmentName.trim() || `第 ${startMeasure}–${endMeasure} 小节`,
+      startMeasure,
+      endMeasure,
+      tempo: bpm,
+      tempoRatio,
+      handMode,
+      practiceMode: effectiveMode,
+      loop,
+      countIn,
+      notes: '',
+      createdAt: now,
+      updatedAt: now
+    }
+    const next = upsertPracticeSegment(readPracticeSegments(), segment)
+    writePracticeSegments(next)
+    setSavedSegments(next.segments)
     setSegmentName('')
+    setSavedMessage('片段已保存')
+  }
+
+  const applySavedSegment = (segment: PracticeSegment): void => {
+    setStartMeasure(segment.startMeasure)
+    setEndMeasure(segment.endMeasure)
+    setHandMode(segment.handMode)
+    setTempoRatio(segment.tempoRatio ?? 1)
+    setLoop(segment.loop)
+    setCountIn(segment.countIn)
+    setMode(segment.practiceMode)
+    setSegmentName(segment.title)
+    setSavedMessage('已载入片段')
+  }
+
+  const deleteSavedSegment = (id: string): void => {
+    const state = readPracticeSegments()
+    const next = { version: 1 as const, segments: state.segments.filter((entry) => entry.id !== id) }
+    writePracticeSegments(next)
+    setSavedSegments(next.segments)
+    setSavedMessage('片段已删除')
+  }
+
+  const handleStart = (): void => {
+    sessionStartedAtRef.current = new Date().toISOString()
+    sessionRecordIdRef.current = `score-session-${Date.now()}`
+    savedRecordIdRef.current = ''
+    practice.start()
+  }
+
+  const handleReset = (): void => {
+    sessionStartedAtRef.current = ''
+    practice.reset()
   }
 
   const weakestMeasures = useMemo(() => {
@@ -311,7 +620,7 @@ export function ScorePracticePage({
                     : 'Follow 模式（Experimental）。'}
               </p>
             </div>
-            <span className={`audio-status-badge status-${practice.isRunning ? 'ready' : 'suspended'}`}>
+            <span className={`audio-status-badge status-${practice.sessionActive ? 'ready' : 'suspended'}`}>
               {practice.phase === 'running' ? '练习中' : practice.phase === 'paused' ? '已暂停' : practice.phase === 'count-in' ? '预备拍' : practice.phase === 'finished' ? '已完成' : '未开始'}
             </span>
           </div>
@@ -322,7 +631,7 @@ export function ScorePracticePage({
                 <button
                   key={option}
                   className={effectiveMode === option ? 'is-active' : ''}
-                  disabled={practice.isRunning}
+                  disabled={practice.sessionActive}
                   type="button"
                   onClick={() => setMode(option)}
                 >
@@ -342,11 +651,30 @@ export function ScorePracticePage({
               }}
             />
             <AppButton variant="secondary" onClick={() => fileInputRef.current?.click()}>导入曲谱</AppButton>
+            <input
+              ref={midiInputRef}
+              className="score-practice-file"
+              type="file"
+              accept=".mid,.midi"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) void handleReferenceMidi(file)
+                if (midiInputRef.current) midiInputRef.current.value = ''
+              }}
+            />
+            <AppButton variant="ghost" onClick={() => midiInputRef.current?.click()} disabled={!score}>添加参考 MIDI（Tier B）</AppButton>
             <AppButton variant="ghost" onClick={() => {
               const demo = loadMusicXmlDocument(DEMO_SCORE_XML)
+              importedXmlRef.current = DEMO_SCORE_XML
+              importedSourceTypeRef.current = 'musicxml'
+              persistScoreImport(demo.title, DEMO_SCORE_XML, 'musicxml', 'A')
               setScore(demo)
               setScoreTitle(demo.title)
               setImportTier('A')
+              setStartMeasure(1)
+              setEndMeasure(demo.parts[0]?.measures.length ?? 2)
+              setValidationReport(null)
+              setReferenceMidiName('')
               setLoadError('')
             }}>加载示例</AppButton>
           </div>
@@ -356,30 +684,61 @@ export function ScorePracticePage({
             <p className="practice-save-error">Experimental feature disabled（Follow 暂未开放）</p>
           ) : null}
 
+          {score ? (
+            <div className="score-sheet-wrap">
+              <div className="score-sheet-heading">
+                <strong>第 {startMeasure}–{endMeasure} 小节 · {handMode === 'both' ? '双手' : handMode === 'right' ? '右手' : '左手'}</strong>
+                {practice.currentMeasure && (practice.phase === 'running' || practice.phase === 'paused' || practice.phase === 'count-in') ? (
+                  <span>当前小节：第 {practice.currentMeasure} 小节</span>
+                ) : null}
+              </div>
+              <ScoreSheetRenderer
+                score={score}
+                startMeasure={startMeasure}
+                endMeasure={endMeasure}
+                currentMeasure={
+                  practice.phase === 'running' || practice.phase === 'paused' || practice.phase === 'count-in'
+                    ? practice.currentMeasure
+                    : null
+                }
+                currentSourceEventIds={practice.currentSourceEventIds}
+                ariaLabel={`${scoreTitle} 第 ${startMeasure}–${endMeasure} 小节谱面`}
+              />
+              {validationReport ? (
+                <div className={`reference-validation-report ${validationReport.consistent ? 'is-ok' : 'is-diff'}`}>
+                  <strong>{validationReport.consistent ? 'Tier B：谱面与参考 MIDI 一致' : '谱面与参考 MIDI 存在差异'}</strong>
+                  <span>匹配 {validationReport.matched} · 仅谱面 {validationReport.onlyScore.length} · 仅 MIDI {validationReport.onlyMidi.length} · 匹配率 {Math.round(validationReport.matchRatio * 100)}%{referenceMidiName ? ` · 参考文件：${referenceMidiName}` : ''}</span>
+                </div>
+              ) : referenceMidiName ? (
+                <div className="reference-validation-report"><span>已选择参考 MIDI：{referenceMidiName}</span></div>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="score-practice-selection">
             <label className="midi-field"><span>起始小节</span>
-              <input className="midi-select" type="number" min="1" value={startMeasure} disabled={practice.isRunning} onChange={(event) => setStartMeasure(Math.max(1, Number(event.target.value) || 1))} />
+              <input className="midi-select" type="number" min="1" value={startMeasure} disabled={practice.sessionActive} onChange={(event) => setStartMeasure(Math.max(1, Number(event.target.value) || 1))} />
             </label>
             <label className="midi-field"><span>结束小节</span>
-              <input className="midi-select" type="number" min={startMeasure} value={endMeasure} disabled={practice.isRunning} onChange={(event) => setEndMeasure(Math.max(startMeasure, Number(event.target.value) || startMeasure))} />
+              <input className="midi-select" type="number" min={startMeasure} value={endMeasure} disabled={practice.sessionActive} onChange={(event) => setEndMeasure(Math.max(startMeasure, Number(event.target.value) || startMeasure))} />
             </label>
             <div className="tolerance-control"><span>手别</span><div className="segmented-control">
               {(['both', 'right', 'left'] as const).map((hand) => (
-                <button key={hand} className={handMode === hand ? 'is-active' : ''} disabled={practice.isRunning} type="button" onClick={() => setHandMode(hand)}>
+                <button key={hand} className={handMode === hand ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setHandMode(hand)}>
                   {hand === 'both' ? '双手' : hand === 'right' ? '右手' : '左手'}
                 </button>
               ))}
             </div></div>
             <div className="tolerance-control"><span>速度</span><div className="segmented-control">
               {[0.5, 0.6, 0.7, 0.8, 0.9, 1].map((ratio) => (
-                <button key={ratio} className={tempoRatio === ratio ? 'is-active' : ''} disabled={practice.isRunning} type="button" onClick={() => setTempoRatio(ratio)}>
+                <button key={ratio} className={tempoRatio === ratio ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setTempoRatio(ratio)}>
                   {Math.round(ratio * 100)}%
                 </button>
               ))}
             </div></div>
             <div className="tolerance-control"><span>选项</span><div className="segmented-control">
-              <button className={loop ? 'is-active' : ''} disabled={practice.isRunning} type="button" onClick={() => setLoop((value) => !value)}>循环</button>
-              <button className={countIn ? 'is-active' : ''} disabled={practice.isRunning} type="button" onClick={() => setCountIn((value) => !value)}>预备拍</button>
+              <button className={loop ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setLoop((value) => !value)}>循环</button>
+              <button className={countIn ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setCountIn((value) => !value)}>预备拍</button>
             </div></div>
           </div>
 
@@ -408,15 +767,18 @@ export function ScorePracticePage({
           ) : null}
 
           <div className="practice-primary-actions">
-            {!practice.isRunning ? (
-              <AppButton onClick={practice.start}>{practice.phase === 'finished' ? '再练一次' : '开始练习'}</AppButton>
-            ) : (
+            {practice.phase === 'idle' ? (
+              <AppButton onClick={handleStart} disabled={!score}>开始练习</AppButton>
+            ) : practice.phase === 'count-in' ? (
+              <span role="status">预备拍倒数中…</span>
+            ) : practice.phase === 'running' ? (
               <AppButton variant="secondary" onClick={practice.pause}>暂停</AppButton>
-            )}
-            {practice.phase === 'paused' ? (
+            ) : practice.phase === 'paused' ? (
               <AppButton onClick={practice.resume}>继续</AppButton>
+            ) : practice.phase === 'finished' ? (
+              <AppButton onClick={handleStart}>再练一次</AppButton>
             ) : null}
-            {practice.isRunning || practice.phase === 'paused' ? (
+            {practice.sessionActive ? (
               <AppButton variant="ghost" onClick={practice.stop}>停止</AppButton>
             ) : null}
           </div>
@@ -430,6 +792,23 @@ export function ScorePracticePage({
             />
             <AppButton variant="ghost" onClick={saveSegment} disabled={!score}>保存片段</AppButton>
           </div>
+          {savedMessage ? <p className="practice-save-success" role="status">{savedMessage}</p> : null}
+          {savedSegments.length > 0 && score ? (
+            <div className="score-segment-list">
+              <span className="score-segment-list__title">我的片段</span>
+              {savedSegments
+                .filter((segment) => segment.scoreId === score.title)
+                .map((segment) => (
+                  <div key={segment.id} className="score-segment-item">
+                    <button type="button" onClick={() => applySavedSegment(segment)}>
+                      <strong>{segment.title}</strong>
+                      <span>第 {segment.startMeasure}–{segment.endMeasure} 小节 · {segment.handMode === 'both' ? '双手' : segment.handMode === 'right' ? '右手' : '左手'} · {segment.practiceMode} · {Math.round((segment.tempoRatio ?? 1) * 100)}%{segment.loop ? ' · 循环' : ''}</span>
+                    </button>
+                    <AppButton variant="ghost" onClick={() => deleteSavedSegment(segment.id)}>删除</AppButton>
+                  </div>
+                ))}
+            </div>
+          ) : null}
         </section>
 
         <PracticeStatBar items={[
@@ -445,7 +824,7 @@ export function ScorePracticePage({
         {coachResponse ? (
           <section className="midi-panel score-ai-panel">
             <div className="panel-title-row">
-              <div><h3>AI 钢琴助理</h3><p>基于当前选区与练习事实的确定性分析（无 API 也可用）。</p></div>
+              <div><h3>AI 钢琴助理</h3><p>读取当前谱面、选区与本次练习事实，回答引用真实证据。当前：{coachProviderStatus}</p></div>
             </div>
             <p className="coach-summary">{coachResponse.summary}</p>
             {coachResponse.diagnoses.map((diagnosis) => (
@@ -454,6 +833,11 @@ export function ScorePracticePage({
             {coachResponse.recommendations.map((recommendation) => (
               <p key={recommendation.text} className="coach-recommendation">{recommendation.text}</p>
             ))}
+            {coachResponse.uncertainty.length > 0 ? (
+              <ul className="coach-uncertainty">
+                {coachResponse.uncertainty.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            ) : null}
             {coachResponse.demoRequests.length > 0 && demoPlan ? (
               <div className="score-demo-controls">
                 <span>示范：第 {demoPlan.startMeasure}–{demoPlan.endMeasure} 小节，{demoPlan.handMode === 'both' ? '双手' : demoPlan.handMode === 'right' ? '右手' : '左手'}，{Math.round(demoPlan.tempoRatio * 100)}%</span>
@@ -461,14 +845,44 @@ export function ScorePracticePage({
                   {demo.isPlaying ? '停止示范' : '▶ 正确示范'}
                 </AppButton>
                 <AppButton variant="ghost" onClick={demo.panic}>Panic</AppButton>
+                {activeDemo ? (
+                  <AppButton variant="ghost" onClick={() => setActiveDemo(null)}>改用当前练习设置</AppButton>
+                ) : null}
               </div>
             ) : null}
+            <div className="coach-question-box">
+              <input
+                aria-label="向 AI 钢琴助理提问"
+                value={coachQuestion}
+                placeholder="问 AI 钢琴助理……"
+                onChange={(event) => setCoachQuestion(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void refreshCoach(coachQuestion)
+                    setCoachQuestion('')
+                  }
+                }}
+              />
+              <AppButton
+                onClick={() => {
+                  void refreshCoach(coachQuestion)
+                  setCoachQuestion('')
+                }}
+              >
+                发送
+              </AppButton>
+            </div>
+            <div className="coach-quick-questions">
+              {['为什么这里总弹错？', '节奏怎么数？', '先练哪只手？', '帮我安排这几小节的练法'].map((question) => (
+                <button key={question} type="button" onClick={() => void refreshCoach(question)}>{question}</button>
+              ))}
+            </div>
           </section>
         ) : null}
       </div>
 
       {practice.phase === 'finished' ? (
-        <PracticeReportModal title="曲谱练习完成" onBack={practice.reset} onRepeat={practice.start}>
+        <PracticeReportModal title="曲谱练习完成" onBack={handleReset} onRepeat={handleStart}>
           <div className="report-grid">
             <div><span>练习小节</span><strong>{startMeasure}–{endMeasure}</strong></div>
             <div><span>模式</span><strong>{effectiveMode === 'wait' ? 'Wait' : effectiveMode === 'realtime' ? 'Realtime' : 'Follow'}</strong></div>

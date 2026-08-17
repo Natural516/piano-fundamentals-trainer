@@ -73,3 +73,13 @@ export function getBassCandidates(
   if (inversionMode === 'inversions') return inversions
   return [root, ...inversions]
 }
+
+export function pickBassConstraint(
+  root: number,
+  quality: ChordV2Quality,
+  inversionMode: ChordV2InversionMode,
+  random = Math.random
+): number {
+  const candidates = getBassCandidates(root, quality, inversionMode)
+  return candidates[Math.min(candidates.length - 1, Math.floor(random() * candidates.length))] ?? ((root % 12) + 12) % 12
+}

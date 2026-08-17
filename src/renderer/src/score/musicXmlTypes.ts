@@ -1,6 +1,27 @@
 export type ScoreClefSign = 'G' | 'F' | 'C' | 'percussion' | 'TAB' | 'none'
 export type ScoreNoteType = 'note' | 'rest'
 
+export interface ScoreTimeModification {
+  actualNotes: number
+  normalNotes: number
+  normalType: string | null
+}
+
+export interface ScoreHarmonyModel {
+  rootStep: string
+  rootAlter: number
+  kind: string
+  kindText: string | null
+  bassStep: string | null
+  bassAlter: number
+}
+
+export interface ScoreClefModel {
+  staff: number
+  sign: ScoreClefSign
+  line: number | null
+}
+
 export interface ScoreNoteModel {
   id: string
   type: ScoreNoteType
@@ -16,6 +37,9 @@ export interface ScoreNoteModel {
   tieStop: boolean
   accidental: string | null
   isGrace?: boolean
+  noteType?: string | null
+  dotCount?: number
+  timeModification?: ScoreTimeModification | null
 }
 
 export interface ScoreMeasure {
@@ -32,6 +56,9 @@ export interface ScoreMeasure {
   timeBeatType: number | null
   tempoBpm: number | null
   divisions: number | null
+  staves: number | null
+  clefs: ScoreClefModel[]
+  harmonies: ScoreHarmonyModel[]
 }
 
 export interface ScorePartModel {
@@ -51,10 +78,16 @@ export interface ScoreExpectedUnit {
   onsetIndex: number
   expectedTick: number
   measure: number
+  originalMeasure: number
+  originalBeat: number
+  practiceTick: number
   notes: ScoreNoteModel[]
   tieStart: boolean
   rest: boolean
   expectedMidi: number[]
+  staff: number | null
+  hand: 'left' | 'right' | 'both' | null
+  sourceEventIds: string[]
 }
 
 export interface ScoreTimeline {

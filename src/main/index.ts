@@ -1,7 +1,14 @@
-import { app, BrowserWindow, dialog, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
+import { inflateRawSync } from 'node:zlib'
 
 const APP_ID = 'com.piano.fundamentals.trainer'
+const INFLATE_RAW_CHANNEL = 'piano:inflate-raw'
+
+ipcMain.handle(INFLATE_RAW_CHANNEL, (_event, input: Uint8Array) => {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input)
+  return Uint8Array.from(inflateRawSync(bytes))
+})
 
 app.commandLine.appendSwitch('enable-features', 'WebMIDI')
 

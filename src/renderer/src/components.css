@@ -1402,3 +1402,182 @@ body::before {
   background: var(--bg-input);
   font: inherit;
 }
+
+.score-sheet-wrap {
+  margin-top: 16px;
+}
+
+.score-sheet-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.score-sheet-heading strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.score-sheet-renderer {
+  width: 100%;
+  height: 216px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.score-sheet-renderer > svg {
+  display: block;
+  overflow: visible;
+}
+
+.reference-validation-report {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  font-size: 12px;
+}
+
+.reference-validation-report strong {
+  color: var(--text-primary);
+}
+
+.reference-validation-report.is-ok {
+  border-color: color-mix(in srgb, var(--success) 42%, transparent);
+}
+
+.reference-validation-report.is-ok strong {
+  color: var(--success);
+}
+
+.reference-validation-report.is-diff {
+  border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+}
+
+.reference-validation-report.is-diff strong {
+  color: var(--danger);
+}
+
+.practice-save-success {
+  margin: 10px 0 0;
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.score-segment-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.score-segment-list__title {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.score-segment-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.score-segment-item > button {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.score-segment-item strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-segment-item span {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coach-uncertainty {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.coach-question-box {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.coach-question-box input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  font: inherit;
+}
+
+.coach-quick-questions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.coach-quick-questions button {
+  appearance: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.coach-quick-questions button:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}

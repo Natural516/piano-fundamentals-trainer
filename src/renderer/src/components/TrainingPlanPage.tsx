@@ -35,6 +35,20 @@ import {
   type WeeklyGoalStatus
 } from '../utils/trainingPlanTypes'
 import { createDefaultWeeklyGoals, WEEKLY_TRAINING_PLAN } from '../utils/weeklyTrainingPlan'
+import { computeAbilityModelV2 } from '../ability/abilityModel'
+import { computeScoreMastery } from '../ability/scoreMastery'
+import { buildDailyPlan } from '../plan/planner'
+import { EXERCISE_LIBRARY } from '../prescription/exerciseLibrary'
+import { practiceRecordRepository } from '../records/practiceRecordRepository'
+import {
+  createDailyPlanV2,
+  readPlannerPreferences,
+  readDailyPlanV2,
+  updateDailyPlanFromRecords,
+  writePlannerPreferences,
+  writeDailyPlanV2,
+  type DailyPlanV2State
+} from '../plan/dailyPlanV2Storage'
 import { AppButton } from './AppButton'
 import { AppCard } from './AppCard'
 import { StatusBadge } from './StatusBadge'
@@ -43,6 +57,7 @@ interface TrainingPlanPageProps {
   practiceRecords: PracticeSessionRecord[]
   onBackHome: () => void
   onNavigateModule: (module: LinkedPracticeModule) => void
+  onOpenScoreSegment: (scoreId: string, startMeasure: number, endMeasure: number) => void
 }
 
 type TrainingPlanTab = 'stage' | 'daily' | 'weekly' | 'mapping' | 'checklist'
@@ -92,6 +107,7 @@ function getConfirmCopy(action: ConfirmAction | null): { title: string; message:
 export function TrainingPlanPage({
   onBackHome,
   onNavigateModule,
+  onOpenScoreSegment,
   practiceRecords
 }: TrainingPlanPageProps): JSX.Element {
   const today = useMemo(() => new Date(), [])
@@ -103,12 +119,74 @@ export function TrainingPlanPage({
   const [selectedWeekStart, setSelectedWeekStart] = useState(currentWeekStart)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const [message, setMessage] = useState('')
+  const [plannerPlan, setPlannerPlan] = useState<DailyPlanV2State | null>(() => readDailyPlanV2())
+  const [plannerMessage, setPlannerMessage] = useState('')
+  const [plannerPreferences, setPlannerPreferences] = useState(() => readPlannerPreferences())
 
   useEffect(() => {
     if (!message) return undefined
     const timer = window.setTimeout(() => setMessage(''), 2200)
     return () => window.clearTimeout(timer)
   }, [message])
+
+  const regeneratePlannerPlan = (): void => {
+    const records = practiceRecordRepository.list()
+    const mastery = computeScoreMastery(records)
+    const ability = computeAbilityModelV2(records, mastery)
+    const plan = buildDailyPlan({
+      ability,
+      records: practiceRecords,
+      goal: plannerPreferences.goal,
+      availableMinutes: plannerPreferences.availableMinutes,
+      library: EXERCISE_LIBRARY,
+      mastery
+    })
+    const stored = createDailyPlanV2(plan)
+    writeDailyPlanV2(stored)
+    setPlannerPlan(stored)
+    setPlannerMessage(`已按 ${records.length} 条 PracticeRecordV2 记录生成今日计划（${stored.items.length} 项）`)
+  }
+
+  useEffect(() => {
+    if (!readDailyPlanV2()) regeneratePlannerPlan()
+  }, [])
+
+  useEffect(() => practiceRecordRepository.subscribe(() => {
+    const current = readDailyPlanV2()
+    if (!current) {
+      regeneratePlannerPlan()
+      return
+    }
+    const records = practiceRecordRepository.list()
+    const mastery = computeScoreMastery(records)
+    const updated = updateDailyPlanFromRecords(current, records, mastery)
+    writeDailyPlanV2(updated.state)
+    setPlannerPlan(updated.state)
+    setPlannerMessage(updated.changed ? '新练习已达到成功标准，今日任务已自动完成' : '新练习已计入能力与小节掌握度；今日任务顺序保持稳定')
+  }), [plannerPreferences.availableMinutes, plannerPreferences.goal, practiceRecords])
+
+  const updatePlannerPreferences = (next: typeof plannerPreferences): void => {
+    const sanitized = {
+      availableMinutes: Math.min(120, Math.max(10, Math.round(next.availableMinutes))),
+      goal: next.goal.slice(0, 200)
+    }
+    setPlannerPreferences(sanitized)
+    writePlannerPreferences(sanitized)
+  }
+
+  const togglePlanItem = (exerciseId: string): void => {
+    if (!plannerPlan) return
+    const next: DailyPlanV2State = {
+      ...plannerPlan,
+      progress: {
+        ...plannerPlan.progress,
+        [exerciseId]: plannerPlan.progress[exerciseId] === 'done' ? 'pending' : 'done'
+      }
+    }
+    writeDailyPlanV2(next)
+    setPlannerPlan(next)
+    setPlannerMessage(next.progress[exerciseId] === 'done' ? '已标记完成' : '已恢复未完成')
+  }
 
   const persist = (nextState: TrainingPlanState, successMessage = '已保存'): void => {
     const result = saveTrainingPlanState(nextState)
@@ -364,55 +442,142 @@ export function TrainingPlanPage({
 
       {activeTab === 'daily' ? (
         <div className="training-plan-content">
+          {plannerMessage ? <div className="training-plan-toast" role="status">{plannerMessage}</div> : null}
           <AppCard className="training-plan-summary training-plan-daily-summary">
             <div>
-              <span className="eyebrow">Daily Practice</span>
-              <h3>固定 90 分钟训练模板</h3>
-              <p>软件任务可读取所选日期的完成记录；任何手动切换都会优先于自动状态。</p>
+              <span className="eyebrow">Daily Practice · Planner 2.0</span>
+              <h3>{plannerPlan ? `今日计划（${plannerPlan.date}）` : '固定 90 分钟训练模板'}</h3>
+              <p>
+                {plannerPlan
+                  ? '由 PracticeRecordV2 → Ability / Score Mastery → Planner 真实生成；每项包含 whyThis 与证据引用，完成后点击勾选更新进度。'
+                  : '软件任务可读取所选日期的完成记录；任何手动切换都会优先于自动状态。'}
+              </p>
             </div>
             <label className="training-plan-date-field"><span>训练日期</span><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
             <div className="training-plan-daily-progress">
-              <strong>{completedMinutes}<small> / {DAILY_TRAINING_TOTAL_MINUTES} 分钟</small></strong>
-              <div className="training-plan-progress"><i style={{ width: `${calculatePercentage(completedMinutes, DAILY_TRAINING_TOTAL_MINUTES)}%` }} /></div>
+              <strong>{plannerPlan ? plannerPlan.items.reduce((sum, item) => sum + (plannerPlan.progress[item.exerciseId] === 'done' ? item.minutes : 0), 0) : completedMinutes}<small> / {plannerPlan ? plannerPlan.items.reduce((sum, item) => sum + item.minutes, 0) : DAILY_TRAINING_TOTAL_MINUTES} 分钟</small></strong>
+              <div className="training-plan-progress"><i style={{ width: `${calculatePercentage(
+                plannerPlan ? plannerPlan.items.reduce((sum, item) => sum + (plannerPlan.progress[item.exerciseId] === 'done' ? item.minutes : 0), 0) : completedMinutes,
+                plannerPlan ? plannerPlan.items.reduce((sum, item) => sum + item.minutes, 0) : DAILY_TRAINING_TOTAL_MINUTES
+              )}%` }} /></div>
             </div>
-            <AppButton variant="ghost" onClick={() => setConfirmAction({ type: 'daily-reset' })}>重置当日状态</AppButton>
+            <div className="training-plan-daily-actions">
+              {plannerPlan ? <AppButton variant="secondary" onClick={regeneratePlannerPlan}>重新生成</AppButton> : null}
+              <AppButton variant="ghost" onClick={() => setConfirmAction({ type: 'daily-reset' })}>重置当日状态</AppButton>
+            </div>
           </AppCard>
 
-          <div className="daily-task-list">
-            {dailyCompletion.map(({ autoCompleted, completed, manualStatus, task }) => (
-              <AppCard key={task.id} as="article" className={`daily-task-card ${completed ? 'is-completed' : ''}`}>
-                <button
-                  className="daily-task-check"
-                  type="button"
-                  aria-label={completed ? `将${task.title}标记为未完成` : `将${task.title}标记为完成`}
-                  onClick={() => persist(
-                    setDailyTaskOverride(planState, selectedDate, task.id, completed ? 'pending' : 'completed'),
-                    '当日状态已保存'
-                  )}
-                >{completed ? '✓' : ''}</button>
-                <div className="daily-task-time"><strong>{task.minutes}</strong><span>分钟</span></div>
-                <div className="daily-task-copy">
-                  <div className="training-plan-badges">
-                    <StatusBadge tone={task.taskType === 'software' ? 'success' : 'warning'}>{TRAINING_TASK_TYPE_LABELS[task.taskType]}</StatusBadge>
-                    {manualStatus ? <StatusBadge tone="info">手动覆盖</StatusBadge> : null}
-                    {!manualStatus && autoCompleted ? <StatusBadge tone="success">今日记录已完成</StatusBadge> : null}
+          <AppCard className="training-plan-planner-settings">
+            <label>
+              <span>可用时间</span>
+              <select
+                value={[15, 20, 30, 45, 60].includes(plannerPreferences.availableMinutes) ? plannerPreferences.availableMinutes : 'custom'}
+                onChange={(event) => {
+                  if (event.target.value !== 'custom') {
+                    updatePlannerPreferences({ ...plannerPreferences, availableMinutes: Number(event.target.value) })
+                  }
+                }}
+              >
+                {[15, 20, 30, 45, 60].map((minutes) => <option key={minutes} value={minutes}>{minutes} 分钟</option>)}
+                <option value="custom">自定义</option>
+              </select>
+            </label>
+            <label>
+              <span>自定义分钟</span>
+              <input
+                type="number"
+                min="10"
+                max="120"
+                value={plannerPreferences.availableMinutes}
+                onChange={(event) => updatePlannerPreferences({ ...plannerPreferences, availableMinutes: Number(event.target.value) || 10 })}
+              />
+            </label>
+            <label className="training-plan-planner-goal">
+              <span>近期目标</span>
+              <input
+                value={plannerPreferences.goal}
+                placeholder="例如：加强识谱 / 提升某首曲"
+                onChange={(event) => updatePlannerPreferences({ ...plannerPreferences, goal: event.target.value })}
+              />
+            </label>
+            <AppButton variant="secondary" onClick={regeneratePlannerPlan}>按设置更新计划</AppButton>
+          </AppCard>
+
+          {plannerPlan ? (
+            <div className="daily-task-list">
+              {plannerPlan.items.map((item) => {
+                const done = plannerPlan.progress[item.exerciseId] === 'done'
+                const scoreMatch = /^score:(.+):(\d+)$/.exec(item.exerciseId)
+                const skillLabel = item.targetSkillIds.join(' · ') || 'score-performance'
+                const handLabel = item.handMode === 'right' ? '右手' : item.handMode === 'left' ? '左手' : item.handMode === 'both' ? '双手' : ''
+                return (
+                  <AppCard key={item.exerciseId} as="article" className={`daily-task-card ${done ? 'is-completed' : ''}`}>
+                    <button
+                      className="daily-task-check"
+                      type="button"
+                      aria-label={done ? `将${item.exerciseId}标记为未完成` : `将${item.exerciseId}标记为完成`}
+                      onClick={() => togglePlanItem(item.exerciseId)}
+                    >{done ? '✓' : ''}</button>
+                    <div className="daily-task-time"><strong>{item.minutes}</strong><span>分钟</span></div>
+                    <div className="daily-task-copy">
+                      <div className="training-plan-badges">
+                        <StatusBadge tone="success">{skillLabel}</StatusBadge>
+                        {item.mode ? <StatusBadge tone="info">{item.mode}{handLabel ? ` · ${handLabel}` : ''}</StatusBadge> : null}
+                        {done ? <StatusBadge tone="success">已完成</StatusBadge> : null}
+                      </div>
+                      <h4>{scoreMatch ? `《${scoreMatch[1]}》第 ${scoreMatch[2]} 小节` : item.exerciseId}</h4>
+                      <p><strong>成功标准：</strong>{item.successCriteria}</p>
+                      <p><strong>为什么安排：</strong>{item.whyThis}</p>
+                      <small>证据引用 {item.evidenceRefs.length} 条 · 降级：{item.fallback ?? '—'} · 进阶：{item.harderVariant ?? '—'}</small>
+                    </div>
+                    <div className="daily-task-actions">
+                      {scoreMatch ? (
+                        <AppButton variant="secondary" onClick={() => onOpenScoreSegment(scoreMatch[1], Number(scoreMatch[2]), Number(scoreMatch[2]))}>
+                          打开乐谱片段
+                        </AppButton>
+                      ) : null}
+                    </div>
+                  </AppCard>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="daily-task-list">
+              {dailyCompletion.map(({ autoCompleted, completed, manualStatus, task }) => (
+                <AppCard key={task.id} as="article" className={`daily-task-card ${completed ? 'is-completed' : ''}`}>
+                  <button
+                    className="daily-task-check"
+                    type="button"
+                    aria-label={completed ? `将${task.title}标记为未完成` : `将${task.title}标记为完成`}
+                    onClick={() => persist(
+                      setDailyTaskOverride(planState, selectedDate, task.id, completed ? 'pending' : 'completed'),
+                      '当日状态已保存'
+                    )}
+                  >{completed ? '✓' : ''}</button>
+                  <div className="daily-task-time"><strong>{task.minutes}</strong><span>分钟</span></div>
+                  <div className="daily-task-copy">
+                    <div className="training-plan-badges">
+                      <StatusBadge tone={task.taskType === 'software' ? 'success' : 'warning'}>{TRAINING_TASK_TYPE_LABELS[task.taskType]}</StatusBadge>
+                      {manualStatus ? <StatusBadge tone="info">手动覆盖</StatusBadge> : null}
+                      {!manualStatus && autoCompleted ? <StatusBadge tone="success">今日记录已完成</StatusBadge> : null}
+                    </div>
+                    <h4>{task.title}</h4>
+                    <p>{task.content}</p>
+                    <p><strong>目标：</strong>{task.objective}</p>
+                    {task.notes ? <small>{task.notes}</small> : null}
+                    {task.linkedModules?.map((module) => latestModuleResults[module] ? (
+                      <small key={module}>{moduleLabels[module]}最近结果：正确率 {latestModuleResults[module]!.accuracy}%</small>
+                    ) : null)}
                   </div>
-                  <h4>{task.title}</h4>
-                  <p>{task.content}</p>
-                  <p><strong>目标：</strong>{task.objective}</p>
-                  {task.notes ? <small>{task.notes}</small> : null}
-                  {task.linkedModules?.map((module) => latestModuleResults[module] ? (
-                    <small key={module}>{moduleLabels[module]}最近结果：正确率 {latestModuleResults[module]!.accuracy}%</small>
-                  ) : null)}
-                </div>
-                {task.linkedModules?.length ? (
-                  <div className="daily-task-actions">
-                    {task.linkedModules.map((module) => <AppButton key={module} variant="secondary" onClick={() => onNavigateModule(module)}>{moduleLabels[module]}</AppButton>)}
-                  </div>
-                ) : null}
-              </AppCard>
-            ))}
-          </div>
+                  {task.linkedModules?.length ? (
+                    <div className="daily-task-actions">
+                      {task.linkedModules.map((module) => <AppButton key={module} variant="secondary" onClick={() => onNavigateModule(module)}>{moduleLabels[module]}</AppButton>)}
+                    </div>
+                  ) : null}
+                </AppCard>
+              ))}
+            </div>
+          )}
         </div>
       ) : null}
 

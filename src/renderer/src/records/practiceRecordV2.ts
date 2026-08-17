@@ -11,6 +11,35 @@ export interface PracticeErrorEvent {
   timingErrorMs?: number | null
   severity?: 'low' | 'medium' | 'high'
   sourceEventIds?: string[]
+  aggregateCount?: number
+  label?: string
+}
+
+export interface HandPracticeMetrics {
+  expectedJudgeableCount: number
+  correct: number
+  wrong: number
+  missed: number
+  extra: number
+}
+
+export interface PerMeasurePracticeMetrics {
+  measureNumber: number
+  expectedJudgeableCount: number
+  correct: number
+  wrong: number
+  missed: number
+  extra: number
+  pitchAccuracy: number
+  early: number
+  late: number
+  averageSignedOffsetMs: number | null
+  medianAbsTimingErrorMs: number | null
+  maxAbsoluteOffsetMs: number | null
+  interruptionCount: number
+  tempoRatio: number
+  handStats: Partial<Record<'left' | 'right' | 'both', HandPracticeMetrics>>
+  evidenceRefs: EvidenceRef[]
 }
 
 export interface PracticeMetric {
@@ -20,9 +49,12 @@ export interface PracticeMetric {
 }
 
 export interface EvidenceRef {
-  practiceRecordId: string
+  practiceRecordId?: string
+  sessionId?: string
+  scoreId?: string | null
   measure?: number | null
   beat?: number | null
+  hand?: 'left' | 'right' | 'both' | null
   metric?: string | null
   errorEventId?: string | null
 }
@@ -44,6 +76,7 @@ export interface PracticeRecordV2 {
   metrics: PracticeMetric[]
   errorEvents: PracticeErrorEvent[]
   evidenceRefs: EvidenceRef[]
+  perMeasureMetrics?: PerMeasurePracticeMetrics[]
   metadata: Record<string, string | number | boolean | null>
 }
 
@@ -85,7 +118,9 @@ export function fromLegacyRecord(record: PracticeSessionRecord): PracticeRecordV
   const errorEvents: PracticeErrorEvent[] = (record.mistakes ?? []).map((mistake, index) => ({
     id: `${record.id}-error-${index}`,
     type: mistake.type ?? 'mistake',
-    expected: typeof mistake.count === 'number' ? mistake.count : null,
+    expected: null,
+    aggregateCount: typeof mistake.count === 'number' ? mistake.count : undefined,
+    label: mistake.label ?? mistake.type ?? 'mistake',
     severity: (mistake.count ?? 0) > 5 ? 'high' : (mistake.count ?? 0) > 2 ? 'medium' : 'low'
   }))
 

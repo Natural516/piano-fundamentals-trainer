@@ -18,6 +18,12 @@ require.extensions['.ts'] = (module, filename) => {
 
 const tests = []
 
+class BlockedTestError extends Error {}
+
+function blocked(message) {
+  throw new BlockedTestError(message)
+}
+
 function test(name, callback) {
   tests.push({ name, callback })
 }
@@ -66,6 +72,54 @@ const platformAdapters = require('../src/renderer/src/platform/adapters.ts')
 const scoreTimeV2 = require('../src/renderer/src/score/scoreTimeV2.ts')
 const zlib = require('node:zlib')
 const practiceSegmentBuilder = require('../src/renderer/src/score/practiceSegmentBuilder.ts')
+const practiceRecordRepositoryModule = require('../src/renderer/src/records/practiceRecordRepository.ts')
+const scoreMastery = require('../src/renderer/src/ability/scoreMastery.ts')
+const referenceValidation = require('../src/renderer/src/score/referenceValidation.ts')
+const scoreImportRepository = require('../src/renderer/src/score/scoreImportRepository.ts')
+const dailyPlanV2Storage = require('../src/renderer/src/plan/dailyPlanV2Storage.ts')
+const mxlImportService = require('../src/renderer/src/score/mxlImportService.ts')
+const practiceMetrics = require('../src/renderer/src/records/practiceMetrics.ts')
+const evidenceResolver = require('../src/renderer/src/ai/evidenceResolver.ts')
+const scoreCoachProvider = require('../src/renderer/src/ai/scoreCoachProvider.ts')
+const scoreEngraving = require('../src/renderer/src/score/scoreEngraving.ts')
+
+function writeVlq(value) {
+  const bytes = []
+  let v = value
+  bytes.unshift(v & 0x7f)
+  v >>= 7
+  while (v > 0) {
+    bytes.unshift((v & 0x7f) | 0x80)
+    v >>= 7
+  }
+  return bytes
+}
+
+function buildReferenceSmf(noteEvents, division = 480, tempoBpm = 80) {
+  const tempo = Math.round(60000000 / tempoBpm)
+  const trackEvents = []
+  const push = (tick, bytes) => trackEvents.push({ tick, bytes })
+  push(0, [0xff, 0x51, 0x03, (tempo >> 16) & 0xff, (tempo >> 8) & 0xff, tempo & 0xff])
+  push(0, [0xff, 0x58, 0x04, 4, 2, 24, 8])
+  for (const note of noteEvents) {
+    const off = note.onsetTick + note.durationTick
+    push(note.onsetTick, [0x90, note.midiNumber, 90])
+    push(off, [0x80, note.midiNumber, 0])
+  }
+  trackEvents.sort((left, right) => left.tick - right.tick)
+  const body = []
+  let last = 0
+  for (const event of trackEvents) {
+    body.push(...writeVlq(event.tick - last))
+    body.push(...event.bytes)
+    last = event.tick
+  }
+  body.push(0x00, 0xff, 0x2f, 0x00)
+  const header = [0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, (division >> 8) & 0xff, division & 0xff]
+  const trackLength = body.length
+  const track = [0x4d, 0x54, 0x72, 0x6b, (trackLength >>> 24) & 0xff, (trackLength >>> 16) & 0xff, (trackLength >>> 8) & 0xff, trackLength & 0xff, ...body]
+  return new Uint8Array([...header, ...track])
+}
 const judgement = require('../src/renderer/src/utils/judgement.ts')
 const scalePatterns = require('../src/renderer/src/utils/scalePatterns.ts')
 const scalePracticeCore = require('../src/renderer/src/utils/scalePracticeCore.ts')
@@ -2365,7 +2419,7 @@ test('Wait 模式核心：正确推进、错误不推进、休止/延音自动�
   assert.equal(wrongCore.results[0].measure, 1)
   assert.deepEqual(wrongCore.results[0].expectedMidi, [60])
   assert.equal(wrongCore.results[0].actualMidi, 61)
-  assert.deepEqual(wrongCore.results[0].sourceEventIds, ['ev-1'])
+  assert.deepEqual(wrongCore.results[0].sourceEventIds, timeline.units[0].sourceEventIds)
   assert.equal(wrongCore.currentIndex, 0, '错误输入不得推进')
   wrongCore.processNoteOn(60)
   assert.equal(wrongCore.currentIndex, 1)
@@ -2436,7 +2490,7 @@ test('曲谱 Wait 练习 Hook 与页面接入逐事件总线且路由存在', ()
   assert.match(hookSource, /WaitScoreCore/)
   assert.doesNotMatch(hookSource, /latestMidiEvent|latestEvent/)
   assert.match(pageSource, /loadMusicXmlDocument/)
-  assert.match(pageSource, /extractMxlContainer/)
+  assert.match(pageSource, /importMxlFile/)
   assert.match(pageSource, /accept="\.xml,\.musicxml,\.mxl,\.mid,\.midi,\.png,\.jpg,\.jpeg,\.pdf"/)
   assert.match(appSource, /ScorePracticePage/)
   assert.doesNotMatch(pageSource, /返回首页/)
@@ -3685,21 +3739,733 @@ test('PracticeSegment：跨选区 tie 进入与离开的语义', () => {
   assert.equal(m1.expectedUnits.length, 2)
 })
 
-let failed = 0
+test('Tier B 参考 MIDI 校验：fixture 一致与差异', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/e2e-core-loop.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const scoreNotes = referenceValidation.buildScoreReferenceNotes(score)
+  assert.equal(scoreNotes.length, 11)
 
-for (const { name, callback } of tests) {
-  try {
-    callback()
-    process.stdout.write(`PASS ${name}\n`)
-  } catch (error) {
-    failed += 1
-    process.stderr.write(`FAIL ${name}\n${error.stack || error}\n`)
+  const fixtureMidiNotes = [
+    { midiNumber: 60, onsetTick: 0, durationTick: 1920 },
+    { midiNumber: 48, onsetTick: 0, durationTick: 1920 },
+    { midiNumber: 67, onsetTick: 1920, durationTick: 480 },
+    { midiNumber: 71, onsetTick: 1920, durationTick: 480 },
+    { midiNumber: 74, onsetTick: 1920, durationTick: 480 },
+    { midiNumber: 77, onsetTick: 2400, durationTick: 480 },
+    { midiNumber: 48, onsetTick: 1920, durationTick: 1920 },
+    { midiNumber: 76, onsetTick: 3840, durationTick: 2880 },
+    { midiNumber: 55, onsetTick: 3840, durationTick: 1920 },
+    { midiNumber: 77, onsetTick: 6720, durationTick: 480 },
+    { midiNumber: 48, onsetTick: 5760, durationTick: 1920 }
+  ]
+  const smf = midiFileParser.parseMidiFile(buildReferenceSmf(fixtureMidiNotes, 480, 80))
+  const midiNotes = referenceValidation.buildMidiReferenceNotes(smf)
+  const report = referenceValidation.validateScoreAgainstMidi(scoreNotes, midiNotes, { tempoBpm: 80 })
+  assert.equal(report.matched, 11)
+  assert.equal(report.onlyScore.length, 0)
+  assert.equal(report.onlyMidi.length, 0)
+  assert.equal(report.consistent, true)
+
+  const extraMidi = [...fixtureMidiNotes, { midiNumber: 65, onsetTick: 3000, durationTick: 240 }]
+  const smf2 = midiFileParser.parseMidiFile(buildReferenceSmf(extraMidi, 480, 80))
+  const report2 = referenceValidation.validateScoreAgainstMidi(
+    scoreNotes,
+    referenceValidation.buildMidiReferenceNotes(smf2),
+    { tempoBpm: 80 }
+  )
+  assert.equal(report2.consistent, false)
+  assert.equal(report2.onlyMidi.length, 1)
+  assert.equal(report2.onlyMidi[0].midiNumber, 65)
+})
+
+test('AI Coach 2.0：读取本次曲谱错误并提供选区示范', () => {
+  const ability = abilityModel.computeAbilityModelV2([], undefined, new Date('2026-08-14T00:00:00.000Z'))
+  const response = coach2.buildDeterministicCoachResponse({
+    selectedMeasures: { start: 2, end: 2 },
+    recentRecords: [],
+    ability,
+    plan: null,
+    userQuestion: '为什么这里总错？',
+    scoreSession: {
+      scoreId: 'E2E Core Loop',
+      segment: '2-2',
+      recordId: 'e2e-record-1',
+      mode: 'wait',
+      facts: [
+        { measure: 2, beat: 1, outcome: 'wrong', expectedMidi: [77], actualMidi: 70, sourceEventIds: ['e4'] }
+      ]
+    }
+  })
+  assert.equal(response.demoRequests.length, 1)
+  assert.equal(response.demoRequests[0].measureStart, 2)
+  assert.equal(response.demoRequests[0].tempoRatio, 0.6)
+  assert.ok(response.observations.some((observation) => observation.text.includes('错误')))
+  assert.ok(response.diagnoses.some((diagnosis) => diagnosis.text.includes('第 2 小节')))
+  assert.ok(response.evidenceRefs.some((ref) => ref.practiceRecordId === 'e2e-record-1'))
+})
+
+test('每日计划 V2 与曲谱导入仓库持久化', () => {
+  const values = new Map()
+  const storage = {
+    getItem: (key) => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key)
+  }
+
+  let imports = scoreImportRepository.upsertScoreImport({ version: 1, scores: [] }, {
+    id: 's1',
+    title: 'S1',
+    xml: '<score-partwise/>',
+    sourceType: 'musicxml',
+    importedAt: '2026-08-14T00:00:00.000Z',
+    tier: 'A'
+  })
+  assert.equal(scoreImportRepository.writeScoreImports(imports, storage), true)
+  assert.equal(scoreImportRepository.readScoreImports(storage).scores.length, 1)
+  assert.equal(scoreImportRepository.getScoreImport('s1', storage).title, 'S1')
+  scoreImportRepository.removeScoreImport('s1', storage)
+  assert.equal(scoreImportRepository.readScoreImports(storage).scores.length, 0)
+
+  const plan = planner.buildDailyPlan({
+    ability: abilityModel.computeAbilityModelV2([], undefined, new Date('2026-08-14T00:00:00.000Z')),
+    records: [],
+    goal: '',
+    availableMinutes: 30,
+    library: exerciseLibrary.EXERCISE_LIBRARY
+  })
+  const stored = dailyPlanV2Storage.createDailyPlanV2(plan)
+  assert.ok(stored.items.length >= 1)
+  assert.equal(dailyPlanV2Storage.writeDailyPlanV2(stored, storage), true)
+  const read = dailyPlanV2Storage.readDailyPlanV2(storage)
+  assert.ok(read !== null)
+  assert.equal(read.items.length, stored.items.length)
+  assert.equal(dailyPlanV2Storage.sanitizeDailyPlanV2('{bad'), null)
+})
+
+test('统一备份：包含 V2 记录、每日计划与曲谱导入键', () => {
+  const values = new Map([
+    ['piano-trainer.practice-records.v2', '[]'],
+    ['training-plan.v2.daily.v1', '{"version":1}'],
+    ['piano-trainer.score-imports.v1', '{"version":1,"scores":[]}']
+  ])
+  const storage = {
+    values,
+    getItem(key) {
+      assert.equal(this, storage, 'Storage 方法必须保留浏览器 receiver')
+      return this.values.has(key) ? this.values.get(key) : null
+    }
+  }
+  const state = backup.collectCurrentStorageState(storage)
+  assert.equal(state['piano-trainer.practice-records.v2'], '[]')
+  assert.equal(state['training-plan.v2.daily.v1'], '{"version":1}')
+  assert.equal(state['piano-trainer.score-imports.v1'], '{"version":1,"scores":[]}')
+})
+
+test('E2E 核心闭环：导入→选区→Wait→记录→Mastery→能力→计划→Coach→示范→改善', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/e2e-core-loop.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  assert.equal(score.defaultTempoBpm, 80)
+  assert.equal(score.parts[0].measures.length, 4)
+  const firstMeasure = score.parts[0].measures[0]
+  assert.equal(firstMeasure.keySignature, 0)
+  assert.equal(firstMeasure.timeBeats, 4)
+
+  // 1.5 Tier B：参考 MIDI 与谱面交叉验证 100% 一致
+  const scoreRefNotes = referenceValidation.buildScoreReferenceNotes(score)
+  assert.equal(scoreRefNotes.length, 11)
+  const fixtureMidiNotes = [
+    { midiNumber: 60, onsetTick: 0, durationTick: 1920 },
+    { midiNumber: 48, onsetTick: 0, durationTick: 1920 },
+    { midiNumber: 67, onsetTick: 1920, durationTick: 480 },
+    { midiNumber: 71, onsetTick: 1920, durationTick: 480 },
+    { midiNumber: 74, onsetTick: 1920, durationTick: 480 },
+    { midiNumber: 77, onsetTick: 2400, durationTick: 480 },
+    { midiNumber: 48, onsetTick: 1920, durationTick: 1920 },
+    { midiNumber: 76, onsetTick: 3840, durationTick: 2880 },
+    { midiNumber: 55, onsetTick: 3840, durationTick: 1920 },
+    { midiNumber: 77, onsetTick: 6720, durationTick: 480 },
+    { midiNumber: 48, onsetTick: 5760, durationTick: 1920 }
+  ]
+  const smf = midiFileParser.parseMidiFile(buildReferenceSmf(fixtureMidiNotes, 480, 80))
+  const crossCheck = referenceValidation.validateScoreAgainstMidi(
+    scoreRefNotes,
+    referenceValidation.buildMidiReferenceNotes(smf),
+    { tempoBpm: 80 }
+  )
+  assert.equal(crossCheck.matched, 11)
+  assert.equal(crossCheck.consistent, true)
+
+  // 1. 选区 Bar2（右手三音和弦 + 左手单音）
+  const bar2 = practiceSegmentBuilder.buildPracticeSegment(score, { startMeasure: 2, endMeasure: 2, handMode: 'right' })
+  assert.equal(bar2.expectedUnits[0].practiceTick, 0, '选区第一事件 practiceTick=0')
+  assert.deepEqual(bar2.expectedUnits[0].expectedMidi, [67, 71, 74], '右手三音和弦')
+
+  // 2. Wait：只弹一个音不推进
+  const waitTimeline = { units: bar2.expectedUnits.map((unit, index) => ({
+    id: `seg-${unit.originalMeasure}-${unit.practiceTick}`,
+    onsetIndex: index,
+    expectedTick: unit.practiceTick,
+    measure: unit.originalMeasure,
+    originalMeasure: unit.originalMeasure,
+    originalBeat: unit.originalBeat,
+    practiceTick: unit.practiceTick,
+    notes: [],
+    tieStart: unit.tieStart,
+    rest: unit.rest,
+    expectedMidi: unit.expectedMidi,
+    staff: unit.staff,
+    hand: unit.hand,
+    sourceEventIds: unit.sourceEventIds
+  })) }
+  const waitCore = new waitScoreCore.WaitScoreCore(waitTimeline)
+  waitCore.processNoteOn(67, 'e1')
+  assert.equal(waitCore.currentIndex, 0, '部分和弦不得推进')
+  waitCore.processNoteOn(71, 'e2')
+  assert.equal(waitCore.currentIndex, 0)
+  waitCore.processNoteOn(74, 'e3')
+  assert.equal(waitCore.currentIndex, 1, '完整和弦推进到下一音')
+  waitCore.processNoteOn(70, 'e4')
+  assert.equal(waitCore.results[1].outcome, 'wrong')
+  assert.equal(waitCore.results[1].measure, 2)
+  assert.deepEqual(waitCore.results[1].expectedMidi, [77])
+  assert.equal(waitCore.results[1].actualMidi, 70)
+  assert.deepEqual(waitCore.results[1].sourceEventIds, bar2.expectedUnits[1].sourceEventIds)
+  waitCore.processNoteOn(77, 'e5')
+  assert.equal(waitCore.isComplete, true)
+
+  // 3. 统一记录仓库（内存存储）
+  const values = new Map()
+  const storage = {
+    getItem: (key) => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key)
+  }
+  const repo = practiceRecordRepositoryModule.createPracticeRecordRepository(storage)
+  const record = {
+    id: 'e2e-record-1',
+    schemaVersion: 2,
+    practiceType: 'score',
+    sourceType: 'musicxml',
+    sourceId: score.title,
+    startedAt: '2026-08-14T10:00:00.000Z',
+    endedAt: '2026-08-14T10:01:00.000Z',
+    durationMs: 60000,
+    tempo: 80,
+    mode: 'wait',
+    handMode: 'right',
+    scoreId: score.title,
+    segment: '2-2',
+    metrics: [
+      { key: 'accuracy', value: 75, unit: '%' },
+      { key: 'correct', value: 3 },
+      { key: 'wrong', value: 1 },
+      { key: 'missing', value: 0 },
+      { key: 'extra', value: 0 }
+    ],
+    errorEvents: [{
+      id: 'e2e-record-1-error-0',
+      type: 'wrong',
+      measure: 2,
+      beat: 1,
+      expected: 71,
+      actual: 70,
+      sourceEventIds: ['e4']
+    }],
+    evidenceRefs: [],
+    perMeasureMetrics: [{
+      measureNumber: 2,
+      expectedJudgeableCount: 4,
+      correct: 3,
+      wrong: 1,
+      missed: 0,
+      extra: 0,
+      pitchAccuracy: 75,
+      early: 0,
+      late: 0,
+      averageSignedOffsetMs: null,
+      medianAbsTimingErrorMs: null,
+      maxAbsoluteOffsetMs: null,
+      interruptionCount: 0,
+      tempoRatio: 1,
+      handStats: { right: { expectedJudgeableCount: 4, correct: 3, wrong: 1, missed: 0, extra: 0 } },
+      evidenceRefs: [{ practiceRecordId: 'e2e-record-1', errorEventId: 'e2e-record-1-error-0', measure: 2 }]
+    }],
+    metadata: {}
+  }
+  assert.equal(repo.add(record), true)
+  assert.equal(repo.list().length, 1)
+  assert.equal(repo.get('e2e-record-1').id, 'e2e-record-1')
+
+  // 4. Score Mastery Bar2 更新
+  const mastery = scoreMastery.computeScoreMastery(repo.list(), new Date('2026-08-14T10:02:00.000Z'))
+  const measure2 = mastery.scores[score.title][2]
+  assert.equal(measure2.attempts, 1)
+  assert.equal(measure2.pitchAccuracy, 75)
+  assert.equal(measure2.confidence, 'low')
+  assert.equal(measure2.evidenceRefs.length, 1)
+
+  // 5. Ability 2.0 读取 V2 仓库
+  const ability = abilityModel.computeAbilityModelV2(repo.list(), mastery)
+  assert.equal(ability.skills['score-performance'].sampleCount, 1)
+  assert.equal(ability.skills['score-performance'].score, 75)
+
+  // 6. Planner 生成针对 Bar2 的任务
+  const plan = planner.buildDailyPlan({
+    ability,
+    records: [],
+    goal: '练好第2小节',
+    availableMinutes: 30,
+    library: exerciseLibrary.EXERCISE_LIBRARY,
+    mastery
+  })
+  const bar2Item = plan.items.find((item) => item.exerciseId === `score:${score.title}:2`)
+  assert.ok(bar2Item !== undefined, '计划必须出现针对第2小节的任务')
+  assert.equal(bar2Item.successCriteria.includes('第 2 小节'), true)
+  assert.ok(bar2Item.evidenceRefs.length >= 1)
+
+  // 7. Coach 读取选区与刚才错误
+  const coach = coach2.buildDeterministicCoachResponse({
+    selectedMeasures: { start: 2, end: 2 },
+    recentRecords: [],
+    ability,
+    plan: null,
+    userQuestion: '为什么这里总错？'
+  })
+  assert.equal(coach.demoRequests.length, 1)
+  assert.equal(coach.demoRequests[0].measureStart, 2)
+  assert.equal(coach.demoRequests[0].measureEnd, 2)
+
+  // 8. DemoRequest 驱动 Teaching Playback：只产生 Bar2 事件、第一事件 offset=0
+  const demoPlan = playback.buildPlaybackPlan(score, {
+    startMeasure: coach.demoRequests[0].measureStart,
+    endMeasure: coach.demoRequests[0].measureEnd,
+    handMode: coach.demoRequests[0].handMode,
+    tempoRatio: coach.demoRequests[0].tempoRatio,
+    loop: coach.demoRequests[0].loop
+  })
+  const noteOns = demoPlan.events.filter((event) => event.type === 'noteOn')
+  assert.ok(noteOns.length >= 4, 'Bar2 双手应产生至少 4 个 noteOn')
+  assert.equal(noteOns[0].timeMs, 0, '示范第一事件必须立即开始')
+  assert.ok(demoPlan.events.every((event) => event.timeMs >= 0))
+
+  // 9. 中途 stop：All Notes Off 被调用，不挂音
+  const calls = { allNotesOff: 0, sustainOff: 0, noteOn: 0 }
+  const fakeAudio = {
+    noteOn: () => { calls.noteOn += 1 },
+    noteOff: () => undefined,
+    setSustain: (down) => { if (!down) calls.sustainOff += 1 },
+    allNotesOff: () => { calls.allNotesOff += 1 }
+  }
+  const scheduler = playback.createPlaybackScheduler({ ...demoPlan, tempoRatio: 0.25, durationMs: demoPlan.durationMs * 4 }, fakeAudio)
+  scheduler.start()
+  scheduler.stop()
+  assert.equal(calls.allNotesOff, 1, 'stop 必须发送 All Notes Off')
+  assert.equal(calls.sustainOff, 1)
+
+  // 10. 改善闭环：第二次正确练习 → Mastery 改善、计划可降级
+  const record2 = {
+    ...record,
+    id: 'e2e-record-2',
+    startedAt: '2026-08-14T10:10:00.000Z',
+    endedAt: '2026-08-14T10:11:00.000Z',
+    metrics: [
+      { key: 'accuracy', value: 100, unit: '%' },
+      { key: 'correct', value: 4 },
+      { key: 'wrong', value: 0 },
+      { key: 'missing', value: 0 },
+      { key: 'extra', value: 0 }
+    ],
+    errorEvents: [],
+    perMeasureMetrics: [{
+      ...record.perMeasureMetrics[0],
+      correct: 4,
+      wrong: 0,
+      pitchAccuracy: 100,
+      handStats: { right: { expectedJudgeableCount: 4, correct: 4, wrong: 0, missed: 0, extra: 0 } },
+      evidenceRefs: []
+    }]
+  }
+  repo.add(record2)
+  const mastery2 = scoreMastery.computeScoreMastery(repo.list(), new Date('2026-08-14T10:10:00.000Z'))
+  const measure2After = mastery2.scores[score.title][2]
+  assert.equal(measure2After.attempts, 2)
+  assert.equal(measure2After.pitchAccuracy, 88)
+  assert.equal(measure2After.recentTrend, 'up')
+  const plan2 = planner.buildDailyPlan({
+    ability: abilityModel.computeAbilityModelV2(repo.list(), mastery2),
+    records: [],
+    goal: '',
+    availableMinutes: 30,
+    library: exerciseLibrary.EXERCISE_LIBRARY,
+    mastery: mastery2
+  })
+  const bar2Item2 = plan2.items.find((item) => item.exerciseId === `score:${score.title}:2`)
+  assert.equal(bar2Item2, undefined, '弱点消除后计划应降低该任务优先级或移除')
+})
+
+test('MusicXML 真实 MuseScore 结构：DOCTYPE/PI/CDATA/harmony/backup', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/musescore-doctype.musicxml'), 'utf8')
+  assert.match(xml, /<!DOCTYPE score-partwise/)
+  const score = musicXmlParser.parseMusicXml(xml)
+  assert.equal(score.parts[0].measures.length, 2)
+  assert.equal(score.parts[0].measures[0].harmonies.length, 1)
+  assert.equal(score.parts[0].measures[0].harmonies[0].rootStep, 'C')
+  assert.equal(score.parts[0].measures[0].clefs.length, 2)
+  const attacks = scoreTimeV2.mergeTiedPerformanceEvents(scoreTimeV2.buildScoreTimeV2(score).events)
+  assert.equal(attacks.filter((event) => event.attackTick === 0).length, 2, 'backup 后双手应共享 onset')
+})
+
+test('Tie performance events：普通重复音、多 voice 与三段 tie 链', () => {
+  const event = (id, onset, duration, options = {}) => ({
+    id, partIndex: 0, measureIndex: Math.floor(onset / 480), measureNumber: Math.floor(onset / 480) + 1,
+    noteIndex: 0, onsetInMeasure: onset % 480, absoluteOnset: onset, duration, staff: 1,
+    voice: options.voice ?? '1', sourceDivisions: 1, writtenStep: 'C', writtenAlter: 0,
+    writtenOctave: 4, midiPitch: 60, tieStart: Boolean(options.tieStart), tieStop: Boolean(options.tieStop), type: 'note'
+  })
+  assert.equal(scoreTimeV2.mergeTiedPerformanceEvents([event('a', 0, 480), event('b', 480, 480)]).length, 2)
+  assert.equal(scoreTimeV2.mergeTiedPerformanceEvents([event('a', 0, 240), event('b', 240, 240)]).length, 2)
+  assert.equal(scoreTimeV2.mergeTiedPerformanceEvents([event('a', 0, 480), event('b', 0, 480, { voice: '2' })]).length, 2)
+  const tied = scoreTimeV2.mergeTiedPerformanceEvents([
+    event('t1', 0, 480, { tieStart: true }),
+    event('t2', 480, 480, { tieStart: true, tieStop: true }),
+    event('t3', 960, 480, { tieStop: true })
+  ])
+  assert.equal(tied.length, 1)
+  assert.equal(tied[0].releaseTick, 1440)
+  assert.deepEqual(tied[0].sourceEventIds, ['t1', 't2', 't3'])
+  const orphan = scoreTimeV2.mergeTiedPerformanceEventsWithDiagnostics([event('orphan', 0, 480, { tieStop: true })])
+  assert.equal(orphan.events.length, 1)
+  assert.equal(orphan.warnings[0].code, 'ORPHAN_TIE_STOP')
+})
+
+test('Production MXL service：raw DEFLATE、container 主谱与 extra.xml', async () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/musescore-doctype.musicxml'), 'utf8')
+  const container = '<?xml version="1.0"?><container><rootfiles><rootfile full-path="scores/main.musicxml" media-type="application/vnd.recordare.musicxml+xml"/></rootfiles></container>'
+  const archive = zipReader.buildZip([
+    { name: 'META-INF/container.xml', content: container },
+    { name: 'extra.xml', content: '<wrong/>' },
+    { name: 'scores/main.musicxml', content: xml }
+  ], 8, (bytes) => zlib.deflateRawSync(bytes))
+  const extractor = mxlImportService.createMxlExtractor((bytes) => zlib.inflateRawSync(bytes))
+  const payload = await extractor.extractMxl(archive)
+  assert.equal(payload.fileName, 'scores/main.musicxml')
+  assert.equal(payload.document.parts[0].measures.length, 2)
+  assert.match(payload.xmlText, /<!DOCTYPE score-partwise/)
+})
+
+test('Wait accuracy：rest 与 tie-only skip 不进入分母', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/chord-tie-rest.xml'), 'utf8')
+  const timeline = scoreTimeline.buildScoreTimeline(musicXmlParser.loadMusicXmlDocument(xml))
+  const core = new waitScoreCore.WaitScoreCore(timeline)
+  while (!core.isComplete) {
+    const unit = core.currentUnit
+    if (!unit) break
+    if (unit.expectedMidi.length === 0) {
+      core.processNoteOn(0)
+      continue
+    }
+    for (const midi of unit.expectedMidi) core.processNoteOn(midi)
+  }
+  const summary = practiceMetrics.buildPracticeSummaryMetrics(timeline, core.results, 1)
+  assert.ok(summary.skipped > 0)
+  assert.equal(summary.correct, summary.judgeableUnitCount)
+  assert.equal(summary.accuracy, 100)
+})
+
+test('Practice facts 与 Realtime timing：original measure/beat/hand、极端提前不消费', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/e2e-core-loop.xml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const segment = practiceSegmentBuilder.buildPracticeSegment(score, { startMeasure: 2, endMeasure: 2, handMode: 'right' })
+  const units = segment.expectedUnits.map((unit, index) => ({
+    id: `u${index}`, onsetIndex: index, expectedTick: unit.practiceTick, measure: unit.originalMeasure,
+    originalMeasure: unit.originalMeasure, originalBeat: unit.originalBeat, practiceTick: unit.practiceTick,
+    notes: [], tieStart: unit.tieStart, rest: unit.rest, expectedMidi: unit.expectedMidi,
+    staff: unit.staff, hand: unit.hand, sourceEventIds: unit.sourceEventIds
+  }))
+  const wait = new waitScoreCore.WaitScoreCore({ units })
+  wait.processNoteOn(67)
+  wait.processNoteOn(71)
+  wait.processNoteOn(74)
+  assert.equal(wait.results[0].originalMeasure, 2)
+  assert.equal(wait.results[0].originalBeat, 1)
+  assert.equal(wait.results[0].hand, 'right')
+  assert.equal(wait.results[0].staff, 1)
+  assert.ok(wait.results[0].sourceEventIds.length >= 3)
+
+  const realtime = new realtimeScoreCore.RealtimeScoreCore({ units }, { msPerTick: 1, toleranceMs: 180, skipWindowMs: 360 })
+  realtime.processNoteOn(67, 0)
+  realtime.processNoteOn(71, 0)
+  realtime.processNoteOn(74, 0)
+  const before = realtime.currentIndex
+  assert.equal(realtime.processNoteOn(77, 20), 'wrong', '第二单元极端提前应作为 extra')
+  assert.equal(realtime.currentIndex, before, '极端提前不得消费当前单元')
+  assert.equal(realtime.processNoteOn(77, 280), 'early', '合理 early 可消费')
+  assert.ok(realtime.currentIndex > before)
+  const summary = practiceMetrics.buildPracticeSummaryMetrics({ units }, realtime.results, 1)
+  assert.equal(summary.earlyCount, 1)
+  assert.equal(summary.averageSignedOffsetMs, -100)
+  assert.equal(summary.medianAbsoluteOffsetMs, 100)
+  assert.equal(summary.maxAbsoluteOffsetMs, 200)
+})
+
+test('ScoreMastery 按逐小节事实聚合且 timing 可计算', () => {
+  const record = {
+    id: 'per-measure', schemaVersion: 2, practiceType: 'score', sourceType: 'musicxml', sourceId: 'score',
+    startedAt: '2026-08-14T00:00:00.000Z', endedAt: '2026-08-14T00:01:00.000Z', durationMs: 60000,
+    scoreId: 'score', metrics: [], errorEvents: [], evidenceRefs: [], metadata: {},
+    perMeasureMetrics: [
+      { measureNumber: 1, expectedJudgeableCount: 4, correct: 4, wrong: 0, missed: 0, extra: 0, pitchAccuracy: 100, early: 0, late: 0, averageSignedOffsetMs: 10, medianAbsTimingErrorMs: 20, maxAbsoluteOffsetMs: 30, interruptionCount: 0, tempoRatio: 1, handStats: {}, evidenceRefs: [] },
+      { measureNumber: 2, expectedJudgeableCount: 4, correct: 2, wrong: 2, missed: 0, extra: 0, pitchAccuracy: 50, early: 1, late: 1, averageSignedOffsetMs: 40, medianAbsTimingErrorMs: 90, maxAbsoluteOffsetMs: 140, interruptionCount: 1, tempoRatio: 0.6, handStats: {}, evidenceRefs: [] }
+    ]
+  }
+  const mastery = scoreMastery.computeScoreMastery([record])
+  assert.ok(mastery.scores.score[1].pitchAccuracy > mastery.scores.score[2].pitchAccuracy)
+  assert.notEqual(mastery.scores.score[1].timingAccuracy, null)
+  assert.equal(scoreMastery.getWeakestMeasures(mastery, 'score', 1)[0].measure, 2)
+})
+
+test('PracticeRecord V2 legacy migration 幂等且 clear 清理 marker/V2', () => {
+  const values = new Map()
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)), removeItem: (key) => values.delete(key) }
+  const repository = practiceRecordRepositoryModule.createPracticeRecordRepository(storage)
+  const legacy = {
+    id: 'legacy-e', schemaVersion: 1, module: 'scale', moduleName: '音阶练习', title: 'C 大调',
+    startedAt: '2026-08-14T00:00:00.000Z', endedAt: '2026-08-14T00:01:00.000Z', durationMs: 60000,
+    status: 'completed', totalEvents: 10, correctEvents: 8, accuracy: 80, wrongNoteCount: 2,
+    missingNoteCount: 0, extraNoteCount: 0, earlyCount: 0, lateCount: 0, restErrorCount: 0,
+    syncWarningCount: 0, settings: {}, details: {}, mistakes: [{ label: '错音', count: 2, type: 'wrong' }]
+  }
+  assert.equal(repository.migrateLegacy([legacy]), 1)
+  assert.equal(repository.migrateLegacy([legacy]), 0)
+  assert.equal(values.get(practiceRecordRepositoryModule.PRACTICE_RECORD_V2_MIGRATION_KEY), '1')
+  assert.equal(repository.list()[0].errorEvents[0]?.expected ?? null, null)
+  assert.equal(repository.clear(), true)
+  assert.equal(repository.list().length, 0)
+  assert.equal(values.has(practiceRecordRepositoryModule.PRACTICE_RECORD_V2_MIGRATION_KEY), false)
+
+  const failedValues = new Map()
+  const failingStorage = {
+    getItem: (key) => failedValues.get(key) ?? null,
+    setItem: (key, value) => {
+      if (key === practiceRecordRepositoryModule.PRACTICE_RECORD_V2_STORAGE_KEY) throw new Error('quota exceeded')
+      failedValues.set(key, String(value))
+    },
+    removeItem: (key) => failedValues.delete(key)
+  }
+  const retryableRepository = practiceRecordRepositoryModule.createPracticeRecordRepository(failingStorage)
+  assert.equal(retryableRepository.migrateLegacy([legacy]), 0)
+  assert.equal(failedValues.has(practiceRecordRepositoryModule.PRACTICE_RECORD_V2_MIGRATION_KEY), false, '迁移写入失败时不得写完成 marker')
+})
+
+test('Planner reactive：新事实自动完成成功标准，goal 改变优先权', () => {
+  const mastery = { version: 1, updatedAt: new Date().toISOString(), scores: { S: { 2: { scoreId: 'S', measureNumber: 2, attempts: 2, pitchAccuracy: 95, timingAccuracy: 90, interruptionRate: 0, lastPracticedAt: new Date().toISOString(), bestTempoRatio: 1, recentTrend: 'up', evidenceRefs: [{ practiceRecordId: 'r' }], confidence: 'low' } } } }
+  const planState = { version: 1, planId: 'p', date: '2026-08-14', generatedAt: new Date().toISOString(), sourceEvidenceSnapshot: { recordCount: 0, masteryScoreCount: 1, planItemCount: 1 }, items: [{ exerciseId: 'score:S:2', targetSkillIds: ['score-performance'], minutes: 10, successCriteria: '90%', whyThis: 'weak', evidenceRefs: [] }], progress: {} }
+  const updated = dailyPlanV2Storage.updateDailyPlanFromRecords(planState, [], mastery)
+  assert.equal(updated.changed, true)
+  assert.equal(updated.state.progress['score:S:2'], 'done')
+  const ability = abilityModel.computeAbilityModelV2([])
+  const sightPlan = planner.buildDailyPlan({ ability, records: [], goal: '加强识谱', availableMinutes: 20, library: exerciseLibrary.EXERCISE_LIBRARY })
+  assert.equal(sightPlan.items[0].targetSkillIds.includes('sight-reading'), true)
+  assert.equal(sightPlan.totalTargetMinutes <= 20, true)
+})
+
+test('Coach intent：WHY_ERROR / COUNT_RHYTHM / WHICH_HAND_FIRST 输出不同', () => {
+  const ability = abilityModel.computeAbilityModelV2([])
+  const base = {
+    selectedMeasures: { start: 14, end: 14 }, recentRecords: [], ability, plan: null,
+    scoreFacts: { title: 'S', timeSignature: '4/4', onsetPattern: [1, 1.5, 2], harmonyLabels: ['C'] },
+    scoreSession: { scoreId: 'S', segment: '14-14', recordId: 'r', mode: 'realtime', facts: [
+      { measure: 14, beat: 3, hand: 'right', staff: 1, outcome: 'wrong', expectedMidi: [72], actualMidi: 71, sourceEventIds: ['e1'] },
+      { measure: 14, beat: 3, hand: 'right', staff: 1, outcome: 'late', expectedMidi: [72], actualMidi: 72, sourceEventIds: ['e1'] }
+    ] }
+  }
+  const why = coach2.buildDeterministicCoachResponse({ ...base, userQuestion: '为什么这里总错？' })
+  const count = coach2.buildDeterministicCoachResponse({ ...base, userQuestion: '节奏怎么数？' })
+  const hand = coach2.buildDeterministicCoachResponse({ ...base, userQuestion: '先练哪只手？' })
+  assert.equal(why.intent, 'WHY_ERROR')
+  assert.equal(count.intent, 'COUNT_RHYTHM')
+  assert.equal(hand.intent, 'WHICH_HAND_FIRST')
+  assert.notEqual(why.summary, count.summary)
+  assert.notEqual(count.summary, hand.summary)
+  assert.match(why.summary, /14.*3/)
+  assert.match(count.summary, /4\/4/)
+  assert.match(hand.summary, /右手/)
+})
+
+test('Evidence resolver 与 provider context：空 ID 拒绝、临时 session 可验证、结构失败 fallback', async () => {
+  const temporary = { sessionId: 'temp-1', scoreId: 'S', facts: [{ originalMeasure: 2, originalBeat: 1, hand: 'right', outcome: 'wrong', sourceEventIds: ['e'] }] }
+  const repositories = { getPracticeRecord: () => null, getTemporarySession: (id) => id === 'temp-1' ? temporary : null }
+  assert.equal(evidenceResolver.resolveEvidenceRef({ practiceRecordId: '' }, repositories).valid, false)
+  assert.equal(evidenceResolver.resolveEvidenceRef({ sessionId: 'temp-1', scoreId: 'S', measure: 2, hand: 'right' }, repositories).valid, true)
+  const ability = abilityModel.computeAbilityModelV2([])
+  const context = { selectedMeasures: { start: 2, end: 2 }, recentRecords: [], ability, plan: null, userQuestion: '播放示范', scoreSession: { scoreId: 'S', segment: '2-2', recordId: '', sessionId: 'temp-1', mode: 'wait', facts: [] }, scoreFacts: { title: 'S', timeSignature: '4/4', onsetPattern: [1], harmonyLabels: [] } }
+  const fallback = coach2.buildDeterministicCoachResponse(context)
+  let captured = ''
+  const client = { chat: async (messages) => {
+    captured = messages[1].content
+    return { ok: true, content: JSON.stringify({ summary: 'provider', observations: [], diagnoses: [], recommendations: [], demoRequests: [{ measureStart: 2, measureEnd: 2, handMode: 'right', tempoRatio: 0.5, loop: false }], nextSteps: ['练习'], evidenceRefs: [{ sessionId: 'temp-1', scoreId: 'S', measure: 2 }], uncertainty: [], confidence: 'medium' }) }
+  } }
+  const result = await scoreCoachProvider.requestScoreCoachFromProvider(context, fallback, client, repositories)
+  assert.equal(result.providerUsed, true)
+  assert.equal(result.response.summary, 'provider')
+  assert.equal(result.response.demoRequests[0].handMode, 'right')
+  assert.doesNotMatch(captured, /apiKey|localStorage/)
+  const failed = await scoreCoachProvider.requestScoreCoachFromProvider(context, fallback, { chat: async () => ({ ok: true, content: 'bad' }) }, repositories)
+  assert.equal(failed.providerUsed, false)
+  assert.equal(failed.response.summary, fallback.summary)
+})
+
+test('Grand Staff duration：附点与 triplet 语义不降级为邻近时值', () => {
+  const dotted = scoreEngraving.getVexDurationSpec({ noteType: 'quarter', dotCount: 1, timeModification: null }, 720)
+  assert.equal(dotted.duration, 'q')
+  assert.equal(dotted.dotCount, 1)
+  const triplet = scoreEngraving.getVexDurationSpec({ noteType: 'eighth', dotCount: 0, timeModification: { actualNotes: 3, normalNotes: 2, normalType: 'eighth' } }, 160)
+  assert.equal(triplet.duration, '8')
+  assert.deepEqual(triplet.tuplet, { actualNotes: 3, normalNotes: 2 })
+})
+
+test('Teaching Playback production controller：Stop/Panic 后 active voice=0', () => {
+  let now = 0
+  let id = 0
+  const tasks = new Map()
+  const clock = {
+    setTimeout(callback, delay) { const taskId = ++id; tasks.set(taskId, { at: now + delay, callback }); return taskId },
+    clearTimeout(taskId) { tasks.delete(taskId) }
+  }
+  const runTo = (target) => {
+    while (true) {
+      const next = [...tasks.entries()].sort((a, b) => a[1].at - b[1].at)[0]
+      if (!next || next[1].at > target) break
+      tasks.delete(next[0]); now = next[1].at; next[1].callback()
+    }
+    now = target
+  }
+  const state = { allOff: 0, sustainOff: 0 }
+  const controller = playback.createTeachingPlaybackController({ noteOn: () => undefined, noteOff: () => undefined, setSustain: (down) => { if (!down) state.sustainOff += 1 }, allNotesOff: () => { state.allOff += 1 } }, () => undefined, clock)
+  controller.play({ scoreId: 'S', title: 'S', startMeasure: 1, endMeasure: 1, handMode: 'both', tempoRatio: 1, loop: false, msPerTick: 1, events: [{ timeMs: 0, type: 'noteOn', midiNumber: 60, velocity: 90 }, { timeMs: 1000, type: 'noteOff', midiNumber: 60, velocity: 0 }], durationMs: 1000 })
+  runTo(0)
+  assert.equal(controller.activeVoiceCount(), 1)
+  controller.stop()
+  runTo(100)
+  assert.equal(controller.activeVoiceCount(), 0)
+  assert.equal(state.allOff, 1)
+  controller.panic()
+  assert.equal(controller.activeVoiceCount(), 0)
+})
+
+test('Chord V2 非 C 根音转位候选与 all 分布', () => {
+  for (const root of [5, 10, 1]) {
+    const expected = chordValidator.getBassCandidates(root, 'major', 'all')
+    const observed = new Set()
+    for (const random of [0, 0.34, 0.67, 0.99]) observed.add(chordValidator.pickBassConstraint(root, 'major', 'all', () => random))
+    assert.deepEqual([...observed].sort((a, b) => a - b), [...new Set(expected)].sort((a, b) => a - b))
+    assert.equal(observed.has(root), true)
+  }
+})
+
+test('Golden Case1 E2E：用户原始 MusicXML + MIDI 硬断言', () => {
+  const xmlPath = require('node:path').join(__dirname, '..', 'fixtures', 'golden', 'case1', '案例1.musicxml')
+  const midiPath = require('node:path').join(__dirname, '..', 'fixtures', 'golden', 'case1', '案例1.mid')
+  if (!fs.existsSync(xmlPath) || !fs.existsSync(midiPath)) blocked('用户 Golden Case1 文件当前不可用，未使用替代 fixture')
+  const xml = fs.readFileSync(xmlPath, 'utf8')
+  assert.match(xml, /<!DOCTYPE score-partwise/)
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  assert.equal(score.parts[0].measures.length, 8)
+  const measures = score.parts.flatMap((part) => part.measures)
+  assert.equal(Math.max(...measures.map((measure) => measure.staves ?? 1)), 2)
+  assert.deepEqual(
+    [...new Set(measures.flatMap((measure) => measure.clefs).map((clef) => `${clef.staff}:${clef.sign}`))].sort(),
+    ['1:G', '2:F']
+  )
+  assert.equal(measures.reduce((sum, measure) => sum + measure.harmonies.length, 0), 8)
+
+  const notatedNotes = measures.flatMap((measure) => measure.notes).filter((note) => !note.rest)
+  assert.equal(notatedNotes.length, 91)
+  assert.equal(notatedNotes.filter((note) => note.tieStart).length, 11)
+  assert.equal(notatedNotes.filter((note) => note.tieStop).length, 11)
+  const dottedNotes = notatedNotes.filter((note) => note.dotCount > 0)
+  assert.equal(dottedNotes.length, 20)
+  assert.ok(dottedNotes.every((note) => {
+    const spec = scoreEngraving.getVexDurationSpec(note, note.duration)
+    return spec.duration === 'q' && spec.dotCount === 1
+  }))
+
+  const scoreTime = scoreTimeV2.buildScoreTimeV2(score)
+  const tieMerge = scoreTimeV2.mergeTiedPerformanceEventsWithDiagnostics(scoreTime.events)
+  assert.equal(tieMerge.warnings.length, 0)
+  assert.deepEqual(
+    tieMerge.events.reduce((counts, event) => ({ ...counts, [event.measureNumber]: (counts[event.measureNumber] ?? 0) + 1 }), {}),
+    { 1: 10, 2: 13, 3: 11, 4: 12, 5: 12, 6: 10, 7: 8, 8: 4 }
+  )
+
+  const performance = referenceValidation.buildScoreReferenceNotes(score)
+  const midiDocument = midiFileParser.parseMidiFile(fs.readFileSync(midiPath))
+  assert.equal(midiDocument.format, 1)
+  assert.equal(midiDocument.tracks.length, 2)
+  assert.deepEqual(midiDocument.tracks.map((track) => track.events.filter((event) => event.type === 'noteOn' && (event.velocity ?? 0) > 0).length), [45, 35])
+  const midi = referenceValidation.buildMidiReferenceNotes(midiDocument)
+  const report = referenceValidation.validateScoreAgainstMidi(performance, midi, { tempoBpm: score.defaultTempoBpm ?? 80 })
+  assert.equal(performance.length, 80)
+  assert.equal(midi.length, 80)
+  assert.equal(report.matched, 80)
+  assert.equal(report.onlyScore.length, 0)
+  assert.equal(report.onlyMidi.length, 0)
+  assert.equal(report.matchRatio, 1)
+  assert.equal(report.consistent, true)
+  const demo = playback.buildPlaybackPlan(score, { startMeasure: 1, endMeasure: 8 })
+  assert.equal(demo.events.filter((event) => event.type === 'noteOn').length, 80)
+
+  const bar2Segment = practiceSegmentBuilder.buildPracticeSegment(score, { startMeasure: 2, endMeasure: 2, handMode: 'both' })
+  assert.deepEqual([...new Set(bar2Segment.events.map((event) => event.originalMeasure))], [2])
+  assert.equal(Math.min(...bar2Segment.events.map((event) => event.practiceTick)), 0)
+  const bar2Performance = scoreTimeV2.mergeTiedPerformanceEvents(bar2Segment.events.map(practiceSegmentBuilder.eventToScoreV2Like))
+  assert.equal(bar2Performance.length, 13)
+  const bar2Demo = playback.buildPlaybackPlan(score, { startMeasure: 2, endMeasure: 2 })
+  assert.equal(bar2Demo.events.filter((event) => event.type === 'noteOn').length, 13)
+  assert.equal(Math.min(...bar2Demo.events.map((event) => event.timeMs)), 0)
+
+  const waitTimeline = scoreTimeline.buildScoreTimeline(score)
+  const wait = new waitScoreCore.WaitScoreCore(waitTimeline)
+  while (!wait.isComplete) {
+    const unit = wait.currentUnit
+    if (!unit) break
+    if (unit.expectedMidi.length === 0) {
+      wait.processNoteOn(0)
+      continue
+    }
+    for (const midiNumber of unit.expectedMidi) wait.processNoteOn(midiNumber)
+  }
+  const waitSummary = practiceMetrics.buildPracticeSummaryMetrics(waitTimeline, wait.results, 1)
+  assert.equal(waitSummary.judgeableUnitCount, 46)
+  assert.equal(waitSummary.correct, 46)
+  assert.equal(waitSummary.accuracy, 100)
+})
+
+let failed = 0
+let blockedCount = 0
+
+async function runTests() {
+  for (const { name, callback } of tests) {
+    try {
+      await callback()
+      process.stdout.write(`PASS ${name}\n`)
+    } catch (error) {
+      if (error instanceof BlockedTestError) {
+        blockedCount += 1
+        process.stdout.write(`BLOCKED ${name}\n${error.message}\n`)
+        continue
+      }
+      failed += 1
+      process.stderr.write(`FAIL ${name}\n${error.stack || error}\n`)
+    }
+  }
+
+  if (failed > 0) {
+    process.stderr.write(`\n${failed} 项回归检查失败；${blockedCount} 项被外部 Golden 文件阻塞。\n`)
+    process.exitCode = 1
+  } else {
+    process.stdout.write(`\n${tests.length - blockedCount} 项回归检查通过；${blockedCount} 项被外部 Golden 文件阻塞。\n`)
   }
 }
 
-if (failed > 0) {
-  process.stderr.write(`\n${failed} 项回归检查失败。\n`)
-  process.exitCode = 1
-} else {
-  process.stdout.write(`\n${tests.length} 项回归检查全部通过。\n`)
-}
+void runTests()

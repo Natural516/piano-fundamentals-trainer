@@ -23,6 +23,7 @@ import { pageTitles } from './data'
 import { useMidi } from './hooks/useMidi'
 import { usePianoAudio } from './hooks/usePianoAudio'
 import { usePracticeHistory } from './hooks/usePracticeHistory'
+import { practiceRecordRepository } from './records/practiceRecordRepository'
 import type { PageId } from './types'
 import {
   createPageHistoryState,
@@ -62,6 +63,12 @@ function App(): JSX.Element {
   const [currentPage, setCurrentPage] = useState<PageId>(getInitialPage)
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null)
   const [showFirstRun, setShowFirstRun] = useState(() => isFirstRun())
+  const [scoreSegmentRequest, setScoreSegmentRequest] = useState<{
+    scoreId: string
+    startMeasure: number
+    endMeasure: number
+    nonce: number
+  } | null>(null)
   const currentPageRef = useRef(currentPage)
   const practiceRunningRef = useRef(false)
   const pendingNavigationRef = useRef<PendingNavigation | null>(null)
@@ -72,6 +79,10 @@ function App(): JSX.Element {
   const midi = useMidi()
   const pianoAudio = usePianoAudio()
   const practiceHistory = usePracticeHistory()
+
+  useEffect(() => {
+    practiceRecordRepository.migrateLegacy(practiceHistory.records)
+  }, [practiceHistory.records])
 
   const currentTitle = useMemo(() => pageTitles[currentPage], [currentPage])
   const isHomePage = currentPage === 'home'
@@ -189,6 +200,11 @@ function App(): JSX.Element {
     pushPage(page)
   }, [pushPage, updatePendingNavigation])
 
+  const openScoreSegment = useCallback((scoreId: string, startMeasure: number, endMeasure: number) => {
+    setScoreSegmentRequest({ scoreId, startMeasure, endMeasure, nonce: Date.now() })
+    handleNavigate('score-practice')
+  }, [handleNavigate])
+
   const cancelPracticeExit = (): void => {
     confirmedHistoryNavigationRef.current = null
     updatePendingNavigation(null)
@@ -231,6 +247,7 @@ function App(): JSX.Element {
             practiceRecords={practiceHistory.records}
             onBackHome={() => handleNavigate('home')}
             onNavigateModule={(module) => handleNavigate(trainingModulePages[module])}
+            onOpenScoreSegment={openScoreSegment}
           />
         ) : currentPage === 'midi-test' ? (
           <MidiTestPage midi={midi} />
@@ -275,6 +292,11 @@ function App(): JSX.Element {
           <ScorePracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
+            initialSegment={scoreSegmentRequest ? {
+              scoreId: scoreSegmentRequest.scoreId,
+              startMeasure: scoreSegmentRequest.startMeasure,
+              endMeasure: scoreSegmentRequest.endMeasure
+            } : null}
             pianoAudio={pianoAudio}
             practiceRecords={practiceHistory.records}
             onPracticeRunningChange={handlePracticeRunningChange}

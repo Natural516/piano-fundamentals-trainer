@@ -3,7 +3,7 @@ import type { ChordV2Difficulty, ChordV2InversionMode, ChordV2JudgeMode, ChordV2
 import { CHORD_V2_DIFFICULTY_QUALITIES, type ChordV2Result } from '../chordV2/chordV2Types'
 import { getChordV2Identity, formatChordSymbol } from '../chordV2/chordIdentity'
 import { createArpeggioSequence, judgeVoicing, normalizeNotes, ArpeggioStateMachine, createDefaultVoicing } from '../chordV2/voicing'
-import { getBassCandidates, validateVoicing } from '../chordV2/chordValidator'
+import { pickBassConstraint, validateVoicing } from '../chordV2/chordValidator'
 import { useMidiEventSubscription } from './useMidiEvents'
 
 type ChordV2Status = 'idle' | 'running' | 'finished'
@@ -79,9 +79,8 @@ function createQuestion(
   const quality = pickRandom(CHORD_V2_DIFFICULTY_QUALITIES[difficulty])
   const root = Math.floor(Math.random() * 12)
   const identity = getChordV2Identity(root, quality)
-  const inversionCandidates = getBassCandidates(root, quality, inversionMode)
-  const bassConstraint = judgeMode === 'inversion' && inversionCandidates.length > 0
-    ? (root + pickRandom(inversionCandidates)) % 12
+  const bassConstraint = judgeMode === 'inversion'
+    ? pickBassConstraint(root, quality, inversionMode)
     : root
   const registerLowest = judgeMode === 'identity' ? 48 + Math.floor(Math.random() * 12) : 48
   const voicing = createDefaultVoicing(identity, {

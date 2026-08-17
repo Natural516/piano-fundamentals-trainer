@@ -2,8 +2,17 @@ import { toSafeAiSettingsExport } from '../ai/aiSettings'
 import { PRACTICE_RECORD_STORAGE_KEY } from '../utils/practiceRecordStorage'
 import { CURRICULUM_PROGRESS_STORAGE_KEY } from '../curriculum/curriculumProgress'
 import { PRACTICE_SEGMENT_STORAGE_KEY } from '../score/practiceSegment'
+import { SCORE_IMPORT_STORAGE_KEY } from '../score/scoreImportRepository'
 import { PLAN_V2_STORAGE_KEY } from '../plan/planV2'
 import { PIANO_AUDIO_MODE_STORAGE_KEY, PIANO_VOLUME_STORAGE_KEY } from '../audio/audioModeSettings'
+import { PRACTICE_RECORD_V2_MIGRATION_KEY, PRACTICE_RECORD_V2_STORAGE_KEY } from '../records/practiceRecordRepository'
+import { DAILY_PLAN_V2_STORAGE_KEY, PLANNER_PREFERENCES_STORAGE_KEY } from '../plan/dailyPlanV2Storage'
+import { TRAINING_PLAN_STORAGE_KEY } from '../utils/trainingPlanStorage'
+import { SIGHT_READING_SETTINGS_STORAGE_KEY } from '../utils/sightReadingSettings'
+import { DISPLAY_PREFERENCES_STORAGE_KEY, DISPLAY_PREFERENCES_STORAGE_KEYS } from '../utils/displayPreferences'
+import { THEME_STORAGE_KEY } from '../utils/themeStorage'
+import { AI_SETTINGS_STORAGE_KEY } from '../ai/aiTypes'
+import { FIRST_RUN_STORAGE_KEY } from './firstRun'
 
 export interface BackupDocument {
   schemaVersion: 1
@@ -23,7 +32,7 @@ export function buildBackup(state: Record<string, string>, appVersion: string, n
   const safeState: Record<string, string> = {}
 
   for (const [key, value] of Object.entries(state)) {
-    if (key === 'ai-settings.v1') {
+    if (key === AI_SETTINGS_STORAGE_KEY) {
       const parsed = JSON.parse(value) as { config?: { apiKey?: string } }
       if (parsed.config?.apiKey) {
         safeState[key] = JSON.stringify({
@@ -65,26 +74,21 @@ export function collectCurrentStorageState(storage: Pick<Storage, 'getItem'> = w
     PRACTICE_RECORD_STORAGE_KEY,
     CURRICULUM_PROGRESS_STORAGE_KEY,
     PRACTICE_SEGMENT_STORAGE_KEY,
+    SCORE_IMPORT_STORAGE_KEY,
     PLAN_V2_STORAGE_KEY,
     PIANO_AUDIO_MODE_STORAGE_KEY,
     PIANO_VOLUME_STORAGE_KEY,
-    'piano-trainer.display-preferences.v1',
-    'piano-trainer.display-preferences.v2.midi-test',
-    'piano-trainer.display-preferences.v2.sight-reading',
-    'piano-trainer.display-preferences.v2.rhythm',
-    'piano-trainer.display-preferences.v2.scales',
-    'piano-trainer.display-preferences.v2.chords',
-    'piano-trainer.display-preferences.v2.coordination',
-    'piano-trainer.display-preferences.v2.free-practice',
-    'training-plan.v1',
-    'sight-reading-settings.v4',
-    'piano-trainer.sight-reading-settings.v3',
-    'piano-trainer.sight-reading-settings.v2',
-    'piano-trainer.sight-reading-settings.v1',
-    'piano-trainer.sight-reading-settings',
-    'piano-trainer.theme-mode.v1',
-    'ai-settings.v1',
-    'piano-trainer.first-run.v1'
+    DISPLAY_PREFERENCES_STORAGE_KEY,
+    ...Object.values(DISPLAY_PREFERENCES_STORAGE_KEYS),
+    TRAINING_PLAN_STORAGE_KEY,
+    SIGHT_READING_SETTINGS_STORAGE_KEY,
+    THEME_STORAGE_KEY,
+    AI_SETTINGS_STORAGE_KEY,
+    FIRST_RUN_STORAGE_KEY,
+    PRACTICE_RECORD_V2_STORAGE_KEY,
+    PRACTICE_RECORD_V2_MIGRATION_KEY,
+    DAILY_PLAN_V2_STORAGE_KEY,
+    PLANNER_PREFERENCES_STORAGE_KEY
   ]
   const state: Record<string, string> = {}
 
@@ -106,18 +110,17 @@ export function collectCurrentStorageState(storage: Pick<Storage, 'getItem'> = w
  */
 export function restoreFromBackup(
   backup: unknown,
-  storage: Pick<Storage, 'setItem' | 'removeItem'> = window.localStorage
-): { ok: boolean; message: string; restoredKeys: string[] } {
+  storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = window.localStorage
+): { ok: boolean; message: string; restoredKeys: string[]; rollbackComplete: boolean; failedKeys: string[] } {
   if (!validateBackup(backup)) {
-    return { ok: false, message: '备份结构无效，未修改任何现有数据', restoredKeys: [] }
+    return { ok: false, message: '备份结构无效，未修改任何现有数据', restoredKeys: [], rollbackComplete: true, failedKeys: [] }
   }
 
   const restoredKeys: string[] = []
   const previousValues = new Map<string, string | null>()
-  const getItem = (storage as unknown as Pick<Storage, 'getItem'>).getItem
   for (const key of Object.keys(backup.data)) {
     try {
-      previousValues.set(key, getItem(key))
+      previousValues.set(key, storage.getItem(key))
     } catch {
       previousValues.set(key, null)
     }
@@ -130,18 +133,25 @@ export function restoreFromBackup(
     }
   } catch {
     // Rollback: restore the previous values (best effort).
+    const failedKeys: string[] = []
     for (const [key, previous] of previousValues) {
       try {
         if (previous === null) storage.removeItem(key)
         else storage.setItem(key, previous)
       } catch {
-        // Rollback is best-effort; the backup was already rejected.
+        failedKeys.push(key)
       }
     }
-    return { ok: false, message: '恢复写入失败，现有数据可能部分被覆盖', restoredKeys }
+    return {
+      ok: false,
+      message: failedKeys.length === 0 ? '恢复写入失败，已完整回滚' : '恢复写入失败，回滚不完整',
+      restoredKeys,
+      rollbackComplete: failedKeys.length === 0,
+      failedKeys
+    }
   }
 
-  return { ok: true, message: `已恢复 ${restoredKeys.length} 项数据`, restoredKeys }
+  return { ok: true, message: `已恢复 ${restoredKeys.length} 项数据`, restoredKeys, rollbackComplete: true, failedKeys: [] }
 }
 
 export function exportBackupToFile(backup: BackupDocument): void {

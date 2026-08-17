@@ -4,8 +4,13 @@ export interface WaitStepResult {
   unitId: string
   outcome: 'correct' | 'wrong' | 'skip'
   measure: number
+  originalMeasure: number
+  originalBeat: number
+  practiceTick: number
   expectedMidi: number[]
   actualMidi: number | null
+  hand: 'left' | 'right' | 'both' | null
+  staff: number | null
   sourceEventIds: string[]
 }
 
@@ -65,9 +70,14 @@ export class WaitScoreCore {
         unitId: unit.id,
         outcome: 'wrong',
         measure: unit.measure,
+        originalMeasure: unit.originalMeasure,
+        originalBeat: unit.originalBeat,
+        practiceTick: unit.practiceTick,
         expectedMidi: required,
         actualMidi: midiNumber,
-        sourceEventIds: sourceEventId ? [sourceEventId] : []
+        hand: unit.hand,
+        staff: unit.staff,
+        sourceEventIds: unit.sourceEventIds
       })
       return 'wrong'
     }
@@ -78,9 +88,14 @@ export class WaitScoreCore {
         unitId: unit.id,
         outcome: 'correct',
         measure: unit.measure,
+        originalMeasure: unit.originalMeasure,
+        originalBeat: unit.originalBeat,
+        practiceTick: unit.practiceTick,
         expectedMidi: required,
         actualMidi: midiNumber,
-        sourceEventIds: sourceEventId ? [sourceEventId] : []
+        hand: unit.hand,
+        staff: unit.staff,
+        sourceEventIds: unit.sourceEventIds
       })
       this.applyTies(unit)
       this.index += 1
@@ -112,9 +127,14 @@ export class WaitScoreCore {
           unitId: unit.id,
           outcome: 'skip',
           measure: unit.measure,
+          originalMeasure: unit.originalMeasure,
+          originalBeat: unit.originalBeat,
+          practiceTick: unit.practiceTick,
           expectedMidi: [],
           actualMidi: null,
-          sourceEventIds: []
+          hand: unit.hand,
+          staff: unit.staff,
+          sourceEventIds: unit.sourceEventIds
         })
         this.index += 1
         this.pressed.clear()

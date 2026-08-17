@@ -8,18 +8,27 @@ import { WaitScoreCore } from '../score/waitScoreCore'
 import { RealtimeScoreCore } from '../score/realtimeScoreCore'
 import { FollowScoreCore } from '../score/followScoreCore'
 import { useMidiEventSubscription } from './useMidiEvents'
+import { buildPracticeSummaryMetrics } from '../records/practiceMetrics'
+import type { PerMeasurePracticeMetrics } from '../records/practiceRecordV2'
 
 export type ScorePracticeMode = 'wait' | 'realtime' | 'follow'
 export type ScorePracticePhase = 'idle' | 'count-in' | 'running' | 'paused' | 'finished'
 
 export interface ScorePracticeReport {
   totalUnits: number
+  judgeableUnitCount: number
   correct: number
   wrong: number
   missing: number
   extra: number
   skipped: number
   accuracy: number
+  earlyCount: number
+  lateCount: number
+  averageSignedOffsetMs: number | null
+  medianAbsoluteOffsetMs: number | null
+  maxAbsoluteOffsetMs: number | null
+  perMeasureMetrics: PerMeasurePracticeMetrics[]
 }
 
 export interface ScorePracticeFact {
@@ -28,9 +37,13 @@ export interface ScorePracticeFact {
   offsetMs?: number
   measure?: number
   beat?: number
+  originalMeasure?: number
+  originalBeat?: number
+  practiceTick?: number
   expectedMidi: number[]
   actualMidi: number | null
   hand?: string | null
+  staff?: number | null
   sourceEventIds: string[]
 }
 
@@ -39,6 +52,8 @@ export interface UseScorePracticeResult {
   mode: ScorePracticeMode
   timelineUnits: number
   currentIndex: number
+  currentMeasure: number | null
+  currentSourceEventIds: string[]
   expectedMidi: number[]
   feedback: 'correct' | 'wrong' | null
   elapsedMs: number
@@ -46,6 +61,7 @@ export interface UseScorePracticeResult {
   facts: ScorePracticeFact[]
   report: ScorePracticeReport
   isRunning: boolean
+  sessionActive: boolean
   start: () => void
   pause: () => void
   resume: () => void
@@ -98,6 +114,7 @@ export function useScorePractice(
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
   const [loopIterations, setLoopIterations] = useState(0)
+  const [interruptionMeasures, setInterruptionMeasures] = useState<number[]>([])
   const phaseRef = useRef(phase)
   phaseRef.current = phase
   const startTimeRef = useRef(0)
@@ -105,6 +122,9 @@ export function useScorePractice(
   const pausedTotalRef = useRef(0)
   const tickerRef = useRef<number | null>(null)
   const countInTimerRef = useRef<number | null>(null)
+  const countInEndsAtRef = useRef(0)
+  const countInRemainingRef = useRef(0)
+  const pausedFromCountInRef = useRef(false)
   const lastEventIdRef = useRef<number | null>(null)
   const loopIterationsRef = useRef(0)
   const completeLoopRef = useRef<() => void>(() => undefined)
@@ -118,6 +138,7 @@ export function useScorePractice(
     setFeedback(null)
     setElapsedMs(0)
     setLoopIterations(0)
+    setInterruptionMeasures([])
     loopIterationsRef.current = 0
     setPhase('idle')
   }, [msPerTick, timeline])
@@ -164,11 +185,15 @@ export function useScorePractice(
     setFacts([])
     setFeedback(null)
     setElapsedMs(0)
+    setInterruptionMeasures([])
     pausedTotalRef.current = 0
     pausedAtRef.current = 0
+    pausedFromCountInRef.current = false
     lastEventIdRef.current = null
     if (countInMs > 0) {
       setPhase('count-in')
+      countInRemainingRef.current = countInMs
+      countInEndsAtRef.current = performance.now() + countInMs
       if (countInTimerRef.current !== null) window.clearTimeout(countInTimerRef.current)
       countInTimerRef.current = window.setTimeout(() => {
         startTimeRef.current = performance.now()
@@ -200,14 +225,44 @@ export function useScorePractice(
   }, [beginRun])
 
   const pause = useCallback(() => {
-    if (phaseRef.current !== 'running') return
+    if (phaseRef.current !== 'running' && phaseRef.current !== 'count-in') return
+    if (phaseRef.current === 'count-in') {
+      if (countInTimerRef.current !== null) {
+        window.clearTimeout(countInTimerRef.current)
+        countInTimerRef.current = null
+      }
+      countInRemainingRef.current = Math.max(0, countInEndsAtRef.current - performance.now())
+      pausedFromCountInRef.current = true
+      setPhase('paused')
+      return
+    }
+    const core = mode === 'wait'
+      ? waitCoreRef.current
+      : mode === 'realtime'
+        ? realtimeCoreRef.current
+        : followCoreRef.current
+    const measure = core?.currentUnit?.originalMeasure
+    if (typeof measure === 'number') setInterruptionMeasures((current) => [...current, measure])
     stopTicker()
     pausedAtRef.current = performance.now()
     setPhase('paused')
-  }, [stopTicker])
+  }, [mode, stopTicker])
 
   const resume = useCallback(() => {
     if (phaseRef.current !== 'paused') return
+    if (pausedFromCountInRef.current) {
+      pausedFromCountInRef.current = false
+      const remaining = countInRemainingRef.current
+      setPhase('count-in')
+      countInEndsAtRef.current = performance.now() + remaining
+      countInTimerRef.current = window.setTimeout(() => {
+        countInTimerRef.current = null
+        startTimeRef.current = performance.now()
+        setPhase('running')
+        startTicker()
+      }, remaining)
+      return
+    }
     pausedTotalRef.current += performance.now() - pausedAtRef.current
     setPhase('running')
     startTicker()
@@ -219,6 +274,8 @@ export function useScorePractice(
       countInTimerRef.current = null
     }
     stopTicker()
+    pausedFromCountInRef.current = false
+    countInRemainingRef.current = 0
     setPhase('idle')
   }, [stopTicker])
 
@@ -271,19 +328,12 @@ export function useScorePractice(
     if (core.isComplete) completeLoop()
   })
 
-  useEffect(() => stopTicker, [stopTicker])
+  useEffect(() => () => {
+    stopTicker()
+    if (countInTimerRef.current !== null) window.clearTimeout(countInTimerRef.current)
+  }, [stopTicker])
 
-  const report: ScorePracticeReport = {
-    totalUnits: timeline.units.length,
-    correct: facts.filter((entry) => entry.outcome === 'correct').length,
-    wrong: facts.filter((entry) => entry.outcome === 'wrong').length,
-    missing: facts.filter((entry) => entry.outcome === 'missing').length,
-    extra: facts.filter((entry) => entry.outcome === 'extra').length,
-    skipped: facts.filter((entry) => entry.outcome === 'skip').length,
-    accuracy: timeline.units.length > 0
-      ? Math.round((facts.filter((entry) => entry.outcome === 'correct').length / timeline.units.length) * 100)
-      : 0
-  }
+  const report: ScorePracticeReport = buildPracticeSummaryMetrics(timeline, facts, tempoRatio, interruptionMeasures)
   const core = mode === 'wait' ? waitCoreRef.current : mode === 'realtime' ? realtimeCoreRef.current : followCoreRef.current
 
   return {
@@ -291,6 +341,8 @@ export function useScorePractice(
     mode,
     timelineUnits: timeline.units.length,
     currentIndex,
+    currentMeasure: core?.currentUnit?.measure ?? null,
+    currentSourceEventIds: core?.currentUnit?.sourceEventIds ?? [],
     expectedMidi: core?.currentUnit?.expectedMidi ?? [],
     feedback,
     elapsedMs,
@@ -298,6 +350,7 @@ export function useScorePractice(
     facts,
     report,
     isRunning: phase === 'running',
+    sessionActive: phase === 'count-in' || phase === 'running' || phase === 'paused',
     start,
     pause,
     resume,
@@ -312,9 +365,13 @@ interface ScorePracticeFactLike {
   offsetMs?: unknown
   measure?: unknown
   beat?: unknown
+  originalMeasure?: unknown
+  originalBeat?: unknown
+  practiceTick?: unknown
   expectedMidi?: unknown
   actualMidi?: unknown
   hand?: unknown
+  staff?: unknown
   sourceEventIds?: unknown
 }
 
@@ -325,9 +382,17 @@ function toFact(result: ScorePracticeFactLike): ScorePracticeFact {
     offsetMs: typeof result.offsetMs === 'number' ? result.offsetMs : undefined,
     measure: typeof result.measure === 'number' ? result.measure : undefined,
     beat: typeof result.beat === 'number' ? result.beat : undefined,
+    originalMeasure: typeof result.originalMeasure === 'number'
+      ? result.originalMeasure
+      : typeof result.measure === 'number' ? result.measure : undefined,
+    originalBeat: typeof result.originalBeat === 'number'
+      ? result.originalBeat
+      : typeof result.beat === 'number' ? result.beat : undefined,
+    practiceTick: typeof result.practiceTick === 'number' ? result.practiceTick : undefined,
     expectedMidi: Array.isArray(result.expectedMidi) ? result.expectedMidi.map(Number) : [],
     actualMidi: typeof result.actualMidi === 'number' ? result.actualMidi : null,
     hand: typeof result.hand === 'string' ? result.hand : null,
+    staff: typeof result.staff === 'number' ? result.staff : null,
     sourceEventIds: Array.isArray(result.sourceEventIds) ? result.sourceEventIds.map(String) : []
   }
 }
@@ -339,6 +404,9 @@ function buildSegmentTimelineFromSegment(segment: ReturnType<typeof buildPractic
       onsetIndex: index,
       expectedTick: unit.practiceTick,
       measure: unit.originalMeasure,
+      originalMeasure: unit.originalMeasure,
+      originalBeat: unit.originalBeat,
+      practiceTick: unit.practiceTick,
       notes: unit.events.map((event) => ({
         id: `seg-${index}-${event.midiPitch ?? 'rest'}`,
         type: (event.midiPitch === null ? 'rest' : 'note') as ScoreNoteModel['type'],
@@ -356,7 +424,10 @@ function buildSegmentTimelineFromSegment(segment: ReturnType<typeof buildPractic
       })),
       tieStart: unit.tieStart,
       rest: unit.rest,
-      expectedMidi: unit.expectedMidi
+      expectedMidi: unit.expectedMidi,
+      staff: unit.staff,
+      hand: unit.hand,
+      sourceEventIds: unit.sourceEventIds
     }))
   }
 }

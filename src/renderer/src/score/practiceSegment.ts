@@ -5,9 +5,11 @@ export interface PracticeSegment {
   startMeasure: number
   endMeasure: number
   tempo: number
+  tempoRatio: number
   handMode: 'left' | 'right' | 'both'
   practiceMode: 'wait' | 'realtime' | 'follow'
   loop: boolean
+  countIn: boolean
   notes: string
   createdAt: string
   updatedAt: string
@@ -36,6 +38,7 @@ export function sanitizePracticeSegment(value: unknown): PracticeSegment | null 
     startMeasure: normalizeNonNegative(candidate.startMeasure, 1),
     endMeasure: normalizeNonNegative(candidate.endMeasure, 1),
     tempo: normalizeTempo(candidate.tempo),
+    tempoRatio: normalizeTempoRatio(candidate.tempoRatio),
     handMode: candidate.handMode === 'left' || candidate.handMode === 'right' || candidate.handMode === 'both'
       ? candidate.handMode
       : 'both',
@@ -43,6 +46,7 @@ export function sanitizePracticeSegment(value: unknown): PracticeSegment | null 
       ? candidate.practiceMode
       : 'wait',
     loop: Boolean(candidate.loop),
+    countIn: Boolean(candidate.countIn),
     notes: typeof candidate.notes === 'string' ? candidate.notes : '',
     createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : new Date().toISOString(),
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : new Date().toISOString()
@@ -96,4 +100,8 @@ function normalizeNonNegative(value: unknown, fallback: number): number {
 
 function normalizeTempo(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.min(240, Math.max(20, Math.round(value))) : 60
+}
+
+function normalizeTempoRatio(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(2, Math.max(0.25, value)) : 1
 }

@@ -55,7 +55,7 @@ function resolveAttributes(previous: EffectiveScoreAttributes, measure: ScoreMea
     fifths: measure.keySignature !== null ? measure.keySignature : previous.fifths,
     beats: measure.timeBeats !== null ? measure.timeBeats : previous.beats,
     beatType: measure.timeBeatType !== null ? measure.timeBeatType : previous.beatType,
-    staves: previous.staves
+    staves: measure.staves ?? previous.staves
   }
 }
 
@@ -150,35 +150,98 @@ export interface TiedPerformanceEvent {
   releaseTick: number
   measureNumber: number
   staff: number
+  partIndex: number
+  voice: string
+  sourceEventIds: string[]
+}
+
+export interface TieMergeWarning {
+  code: 'ORPHAN_TIE_STOP' | 'OVERLAPPING_TIE_START' | 'DISCONTINUOUS_TIE'
+  eventId: string
+  message: string
+}
+
+export interface TieMergeResult {
+  events: TiedPerformanceEvent[]
+  warnings: TieMergeWarning[]
 }
 
 /**
  * Merges a tie chain into performance events: one attack per chain and one
  * release at the end. Notated notes remain separate in the display model.
  */
-export function mergeTiedPerformanceEvents(events: ScoreEventV2[]): TiedPerformanceEvent[] {
-  const byPitch = new Map<string, TiedPerformanceEvent>()
+export function mergeTiedPerformanceEventsWithDiagnostics(events: ScoreEventV2[]): TieMergeResult {
+  const performanceEvents: TiedPerformanceEvent[] = []
+  const warnings: TieMergeWarning[] = []
+  const activeChains = new Map<string, TiedPerformanceEvent>()
+  const ordered = [...events].sort((left, right) =>
+    left.absoluteOnset - right.absoluteOnset ||
+    left.partIndex - right.partIndex ||
+    left.staff - right.staff ||
+    left.noteIndex - right.noteIndex
+  )
 
-  for (const event of events) {
+  const createAttack = (event: ScoreEventV2): TiedPerformanceEvent => ({
+    midiPitch: event.midiPitch as number,
+    attackTick: event.absoluteOnset,
+    releaseTick: event.absoluteOnset + event.duration,
+    measureNumber: event.measureNumber,
+    staff: event.staff,
+    partIndex: event.partIndex,
+    voice: event.voice,
+    sourceEventIds: [event.id]
+  })
+
+  for (const event of ordered) {
     if (event.type === 'rest' || event.midiPitch === null) continue
-    const key = `${event.midiPitch}:${event.staff}:${event.partIndex}`
-    const existing = byPitch.get(key)
+    const key = `${event.partIndex}:${event.staff}:${event.voice}:${event.midiPitch}`
+    const active = activeChains.get(key)
 
-    if (existing && event.tieStop && event.absoluteOnset >= existing.attackTick) {
-      byPitch.set(key, {
-        ...existing,
-        releaseTick: event.absoluteOnset + event.duration
+    if (event.tieStop) {
+      const isContinuous = Boolean(active) && Math.abs(event.absoluteOnset - active!.releaseTick) <= 1
+      if (active && isContinuous) {
+        active.releaseTick = Math.max(active.releaseTick, event.absoluteOnset + event.duration)
+        active.sourceEventIds.push(event.id)
+        if (!event.tieStart) activeChains.delete(key)
+        continue
+      }
+
+      warnings.push({
+        code: active ? 'DISCONTINUOUS_TIE' : 'ORPHAN_TIE_STOP',
+        eventId: event.id,
+        message: active
+          ? `Tie continuation ${event.id} is not continuous with its active chain.`
+          : `Tie stop ${event.id} has no matching active chain; treated as a standalone attack.`
       })
-    } else {
-      byPitch.set(key, {
-        midiPitch: event.midiPitch,
-        attackTick: event.absoluteOnset,
-        releaseTick: event.absoluteOnset + event.duration,
-        measureNumber: event.measureNumber,
-        staff: event.staff
-      })
+      if (active) activeChains.delete(key)
+      const standalone = createAttack(event)
+      performanceEvents.push(standalone)
+      if (event.tieStart) activeChains.set(key, standalone)
+      continue
+    }
+
+    const attack = createAttack(event)
+    performanceEvents.push(attack)
+    if (event.tieStart) {
+      if (active) {
+        warnings.push({
+          code: 'OVERLAPPING_TIE_START',
+          eventId: event.id,
+          message: `Tie start ${event.id} overlaps an unfinished chain; both attacks are preserved.`
+        })
+      }
+      activeChains.set(key, attack)
     }
   }
 
-  return [...byPitch.values()].sort((left, right) => left.attackTick - right.attackTick)
+  return {
+    events: performanceEvents.sort((left, right) =>
+      left.attackTick - right.attackTick || left.midiPitch - right.midiPitch
+    ),
+    warnings
+  }
+}
+
+export function mergeTiedPerformanceEvents(events: ScoreEventV2[]): TiedPerformanceEvent[] {
+  return mergeTiedPerformanceEventsWithDiagnostics(events).events
 }

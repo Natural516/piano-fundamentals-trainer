@@ -2,12 +2,15 @@ import type { ScoreDocument } from './musicXmlTypes'
 import { buildScoreTimeV2, type ScoreEventV2 } from './scoreTimeV2'
 
 export interface PracticeSegmentEvent {
+  sourceEventId: string
+  partIndex: number
   practiceTick: number
   originalAbsoluteTick: number
   originalMeasure: number
   originalBeat: number
   duration: number
   staff: number
+  hand: 'left' | 'right' | 'both'
   voice: string
   midiPitch: number | null
   tieStart: boolean
@@ -24,6 +27,9 @@ export interface PracticeExpectedUnit {
   rest: boolean
   tieStart: boolean
   events: PracticeSegmentEvent[]
+  staff: number | null
+  hand: 'left' | 'right' | 'both' | null
+  sourceEventIds: string[]
 }
 
 export interface PracticeSegment {
@@ -47,9 +53,14 @@ export interface PracticeSegmentOptions {
   segmentBoundaryRetrigger?: boolean
 }
 
-function staffMatches(staff: number, handMode: 'left' | 'right' | 'both'): boolean {
-  if (handMode === 'both') return true
-  return handMode === 'right' ? staff === 1 : staff === 2
+function handForStaff(score: ScoreDocument, partIndex: number, staff: number): 'left' | 'right' | 'both' {
+  const measures = score.parts[partIndex]?.measures ?? []
+  const clef = measures.flatMap((measure) => measure.clefs).find((entry) => entry.staff === staff)
+  if (clef?.sign === 'F') return 'left'
+  if (clef?.sign === 'G') return 'right'
+  const staffCount = measures.reduce((maximum, measure) => Math.max(maximum, measure.staves ?? 1), 1)
+  if (staffCount > 1) return staff === 2 ? 'left' : 'right'
+  return staff === 2 ? 'left' : 'right'
 }
 
 /**
@@ -66,7 +77,7 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
 
   const selected = scoreEvents
     .filter((event) => event.measureNumber >= startMeasure && event.measureNumber <= endMeasure)
-    .filter((event) => staffMatches(event.staff, handMode))
+    .filter((event) => handMode === 'both' || handForStaff(score, event.partIndex, event.staff) === handMode)
 
   const sourceStartAbsoluteTick = selected.length > 0
     ? Math.min(...selected.map((event) => event.absoluteOnset))
@@ -75,12 +86,15 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
   const events: PracticeSegmentEvent[] = selected
     .sort((left, right) => left.absoluteOnset - right.absoluteOnset || left.noteIndex - right.noteIndex)
     .map((event) => ({
+      sourceEventId: event.id,
+      partIndex: event.partIndex,
       practiceTick: event.absoluteOnset - sourceStartAbsoluteTick,
       originalAbsoluteTick: event.absoluteOnset,
       originalMeasure: event.measureNumber,
       originalBeat: event.onsetInMeasure / 480 + 1,
       duration: event.duration,
       staff: event.staff,
+      hand: handForStaff(score, event.partIndex, event.staff),
       voice: event.voice,
       midiPitch: event.midiPitch,
       tieStart: event.tieStart,
@@ -120,7 +134,16 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
         expectedMidi: [...new Set(expectedMidi)],
         rest: group.segmentEvents.every((event) => event.type === 'rest'),
         tieStart: group.segmentEvents.some((event) => event.tieStart),
-        events: group.segmentEvents
+        events: group.segmentEvents,
+        staff: new Set(group.segmentEvents.map((event) => event.staff)).size === 1
+          ? group.segmentEvents[0]?.staff ?? null
+          : null,
+        hand: (() => {
+          const hands = new Set(group.segmentEvents.filter((event) => event.midiPitch !== null).map((event) => event.hand))
+          if (hands.size === 0) return null
+          return hands.size === 1 ? [...hands][0] : 'both'
+        })(),
+        sourceEventIds: group.segmentEvents.filter((event) => event.midiPitch !== null).map((event) => event.sourceEventId)
       }
     })
     .sort((left, right) => left.practiceTick - right.practiceTick)
@@ -147,8 +170,8 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
 
 export function eventToScoreV2Like(event: PracticeSegmentEvent): ScoreEventV2 {
   return {
-    id: `seg-${event.originalMeasure}-${event.practiceTick}`,
-    partIndex: 0,
+    id: event.sourceEventId,
+    partIndex: event.partIndex,
     measureIndex: 0,
     measureNumber: event.originalMeasure,
     noteIndex: 0,

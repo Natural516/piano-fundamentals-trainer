@@ -70,12 +70,7 @@ export async function inflateEntry(entry: ZipEntryInfo, inflate?: InflateFn): Pr
   if (inflate) {
     return new Uint8Array(await inflate(entry.data))
   }
-  if (typeof DecompressionStream !== 'undefined') {
-    const stream = new DecompressionStream('deflate')
-    const response = new Response(new Blob([new Uint8Array(entry.data)]).stream().pipeThrough(stream))
-    return new Uint8Array(await response.arrayBuffer())
-  }
-  throw new Error('当前环境不支持 DEFLATE 解压，请通过 FileImportAdapter 提供 inflate 实现')
+  throw new Error('MXL raw DEFLATE 需要生产 MxlExtractor adapter')
 }
 
 export interface MxlExtractOptions {

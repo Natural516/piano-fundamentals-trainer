@@ -30,7 +30,8 @@ export const DEFAULT_SIGHT_READING_SETTINGS: SightReadingSettings = {
   noteNameVisible: true
 }
 
-const STORAGE_KEY = 'piano-trainer.sight-reading-settings.v4'
+export const SIGHT_READING_SETTINGS_STORAGE_KEY = 'piano-trainer.sight-reading-settings.v4'
+const STORAGE_KEY = SIGHT_READING_SETTINGS_STORAGE_KEY
 const LEGACY_STORAGE_KEYS = [
   'piano-trainer.sight-reading-settings.v3',
   'piano-trainer.sight-reading-settings.v2',

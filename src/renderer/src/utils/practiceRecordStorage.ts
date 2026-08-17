@@ -5,6 +5,9 @@ import {
   type PracticeSessionRecord,
   type TodayPracticeStats
 } from './practiceRecordTypes'
+import { practiceRecordRepository } from '../records/practiceRecordRepository'
+import { fromLegacyRecord } from '../records/practiceRecordV2'
+import { DAILY_PLAN_V2_STORAGE_KEY } from '../plan/dailyPlanV2Storage'
 
 export const PRACTICE_RECORD_STORAGE_KEY = 'piano-trainer.practice-records.v1'
 export const PRACTICE_RECORDS_CHANGED_EVENT = 'piano-trainer:practice-records-changed'
@@ -163,6 +166,7 @@ export function savePracticeRecord(record: PracticeSessionRecord): PracticeStora
 
     const nextRecords = sortNewestFirst([record, ...records]).slice(0, MAX_PRACTICE_RECORDS)
     window.localStorage.setItem(PRACTICE_RECORD_STORAGE_KEY, JSON.stringify(nextRecords))
+    practiceRecordRepository.add(fromLegacyRecord(record))
     notifyRecordsChanged()
     return { success: true }
   } catch (error) {
@@ -176,6 +180,11 @@ export function clearPracticeRecords(): PracticeStorageResult {
 
   try {
     window.localStorage.removeItem(PRACTICE_RECORD_STORAGE_KEY)
+    const v2Cleared = practiceRecordRepository.clear()
+    window.localStorage.removeItem(DAILY_PLAN_V2_STORAGE_KEY)
+    if (!v2Cleared) {
+      return { success: false, message: '旧记录已清除，但统一 V2 记录清除失败。' }
+    }
     notifyRecordsChanged()
     return { success: true }
   } catch (error) {

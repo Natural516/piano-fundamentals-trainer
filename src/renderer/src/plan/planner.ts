@@ -2,6 +2,8 @@ import type { AbilityModelState, AbilitySkillId } from '../ability/abilityModel'
 import { getWeakestReliableSkills } from '../ability/abilityModel'
 import type { PracticeSessionRecord } from '../utils/practiceRecordTypes'
 import { getExercisesForSkill, type ExerciseDefinition } from '../prescription/exerciseLibrary'
+import type { ScoreMasteryState } from '../ability/scoreMastery'
+import { getWeakestMeasures } from '../ability/scoreMastery'
 
 export interface PlanItem {
   exerciseId: string
@@ -30,6 +32,7 @@ export interface PlannerInput {
   goal: string
   availableMinutes: number
   library: ExerciseDefinition[]
+  mastery?: ScoreMasteryState
 }
 
 const CATEGORY_LIMIT_RATIO = 0.5
@@ -75,12 +78,55 @@ export function buildDailyPlan(input: PlannerInput): DailyTrainingPlan {
   let remainingMinutes = availableMinutes
   const candidates: Array<{ skillId: AbilitySkillId; priority: number }> = []
 
+  const goalText = input.goal.trim().toLowerCase()
+  const goalBoost = (skillId: AbilitySkillId): number => {
+    if (!goalText) return 0
+    if (skillId === 'sight-reading' && /识谱|视奏/.test(goalText)) return -20
+    if (skillId === 'rhythm' && /节奏|拍/.test(goalText)) return -20
+    if (skillId === 'scale' && /音阶|调性/.test(goalText)) return -20
+    if (skillId === 'chord' && /和弦/.test(goalText)) return -20
+    if (skillId === 'coordination' && /协调|双手/.test(goalText)) return -20
+    if (skillId === 'score-performance' && /曲|作品|乐谱/.test(goalText)) return -20
+    return 0
+  }
+
   const allSkills: AbilitySkillId[] = ['sight-reading', 'rhythm', 'scale', 'chord', 'coordination']
   allSkills.forEach((skillId, index) => {
     const weakIndex = weakest.indexOf(skillId)
-    candidates.push({ skillId, priority: weakIndex >= 0 ? weakIndex : weakest.length + index })
+    candidates.push({
+      skillId,
+      priority: (weakIndex >= 0 ? weakIndex : weakest.length + index) + goalBoost(skillId)
+    })
   })
   candidates.sort((left, right) => left.priority - right.priority)
+
+  if (input.mastery) {
+    let scoreItemsAdded = 0
+    for (const [scoreId, byMeasure] of Object.entries(input.mastery.scores)) {
+      if (scoreItemsAdded >= 2 || remainingMinutes < 10) break
+      const weakest = getWeakestMeasures(input.mastery, scoreId, 1)
+      for (const weak of weakest) {
+        if (scoreItemsAdded >= 2 || remainingMinutes < 10) break
+        const itemMinutes = Math.min(20, remainingMinutes)
+        items.push({
+          exerciseId: `score:${scoreId}:${weak.measure}`,
+          targetSkillIds: ['score-performance'],
+          minutes: itemMinutes,
+          targetTempo: null,
+          mode: 'wait',
+          handMode: 'both',
+          successCriteria: `第 ${weak.measure} 小节 Wait 60% 连续 3 遍无错`,
+          whyThis: `最近 ${weak.attempts} 次练习中第 ${weak.measure} 小节正确率 ${weak.pitchAccuracy}%，为最薄弱小节`,
+          evidenceRefs: weak.evidenceRefs,
+          fallback: '降速到 50%',
+          harderVariant: '提速到 80%'
+        })
+        remainingMinutes -= itemMinutes
+        scoreItemsAdded += 1
+        void byMeasure
+      }
+    }
+  }
 
   for (const candidate of candidates) {
     if (remainingMinutes <= 0) break

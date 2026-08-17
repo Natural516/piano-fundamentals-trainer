@@ -1,6 +1,8 @@
 import { childNumber, childText, findChild, findChildren, parseXml, type XmlElement } from './xmlMiniParser'
 import type {
+  ScoreClefModel,
   ScoreDocument,
+  ScoreHarmonyModel,
   ScoreMeasure,
   ScoreNoteModel,
   ScorePartModel
@@ -57,7 +59,10 @@ function parseMeasure(element: XmlElement): ScoreMeasure {
     timeBeats: null,
     timeBeatType: null,
     tempoBpm: null,
-    divisions: null
+    divisions: null,
+    staves: null,
+    clefs: [],
+    harmonies: []
   }
 
   for (const child of element.children) {
@@ -65,6 +70,7 @@ function parseMeasure(element: XmlElement): ScoreMeasure {
 
     if (child.tag === 'attributes') {
       measure.divisions = childNumber(child, 'divisions') ?? measure.divisions
+      measure.staves = childNumber(child, 'staves') ?? measure.staves
       const key = findChild(child, 'key')
       if (key) {
         const fifths = childNumber(key, 'fifths')
@@ -75,6 +81,7 @@ function parseMeasure(element: XmlElement): ScoreMeasure {
         measure.timeBeats = childNumber(time, 'beats') ?? measure.timeBeats
         measure.timeBeatType = childNumber(time, 'beat-type') ?? measure.timeBeatType
       }
+      measure.clefs.push(...findChildren(child, 'clef').map(parseClef))
       continue
     }
 
@@ -91,6 +98,11 @@ function parseMeasure(element: XmlElement): ScoreMeasure {
         measure.timeEvents.push({ kind: 'note', noteIndex: measure.notes.length })
         measure.notes.push(note)
       }
+      continue
+    }
+
+    if (child.tag === 'harmony') {
+      measure.harmonies.push(parseHarmony(child))
       continue
     }
 
@@ -124,6 +136,9 @@ function parseNote(element: XmlElement, index: number): ScoreNoteModel | null {
   const voice = childText(element, 'voice') || '1'
   const staff = childNumber(element, 'staff') ?? 1
   const tieContinue = findChildren(element, 'tie').some((tie) => tie.attributes.type === 'continue')
+  const notationTies = findChild(element, 'notations')
+    ? findChildren(findChild(element, 'notations') as XmlElement, 'tied')
+    : []
   const accidental = findChild(element, 'accidental')?.text ?? null
   const grace = findChild(element, 'grace') !== null
 
@@ -140,10 +155,51 @@ function parseNote(element: XmlElement, index: number): ScoreNoteModel | null {
     voice,
     staff,
     isChordTone: findChild(element, 'chord') !== null,
-    tieStart: findChildren(element, 'tie').some((tie) => tie.attributes.type === 'start'),
-    tieStop: findChildren(element, 'tie').some((tie) => tie.attributes.type === 'stop') || tieContinue,
+    tieStart: findChildren(element, 'tie').some((tie) => tie.attributes.type === 'start') ||
+      notationTies.some((tie) => tie.attributes.type === 'start' || tie.attributes.type === 'continue'),
+    tieStop: findChildren(element, 'tie').some((tie) => tie.attributes.type === 'stop') ||
+      notationTies.some((tie) => tie.attributes.type === 'stop' || tie.attributes.type === 'continue') ||
+      tieContinue,
     accidental: accidental || null,
-    isGrace: grace
+    isGrace: grace,
+    noteType: childText(element, 'type') || null,
+    dotCount: findChildren(element, 'dot').length,
+    timeModification: parseTimeModification(findChild(element, 'time-modification'))
+  }
+}
+
+function parseClef(element: XmlElement): ScoreClefModel {
+  const sign = childText(element, 'sign') as ScoreClefModel['sign']
+  return {
+    staff: Math.max(1, Number(element.attributes.number) || 1),
+    sign: ['G', 'F', 'C', 'percussion', 'TAB', 'none'].includes(sign) ? sign : 'none',
+    line: childNumber(element, 'line')
+  }
+}
+
+function parseHarmony(element: XmlElement): ScoreHarmonyModel {
+  const root = findChild(element, 'root')
+  const bass = findChild(element, 'bass')
+  const kind = findChild(element, 'kind')
+  return {
+    rootStep: root ? childText(root, 'root-step') : '',
+    rootAlter: root ? (childNumber(root, 'root-alter') ?? 0) : 0,
+    kind: kind?.text || 'none',
+    kindText: kind?.attributes.text ?? null,
+    bassStep: bass ? (childText(bass, 'bass-step') || null) : null,
+    bassAlter: bass ? (childNumber(bass, 'bass-alter') ?? 0) : 0
+  }
+}
+
+function parseTimeModification(element: XmlElement | null): ScoreNoteModel['timeModification'] {
+  if (!element) return null
+  const actualNotes = childNumber(element, 'actual-notes')
+  const normalNotes = childNumber(element, 'normal-notes')
+  if (!actualNotes || !normalNotes) return null
+  return {
+    actualNotes,
+    normalNotes,
+    normalType: childText(element, 'normal-type') || null
   }
 }
 
