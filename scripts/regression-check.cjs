@@ -4454,7 +4454,25 @@ test('AI observable boundary：summary/diagnosis/observation/recommendation/next
   assert.equal(filtered.uncertainty.length, 5)
 
   const qualified = coach2.filterUnobservableClaims({ ...response, summary: '如果你感觉手腕紧张，可以请教师确认。', observations: [], diagnoses: [], recommendations: [], nextSteps: [] })
-  assert.equal(qualified.summary, '如果你感觉手腕紧张，可以请教师确认。')
+  assert.match(qualified.summary, /^无法仅根据 MIDI 确认以下不可观测内容：/)
+})
+
+test('AI observable boundary adversarial：句中限定词不得放行后续确定性身体断言', () => {
+  const adversarial = [
+    '可能这里节奏有问题，但你的手腕太紧。',
+    '如果你感觉这一拍很难，你的手腕就是太紧。',
+    'MIDI 无法判断坐姿，但你的手型一定有问题。'
+  ]
+  for (const summary of adversarial) {
+    const response = {
+      intent: 'GENERAL', summary, observations: [], diagnoses: [], recommendations: [],
+      demoRequests: [], nextSteps: [], evidenceRefs: [], uncertainty: [], confidence: 'low'
+    }
+    const filtered = coach2.filterUnobservableClaims(response)
+    assert.match(filtered.summary, /^无法仅根据 MIDI 确认以下不可观测内容：/)
+    assert.notEqual(filtered.summary, summary)
+    assert.equal(coach2.filterUnobservableClaims(filtered).summary, filtered.summary, '重复过滤必须幂等')
+  }
 })
 
 test('Evidence resolver persisted record：逐字段验证 measure/beat/hand/staff/error/source', () => {
@@ -4477,6 +4495,23 @@ test('Evidence resolver persisted record：逐字段验证 measure/beat/hand/sta
   assert.equal(evidenceResolver.resolveEvidenceRef({ practiceRecordId: 'r', errorEventId: 'err-1', measure: 2, staff: 2 }, repositories).valid, false)
   assert.equal(evidenceResolver.resolveEvidenceRef({ practiceRecordId: 'r', errorEventId: 'err-1', measure: 2, sourceEventId: 'wrong-source' }, repositories).valid, false)
   assert.equal(evidenceResolver.resolveEvidenceRef({ practiceRecordId: 'r', errorEventId: 'err-1', measure: 2, beat: 1.5, hand: 'right', staff: 1, sourceEventId: 'score-event-2' }, repositories).valid, true)
+})
+
+test('Evidence resolver adversarial：handStats 不得替 beat/staff/sourceEventId 提供证明', () => {
+  const record = {
+    id: 'r', schemaVersion: 2, practiceType: 'score', sourceType: 'mxl', sourceId: 'S',
+    startedAt: '2026-08-17T00:00:00.000Z', endedAt: '2026-08-17T00:01:00.000Z', durationMs: 60000,
+    scoreId: 'S', metrics: [],
+    errorEvents: [{ id: 'err-1', type: 'wrong', measure: 2, beat: 1.5, hand: 'right', staff: 1, sourceEventIds: ['score-event-2'] }],
+    evidenceRefs: [], metadata: {},
+    perMeasureMetrics: [{ measureNumber: 2, expectedJudgeableCount: 1, correct: 0, wrong: 1, missed: 0, extra: 0, pitchAccuracy: 0, early: 0, late: 0, averageSignedOffsetMs: null, medianAbsTimingErrorMs: null, maxAbsoluteOffsetMs: null, interruptionCount: 0, tempoRatio: 0.6, handStats: { right: { expectedJudgeableCount: 1, correct: 0, wrong: 1, missed: 0, extra: 0 } }, evidenceRefs: [] }]
+  }
+  const repositories = { getPracticeRecord: (id) => id === 'r' ? record : null }
+  assert.equal(evidenceResolver.resolveEvidenceRef({ practiceRecordId: 'r', scoreId: 'S', measure: 2, hand: 'right' }, repositories).valid, true, 'handStats 可证明 measure + hand')
+  assert.equal(evidenceResolver.resolveEvidenceRef({ practiceRecordId: 'r', scoreId: 'S', measure: 2, hand: 'right', staff: 999 }, repositories).valid, false)
+  assert.equal(evidenceResolver.resolveEvidenceRef({ practiceRecordId: 'r', scoreId: 'S', measure: 2, hand: 'right', beat: 999 }, repositories).valid, false)
+  assert.equal(evidenceResolver.resolveEvidenceRef({ practiceRecordId: 'r', scoreId: 'S', measure: 2, hand: 'right', sourceEventId: 'fake' }, repositories).valid, false)
+  assert.equal(evidenceResolver.resolveEvidenceRef({ practiceRecordId: 'r', errorEventId: 'err-1', scoreId: 'S', measure: 2, hand: 'right', beat: 1.5, staff: 1, sourceEventId: 'score-event-2' }, repositories).valid, true, '真实 errorEvent 全字段匹配')
 })
 
 test('Grand Staff duration：附点与 triplet 语义不降级为邻近时值', () => {

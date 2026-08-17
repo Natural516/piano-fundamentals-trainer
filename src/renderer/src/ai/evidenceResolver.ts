@@ -67,6 +67,20 @@ function temporaryFactMatchesReference(
   return true
 }
 
+function recordHasHandEvidence(record: PracticeRecordV2, ref: EvidenceRef): boolean {
+  const hand = ref.hand
+  if (!hand) return true
+  const metricProvesHand = record.perMeasureMetrics?.some((measure) => (
+    (typeof ref.measure !== 'number' || measure.measureNumber === ref.measure) &&
+    Boolean(measure.handStats[hand])
+  )) ?? false
+  const errorProvesHand = record.errorEvents.some((entry) => (
+    (typeof ref.measure !== 'number' || entry.measure === ref.measure) &&
+    (entry.hand === hand || entry.hand === 'both')
+  ))
+  return metricProvesHand || errorProvesHand
+}
+
 export function resolveEvidenceRef(
   ref: EvidenceRef,
   repositories: EvidenceRepositories,
@@ -107,20 +121,17 @@ export function resolveEvidenceRef(
   }
   if (error && !errorMatchesReference(error, ref)) {
     errors.push('referenced fields do not match error event')
-  } else if (record && !error && (
-    typeof ref.beat === 'number' ||
-    Boolean(ref.hand) ||
-    typeof ref.staff === 'number' ||
-    Boolean(ref.sourceEventId)
-  )) {
-    const matchingError = record.errorEvents.some((entry) => errorMatchesReference(entry, ref))
-    const matchingHandMetric = Boolean(
-      ref.hand &&
-      typeof ref.measure === 'number' &&
-      record.perMeasureMetrics?.find((entry) => entry.measureNumber === ref.measure)?.handStats[ref.hand]
+  } else if (record && !error) {
+    const requiresEventEvidence = (
+      typeof ref.beat === 'number' ||
+      typeof ref.staff === 'number' ||
+      Boolean(ref.sourceEventId)
     )
-    if (!matchingError && !matchingHandMetric) {
-      errors.push('beat/hand/staff/source does not match practice record contents')
+    if (requiresEventEvidence && !record.errorEvents.some((entry) => errorMatchesReference(entry, ref))) {
+      errors.push('beat/staff/source does not match a single practice record error event')
+    }
+    if (ref.hand && !recordHasHandEvidence(record, ref)) {
+      errors.push('hand does not match practice record hand metrics or error events')
     }
   }
   if (record && ref.metric && !metricExists(record, ref.metric)) errors.push(`metric not found: ${ref.metric}`)

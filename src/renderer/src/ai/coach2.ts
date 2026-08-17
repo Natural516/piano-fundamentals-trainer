@@ -247,15 +247,11 @@ export function validateDiagnosisGrounding(response: CoachResponse): boolean {
 
 export function filterUnobservableClaims(response: CoachResponse): CoachResponse {
   const flagged: string[] = []
-  const isAlreadyQualified = (text: string): boolean => (
-    /可能|如果你感觉|如果.*感觉|无法仅根据\s*MIDI|不能仅根据\s*MIDI|MIDI\s*(?:不能|无法)/i.test(text)
-  )
+  const observableBoundaryPrefix = '无法仅根据 MIDI 确认以下不可观测内容：'
   const clean = (text: string): string => {
-    if (isUnobservableFromMidi(text) && !isAlreadyQualified(text)) {
-      flagged.push(text)
-      return `无法仅根据 MIDI 确认：${text}`
-    }
-    return text
+    if (!isUnobservableFromMidi(text) || text.startsWith(observableBoundaryPrefix)) return text
+    flagged.push(text)
+    return `${observableBoundaryPrefix}${text}`
   }
 
   return {
