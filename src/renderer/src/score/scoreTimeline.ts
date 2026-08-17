@@ -4,7 +4,7 @@ import type {
   ScoreNoteModel,
   ScoreTimeline
 } from './musicXmlTypes'
-import { buildScoreTimeV2 } from './scoreTimeV2'
+import { buildScoreTimeV2, mergeTiedPerformanceEvents } from './scoreTimeV2'
 import { buildPracticeSegment } from './practiceSegmentBuilder'
 
 /**
@@ -17,6 +17,9 @@ import { buildPracticeSegment } from './practiceSegmentBuilder'
  */
 export function buildScoreTimeline(score: ScoreDocument): ScoreTimeline {
   const { events } = buildScoreTimeV2(score)
+  const performanceAttackEventIds = new Set(
+    mergeTiedPerformanceEvents(events).map((event) => event.sourceEventIds[0])
+  )
   const unitGroups = new Map<string, { expectedTick: number; onsetInMeasure: number; measure: number; notes: ScoreNoteModel[]; sourceEventIds: string[] }>()
 
   for (const event of events) {
@@ -38,7 +41,11 @@ export function buildScoreTimeline(score: ScoreDocument): ScoreTimeline {
   const units: ScoreExpectedUnit[] = [...unitGroups.entries()]
     .map(([, group]) => {
       const expectedMidi = group.notes
-        .filter((note) => note.type === 'note' && note.midiNumber !== null && !(note.tieStop && !note.tieStart))
+        .filter((note, index) => (
+          note.type === 'note' &&
+          note.midiNumber !== null &&
+          performanceAttackEventIds.has(group.sourceEventIds[index])
+        ))
         .map((note) => note.midiNumber as number)
         .sort((left, right) => left - right)
 

@@ -137,7 +137,9 @@ export function buildDeterministicCoachResponse(context: CoachContext): CoachRes
       scoreId: session?.scoreId ?? null,
       measure: fact.measure,
       beat: fact.beat,
-      hand: fact.hand ?? null
+      hand: fact.hand ?? null,
+      staff: fact.staff ?? null,
+      sourceEventId: fact.sourceEventIds[0] ?? null
     }]
   })
   const problemRefs = refsFor(problemFacts)
@@ -225,7 +227,7 @@ export function buildDeterministicCoachResponse(context: CoachContext): CoachRes
 
   if (!session && context.recentRecords.length === 0) uncertainty.push('尚无当前或历史练习事实，建议先完成一次练习。')
 
-  return {
+  return filterUnobservableClaims({
     intent,
     summary,
     observations,
@@ -236,7 +238,7 @@ export function buildDeterministicCoachResponse(context: CoachContext): CoachRes
     evidenceRefs,
     uncertainty,
     confidence: problemRefs.length > 0 ? 'medium' : 'low'
-  }
+  })
 }
 
 export function validateDiagnosisGrounding(response: CoachResponse): boolean {
@@ -245,18 +247,24 @@ export function validateDiagnosisGrounding(response: CoachResponse): boolean {
 
 export function filterUnobservableClaims(response: CoachResponse): CoachResponse {
   const flagged: string[] = []
+  const isAlreadyQualified = (text: string): boolean => (
+    /可能|如果你感觉|如果.*感觉|无法仅根据\s*MIDI|不能仅根据\s*MIDI|MIDI\s*(?:不能|无法)/i.test(text)
+  )
   const clean = (text: string): string => {
-    if (isUnobservableFromMidi(text)) {
+    if (isUnobservableFromMidi(text) && !isAlreadyQualified(text)) {
       flagged.push(text)
-      return `${text}（注：此判断需要额外 Ground Truth，仅 MIDI 无法确认）`
+      return `无法仅根据 MIDI 确认：${text}`
     }
     return text
   }
 
   return {
     ...response,
+    summary: clean(response.summary),
     diagnoses: response.diagnoses.map((diagnosis) => ({ ...diagnosis, text: clean(diagnosis.text) })),
     observations: response.observations.map((observation) => ({ ...observation, text: clean(observation.text) })),
-    uncertainty: [...response.uncertainty, ...flagged.map((text) => `已标注不可观测声称：${text}`)]
+    recommendations: response.recommendations.map((recommendation) => ({ ...recommendation, text: clean(recommendation.text) })),
+    nextSteps: response.nextSteps.map(clean),
+    uncertainty: [...response.uncertainty.map(clean), ...flagged.map(() => '相关建议涉及 MIDI 不可观测信息，需由演奏者或教师另行确认。')]
   }
 }

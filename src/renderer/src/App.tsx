@@ -24,6 +24,7 @@ import { useMidi } from './hooks/useMidi'
 import { usePianoAudio } from './hooks/usePianoAudio'
 import { usePracticeHistory } from './hooks/usePracticeHistory'
 import { practiceRecordRepository } from './records/practiceRecordRepository'
+import type { ScorePracticePreset } from './plan/planner'
 import type { PageId } from './types'
 import {
   createPageHistoryState,
@@ -63,12 +64,7 @@ function App(): JSX.Element {
   const [currentPage, setCurrentPage] = useState<PageId>(getInitialPage)
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null)
   const [showFirstRun, setShowFirstRun] = useState(() => isFirstRun())
-  const [scoreSegmentRequest, setScoreSegmentRequest] = useState<{
-    scoreId: string
-    startMeasure: number
-    endMeasure: number
-    nonce: number
-  } | null>(null)
+  const [scoreSegmentRequest, setScoreSegmentRequest] = useState<(ScorePracticePreset & { requestId: number }) | null>(null)
   const currentPageRef = useRef(currentPage)
   const practiceRunningRef = useRef(false)
   const pendingNavigationRef = useRef<PendingNavigation | null>(null)
@@ -200,8 +196,8 @@ function App(): JSX.Element {
     pushPage(page)
   }, [pushPage, updatePendingNavigation])
 
-  const openScoreSegment = useCallback((scoreId: string, startMeasure: number, endMeasure: number) => {
-    setScoreSegmentRequest({ scoreId, startMeasure, endMeasure, nonce: Date.now() })
+  const openScoreSegment = useCallback((preset: ScorePracticePreset) => {
+    setScoreSegmentRequest((current) => ({ ...preset, requestId: (current?.requestId ?? 0) + 1 }))
     handleNavigate('score-practice')
   }, [handleNavigate])
 
@@ -292,11 +288,7 @@ function App(): JSX.Element {
           <ScorePracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
-            initialSegment={scoreSegmentRequest ? {
-              scoreId: scoreSegmentRequest.scoreId,
-              startMeasure: scoreSegmentRequest.startMeasure,
-              endMeasure: scoreSegmentRequest.endMeasure
-            } : null}
+            initialSegment={scoreSegmentRequest}
             pianoAudio={pianoAudio}
             practiceRecords={practiceHistory.records}
             onPracticeRunningChange={handlePracticeRunningChange}

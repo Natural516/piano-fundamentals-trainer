@@ -18,6 +18,9 @@ export interface PracticeSummaryMetrics {
   extra: number
   skipped: number
   accuracy: number
+  completionAccuracy: number
+  errorCount: number
+  isPerfect: boolean
   earlyCount: number
   lateCount: number
   averageSignedOffsetMs: number | null
@@ -57,6 +60,9 @@ export function buildPerMeasurePracticeMetrics(
       missed: 0,
       extra: 0,
       pitchAccuracy: 0,
+      completionAccuracy: 0,
+      errorCount: 0,
+      isPerfect: false,
       early: 0,
       late: 0,
       averageSignedOffsetMs: null,
@@ -115,9 +121,15 @@ export function buildPerMeasurePracticeMetrics(
   for (const measureNumber of interruptionMeasures) ensure(measureNumber).interruptionCount += 1
 
   for (const measure of measures.values()) {
-    measure.pitchAccuracy = measure.expectedJudgeableCount > 0
+    measure.completionAccuracy = measure.expectedJudgeableCount > 0
       ? Math.round(Math.min(measure.correct, measure.expectedJudgeableCount) / measure.expectedJudgeableCount * 100)
       : 100
+    measure.errorCount = measure.wrong + measure.extra + measure.missed
+    const pitchDenominator = measure.expectedJudgeableCount + measure.wrong + measure.extra
+    measure.pitchAccuracy = measure.expectedJudgeableCount > 0
+      ? Math.round(Math.min(measure.correct, measure.expectedJudgeableCount) / pitchDenominator * 100)
+      : 100
+    measure.isPerfect = measure.completionAccuracy === 100 && measure.errorCount === 0
     const timing = offsets.get(measure.measureNumber) ?? []
     measure.averageSignedOffsetMs = timing.length > 0
       ? Math.round(timing.reduce((sum, value) => sum + value, 0) / timing.length)
@@ -144,15 +156,26 @@ export function buildPracticeSummaryMetrics(
     .map((fact) => fact.offsetMs as number)
   const absolute = timing.map(Math.abs)
   const medianAbsolute = median(absolute)
+  const wrong = facts.filter((fact) => fact.outcome === 'wrong').length
+  const missing = facts.filter((fact) => fact.outcome === 'missing').length
+  const extra = facts.filter((fact) => fact.outcome === 'extra').length
+  const completionAccuracy = judgeableUnitCount > 0
+    ? Math.round(Math.min(correct, judgeableUnitCount) / judgeableUnitCount * 100)
+    : 100
+  const errorCount = wrong + missing + extra
+  const pitchDenominator = judgeableUnitCount + wrong + extra
   return {
     totalUnits: timeline.units.length,
     judgeableUnitCount,
     correct,
-    wrong: facts.filter((fact) => fact.outcome === 'wrong').length,
-    missing: facts.filter((fact) => fact.outcome === 'missing').length,
-    extra: facts.filter((fact) => fact.outcome === 'extra').length,
+    wrong,
+    missing,
+    extra,
     skipped: facts.filter((fact) => fact.outcome === 'skip').length,
-    accuracy: judgeableUnitCount > 0 ? Math.round(Math.min(correct, judgeableUnitCount) / judgeableUnitCount * 100) : 100,
+    accuracy: judgeableUnitCount > 0 ? Math.round(Math.min(correct, judgeableUnitCount) / pitchDenominator * 100) : 100,
+    completionAccuracy,
+    errorCount,
+    isPerfect: completionAccuracy === 100 && errorCount === 0,
     earlyCount: facts.filter((fact) => fact.outcome === 'early').length,
     lateCount: facts.filter((fact) => fact.outcome === 'late').length,
     averageSignedOffsetMs: timing.length > 0 ? Math.round(timing.reduce((sum, value) => sum + value, 0) / timing.length) : null,

@@ -5,6 +5,31 @@ import { getExercisesForSkill, type ExerciseDefinition } from '../prescription/e
 import type { ScoreMasteryState } from '../ability/scoreMastery'
 import { getWeakestMeasures } from '../ability/scoreMastery'
 
+export interface ScorePlanSuccessCriteria {
+  type: 'score-segment'
+  scoreId: string
+  startMeasure: number
+  endMeasure: number
+  mode: 'wait' | 'realtime'
+  handMode: 'left' | 'right' | 'both'
+  tempoRatio: number
+  requiredConsecutiveSuccesses: number
+  requireNoErrors: boolean
+  minimumPitchAccuracy: number
+  minimumTimingAccuracy?: number | null
+}
+
+export interface ScorePracticePreset {
+  scoreId: string
+  startMeasure: number
+  endMeasure: number
+  mode: 'wait' | 'realtime'
+  handMode: 'left' | 'right' | 'both'
+  tempoRatio: number
+  loop: boolean
+  countIn: boolean
+}
+
 export interface PlanItem {
   exerciseId: string
   targetSkillIds: AbilitySkillId[]
@@ -12,11 +37,37 @@ export interface PlanItem {
   targetTempo?: number | null
   mode?: string | null
   handMode?: string | null
+  criteria?: ScorePlanSuccessCriteria | null
   successCriteria: string
   whyThis: string
   evidenceRefs: Array<{ practiceRecordId: string }>
   fallback?: string | null
   harderVariant?: string | null
+}
+
+export function formatScoreSuccessCriteria(criteria: ScorePlanSuccessCriteria): string {
+  const modeLabel = criteria.mode === 'wait' ? 'Wait' : 'Realtime'
+  const handLabel = criteria.handMode === 'both' ? '双手' : criteria.handMode === 'right' ? '右手' : '左手'
+  const rangeLabel = criteria.startMeasure === criteria.endMeasure
+    ? `第 ${criteria.startMeasure} 小节`
+    : `第 ${criteria.startMeasure}–${criteria.endMeasure} 小节`
+  const noErrorLabel = criteria.requireNoErrors ? '无错' : `正确率 ≥ ${criteria.minimumPitchAccuracy}%`
+  return `${rangeLabel} ${modeLabel} ${Math.round(criteria.tempoRatio * 100)}% ${handLabel}连续 ${criteria.requiredConsecutiveSuccesses} 遍${noErrorLabel}`
+}
+
+export function planItemToScorePracticePreset(item: PlanItem): ScorePracticePreset | null {
+  if (!item.criteria || item.criteria.type !== 'score-segment') return null
+  const criteria = item.criteria
+  return {
+    scoreId: criteria.scoreId,
+    startMeasure: criteria.startMeasure,
+    endMeasure: criteria.endMeasure,
+    mode: criteria.mode,
+    handMode: criteria.handMode,
+    tempoRatio: criteria.tempoRatio,
+    loop: false,
+    countIn: false
+  }
 }
 
 export interface DailyTrainingPlan {
@@ -108,6 +159,19 @@ export function buildDailyPlan(input: PlannerInput): DailyTrainingPlan {
       for (const weak of weakest) {
         if (scoreItemsAdded >= 2 || remainingMinutes < 10) break
         const itemMinutes = Math.min(20, remainingMinutes)
+        const criteria: ScorePlanSuccessCriteria = {
+          type: 'score-segment',
+          scoreId,
+          startMeasure: weak.measure,
+          endMeasure: weak.measure,
+          mode: 'wait',
+          handMode: 'both',
+          tempoRatio: 0.6,
+          requiredConsecutiveSuccesses: 3,
+          requireNoErrors: true,
+          minimumPitchAccuracy: 100,
+          minimumTimingAccuracy: null
+        }
         items.push({
           exerciseId: `score:${scoreId}:${weak.measure}`,
           targetSkillIds: ['score-performance'],
@@ -115,7 +179,8 @@ export function buildDailyPlan(input: PlannerInput): DailyTrainingPlan {
           targetTempo: null,
           mode: 'wait',
           handMode: 'both',
-          successCriteria: `第 ${weak.measure} 小节 Wait 60% 连续 3 遍无错`,
+          criteria,
+          successCriteria: formatScoreSuccessCriteria(criteria),
           whyThis: `最近 ${weak.attempts} 次练习中第 ${weak.measure} 小节正确率 ${weak.pitchAccuracy}%，为最薄弱小节`,
           evidenceRefs: weak.evidenceRefs,
           fallback: '降速到 50%',

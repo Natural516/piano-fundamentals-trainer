@@ -37,7 +37,7 @@ import {
 import { createDefaultWeeklyGoals, WEEKLY_TRAINING_PLAN } from '../utils/weeklyTrainingPlan'
 import { computeAbilityModelV2 } from '../ability/abilityModel'
 import { computeScoreMastery } from '../ability/scoreMastery'
-import { buildDailyPlan } from '../plan/planner'
+import { buildDailyPlan, planItemToScorePracticePreset, type ScorePracticePreset } from '../plan/planner'
 import { EXERCISE_LIBRARY } from '../prescription/exerciseLibrary'
 import { practiceRecordRepository } from '../records/practiceRecordRepository'
 import {
@@ -57,7 +57,7 @@ interface TrainingPlanPageProps {
   practiceRecords: PracticeSessionRecord[]
   onBackHome: () => void
   onNavigateModule: (module: LinkedPracticeModule) => void
-  onOpenScoreSegment: (scoreId: string, startMeasure: number, endMeasure: number) => void
+  onOpenScoreSegment: (preset: ScorePracticePreset) => void
 }
 
 type TrainingPlanTab = 'stage' | 'daily' | 'weekly' | 'mapping' | 'checklist'
@@ -508,6 +508,7 @@ export function TrainingPlanPage({
               {plannerPlan.items.map((item) => {
                 const done = plannerPlan.progress[item.exerciseId] === 'done'
                 const scoreMatch = /^score:(.+):(\d+)$/.exec(item.exerciseId)
+                const scorePreset = planItemToScorePracticePreset(item)
                 const skillLabel = item.targetSkillIds.join(' · ') || 'score-performance'
                 const handLabel = item.handMode === 'right' ? '右手' : item.handMode === 'left' ? '左手' : item.handMode === 'both' ? '双手' : ''
                 return (
@@ -531,8 +532,8 @@ export function TrainingPlanPage({
                       <small>证据引用 {item.evidenceRefs.length} 条 · 降级：{item.fallback ?? '—'} · 进阶：{item.harderVariant ?? '—'}</small>
                     </div>
                     <div className="daily-task-actions">
-                      {scoreMatch ? (
-                        <AppButton variant="secondary" onClick={() => onOpenScoreSegment(scoreMatch[1], Number(scoreMatch[2]), Number(scoreMatch[2]))}>
+                      {scorePreset ? (
+                        <AppButton variant="secondary" onClick={() => onOpenScoreSegment(scorePreset)}>
                           打开乐谱片段
                         </AppButton>
                       ) : null}

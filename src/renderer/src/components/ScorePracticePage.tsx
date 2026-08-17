@@ -49,11 +49,16 @@ import { PracticeStatBar } from './PracticeStatBar'
 import { ScoreSheetRenderer } from './ScoreSheetRenderer'
 import { buildScoreTimeV2 } from '../score/scoreTimeV2'
 import { readDailyPlanV2 } from '../plan/dailyPlanV2Storage'
+import type { ScorePracticePreset } from '../plan/planner'
+
+export interface ScorePracticeRequest extends ScorePracticePreset {
+  requestId: number
+}
 
 interface ScorePracticePageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
-  initialSegment?: { scoreId: string; startMeasure: number; endMeasure: number } | null
+  initialSegment?: ScorePracticeRequest | null
   pianoAudio: UsePianoAudioResult
   practiceRecords: PracticeSessionRecord[]
   onPracticeRunningChange: (running: boolean) => void
@@ -169,6 +174,15 @@ export function ScorePracticePage({
   const effectiveMode: ScorePracticeMode = mode === 'follow' && !followVisible ? 'wait' : mode
   const bpm = score?.defaultTempoBpm ?? 60
   const countInMs = countIn ? 4 * (60000 / bpm) : 0
+  const initialRequestId = initialSegment?.requestId
+  const initialScoreId = initialSegment?.scoreId
+  const initialStartMeasure = initialSegment?.startMeasure
+  const initialEndMeasure = initialSegment?.endMeasure
+  const initialMode = initialSegment?.mode
+  const initialHandMode = initialSegment?.handMode
+  const initialTempoRatio = initialSegment?.tempoRatio
+  const initialLoop = initialSegment?.loop
+  const initialCountIn = initialSegment?.countIn
 
   const practice = useScorePractice(score, effectiveMode, {
     segment: { startMeasure, endMeasure, handMode },
@@ -261,6 +275,7 @@ export function ScorePracticePage({
         originalMeasure: fact.originalMeasure,
         originalBeat: fact.originalBeat,
         hand: fact.hand,
+        staff: fact.staff,
         outcome: fact.outcome,
         sourceEventIds: fact.sourceEventIds
       }))
@@ -299,21 +314,28 @@ export function ScorePracticePage({
   }, [savedMessage])
 
   useEffect(() => {
-    const initial = initialSegment
-    const imported = initial ? getScoreImport(initial.scoreId) : null
-    if (initial && imported) {
+    const imported = initialScoreId ? getScoreImport(initialScoreId) : null
+    if (initialScoreId && imported) {
       const document = loadMusicXmlDocument(imported.xml)
       const measureCount = document.parts[0]?.measures.length ?? 1
       importedXmlRef.current = imported.xml
+      importedSourceTypeRef.current = imported.sourceType
       setScore(document)
       setScoreTitle(document.title)
       setImportTier(imported.tier)
-      setStartMeasure(Math.min(Math.max(1, initial.startMeasure), measureCount))
-      setEndMeasure(Math.min(Math.max(initial.startMeasure, initial.endMeasure), measureCount))
+      const nextStart = Math.min(Math.max(1, initialStartMeasure ?? 1), measureCount)
+      setStartMeasure(nextStart)
+      setEndMeasure(Math.min(Math.max(nextStart, initialEndMeasure ?? nextStart), measureCount))
+      setMode(initialMode ?? 'wait')
+      setHandMode(initialHandMode ?? 'both')
+      setTempoRatio(initialTempoRatio ?? 1)
+      setLoop(initialLoop ?? false)
+      setCountIn(initialCountIn ?? false)
       return
     }
     const demo = loadMusicXmlDocument(DEMO_SCORE_XML)
     importedXmlRef.current = DEMO_SCORE_XML
+    importedSourceTypeRef.current = 'musicxml'
     setScore(demo)
     setScoreTitle(demo.title)
     setImportTier('A')
@@ -326,7 +348,17 @@ export function ScorePracticePage({
       importedAt: new Date().toISOString(),
       tier: 'A'
     }))
-  }, [initialSegment])
+  }, [
+    initialCountIn,
+    initialEndMeasure,
+    initialHandMode,
+    initialLoop,
+    initialMode,
+    initialRequestId,
+    initialScoreId,
+    initialStartMeasure,
+    initialTempoRatio
+  ])
 
   useEffect(() => {
     onPracticeRunningChange(practice.sessionActive)
@@ -360,6 +392,7 @@ export function ScorePracticePage({
           expected: entry.expectedMidi.length === 1 ? entry.expectedMidi[0] : null,
           actual: entry.actualMidi,
           hand: (entry.hand ?? null) as 'left' | 'right' | 'both' | null,
+          staff: entry.staff ?? null,
           timingErrorMs: entry.offsetMs ?? null,
           sourceEventIds: entry.sourceEventIds
         }))
@@ -379,6 +412,9 @@ export function ScorePracticePage({
         segment: `${startMeasure}-${endMeasure}`,
         metrics: [
           { key: 'accuracy', value: practice.report.accuracy, unit: '%' },
+          { key: 'completionAccuracy', value: practice.report.completionAccuracy, unit: '%' },
+          { key: 'errorCount', value: practice.report.errorCount },
+          { key: 'isPerfect', value: practice.report.isPerfect ? 1 : 0 },
           { key: 'correct', value: practice.report.correct },
           { key: 'wrong', value: practice.report.wrong },
           { key: 'missing', value: practice.report.missing },
@@ -394,7 +430,10 @@ export function ScorePracticePage({
           practiceRecordId: key,
           errorEventId: event.id,
           measure: event.measure,
-          beat: event.beat
+          beat: event.beat,
+          hand: event.hand,
+          staff: event.staff,
+          sourceEventId: event.sourceEventIds?.[0] ?? null
         })),
         perMeasureMetrics: practice.report.perMeasureMetrics.map((measure) => ({
           ...measure,
@@ -404,7 +443,10 @@ export function ScorePracticePage({
               practiceRecordId: key,
               errorEventId: event.id,
               measure: event.measure,
-              beat: event.beat
+              beat: event.beat,
+              hand: event.hand,
+              staff: event.staff,
+              sourceEventId: event.sourceEventIds?.[0] ?? null
             }))
         })),
         metadata: {

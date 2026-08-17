@@ -1,4 +1,9 @@
-import type { DailyTrainingPlan, PlanItem } from './planner'
+import {
+  formatScoreSuccessCriteria,
+  type DailyTrainingPlan,
+  type PlanItem,
+  type ScorePlanSuccessCriteria
+} from './planner'
 import type { PracticeRecordV2 } from '../records/practiceRecordV2'
 import type { ScoreMasteryState } from '../ability/scoreMastery'
 
@@ -67,8 +72,9 @@ export function updateDailyPlanFromRecords(
     const scoreMatch = /^score:(.+):(\d+)$/.exec(item.exerciseId)
     let achieved = false
     if (scoreMatch) {
-      const measure = mastery.scores[scoreMatch[1]]?.[Number(scoreMatch[2])]
-      achieved = Boolean(measure && measure.pitchAccuracy !== null && measure.pitchAccuracy >= 90)
+      achieved = item.criteria?.type === 'score-segment'
+        ? getConsecutiveScoreSuccessCount(item.criteria, records) >= item.criteria.requiredConsecutiveSuccesses
+        : false
     } else {
       achieved = records.some((record) => {
         const accuracy = record.metrics.find((metric) => metric.key === 'accuracy')?.value ?? 0
@@ -92,12 +98,80 @@ export function updateDailyPlanFromRecords(
   return { state, changed }
 }
 
+function recordMatchesScoreCriteria(record: PracticeRecordV2, criteria: ScorePlanSuccessCriteria): boolean {
+  if (record.practiceType !== 'score' || record.scoreId !== criteria.scoreId) return false
+  if (record.mode !== criteria.mode || record.handMode !== criteria.handMode) return false
+  if (record.segment !== `${criteria.startMeasure}-${criteria.endMeasure}`) return false
+  const tempoRatio = record.metadata.tempoRatio
+  return typeof tempoRatio === 'number' && Math.abs(tempoRatio - criteria.tempoRatio) < 0.001
+}
+
+function recordSatisfiesScoreCriteria(record: PracticeRecordV2, criteria: ScorePlanSuccessCriteria): boolean {
+  const measures = record.perMeasureMetrics?.filter((measure) => (
+    measure.measureNumber >= criteria.startMeasure && measure.measureNumber <= criteria.endMeasure
+  )) ?? []
+  if (measures.length !== criteria.endMeasure - criteria.startMeasure + 1) return false
+  if (measures.some((measure) => measure.pitchAccuracy < criteria.minimumPitchAccuracy)) return false
+  if (criteria.requireNoErrors && measures.some((measure) => measure.wrong + measure.missed + measure.extra > 0)) return false
+  if (typeof criteria.minimumTimingAccuracy === 'number') {
+    const timingAccuracy = record.metrics.find((metric) => metric.key === 'timingAccuracy')?.value
+    if (typeof timingAccuracy !== 'number' || timingAccuracy < criteria.minimumTimingAccuracy) return false
+  }
+  return true
+}
+
+export function getConsecutiveScoreSuccessCount(
+  criteria: ScorePlanSuccessCriteria,
+  records: PracticeRecordV2[]
+): number {
+  let streak = 0
+  const matching = records
+    .filter((record) => recordMatchesScoreCriteria(record, criteria))
+    .sort((left, right) => Date.parse(left.endedAt) - Date.parse(right.endedAt))
+  for (const record of matching) {
+    streak = recordSatisfiesScoreCriteria(record, criteria) ? streak + 1 : 0
+  }
+  return streak
+}
+
+function sanitizeScoreCriteria(value: unknown, exerciseId: string): ScorePlanSuccessCriteria | null {
+  const scoreMatch = /^score:(.+):(\d+)$/.exec(exerciseId)
+  if (!scoreMatch) return null
+  const candidate = value && typeof value === 'object' ? value as Partial<ScorePlanSuccessCriteria> : null
+  const fallbackMeasure = Number(scoreMatch[2])
+  const scoreId = typeof candidate?.scoreId === 'string' ? candidate.scoreId : scoreMatch[1]
+  const startMeasure = typeof candidate?.startMeasure === 'number' ? Math.max(1, Math.round(candidate.startMeasure)) : fallbackMeasure
+  const endMeasure = typeof candidate?.endMeasure === 'number' ? Math.max(startMeasure, Math.round(candidate.endMeasure)) : startMeasure
+  return {
+    type: 'score-segment',
+    scoreId,
+    startMeasure,
+    endMeasure,
+    mode: candidate?.mode === 'realtime' ? 'realtime' : 'wait',
+    handMode: candidate?.handMode === 'left' || candidate?.handMode === 'right' ? candidate.handMode : 'both',
+    tempoRatio: typeof candidate?.tempoRatio === 'number'
+      ? Math.min(2, Math.max(0.25, candidate.tempoRatio))
+      : 0.6,
+    requiredConsecutiveSuccesses: typeof candidate?.requiredConsecutiveSuccesses === 'number'
+      ? Math.max(1, Math.round(candidate.requiredConsecutiveSuccesses))
+      : 3,
+    requireNoErrors: candidate?.requireNoErrors !== false,
+    minimumPitchAccuracy: typeof candidate?.minimumPitchAccuracy === 'number'
+      ? Math.min(100, Math.max(0, candidate.minimumPitchAccuracy))
+      : 100,
+    minimumTimingAccuracy: typeof candidate?.minimumTimingAccuracy === 'number'
+      ? Math.min(100, Math.max(0, candidate.minimumTimingAccuracy))
+      : null
+  }
+}
+
 function sanitizePlanItem(value: unknown): PlanItem | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<PlanItem>
   if (typeof candidate.exerciseId !== 'string' || typeof candidate.successCriteria !== 'string' || typeof candidate.whyThis !== 'string') {
     return null
   }
+  const criteria = sanitizeScoreCriteria(candidate.criteria, candidate.exerciseId)
   return {
     exerciseId: candidate.exerciseId,
     targetSkillIds: Array.isArray(candidate.targetSkillIds) ? candidate.targetSkillIds.filter((id): id is PlanItem['targetSkillIds'][number] => typeof id === 'string') : [],
@@ -105,7 +179,8 @@ function sanitizePlanItem(value: unknown): PlanItem | null {
     targetTempo: typeof candidate.targetTempo === 'number' ? candidate.targetTempo : null,
     mode: typeof candidate.mode === 'string' ? candidate.mode : null,
     handMode: typeof candidate.handMode === 'string' ? candidate.handMode : null,
-    successCriteria: candidate.successCriteria,
+    criteria,
+    successCriteria: criteria ? formatScoreSuccessCriteria(criteria) : candidate.successCriteria,
     whyThis: candidate.whyThis,
     evidenceRefs: Array.isArray(candidate.evidenceRefs)
       ? candidate.evidenceRefs.filter((ref): ref is PlanItem['evidenceRefs'][number] => Boolean(ref && typeof ref === 'object' && typeof (ref as { practiceRecordId?: unknown }).practiceRecordId === 'string'))

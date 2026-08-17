@@ -23,6 +23,9 @@ export interface ScorePracticeReport {
   extra: number
   skipped: number
   accuracy: number
+  completionAccuracy: number
+  errorCount: number
+  isPerfect: boolean
   earlyCount: number
   lateCount: number
   averageSignedOffsetMs: number | null
@@ -81,12 +84,21 @@ export function useScorePractice(
   mode: ScorePracticeMode = 'wait',
   options: ScorePracticeOptions = {}
 ): UseScorePracticeResult {
+  const segmentStartMeasure = options.segment?.startMeasure
+  const segmentEndMeasure = options.segment?.endMeasure
+  const segmentHandMode = options.segment?.handMode
   const timeline = useMemo(() => {
     if (!score) return { units: [] }
-    if (!options.segment) return buildScoreTimeline(score)
-    const segment = buildPracticeSegment(score, options.segment)
+    if (segmentStartMeasure === undefined && segmentEndMeasure === undefined && segmentHandMode === undefined) {
+      return buildScoreTimeline(score)
+    }
+    const segment = buildPracticeSegment(score, {
+      startMeasure: segmentStartMeasure,
+      endMeasure: segmentEndMeasure,
+      handMode: segmentHandMode
+    })
     return buildSegmentTimelineFromSegment(segment)
-  }, [options.segment, score])
+  }, [score, segmentEndMeasure, segmentHandMode, segmentStartMeasure])
   const loop = options.loop ?? false
   const countInMs = options.countInMs ?? 0
   const tempoRatio = Math.min(2, Math.max(0.25, options.tempoRatio ?? 1))
@@ -130,6 +142,14 @@ export function useScorePractice(
   const completeLoopRef = useRef<() => void>(() => undefined)
 
   useEffect(() => {
+    if (tickerRef.current !== null) {
+      window.clearInterval(tickerRef.current)
+      tickerRef.current = null
+    }
+    if (countInTimerRef.current !== null) {
+      window.clearTimeout(countInTimerRef.current)
+      countInTimerRef.current = null
+    }
     waitCoreRef.current = new WaitScoreCore(timeline)
     realtimeCoreRef.current = new RealtimeScoreCore(timeline, { beatDurationMs: 500, msPerTick })
     followCoreRef.current = new FollowScoreCore(timeline, { beatDurationMs: 500, msPerTick })
@@ -139,6 +159,11 @@ export function useScorePractice(
     setElapsedMs(0)
     setLoopIterations(0)
     setInterruptionMeasures([])
+    countInRemainingRef.current = 0
+    pausedFromCountInRef.current = false
+    pausedTotalRef.current = 0
+    pausedAtRef.current = 0
+    lastEventIdRef.current = null
     loopIterationsRef.current = 0
     setPhase('idle')
   }, [msPerTick, timeline])

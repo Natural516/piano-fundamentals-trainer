@@ -199,7 +199,14 @@ export function mergeTiedPerformanceEventsWithDiagnostics(events: ScoreEventV2[]
 
     if (event.tieStop) {
       const isContinuous = Boolean(active) && Math.abs(event.absoluteOnset - active!.releaseTick) <= 1
-      if (active && isContinuous) {
+      if (active) {
+        if (!isContinuous) {
+          warnings.push({
+            code: 'DISCONTINUOUS_TIE',
+            eventId: event.id,
+            message: `Tie continuation ${event.id} is not continuous with its active chain; notation tie semantics were preserved.`
+          })
+        }
         active.releaseTick = Math.max(active.releaseTick, event.absoluteOnset + event.duration)
         active.sourceEventIds.push(event.id)
         if (!event.tieStart) activeChains.delete(key)
@@ -207,13 +214,10 @@ export function mergeTiedPerformanceEventsWithDiagnostics(events: ScoreEventV2[]
       }
 
       warnings.push({
-        code: active ? 'DISCONTINUOUS_TIE' : 'ORPHAN_TIE_STOP',
+        code: 'ORPHAN_TIE_STOP',
         eventId: event.id,
-        message: active
-          ? `Tie continuation ${event.id} is not continuous with its active chain.`
-          : `Tie stop ${event.id} has no matching active chain; treated as a standalone attack.`
+        message: `Tie stop ${event.id} has no matching active chain; treated as a standalone attack.`
       })
-      if (active) activeChains.delete(key)
       const standalone = createAttack(event)
       performanceEvents.push(standalone)
       if (event.tieStart) activeChains.set(key, standalone)

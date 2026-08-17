@@ -81,6 +81,8 @@ function asEvidenceRefs(value: unknown): EvidenceRef[] {
       measure: typeof candidate.measure === 'number' ? candidate.measure : null,
       beat: typeof candidate.beat === 'number' ? candidate.beat : null,
       hand: candidate.hand === 'left' || candidate.hand === 'right' || candidate.hand === 'both' ? candidate.hand : null,
+      staff: typeof candidate.staff === 'number' ? candidate.staff : null,
+      sourceEventId: typeof candidate.sourceEventId === 'string' ? candidate.sourceEventId : null,
       metric: typeof candidate.metric === 'string' ? candidate.metric : null,
       errorEventId: typeof candidate.errorEventId === 'string' ? candidate.errorEventId : null
     }]

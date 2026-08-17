@@ -1,5 +1,5 @@
 import type { ScoreDocument } from './musicXmlTypes'
-import { buildScoreTimeV2, type ScoreEventV2 } from './scoreTimeV2'
+import { buildScoreTimeV2, mergeTiedPerformanceEvents, type ScoreEventV2 } from './scoreTimeV2'
 
 export interface PracticeSegmentEvent {
   sourceEventId: string
@@ -74,6 +74,9 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
   const handMode = options.handMode ?? 'both'
   const segmentBoundaryRetrigger = options.segmentBoundaryRetrigger ?? false
   const { events: scoreEvents } = buildScoreTimeV2(score)
+  const performanceAttackEventIds = new Set(
+    mergeTiedPerformanceEvents(scoreEvents).map((event) => event.sourceEventIds[0])
+  )
 
   const selected = scoreEvents
     .filter((event) => event.measureNumber >= startMeasure && event.measureNumber <= endMeasure)
@@ -122,7 +125,7 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
         .filter((event) => {
           if (event.midiPitch === null) return false
           if (segmentBoundaryRetrigger && group.practiceTick === 0 && event.tieStop) return true
-          return !(event.tieStop && !event.tieStart)
+          return performanceAttackEventIds.has(event.sourceEventId)
         })
         .map((event) => event.midiPitch as number)
         .sort((left, right) => left - right)

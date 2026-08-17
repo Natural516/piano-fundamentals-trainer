@@ -7,6 +7,7 @@ export interface TemporarySessionEvidence {
     originalMeasure?: number
     originalBeat?: number
     hand?: string | null
+    staff?: number | null
     outcome: string
     sourceEventIds: string[]
   }>
@@ -42,6 +43,30 @@ function metricExists(record: PracticeRecordV2, metricPath: string): boolean {
   return typeof value === 'number'
 }
 
+function errorMatchesReference(
+  error: PracticeRecordV2['errorEvents'][number],
+  ref: EvidenceRef
+): boolean {
+  if (typeof ref.measure === 'number' && error.measure !== ref.measure) return false
+  if (typeof ref.beat === 'number' && error.beat !== ref.beat) return false
+  if (ref.hand && error.hand !== ref.hand && error.hand !== 'both') return false
+  if (typeof ref.staff === 'number' && error.staff !== ref.staff) return false
+  if (ref.sourceEventId && !error.sourceEventIds?.includes(ref.sourceEventId)) return false
+  return true
+}
+
+function temporaryFactMatchesReference(
+  fact: TemporarySessionEvidence['facts'][number],
+  ref: EvidenceRef
+): boolean {
+  if (typeof ref.measure === 'number' && fact.originalMeasure !== ref.measure) return false
+  if (typeof ref.beat === 'number' && fact.originalBeat !== ref.beat) return false
+  if (ref.hand && fact.hand !== ref.hand && fact.hand !== 'both') return false
+  if (typeof ref.staff === 'number' && fact.staff !== ref.staff) return false
+  if (ref.sourceEventId && !fact.sourceEventIds.includes(ref.sourceEventId)) return false
+  return true
+}
+
 export function resolveEvidenceRef(
   ref: EvidenceRef,
   repositories: EvidenceRepositories,
@@ -62,14 +87,42 @@ export function resolveEvidenceRef(
   if (ref.errorEventId && !error) errors.push(`error event not found: ${ref.errorEventId}`)
   if (record && ref.scoreId && record.scoreId !== ref.scoreId) errors.push('score does not match record')
   if (temporarySession && ref.scoreId && temporarySession.scoreId !== ref.scoreId) errors.push('score does not match session')
-  if (temporarySession && typeof ref.measure === 'number') {
-    const matchingFact = temporarySession.facts.find((fact) =>
-      fact.originalMeasure === ref.measure && (!ref.hand || fact.hand === ref.hand || fact.hand === 'both')
-    )
-    if (!matchingFact) errors.push('measure/hand does not match temporary session facts')
+  if (temporarySession && (
+    typeof ref.measure === 'number' ||
+    typeof ref.beat === 'number' ||
+    Boolean(ref.hand) ||
+    typeof ref.staff === 'number' ||
+    Boolean(ref.sourceEventId)
+  )) {
+    if (!temporarySession.facts.some((fact) => temporaryFactMatchesReference(fact, ref))) {
+      errors.push('measure/beat/hand/staff/source does not match temporary session facts')
+    }
   }
-  if (error && typeof ref.measure === 'number' && error.measure !== ref.measure) errors.push('measure does not match error event')
-  if (error && ref.hand && error.hand !== ref.hand && error.hand !== 'both') errors.push('hand does not match error event')
+  if (record && typeof ref.measure === 'number') {
+    const measureExists = Boolean(
+      record.perMeasureMetrics?.some((entry) => entry.measureNumber === ref.measure) ||
+      record.errorEvents.some((entry) => entry.measure === ref.measure)
+    )
+    if (!measureExists) errors.push(`measure not found in practice record: ${ref.measure}`)
+  }
+  if (error && !errorMatchesReference(error, ref)) {
+    errors.push('referenced fields do not match error event')
+  } else if (record && !error && (
+    typeof ref.beat === 'number' ||
+    Boolean(ref.hand) ||
+    typeof ref.staff === 'number' ||
+    Boolean(ref.sourceEventId)
+  )) {
+    const matchingError = record.errorEvents.some((entry) => errorMatchesReference(entry, ref))
+    const matchingHandMetric = Boolean(
+      ref.hand &&
+      typeof ref.measure === 'number' &&
+      record.perMeasureMetrics?.find((entry) => entry.measureNumber === ref.measure)?.handStats[ref.hand]
+    )
+    if (!matchingError && !matchingHandMetric) {
+      errors.push('beat/hand/staff/source does not match practice record contents')
+    }
+  }
   if (record && ref.metric && !metricExists(record, ref.metric)) errors.push(`metric not found: ${ref.metric}`)
   if (temporarySession && ref.metric) errors.push('temporary session does not expose persisted metrics')
 

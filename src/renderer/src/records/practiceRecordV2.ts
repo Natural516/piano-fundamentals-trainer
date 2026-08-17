@@ -8,6 +8,7 @@ export interface PracticeErrorEvent {
   expected?: number | null
   actual?: number | null
   hand?: 'left' | 'right' | 'both' | null
+  staff?: number | null
   timingErrorMs?: number | null
   severity?: 'low' | 'medium' | 'high'
   sourceEventIds?: string[]
@@ -31,6 +32,9 @@ export interface PerMeasurePracticeMetrics {
   missed: number
   extra: number
   pitchAccuracy: number
+  completionAccuracy?: number
+  errorCount?: number
+  isPerfect?: boolean
   early: number
   late: number
   averageSignedOffsetMs: number | null
@@ -55,6 +59,8 @@ export interface EvidenceRef {
   measure?: number | null
   beat?: number | null
   hand?: 'left' | 'right' | 'both' | null
+  staff?: number | null
+  sourceEventId?: string | null
   metric?: string | null
   errorEventId?: string | null
 }
@@ -181,6 +187,6 @@ export function exportRecordsToJson(records: PracticeSessionRecord[]): string {
 }
 
 export function isUnobservableFromMidi(claim: string): boolean {
-  const unobservable = /指法|手腕|手型|肌肉紧张|坐姿|放松|紧张/
+  const unobservable = /指法|\d\s*指|手指|指头|手腕|手型|肌肉|坐姿|放松|紧张|触键动作|身体使用/
   return unobservable.test(claim)
 }
