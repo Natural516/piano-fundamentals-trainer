@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ActiveMidiNote, MidiConnectionState } from '../types'
 import { useScorePractice, type ScorePracticeMode } from '../hooks/useScorePractice'
 import type { UsePianoAudioResult } from '../hooks/usePianoAudio'
-import { loadMusicXmlDocument } from '../score/musicXmlParser'
+import { loadTrainingSafeMusicXmlDocument, UnsupportedMusicXmlProfileError } from '../score/musicXmlProfile'
 import { importMxlFile } from '../score/mxlImportService'
 import { parseMidiFile } from '../midiFile/midiFileParser'
 import {
@@ -317,24 +317,31 @@ export function ScorePracticePage({
   useEffect(() => {
     const imported = initialScoreId ? getScoreImport(initialScoreId) : null
     if (initialScoreId && imported) {
-      const document = loadMusicXmlDocument(imported.xml)
-      const measureCount = document.parts[0]?.measures.length ?? 1
-      importedXmlRef.current = imported.xml
-      importedSourceTypeRef.current = imported.sourceType
-      setScore(document)
-      setScoreTitle(document.title)
-      setImportTier(imported.tier)
-      const nextStart = Math.min(Math.max(1, initialStartMeasure ?? 1), measureCount)
-      setStartMeasure(nextStart)
-      setEndMeasure(Math.min(Math.max(nextStart, initialEndMeasure ?? nextStart), measureCount))
-      setMode(initialMode ?? 'wait')
-      setHandMode(initialHandMode ?? 'both')
-      setTempoRatio(initialTempoRatio ?? 1)
-      setLoop(initialLoop ?? false)
-      setCountIn(initialCountIn ?? false)
-      return
+      try {
+        const document = loadTrainingSafeMusicXmlDocument(imported.xml).document
+        const measureCount = document.parts[0]?.measures.length ?? 1
+        importedXmlRef.current = imported.xml
+        importedSourceTypeRef.current = imported.sourceType
+        setScore(document)
+        setScoreTitle(document.title)
+        setImportTier(imported.tier)
+        const nextStart = Math.min(Math.max(1, initialStartMeasure ?? 1), measureCount)
+        setStartMeasure(nextStart)
+        setEndMeasure(Math.min(Math.max(nextStart, initialEndMeasure ?? nextStart), measureCount))
+        setMode(initialMode ?? 'wait')
+        setHandMode(initialHandMode ?? 'both')
+        setTempoRatio(initialTempoRatio ?? 1)
+        setLoop(initialLoop ?? false)
+        setCountIn(initialCountIn ?? false)
+        return
+      } catch (error) {
+        const detail = error instanceof UnsupportedMusicXmlProfileError
+          ? error.validation.reasons.join('；')
+          : error instanceof Error ? error.message : '保存的曲谱无法解析'
+        setLoadError(`保存的曲谱不能进入严格练习：${detail}`)
+      }
     }
-    const demo = loadMusicXmlDocument(DEMO_SCORE_XML)
+    const demo = loadTrainingSafeMusicXmlDocument(DEMO_SCORE_XML).document
     importedXmlRef.current = DEMO_SCORE_XML
     importedSourceTypeRef.current = 'musicxml'
     setScore(demo)
@@ -531,7 +538,7 @@ export function ScorePracticePage({
 
       if (extension === 'xml' || extension === 'musicxml') {
         const text = await file.text()
-        const document = loadMusicXmlDocument(text)
+        const document = loadTrainingSafeMusicXmlDocument(text).document
         importedXmlRef.current = text
         importedSourceTypeRef.current = 'musicxml'
         const persisted = persistScoreImport(document.title, text, 'musicxml', 'A')
@@ -572,7 +579,11 @@ export function ScorePracticePage({
 
       setLoadError('不支持的文件类型（支持 .xml/.musicxml/.mxl/.mid/.midi/.png/.jpg/.pdf）')
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : '导入解析失败')
+      if (error instanceof UnsupportedMusicXmlProfileError) {
+        setLoadError(`这份曲谱包含当前无法保证正确解析的记谱内容，因此不能进入严格练习：${error.validation.reasons.join('；')}`)
+      } else {
+        setLoadError(error instanceof Error ? error.message : '导入解析失败')
+      }
     }
   }
 
@@ -742,10 +753,10 @@ export function ScorePracticePage({
               />
               <AppButton variant="ghost" onClick={() => midiInputRef.current?.click()} disabled={!score}>添加参考 MIDI（Tier B）</AppButton>
               <AppButton variant="ghost" onClick={() => {
-                const demo = loadMusicXmlDocument(DEMO_SCORE_XML)
+                const demo = loadTrainingSafeMusicXmlDocument(DEMO_SCORE_XML).document
                 importedXmlRef.current = DEMO_SCORE_XML
                 importedSourceTypeRef.current = 'musicxml'
-                persistScoreImport(demo.title, DEMO_SCORE_XML, 'musicxml', 'A')
+                const persisted = persistScoreImport(demo.title, DEMO_SCORE_XML, 'musicxml', 'A')
                 setScore(demo)
                 setScoreTitle(demo.title)
                 setImportTier('A')
@@ -753,7 +764,7 @@ export function ScorePracticePage({
                 setEndMeasure(demo.parts[0]?.measures.length ?? 2)
                 setValidationReport(null)
                 setReferenceMidiName('')
-                setLoadError('')
+                setLoadError(persisted ? '' : '示例已加载，但无法保存到本地曲谱库。')
               }}>加载示例</AppButton>
             </div>
           </div>

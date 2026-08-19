@@ -1,11 +1,12 @@
-import { loadMusicXmlDocument } from './musicXmlParser'
 import type { ScoreDocument } from './musicXmlTypes'
 import { extractMxlContainerAsync, type InflateFn } from './zipReader'
+import { loadTrainingSafeMusicXmlDocument, type MusicXmlCapabilityResult } from './musicXmlProfile'
 
 export interface MusicXmlPayload {
   fileName: string
   xmlText: string
   document: ScoreDocument
+  validation: MusicXmlCapabilityResult
 }
 
 export interface MxlExtractor {
@@ -17,9 +18,11 @@ export function createMxlExtractor(inflateRaw: InflateFn): MxlExtractor {
     async extractMxl(bytes) {
       const container = await extractMxlContainerAsync(bytes, { inflate: inflateRaw })
       if (!container) throw new Error('MXL 中未找到 MusicXML 主谱文件')
+      const loaded = loadTrainingSafeMusicXmlDocument(container.xmlText)
       return {
         ...container,
-        document: loadMusicXmlDocument(container.xmlText)
+        document: loaded.document,
+        validation: loaded.validation
       }
     }
   }

@@ -8,7 +8,9 @@
         <divisions>1</divisions>
         <key><fifths>0</fifths></key>
         <time><beats>4</beats><beat-type>4</beat-type></time>
-        <clef><sign>G</sign><line>2</line></clef>
+        <staves>2</staves>
+        <clef number="1"><sign>G</sign><line>2</line></clef>
+        <clef number="2"><sign>F</sign><line>4</line></clef>
       </attributes>
       <direction><sound tempo="80"/></direction>
       <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><staff>1</staff></note>

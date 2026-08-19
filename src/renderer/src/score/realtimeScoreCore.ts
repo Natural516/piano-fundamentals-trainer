@@ -21,6 +21,7 @@ export interface RealtimeCoreOptions {
   toleranceMs?: number
   beatDurationMs?: number
   msPerTick?: number
+  tickToMs?: (tick: number) => number
   skipWindowMs?: number
 }
 
@@ -36,6 +37,7 @@ export class RealtimeScoreCore {
   private readonly toleranceMs: number
   private readonly beatDurationMs: number
   private readonly msPerTick: number
+  private readonly tickToMs: ((tick: number) => number) | null
   private readonly skipWindowMs: number
   private index = 0
   private pressed = new Set<number>()
@@ -46,6 +48,7 @@ export class RealtimeScoreCore {
     this.toleranceMs = options.toleranceMs ?? 180
     this.beatDurationMs = options.beatDurationMs ?? 500
     this.msPerTick = options.msPerTick ?? this.beatDurationMs / INTERNAL_PPQ
+    this.tickToMs = options.tickToMs ?? null
     this.skipWindowMs = options.skipWindowMs ?? this.toleranceMs * 2
   }
 
@@ -220,7 +223,7 @@ export class RealtimeScoreCore {
   }
 
   private expectedTimeFor(unit: ScoreExpectedUnit): number {
-    return unit.expectedTick * this.msPerTick
+    return this.tickToMs ? this.tickToMs(unit.expectedTick) : unit.expectedTick * this.msPerTick
   }
 
   private unitSatisfied(unit: ScoreExpectedUnit): boolean {

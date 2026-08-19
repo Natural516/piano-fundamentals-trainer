@@ -15,6 +15,7 @@ export interface FollowStepResult {
 export interface FollowCoreOptions {
   beatDurationMs?: number
   msPerTick?: number
+  tickToMs?: (tick: number) => number
   timeCostWeight?: number
   pitchCost?: number
   skipCost?: number
@@ -32,6 +33,7 @@ export interface FollowCoreOptions {
 export class FollowScoreCore {
   private readonly units: ScoreExpectedUnit[]
   private readonly msPerTick: number
+  private readonly tickToMs: ((tick: number) => number) | null
   private readonly timeCostWeight: number
   private readonly pitchCost: number
   private readonly skipCost: number
@@ -44,6 +46,7 @@ export class FollowScoreCore {
   constructor(timeline: ScoreTimeline, options: FollowCoreOptions = {}) {
     this.units = timeline.units
     this.msPerTick = options.msPerTick ?? (options.beatDurationMs ?? 500) / INTERNAL_PPQ
+    this.tickToMs = options.tickToMs ?? null
     this.timeCostWeight = options.timeCostWeight ?? 0.6
     this.pitchCost = options.pitchCost ?? 2
     this.skipCost = options.skipCost ?? 3
@@ -90,7 +93,7 @@ export class FollowScoreCore {
         continue
       }
 
-      const expectedTime = unit.expectedTick * this.msPerTick
+      const expectedTime = this.tickToMs ? this.tickToMs(unit.expectedTick) : unit.expectedTick * this.msPerTick
       const timeCost = Math.abs(elapsedMs - expectedTime) * this.timeCostWeight
 
       if (unit.expectedMidi.includes(midiNumber)) {

@@ -43,6 +43,9 @@ export interface ScoreNoteModel {
 }
 
 export interface ScoreMeasure {
+  stableMeasureId: string
+  displayMeasureNumber: string
+  sequenceIndex: number
   number: number
   implicit: boolean
   notes: ScoreNoteModel[]
@@ -71,6 +74,14 @@ export interface ScoreDocument {
   title: string
   parts: ScorePartModel[]
   defaultTempoBpm: number | null
+  trainingProfile?: {
+    profileVersion: 'Piano Training MusicXML Profile v1'
+    trainingSafe: boolean
+    supportedFeatures: string[]
+    unsupportedFeatures: Array<{ code: string; message: string; measure?: string }>
+    warnings: Array<{ code: string; message: string; measure?: string }>
+    reasons: string[]
+  }
 }
 
 export interface ScoreExpectedUnit {

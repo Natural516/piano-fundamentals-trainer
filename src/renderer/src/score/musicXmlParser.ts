@@ -30,11 +30,13 @@ export function parseMusicXml(source: string): ScoreDocument {
     const partId = partElement.attributes.id ?? ''
     const partListPart = findPartListPart(root, partId)
     const name = partListPart ? childText(partListPart, 'part-name') : partId
-    const measures = findChildren(partElement, 'measure').map(parseMeasure)
+    const measures = findChildren(partElement, 'measure').map((measure, sequenceIndex) => (
+      parseMeasure(measure, partId, sequenceIndex)
+    ))
     parts.push({ id: partId, name, measures })
   }
 
-  const firstTempo = parts[0]?.measures.find((measure) => measure.tempoBpm !== null)?.tempoBpm ?? null
+  const firstTempo = parts[0]?.measures[0]?.tempoBpm ?? null
 
   return {
     title,
@@ -49,9 +51,13 @@ function findPartListPart(root: XmlElement, partId: string): XmlElement | null {
   return findChildren(partList, 'score-part').find((element) => element.attributes.id === partId) ?? null
 }
 
-function parseMeasure(element: XmlElement): ScoreMeasure {
+function parseMeasure(element: XmlElement, partId: string, sequenceIndex: number): ScoreMeasure {
+  const displayMeasureNumber = element.attributes.number?.trim() || String(sequenceIndex + 1)
   const measure: ScoreMeasure = {
-    number: Number(element.attributes.number) || 0,
+    stableMeasureId: `${partId || 'part'}:measure:${sequenceIndex}`,
+    displayMeasureNumber,
+    sequenceIndex,
+    number: sequenceIndex + 1,
     implicit: element.attributes.implicit === 'yes',
     notes: [],
     timeEvents: [],

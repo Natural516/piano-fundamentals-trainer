@@ -15,6 +15,9 @@ export interface ScoreEventV2 {
   partIndex: number
   measureIndex: number
   measureNumber: number
+  stableMeasureId: string
+  displayMeasureNumber: string
+  measureSequenceIndex: number
   noteIndex: number
   onsetInMeasure: number
   absoluteOnset: number
@@ -33,7 +36,25 @@ export interface ScoreEventV2 {
 
 export interface ScoreTimeDocumentV2 {
   events: ScoreEventV2[]
-  measureStartTicks: Array<{ partIndex: number; measureIndex: number; measureNumber: number; startTick: number }>
+  measureStartTicks: Array<{
+    partIndex: number
+    measureIndex: number
+    measureNumber: number
+    stableMeasureId: string
+    displayMeasureNumber: string
+    sequenceIndex: number
+    startTick: number
+  }>
+  tempoMap: ScoreTempoPoint[]
+}
+
+export interface ScoreTempoPoint {
+  absoluteTick: number
+  bpm: number
+  measureNumber: number
+  stableMeasureId: string
+  displayMeasureNumber: string
+  sequenceIndex: number
 }
 
 export class UnsupportedScoreFormatError extends Error {
@@ -79,10 +100,12 @@ const DEFAULT_ATTRIBUTES: EffectiveScoreAttributes = {
 export function buildScoreTimeV2(score: ScoreDocument): ScoreTimeDocumentV2 {
   const events: ScoreEventV2[] = []
   const measureStartTicks: ScoreTimeDocumentV2['measureStartTicks'] = []
+  const tempoMap: ScoreTempoPoint[] = []
 
   score.parts.forEach((part, partIndex) => {
     let attributes = { ...DEFAULT_ATTRIBUTES }
     let documentCursor = 0
+    let activeTempo = score.defaultTempoBpm ?? 60
 
     part.measures.forEach((measure, measureIndex) => {
       attributes = resolveAttributes(attributes, measure)
@@ -92,8 +115,25 @@ export function buildScoreTimeV2(score: ScoreDocument): ScoreTimeDocumentV2 {
         partIndex,
         measureIndex,
         measureNumber: measure.number,
+        stableMeasureId: measure.stableMeasureId ?? `${part.id}:measure:${measureIndex}`,
+        displayMeasureNumber: measure.displayMeasureNumber ?? String(measure.number),
+        sequenceIndex: measure.sequenceIndex ?? measureIndex,
         startTick: measureStartTick
       })
+      if (partIndex === 0) {
+        const nextTempo = measure.tempoBpm ?? activeTempo
+        if (tempoMap.length === 0 || nextTempo !== activeTempo || tempoMap[tempoMap.length - 1].bpm !== nextTempo) {
+          tempoMap.push({
+            absoluteTick: measureStartTick,
+            bpm: nextTempo,
+            measureNumber: measure.number,
+            stableMeasureId: measure.stableMeasureId ?? `${part.id}:measure:${measureIndex}`,
+            displayMeasureNumber: measure.displayMeasureNumber ?? String(measure.number),
+            sequenceIndex: measure.sequenceIndex ?? measureIndex
+          })
+        }
+        activeTempo = nextTempo
+      }
       let lastNoteOnset: number | null = null
 
       for (const event of measure.timeEvents) {
@@ -125,6 +165,9 @@ export function buildScoreTimeV2(score: ScoreDocument): ScoreTimeDocumentV2 {
           partIndex,
           measureIndex,
           measureNumber: measure.number,
+          stableMeasureId: measure.stableMeasureId ?? `${part.id}:measure:${measureIndex}`,
+          displayMeasureNumber: measure.displayMeasureNumber ?? String(measure.number),
+          measureSequenceIndex: measure.sequenceIndex ?? measureIndex,
           noteIndex: event.noteIndex,
           onsetInMeasure,
           absoluteOnset: measureStartTick + onsetInMeasure,
@@ -149,7 +192,68 @@ export function buildScoreTimeV2(score: ScoreDocument): ScoreTimeDocumentV2 {
     })
   })
 
-  return { events, measureStartTicks }
+  if (tempoMap.length === 0) {
+    tempoMap.push({
+      absoluteTick: 0,
+      bpm: score.defaultTempoBpm ?? 60,
+      measureNumber: 1,
+      stableMeasureId: 'score:measure:0',
+      displayMeasureNumber: '1',
+      sequenceIndex: 0
+    })
+  }
+  return { events, measureStartTicks, tempoMap }
+}
+
+export function scoreTickToMilliseconds(
+  absoluteTick: number,
+  tempoMap: ScoreTempoPoint[],
+  tempoRatio = 1
+): number {
+  const targetTick = Math.max(0, absoluteTick)
+  const safeRatio = Math.min(2, Math.max(0.25, tempoRatio))
+  const points = [...tempoMap]
+    .filter((point) => Number.isFinite(point.absoluteTick) && Number.isFinite(point.bpm) && point.bpm > 0)
+    .sort((left, right) => left.absoluteTick - right.absoluteTick)
+  if (points.length === 0) return targetTick * (60000 / 60 / INTERNAL_PPQ) / safeRatio
+  let elapsedMs = 0
+  let cursorTick = 0
+  let bpm = points[0].absoluteTick <= 0 ? points[0].bpm : 60
+  for (const point of points) {
+    if (point.absoluteTick <= cursorTick) {
+      bpm = point.bpm
+      continue
+    }
+    if (point.absoluteTick >= targetTick) break
+    elapsedMs += (point.absoluteTick - cursorTick) * (60000 / bpm / INTERNAL_PPQ) / safeRatio
+    cursorTick = point.absoluteTick
+    bpm = point.bpm
+  }
+  elapsedMs += (targetTick - cursorTick) * (60000 / bpm / INTERNAL_PPQ) / safeRatio
+  return elapsedMs
+}
+
+export function scoreTickSpanToMilliseconds(
+  startTick: number,
+  endTick: number,
+  tempoMap: ScoreTempoPoint[],
+  tempoRatio = 1
+): number {
+  if (endTick <= startTick) return 0
+  return scoreTickToMilliseconds(endTick, tempoMap, tempoRatio) -
+    scoreTickToMilliseconds(startTick, tempoMap, tempoRatio)
+}
+
+export function tempoAtScoreTick(absoluteTick: number, tempoMap: ScoreTempoPoint[]): number {
+  const points = [...tempoMap]
+    .filter((point) => point.bpm > 0 && Number.isFinite(point.absoluteTick))
+    .sort((left, right) => left.absoluteTick - right.absoluteTick)
+  let bpm = points[0]?.absoluteTick === 0 ? points[0].bpm : 60
+  for (const point of points) {
+    if (point.absoluteTick > absoluteTick) break
+    bpm = point.bpm
+  }
+  return bpm
 }
 
 export interface TiedPerformanceEvent {

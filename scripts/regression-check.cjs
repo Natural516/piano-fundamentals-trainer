@@ -89,6 +89,7 @@ const scoreEngraving = require('../src/renderer/src/score/scoreEngraving.ts')
 const scoreSheetLayout = require('../src/renderer/src/score/scoreSheetLayout.ts')
 const scoreSheetBounds = require('../src/renderer/src/score/scoreSheetBounds.ts')
 const scoreSheetTimeAxis = require('../src/renderer/src/score/scoreSheetTimeAxis.ts')
+const musicXmlProfile = require('../src/renderer/src/score/musicXmlProfile.ts')
 const {
   Element: VexElement,
   Stave: VexStave,
@@ -2504,8 +2505,9 @@ test('曲谱 Wait 练习 Hook 与页面接入逐事件总线且路由存在', ()
   assert.match(hookSource, /useMidiEventSubscription/)
   assert.match(hookSource, /WaitScoreCore/)
   assert.doesNotMatch(hookSource, /latestMidiEvent|latestEvent/)
-  assert.match(pageSource, /loadMusicXmlDocument/)
+  assert.match(pageSource, /loadTrainingSafeMusicXmlDocument/)
   assert.match(pageSource, /importMxlFile/)
+  assert.match(hookSource, /trainingProfile\?\.trainingSafe !== true/)
   assert.match(pageSource, /accept="\.xml,\.musicxml,\.mxl,\.mid,\.midi,\.png,\.jpg,\.jpeg,\.pdf"/)
   assert.match(appSource, /ScorePracticePage/)
   assert.doesNotMatch(pageSource, /返回首页/)
@@ -5048,7 +5050,9 @@ test('React lifecycle：Score Practice start/MIDI/render/pause/resume 保持状�
     }
   }
   midiEventBus.resetMidiEventBusForTests()
-  const score = musicXmlParser.loadMusicXmlDocument(fs.readFileSync(require.resolve('./score-fixtures/e2e-core-loop.xml'), 'utf8'))
+  const score = musicXmlProfile.loadTrainingSafeMusicXmlDocument(
+    fs.readFileSync(require.resolve('./score-fixtures/e2e-core-loop.xml'), 'utf8')
+  ).document
   let latest = null
   const Harness = ({ startMeasure }) => {
     latest = useScorePracticeModule.useScorePractice(score, 'wait', {
@@ -5217,6 +5221,130 @@ test('Chord V2 非 C 根音转位候选与 all 分布', () => {
     assert.deepEqual([...observed].sort((a, b) => a - b), [...new Set(expected)].sort((a, b) => a - b))
     assert.equal(observed.has(root), true)
   }
+})
+
+test('Piano Training MusicXML Profile v1：已验证能力矩阵允许严格练习', () => {
+  const goldenXml = fs.readFileSync(require.resolve('../fixtures/golden/case1/案例1.musicxml'), 'utf8')
+  const golden = musicXmlProfile.validatePianoTrainingMusicXml(goldenXml)
+  assert.equal(golden.trainingSafe, true, golden.reasons.join('；'))
+  for (const feature of [
+    'score-partwise',
+    'exactly-one-part',
+    'one-part-grand-staff',
+    'verified-multi-voice',
+    'tie',
+    'beam',
+    'dot',
+    'harmony',
+    'backup-forward'
+  ]) {
+    assert.equal(golden.supportedFeatures.includes(feature), true, `Golden Case1 应证明 ${feature}`)
+  }
+  const loadedGolden = musicXmlProfile.loadTrainingSafeMusicXmlDocument(goldenXml)
+  assert.equal(loadedGolden.document.trainingProfile?.trainingSafe, true)
+  assert.equal(loadedGolden.validation.profileVersion, 'Piano Training MusicXML Profile v1')
+
+  const supportedCases = [
+    ['./score-fixtures/e2e-core-loop.xml', 'one-part-grand-staff'],
+    ['./score-fixtures/musescore-doctype.musicxml', 'harmony'],
+    ['./score-fixtures/profile-supported-tuplet.musicxml', 'verified-triplet-3-2'],
+    ['./score-fixtures/tempo-change.musicxml', 'tempo-map-measure-boundary'],
+    ['./score-fixtures/profile-boundary-attributes.musicxml', 'measure-boundary-attributes']
+  ]
+  for (const [fixture, expectedFeature] of supportedCases) {
+    const xml = fs.readFileSync(require.resolve(fixture), 'utf8')
+    const validation = musicXmlProfile.validatePianoTrainingMusicXml(xml)
+    assert.equal(validation.trainingSafe, true, `${fixture}: ${validation.reasons.join('；')}`)
+    assert.equal(validation.supportedFeatures.includes(expectedFeature), true, `${fixture} 应证明 ${expectedFeature}`)
+    assert.equal(musicXmlProfile.loadTrainingSafeMusicXmlDocument(xml).document.trainingProfile?.trainingSafe, true)
+  }
+})
+
+test('Piano Training MusicXML Profile v1：不安全结构拒绝严格练习且不能绕过', () => {
+  const unsupportedCases = [
+    ['./score-fixtures/profile-multi-part.musicxml', 'MULTI_PART'],
+    ['./score-fixtures/profile-grace-note.musicxml', 'GRACE_NOTE'],
+    ['./score-fixtures/profile-unsupported-tuplet.musicxml', 'UNSUPPORTED_TUPLET'],
+    ['./score-fixtures/profile-unsupported-notation.musicxml', 'UNSUPPORTED_NOTATION'],
+    ['./score-fixtures/profile-mid-measure-attributes.musicxml', 'MID_MEASURE_ATTRIBUTES'],
+    ['./score-fixtures/profile-mid-measure-tempo.musicxml', 'MID_MEASURE_TEMPO']
+  ]
+  for (const [fixture, expectedCode] of unsupportedCases) {
+    const xml = fs.readFileSync(require.resolve(fixture), 'utf8')
+    const validation = musicXmlProfile.validatePianoTrainingMusicXml(xml)
+    assert.equal(validation.trainingSafe, false, `${fixture} 不得进入严格练习`)
+    assert.equal(validation.unsupportedFeatures.some((issue) => issue.code === expectedCode), true, `${fixture} 应报告 ${expectedCode}`)
+    assert.throws(
+      () => musicXmlProfile.loadTrainingSafeMusicXmlDocument(xml),
+      (error) => error instanceof musicXmlProfile.UnsupportedMusicXmlProfileError &&
+        error.validation.trainingSafe === false &&
+        error.validation.unsupportedFeatures.some((issue) => issue.code === expectedCode)
+    )
+  }
+
+  const timewise = '<score-timewise version="4.0"><part-list/></score-timewise>'
+  const timewiseValidation = musicXmlProfile.validatePianoTrainingMusicXml(timewise)
+  assert.equal(timewiseValidation.trainingSafe, false)
+  assert.equal(timewiseValidation.unsupportedFeatures.some((issue) => issue.code === 'SCORE_TIMEWISE'), true)
+
+  const hookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useScorePractice.ts'), 'utf8')
+  const pageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ScorePracticePage.tsx'), 'utf8')
+  const mxlSource = fs.readFileSync(require.resolve('../src/renderer/src/score/mxlImportService.ts'), 'utf8')
+  assert.match(hookSource, /score\.trainingProfile\?\.trainingSafe !== true/)
+  assert.match(pageSource, /loadTrainingSafeMusicXmlDocument/)
+  assert.doesNotMatch(pageSource, /loadMusicXmlDocument/)
+  assert.match(mxlSource, /loadTrainingSafeMusicXmlDocument/)
+})
+
+test('MusicXML measure identity：弱起显示编号与内部顺序/稳定 ID 分离', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/profile-pickup.musicxml'), 'utf8')
+  const validation = musicXmlProfile.validatePianoTrainingMusicXml(xml)
+  assert.equal(validation.trainingSafe, true, validation.reasons.join('；'))
+  assert.equal(validation.warnings.some((warning) => warning.code === 'PICKUP_MEASURE'), true)
+  const score = musicXmlProfile.loadTrainingSafeMusicXmlDocument(xml).document
+  const measures = score.parts[0].measures
+  assert.deepEqual(measures.map((measure) => measure.displayMeasureNumber), ['0', '1'])
+  assert.deepEqual(measures.map((measure) => measure.sequenceIndex), [0, 1])
+  assert.deepEqual(measures.map((measure) => measure.number), [1, 2])
+  assert.equal(new Set(measures.map((measure) => measure.stableMeasureId)).size, 2)
+
+  const scoreTime = scoreTimeV2.buildScoreTimeV2(score)
+  assert.deepEqual(scoreTime.measureStartTicks.map((measure) => measure.displayMeasureNumber), ['0', '1'])
+  assert.deepEqual(scoreTime.measureStartTicks.map((measure) => measure.sequenceIndex), [0, 1])
+  assert.deepEqual(scoreTime.events.map((event) => event.measureSequenceIndex), [0, 1])
+  assert.deepEqual(scoreTime.events.map((event) => event.stableMeasureId), measures.map((measure) => measure.stableMeasureId))
+})
+
+test('Tempo Map：Realtime 与 Teaching Playback 共用变速后的 score time', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/tempo-change.musicxml'), 'utf8')
+  const score = musicXmlProfile.loadTrainingSafeMusicXmlDocument(xml).document
+  const scoreTime = scoreTimeV2.buildScoreTimeV2(score)
+  assert.deepEqual(scoreTime.tempoMap.map((point) => [point.absoluteTick, point.bpm]), [[0, 80], [1920, 120]])
+  assert.equal(scoreTimeV2.tempoAtScoreTick(1919, scoreTime.tempoMap), 80)
+  assert.equal(scoreTimeV2.tempoAtScoreTick(1920, scoreTime.tempoMap), 120)
+  assert.equal(scoreTimeV2.scoreTickToMilliseconds(1920, scoreTime.tempoMap), 3000)
+  assert.equal(scoreTimeV2.scoreTickToMilliseconds(2400, scoreTime.tempoMap), 3500)
+
+  const plan = playback.buildPlaybackPlan(score, { startMeasure: 1, endMeasure: 2, tempoRatio: 1 })
+  assert.ok(plan)
+  assert.deepEqual(plan.tempoMap, [
+    { practiceTick: 0, timeMs: 0, bpm: 80 },
+    { practiceTick: 1920, timeMs: 3000, bpm: 120 }
+  ])
+  const noteOnTimes = plan.events
+    .filter((event) => event.type === 'noteOn')
+    .map((event) => [event.midiNumber, event.timeMs])
+  assert.deepEqual(noteOnTimes, [[60, 0], [62, 3000], [64, 3500]])
+
+  const timeline = scoreTimeline.buildScoreTimeline(score)
+  const realtime = new realtimeScoreCore.RealtimeScoreCore(timeline, {
+    toleranceMs: 10,
+    tickToMs: (tick) => scoreTimeV2.scoreTickToMilliseconds(tick, scoreTime.tempoMap)
+  })
+  assert.equal(realtime.processNoteOn(60, 0), 'correct')
+  assert.equal(realtime.processNoteOn(62, 3000), 'correct')
+  assert.equal(realtime.processNoteOn(64, 3500), 'complete')
+  assert.deepEqual(realtime.results.map((result) => result.offsetMs), [0, 0, 0])
 })
 
 test('Golden Case1 E2E：用户原始 MusicXML + MIDI 硬断言', () => {

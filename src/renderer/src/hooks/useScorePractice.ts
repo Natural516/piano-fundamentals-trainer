@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ScoreDocument } from '../score/musicXmlTypes'
 import { buildScoreTimeline } from '../score/scoreTimeline'
 import { buildSegmentTimeline, type ScoreSegmentOptions } from '../score/scoreTimeline'
-import { INTERNAL_PPQ } from '../score/scoreTimeV2'
+import { INTERNAL_PPQ, buildScoreTimeV2, scoreTickSpanToMilliseconds } from '../score/scoreTimeV2'
+import { buildPracticeSegment } from '../score/practiceSegmentBuilder'
 import { WaitScoreCore } from '../score/waitScoreCore'
 import { RealtimeScoreCore } from '../score/realtimeScoreCore'
 import { FollowScoreCore } from '../score/followScoreCore'
@@ -120,16 +121,31 @@ export function useScorePractice(
     const bpm = score.defaultTempoBpm ?? 60
     return 60000 / Math.max(1, bpm) / INTERNAL_PPQ / tempoRatio
   }, [score, tempoRatio])
+  const tickToMs = useMemo(() => {
+    if (!score) return (tick: number): number => tick * msPerTick
+    const scoreTime = buildScoreTimeV2(score)
+    const segment = buildPracticeSegment(score, {
+      startMeasure: segmentStartMeasure,
+      endMeasure: segmentEndMeasure,
+      handMode: segmentHandMode
+    })
+    return (practiceTick: number): number => scoreTickSpanToMilliseconds(
+      segment.sourceStartAbsoluteTick,
+      segment.sourceStartAbsoluteTick + practiceTick,
+      scoreTime.tempoMap,
+      tempoRatio
+    )
+  }, [msPerTick, score, segmentEndMeasure, segmentHandMode, segmentStartMeasure, tempoRatio])
 
   const waitCoreRef = useRef<WaitScoreCore | null>(null)
   const realtimeCoreRef = useRef<RealtimeScoreCore | null>(null)
   const followCoreRef = useRef<FollowScoreCore | null>(null)
   if (waitCoreRef.current === null) waitCoreRef.current = new WaitScoreCore(timeline)
   if (realtimeCoreRef.current === null) {
-    realtimeCoreRef.current = new RealtimeScoreCore(timeline, { beatDurationMs: 500, msPerTick })
+    realtimeCoreRef.current = new RealtimeScoreCore(timeline, { beatDurationMs: 500, msPerTick, tickToMs })
   }
   if (followCoreRef.current === null) {
-    followCoreRef.current = new FollowScoreCore(timeline, { beatDurationMs: 500, msPerTick })
+    followCoreRef.current = new FollowScoreCore(timeline, { beatDurationMs: 500, msPerTick, tickToMs })
   }
 
   const [phase, setPhase] = useState<ScorePracticePhase>('idle')
@@ -171,8 +187,8 @@ export function useScorePractice(
       countInTimerRef.current = null
     }
     waitCoreRef.current = new WaitScoreCore(timeline)
-    realtimeCoreRef.current = new RealtimeScoreCore(timeline, { beatDurationMs: 500, msPerTick })
-    followCoreRef.current = new FollowScoreCore(timeline, { beatDurationMs: 500, msPerTick })
+    realtimeCoreRef.current = new RealtimeScoreCore(timeline, { beatDurationMs: 500, msPerTick, tickToMs })
+    followCoreRef.current = new FollowScoreCore(timeline, { beatDurationMs: 500, msPerTick, tickToMs })
     setCurrentIndex(0)
     setFacts([])
     setFeedback(null)
@@ -194,7 +210,7 @@ export function useScorePractice(
     completedIterationsRef.current = []
     lastCheckpointMeasureRef.current = null
     setPhase('idle')
-  }, [msPerTick, timeline])
+  }, [msPerTick, tickToMs, timeline])
 
   const sync = useCallback(() => {
     const core = mode === 'wait'
@@ -315,6 +331,11 @@ export function useScorePractice(
 
   const start = useCallback(() => {
     if (!score || timeline.units.length === 0) return
+    if (score.trainingProfile?.trainingSafe !== true) {
+      setSessionError('曲谱未通过 Piano Training MusicXML Profile v1，不能进入严格练习。')
+      setPhase('idle')
+      return
+    }
     if (countInTimerRef.current !== null) {
       window.clearTimeout(countInTimerRef.current)
       countInTimerRef.current = null

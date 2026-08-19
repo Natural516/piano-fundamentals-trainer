@@ -1,5 +1,11 @@
 import type { ScoreDocument } from '../score/musicXmlTypes'
-import { INTERNAL_PPQ, mergeTiedPerformanceEvents } from '../score/scoreTimeV2'
+import {
+  INTERNAL_PPQ,
+  buildScoreTimeV2,
+  mergeTiedPerformanceEvents,
+  scoreTickSpanToMilliseconds,
+  tempoAtScoreTick
+} from '../score/scoreTimeV2'
 import { buildPracticeSegment, eventToScoreV2Like } from '../score/practiceSegmentBuilder'
 
 export interface PlaybackEvent {
@@ -18,6 +24,7 @@ export interface PlaybackPlan {
   tempoRatio: number
   loop: boolean
   msPerTick: number
+  tempoMap: Array<{ practiceTick: number; timeMs: number; bpm: number }>
   events: PlaybackEvent[]
   durationMs: number
 }
@@ -35,26 +42,40 @@ export interface PlaybackPlanOptions {
  * chooses measures / hand / tempo; the notes come from the score.
  */
 export function buildPlaybackPlan(score: ScoreDocument, options: PlaybackPlanOptions = {}): PlaybackPlan | null {
-  const bpm = score.defaultTempoBpm ?? 60
-  const baseMsPerTick = 60000 / Math.max(1, bpm) / INTERNAL_PPQ
   const tempoRatio = Math.min(2, Math.max(0.25, options.tempoRatio ?? 1))
-  const msPerTick = baseMsPerTick / tempoRatio
   const startMeasure = Math.max(1, options.startMeasure ?? 1)
   const endMeasure = Math.max(startMeasure, options.endMeasure ?? score.parts[0]?.measures.length ?? startMeasure)
   const handMode = options.handMode ?? 'both'
   const loop = Boolean(options.loop)
 
   const segment = buildPracticeSegment(score, { startMeasure, endMeasure, handMode })
+  const scoreTime = buildScoreTimeV2(score)
+  const segmentStart = segment.sourceStartAbsoluteTick
+  const toSegmentMilliseconds = (practiceTick: number): number => scoreTickSpanToMilliseconds(
+    segmentStart,
+    segmentStart + practiceTick,
+    scoreTime.tempoMap,
+    tempoRatio
+  )
+  const initialBpm = tempoAtScoreTick(segmentStart, scoreTime.tempoMap)
+  const msPerTick = 60000 / Math.max(1, initialBpm) / INTERNAL_PPQ / tempoRatio
+  const tempoMap = [{ practiceTick: 0, timeMs: 0, bpm: initialBpm }, ...scoreTime.tempoMap
+    .filter((point) => point.absoluteTick > segmentStart && point.absoluteTick <= segmentStart + segment.duration)
+    .map((point) => ({
+      practiceTick: point.absoluteTick - segmentStart,
+      timeMs: toSegmentMilliseconds(point.absoluteTick - segmentStart),
+      bpm: point.bpm
+    }))]
   const tied = mergeTiedPerformanceEvents(segment.events.map(eventToScoreV2Like))
   const events: PlaybackEvent[] = tied.flatMap((tiedEvent) => [
     {
-      timeMs: tiedEvent.attackTick * msPerTick,
+      timeMs: toSegmentMilliseconds(tiedEvent.attackTick),
       type: 'noteOn' as const,
       midiNumber: tiedEvent.midiPitch,
       velocity: 90
     },
     {
-      timeMs: tiedEvent.releaseTick * msPerTick,
+      timeMs: toSegmentMilliseconds(tiedEvent.releaseTick),
       type: 'noteOff' as const,
       midiNumber: tiedEvent.midiPitch,
       velocity: 0
@@ -72,6 +93,7 @@ export function buildPlaybackPlan(score: ScoreDocument, options: PlaybackPlanOpt
     tempoRatio,
     loop,
     msPerTick,
+    tempoMap,
     events,
     durationMs: events.length > 0 ? Math.max(...events.map((event) => event.timeMs)) : 0
   }
