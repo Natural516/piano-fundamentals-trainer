@@ -625,6 +625,38 @@
 
 .home-main {
   grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 100%;
+  overflow: visible;
+}
+
+.home-layout {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+@media (max-height: 900px) {
+  .practice-grid {
+    grid-template-rows: repeat(3, minmax(168px, 1fr));
+  }
+
+  .practice-card {
+    height: auto;
+    min-height: 168px;
+    max-height: none;
+    padding: 16px 18px;
+  }
+
+  .home-action-card {
+    align-content: center;
+    min-height: 168px;
+  }
+}
+
+@media (max-height: 680px) {
+  .home-main {
+    min-height: 650px;
+  }
 }
 
 .midi-card.midi-card--compact {

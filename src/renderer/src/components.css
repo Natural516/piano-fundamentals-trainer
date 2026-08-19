@@ -447,6 +447,16 @@ body::before {
   background: rgba(79, 70, 229, 0.16);
 }
 
+.segmented-control button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  line-height: 1.25;
+  text-align: center;
+}
+
 .current-note-display {
   border-color: rgba(37, 214, 200, 0.22);
   background: rgba(15, 23, 42, 0.86);
@@ -1134,6 +1144,73 @@ body::before {
   margin-top: 12px;
 }
 
+.score-practice-page > .practice-page-header {
+  min-height: 74px;
+  padding: 2px 4px 10px;
+}
+
+.score-practice-page > .practice-page-header h2 {
+  font-size: 27px;
+}
+
+.score-practice-page > .practice-page-header .eyebrow {
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+
+.score-practice-page > .practice-page-header p {
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+.score-practice-page .practice-single-column {
+  margin-top: 10px;
+}
+
+.score-practice-panel.practice-primary-panel {
+  padding: 14px 16px;
+}
+
+.score-practice-command-bar {
+  display: grid;
+  grid-template-columns: minmax(290px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.score-practice-command-bar .panel-title-row {
+  align-items: center;
+  gap: 10px;
+}
+
+.score-practice-command-bar .panel-title-row h3 {
+  font-size: 17px;
+}
+
+.score-practice-command-bar .panel-title-row p {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.score-practice-command-bar .audio-status-badge {
+  flex: 0 0 auto;
+}
+
+.score-practice-command-bar .score-practice-toolbar {
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+.score-practice-command-bar .app-button,
+.score-practice-mode button {
+  min-height: 38px;
+}
+
+.score-practice-mode button {
+  padding-block: 5px;
+}
+
 .score-practice-mode {
   display: inline-flex;
 }
@@ -1147,10 +1224,58 @@ body::before {
 
 .score-practice-selection {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(82px, 0.55fr) minmax(82px, 0.55fr) minmax(156px, 1.1fr) minmax(260px, 2fr) minmax(142px, 1fr);
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
+.score-practice-control-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: end;
-  margin-top: 12px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-input);
+}
+
+.score-practice-selection .midi-field,
+.score-practice-selection .tolerance-control {
+  gap: 5px;
+  margin-top: 0;
+}
+
+.score-practice-selection .midi-field > span,
+.score-practice-selection .tolerance-control > span {
+  font-size: 11px;
+}
+
+.score-practice-selection .midi-select,
+.score-practice-selection .segmented-control button {
+  min-height: 36px;
+}
+
+.score-practice-selection .segmented-control {
+  gap: 4px;
+}
+
+.score-practice-selection .segmented-control button {
+  padding: 4px 6px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
+.score-practice-control-bar .practice-primary-actions {
+  flex-wrap: nowrap;
+  align-items: center;
+  margin-top: 0;
+}
+
+.score-practice-control-bar .practice-primary-actions .app-button {
+  min-height: 38px;
 }
 
 .score-ai-panel {
@@ -1217,6 +1342,15 @@ body::before {
 
 /* Tablet / touch adaptation */
 @media (max-width: 1100px) {
+  .score-practice-command-bar,
+  .score-practice-control-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .score-practice-command-bar .score-practice-toolbar {
+    justify-content: flex-start;
+  }
+
   .score-practice-selection {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1404,7 +1538,7 @@ body::before {
 }
 
 .score-sheet-wrap {
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 .score-sheet-heading {
@@ -1424,10 +1558,9 @@ body::before {
 
 .score-sheet-renderer {
   width: 100%;
-  height: 216px;
+  min-height: 126px;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
   border: 1px solid var(--border-soft);
   border-radius: 12px;
   background: var(--bg-card);
@@ -1435,6 +1568,8 @@ body::before {
 
 .score-sheet-renderer > svg {
   display: block;
+  width: 100%;
+  height: auto;
   overflow: visible;
 }
 

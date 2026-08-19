@@ -15,6 +15,7 @@ import { ensureMusicNotationFont } from '../utils/musicNotationFont'
 import { buildScoreTimeV2, INTERNAL_PPQ, type ScoreEventV2 } from '../score/scoreTimeV2'
 import type { ScoreDocument, ScoreNoteModel } from '../score/musicXmlTypes'
 import { getVexDurationSpec } from '../score/scoreEngraving'
+import { buildScoreSheetLayout } from '../score/scoreSheetLayout'
 
 interface ScoreSheetRendererProps {
   score: ScoreDocument
@@ -25,12 +26,8 @@ interface ScoreSheetRendererProps {
   ariaLabel: string
 }
 
-const MEASURE_WIDTH = 232
-const SYSTEM_HEIGHT = 216
 const TREBLE_Y = 22
 const BASS_Y = 126
-const STAFF_X = 8
-const STAFF_WIDTH = MEASURE_WIDTH - STAFF_X * 2
 
 const SHARP_STEPS = ['F', 'C', 'G', 'D', 'A', 'E', 'B']
 const FLAT_STEPS = ['B', 'E', 'A', 'D', 'G', 'C', 'F']
@@ -110,6 +107,7 @@ interface RenderedNote {
   staff: number
   voice: string
   measureNumber: number
+  systemIndex: number
   tieStart: boolean
   tieStop: boolean
 }
@@ -140,13 +138,8 @@ function drawSheet(
     eventsByMeasure.set(event.measureNumber, list)
   }
 
-  const width = Math.max(MEASURE_WIDTH * displayMeasures.length, 420)
   const inkColor = readThemeColor(container, '--text-primary', '#171717')
   const paperColor = readThemeColor(container, '--bg-card', '#ffffff')
-  const renderer = new Renderer(container, Renderer.Backends.SVG)
-  renderer.resize(width, SYSTEM_HEIGHT)
-  const context = renderer.getContext()
-  const style = { fillStyle: inkColor, strokeStyle: inkColor }
 
   let runningFifths: number | null = null
   let runningBeats: number | null = null
@@ -156,36 +149,63 @@ function drawSheet(
   )) || displayMeasures.some((measureNumber) =>
     (eventsByMeasure.get(measureNumber) ?? []).some((event) => event.staff === 2)
   )
+  const layout = buildScoreSheetLayout(displayMeasures, container.clientWidth || 920, hasBassStaff)
+  const renderer = new Renderer(container, Renderer.Backends.SVG)
+  renderer.resize(layout.width, layout.height)
+  const context = renderer.getContext()
+  const style = { fillStyle: inkColor, strokeStyle: inkColor }
   const tieQueue = new Map<string, Array<{ note: RenderedNote }>>()
   const ties: StaveTie[] = []
 
+  container.dataset.systemCount = String(layout.systems.length)
+  const measurePlacement = new Map<number, {
+    measureWidth: number
+    startX: number
+    systemIndex: number
+    systemMeasureIndex: number
+    systemTop: number
+  }>()
+  for (const system of layout.systems) {
+    system.measureNumbers.forEach((measureNumber, systemMeasureIndex) => {
+      measurePlacement.set(measureNumber, {
+        measureWidth: system.measureWidth,
+        startX: system.startX,
+        systemIndex: system.index,
+        systemMeasureIndex,
+        systemTop: system.top
+      })
+    })
+  }
+
   displayMeasures.forEach((measureNumber, index) => {
     const measure = byNumber.get(measureNumber)
-    if (!measure) return
+    const placement = measurePlacement.get(measureNumber)
+    if (!measure || !placement) return
     const events = (eventsByMeasure.get(measureNumber) ?? []).sort(
       (left, right) => left.onsetInMeasure - right.onsetInMeasure || left.noteIndex - right.noteIndex
     )
     const fifths = measure.keySignature ?? runningFifths ?? 0
     const beats = measure.timeBeats ?? runningBeats ?? 4
     const beatType = measure.timeBeatType ?? runningBeatType ?? 4
-    const showHeader = index === 0 || fifths !== runningFifths || beats !== runningBeats || beatType !== runningBeatType
+    const showHeader = index === 0 || placement.systemMeasureIndex === 0 || fifths !== runningFifths || beats !== runningBeats || beatType !== runningBeatType
     runningFifths = fifths
     runningBeats = beats
     runningBeatType = beatType
-    const x = index * MEASURE_WIDTH
+    const x = placement.startX + placement.systemMeasureIndex * placement.measureWidth
+    const systemTop = placement.systemTop
     context.save()
     context.setFillStyle(currentMeasure === measureNumber ? 'rgba(121, 100, 242, 0.14)' : 'rgba(121, 100, 242, 0.035)')
-    context.fillRect(x - 4, 8, MEASURE_WIDTH, SYSTEM_HEIGHT - 16)
+    context.fillRect(x, systemTop + 8, placement.measureWidth, layout.systemHeight - 16)
     context.restore()
     if (currentMeasure === measureNumber) {
       context.save()
       context.setStrokeStyle('rgba(121, 100, 242, 0.55)')
-      context.beginPath().rect(x - 3, 9, MEASURE_WIDTH - 2, SYSTEM_HEIGHT - 18).stroke().closePath()
+      context.beginPath().rect(x + 1, systemTop + 9, placement.measureWidth - 2, layout.systemHeight - 18).stroke().closePath()
       context.restore()
     }
 
-    const trebleStave = new Stave(x + STAFF_X, TREBLE_Y, STAFF_WIDTH)
-    const bassStave = hasBassStaff ? new Stave(x + STAFF_X, BASS_Y, STAFF_WIDTH) : null
+    const trebleStave = new Stave(x, systemTop + TREBLE_Y, placement.measureWidth)
+    const bassStave = hasBassStaff ? new Stave(x, systemTop + BASS_Y, placement.measureWidth) : null
     const keyName = FIFTHS_TO_KEY[fifths] ?? 'C'
     if (showHeader || index === 0) {
       trebleStave.addClef('treble').addKeySignature(keyName).addTimeSignature(`${beats}/${beatType}`)
@@ -201,7 +221,7 @@ function drawSheet(
       stave.drawWithStyle()
     }
 
-    if (bassStave) {
+    if (bassStave && placement.systemMeasureIndex === 0) {
       context.save()
       context.setFillStyle(inkColor)
       context.setStrokeStyle(inkColor)
@@ -297,6 +317,7 @@ function drawSheet(
               staff: staffNumber,
               voice: event.voice,
               measureNumber,
+              systemIndex: placement.systemIndex,
               tieStart: event.tieStart,
               tieStop: event.tieStop
             }))
@@ -332,15 +353,22 @@ function drawSheet(
         const queue = tieQueue.get(queueKey) ?? []
         const start = queue.shift()
         if (start) {
-          ties.push(new StaveTie(
-            {
-              firstNote: start.note.staveNote,
-              lastNote: rendered.staveNote,
-              firstIndexes: [start.note.keyIndex],
-              lastIndexes: [rendered.keyIndex]
-            },
-            ''
-          ))
+          if (start.note.systemIndex === rendered.systemIndex) {
+            ties.push(new StaveTie(
+              {
+                firstNote: start.note.staveNote,
+                lastNote: rendered.staveNote,
+                firstIndexes: [start.note.keyIndex],
+                lastIndexes: [rendered.keyIndex]
+              },
+              ''
+            ))
+          } else {
+            ties.push(
+              new StaveTie({ firstNote: start.note.staveNote, firstIndexes: [start.note.keyIndex] }, ''),
+              new StaveTie({ lastNote: rendered.staveNote, lastIndexes: [rendered.keyIndex] }, '')
+            )
+          }
         }
       }
     }
@@ -357,14 +385,9 @@ function drawSheet(
     svg.style.background = paperColor
   }
 
-  if (currentMeasure !== null && currentMeasure >= startMeasure && currentMeasure <= endMeasure) {
-    const index = displayMeasures.indexOf(currentMeasure)
-    const targetLeft = index * MEASURE_WIDTH
-    const currentLeft = container.scrollLeft
-    const viewportWidth = container.clientWidth
-    const centerLeft = targetLeft - viewportWidth / 2 + MEASURE_WIDTH / 2
-    container.scrollTo({ left: Math.max(0, Math.round(centerLeft)), behavior: currentLeft === 0 ? 'auto' : 'smooth' })
-  }
+  const currentPlacement = currentMeasure === null ? null : measurePlacement.get(currentMeasure)
+  if (currentPlacement) container.dataset.currentSystem = String(currentPlacement.systemIndex)
+  else delete container.dataset.currentSystem
 }
 
 export function ScoreSheetRenderer(props: ScoreSheetRendererProps): JSX.Element {

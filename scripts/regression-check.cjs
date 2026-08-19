@@ -86,6 +86,7 @@ const practiceMetrics = require('../src/renderer/src/records/practiceMetrics.ts'
 const evidenceResolver = require('../src/renderer/src/ai/evidenceResolver.ts')
 const scoreCoachProvider = require('../src/renderer/src/ai/scoreCoachProvider.ts')
 const scoreEngraving = require('../src/renderer/src/score/scoreEngraving.ts')
+const scoreSheetLayout = require('../src/renderer/src/score/scoreSheetLayout.ts')
 
 function writeVlq(value) {
   const bytes = []
@@ -4542,6 +4543,28 @@ test('Grand Staff duration：附点与 triplet 语义不降级为邻近时值', 
   const triplet = scoreEngraving.getVexDurationSpec({ noteType: 'eighth', dotCount: 0, timeModification: { actualNotes: 3, normalNotes: 2, normalType: 'eighth' } }, 160)
   assert.equal(triplet.duration, '8')
   assert.deepEqual(triplet.tuplet, { actualNotes: 3, normalNotes: 2 })
+})
+
+test('Grand Staff responsive layout：Case1 八小节在桌面分为 4+4，竖屏分为 2+2+2+2', () => {
+  const measures = [1, 2, 3, 4, 5, 6, 7, 8]
+  const desktop = scoreSheetLayout.buildScoreSheetLayout(measures, 1024, true)
+  assert.equal(desktop.systems.length, 2)
+  assert.deepEqual(desktop.systems.map((system) => system.measureNumbers), [[1, 2, 3, 4], [5, 6, 7, 8]])
+  assert.equal(desktop.measuresPerSystem, 4)
+
+  const wideDesktop = scoreSheetLayout.buildScoreSheetLayout(measures, 1280, true)
+  assert.deepEqual(wideDesktop.systems.map((system) => system.measureNumbers), [[1, 2, 3, 4], [5, 6, 7, 8]])
+  assert.ok(wideDesktop.systems.every((system) => system.measureWidth <= scoreSheetLayout.SCORE_SHEET_MAX_MEASURE_WIDTH))
+
+  const portrait = scoreSheetLayout.buildScoreSheetLayout(measures, 680, true)
+  assert.deepEqual(portrait.systems.map((system) => system.measureNumbers), [[1, 2], [3, 4], [5, 6], [7, 8]])
+  for (const layout of [desktop, wideDesktop, portrait]) {
+    for (const system of layout.systems) {
+      const systemRight = system.startX + system.measureWidth * system.measureNumbers.length
+      assert.ok(system.startX >= layout.sideMargin, 'system 左侧必须保留 brace 安全边距')
+      assert.ok(systemRight <= layout.width - layout.sideMargin, 'system 右侧不得越出容器')
+    }
+  }
 })
 
 test('Teaching Playback production controller：Stop/Panic 后 active voice=0', () => {

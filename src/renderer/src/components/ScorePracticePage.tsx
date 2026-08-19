@@ -651,74 +651,76 @@ export function ScorePracticePage({
 
       <div className="practice-single-column">
         <section className="midi-panel score-practice-panel practice-primary-panel">
-          <div className="panel-title-row">
-            <div>
-              <h3>{scoreTitle || '未加载曲谱'}</h3>
-              <p>
-                {effectiveMode === 'wait'
-                  ? 'Wait 模式：当前目标单元满足后才推进。'
-                  : effectiveMode === 'realtime'
-                    ? 'Realtime 模式：按谱面 tempo 运行，早/晚/漏/多按窗口判定。'
-                    : 'Follow 模式（Experimental）。'}
-              </p>
+          <div className="score-practice-command-bar">
+            <div className="panel-title-row">
+              <div>
+                <h3>{scoreTitle || '未加载曲谱'}</h3>
+                <p>
+                  {effectiveMode === 'wait'
+                    ? 'Wait 模式：当前目标单元满足后才推进。'
+                    : effectiveMode === 'realtime'
+                      ? 'Realtime 模式：按谱面 tempo 运行，早/晚/漏/多按窗口判定。'
+                      : 'Follow 模式（Experimental）。'}
+                </p>
+              </div>
+              <span className={`audio-status-badge status-${practice.sessionActive ? 'ready' : 'suspended'}`}>
+                {practice.phase === 'running' ? '练习中' : practice.phase === 'paused' ? '已暂停' : practice.phase === 'count-in' ? '预备拍' : practice.phase === 'finished' ? '已完成' : '未开始'}
+              </span>
             </div>
-            <span className={`audio-status-badge status-${practice.sessionActive ? 'ready' : 'suspended'}`}>
-              {practice.phase === 'running' ? '练习中' : practice.phase === 'paused' ? '已暂停' : practice.phase === 'count-in' ? '预备拍' : practice.phase === 'finished' ? '已完成' : '未开始'}
-            </span>
-          </div>
 
-          <div className="score-practice-toolbar">
-            <div className="segmented-control score-practice-mode">
-              {(['wait', 'realtime', ...(followVisible ? ['follow'] : [])] as ScorePracticeMode[]).map((option) => (
-                <button
-                  key={option}
-                  className={effectiveMode === option ? 'is-active' : ''}
-                  disabled={practice.sessionActive}
-                  type="button"
-                  onClick={() => setMode(option)}
-                >
-                  {option === 'wait' ? 'Wait' : option === 'realtime' ? 'Realtime' : 'Follow'}
-                </button>
-              ))}
+            <div className="score-practice-toolbar">
+              <div className="segmented-control score-practice-mode">
+                {(['wait', 'realtime', ...(followVisible ? ['follow'] : [])] as ScorePracticeMode[]).map((option) => (
+                  <button
+                    key={option}
+                    className={effectiveMode === option ? 'is-active' : ''}
+                    disabled={practice.sessionActive}
+                    type="button"
+                    onClick={() => setMode(option)}
+                  >
+                    {option === 'wait' ? 'Wait' : option === 'realtime' ? 'Realtime' : 'Follow'}
+                  </button>
+                ))}
+              </div>
+              <input
+                ref={fileInputRef}
+                className="score-practice-file"
+                type="file"
+                accept=".xml,.musicxml,.mxl,.mid,.midi,.png,.jpg,.jpeg,.pdf"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) void handleFile(file)
+                  if (fileInputRef.current) fileInputRef.current.value = ''
+                }}
+              />
+              <AppButton variant="secondary" onClick={() => fileInputRef.current?.click()}>导入曲谱</AppButton>
+              <input
+                ref={midiInputRef}
+                className="score-practice-file"
+                type="file"
+                accept=".mid,.midi"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) void handleReferenceMidi(file)
+                  if (midiInputRef.current) midiInputRef.current.value = ''
+                }}
+              />
+              <AppButton variant="ghost" onClick={() => midiInputRef.current?.click()} disabled={!score}>添加参考 MIDI（Tier B）</AppButton>
+              <AppButton variant="ghost" onClick={() => {
+                const demo = loadMusicXmlDocument(DEMO_SCORE_XML)
+                importedXmlRef.current = DEMO_SCORE_XML
+                importedSourceTypeRef.current = 'musicxml'
+                persistScoreImport(demo.title, DEMO_SCORE_XML, 'musicxml', 'A')
+                setScore(demo)
+                setScoreTitle(demo.title)
+                setImportTier('A')
+                setStartMeasure(1)
+                setEndMeasure(demo.parts[0]?.measures.length ?? 2)
+                setValidationReport(null)
+                setReferenceMidiName('')
+                setLoadError('')
+              }}>加载示例</AppButton>
             </div>
-            <input
-              ref={fileInputRef}
-              className="score-practice-file"
-              type="file"
-              accept=".xml,.musicxml,.mxl,.mid,.midi,.png,.jpg,.jpeg,.pdf"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                if (file) void handleFile(file)
-                if (fileInputRef.current) fileInputRef.current.value = ''
-              }}
-            />
-            <AppButton variant="secondary" onClick={() => fileInputRef.current?.click()}>导入曲谱</AppButton>
-            <input
-              ref={midiInputRef}
-              className="score-practice-file"
-              type="file"
-              accept=".mid,.midi"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                if (file) void handleReferenceMidi(file)
-                if (midiInputRef.current) midiInputRef.current.value = ''
-              }}
-            />
-            <AppButton variant="ghost" onClick={() => midiInputRef.current?.click()} disabled={!score}>添加参考 MIDI（Tier B）</AppButton>
-            <AppButton variant="ghost" onClick={() => {
-              const demo = loadMusicXmlDocument(DEMO_SCORE_XML)
-              importedXmlRef.current = DEMO_SCORE_XML
-              importedSourceTypeRef.current = 'musicxml'
-              persistScoreImport(demo.title, DEMO_SCORE_XML, 'musicxml', 'A')
-              setScore(demo)
-              setScoreTitle(demo.title)
-              setImportTier('A')
-              setStartMeasure(1)
-              setEndMeasure(demo.parts[0]?.measures.length ?? 2)
-              setValidationReport(null)
-              setReferenceMidiName('')
-              setLoadError('')
-            }}>加载示例</AppButton>
           </div>
           {importTier ? <p className="score-practice-tier">{TIER_LABELS[importTier]}</p> : null}
           {loadError ? <p className="practice-save-error">{loadError}</p> : null}
@@ -757,31 +759,50 @@ export function ScorePracticePage({
             </div>
           ) : null}
 
-          <div className="score-practice-selection">
-            <label className="midi-field"><span>起始小节</span>
-              <input className="midi-select" type="number" min="1" value={startMeasure} disabled={practice.sessionActive} onChange={(event) => setStartMeasure(Math.max(1, Number(event.target.value) || 1))} />
-            </label>
-            <label className="midi-field"><span>结束小节</span>
-              <input className="midi-select" type="number" min={startMeasure} value={endMeasure} disabled={practice.sessionActive} onChange={(event) => setEndMeasure(Math.max(startMeasure, Number(event.target.value) || startMeasure))} />
-            </label>
-            <div className="tolerance-control"><span>手别</span><div className="segmented-control">
-              {(['both', 'right', 'left'] as const).map((hand) => (
-                <button key={hand} className={handMode === hand ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setHandMode(hand)}>
-                  {hand === 'both' ? '双手' : hand === 'right' ? '右手' : '左手'}
-                </button>
-              ))}
-            </div></div>
-            <div className="tolerance-control"><span>速度</span><div className="segmented-control">
-              {[0.5, 0.6, 0.7, 0.8, 0.9, 1].map((ratio) => (
-                <button key={ratio} className={tempoRatio === ratio ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setTempoRatio(ratio)}>
-                  {Math.round(ratio * 100)}%
-                </button>
-              ))}
-            </div></div>
-            <div className="tolerance-control"><span>选项</span><div className="segmented-control">
-              <button className={loop ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setLoop((value) => !value)}>循环</button>
-              <button className={countIn ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setCountIn((value) => !value)}>预备拍</button>
-            </div></div>
+          <div className="score-practice-control-bar">
+            <div className="score-practice-selection">
+              <label className="midi-field"><span>起始小节</span>
+                <input className="midi-select" type="number" min="1" value={startMeasure} disabled={practice.sessionActive} onChange={(event) => setStartMeasure(Math.max(1, Number(event.target.value) || 1))} />
+              </label>
+              <label className="midi-field"><span>结束小节</span>
+                <input className="midi-select" type="number" min={startMeasure} value={endMeasure} disabled={practice.sessionActive} onChange={(event) => setEndMeasure(Math.max(startMeasure, Number(event.target.value) || startMeasure))} />
+              </label>
+              <div className="tolerance-control"><span>手别</span><div className="segmented-control">
+                {(['both', 'right', 'left'] as const).map((hand) => (
+                  <button key={hand} className={handMode === hand ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setHandMode(hand)}>
+                    {hand === 'both' ? '双手' : hand === 'right' ? '右手' : '左手'}
+                  </button>
+                ))}
+              </div></div>
+              <div className="tolerance-control"><span>速度</span><div className="segmented-control">
+                {[0.5, 0.6, 0.7, 0.8, 0.9, 1].map((ratio) => (
+                  <button key={ratio} className={tempoRatio === ratio ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setTempoRatio(ratio)}>
+                    {Math.round(ratio * 100)}%
+                  </button>
+                ))}
+              </div></div>
+              <div className="tolerance-control"><span>选项</span><div className="segmented-control">
+                <button className={loop ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setLoop((value) => !value)}>循环</button>
+                <button className={countIn ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setCountIn((value) => !value)}>预备拍</button>
+              </div></div>
+            </div>
+
+            <div className="practice-primary-actions">
+              {practice.phase === 'idle' ? (
+                <AppButton onClick={handleStart} disabled={!score}>开始练习</AppButton>
+              ) : practice.phase === 'count-in' ? (
+                <span role="status">预备拍倒数中…</span>
+              ) : practice.phase === 'running' ? (
+                <AppButton variant="secondary" onClick={practice.pause}>暂停</AppButton>
+              ) : practice.phase === 'paused' ? (
+                <AppButton onClick={practice.resume}>继续</AppButton>
+              ) : practice.phase === 'finished' ? (
+                <AppButton onClick={handleStart}>再练一次</AppButton>
+              ) : null}
+              {practice.sessionActive ? (
+                <AppButton variant="ghost" onClick={practice.stop}>停止</AppButton>
+              ) : null}
+            </div>
           </div>
 
           <div className="score-practice-target">
@@ -807,23 +828,6 @@ export function ScorePracticePage({
               {practice.feedback === 'correct' ? '正确' : '错误：请弹奏目标音'}
             </p>
           ) : null}
-
-          <div className="practice-primary-actions">
-            {practice.phase === 'idle' ? (
-              <AppButton onClick={handleStart} disabled={!score}>开始练习</AppButton>
-            ) : practice.phase === 'count-in' ? (
-              <span role="status">预备拍倒数中…</span>
-            ) : practice.phase === 'running' ? (
-              <AppButton variant="secondary" onClick={practice.pause}>暂停</AppButton>
-            ) : practice.phase === 'paused' ? (
-              <AppButton onClick={practice.resume}>继续</AppButton>
-            ) : practice.phase === 'finished' ? (
-              <AppButton onClick={handleStart}>再练一次</AppButton>
-            ) : null}
-            {practice.sessionActive ? (
-              <AppButton variant="ghost" onClick={practice.stop}>停止</AppButton>
-            ) : null}
-          </div>
 
           <div className="score-practice-segment">
             <input
