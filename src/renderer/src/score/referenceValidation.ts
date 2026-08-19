@@ -30,6 +30,26 @@ export interface ReferenceValidationOptions {
   tempoBpm?: number
 }
 
+export interface ReferenceAttackGroup {
+  onsetTick: number
+  pitches: number[]
+  attackCount: number
+}
+
+export interface AttackGroupMismatch {
+  index: number
+  score: ReferenceAttackGroup | null
+  midi: ReferenceAttackGroup | null
+}
+
+export interface AttackGroupValidationReport {
+  scoreGroupCount: number
+  midiGroupCount: number
+  matchedGroups: number
+  mismatches: AttackGroupMismatch[]
+  consistent: boolean
+}
+
 const DEFAULT_ONSET_TOLERANCE_TICKS = 6
 const DEFAULT_DURATION_TOLERANCE_TICKS = 12
 
@@ -90,6 +110,55 @@ export function buildMidiReferenceNotes(smf: SmfDocument): ReferenceNote[] {
   }
 
   return notes.sort((left, right) => left.onsetTick - right.onsetTick || left.midiNumber - right.midiNumber)
+}
+
+export function buildReferenceAttackGroups(notes: ReferenceNote[]): ReferenceAttackGroup[] {
+  const groups = new Map<number, number[]>()
+  for (const note of [...notes].sort((left, right) => left.onsetTick - right.onsetTick || left.midiNumber - right.midiNumber)) {
+    const pitches = groups.get(note.onsetTick) ?? []
+    pitches.push(note.midiNumber)
+    groups.set(note.onsetTick, pitches)
+  }
+  return [...groups.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([onsetTick, pitches]) => ({
+      onsetTick,
+      pitches: pitches.sort((left, right) => left - right),
+      attackCount: pitches.length
+    }))
+}
+
+export function validateAttackGroupSequence(
+  scoreNotes: ReferenceNote[],
+  midiNotes: ReferenceNote[]
+): AttackGroupValidationReport {
+  const scoreGroups = buildReferenceAttackGroups(scoreNotes)
+  const midiGroups = buildReferenceAttackGroups(midiNotes)
+  const mismatches: AttackGroupMismatch[] = []
+  const groupCount = Math.max(scoreGroups.length, midiGroups.length)
+
+  for (let index = 0; index < groupCount; index += 1) {
+    const score = scoreGroups[index] ?? null
+    const midi = midiGroups[index] ?? null
+    if (
+      score === null ||
+      midi === null ||
+      score.onsetTick !== midi.onsetTick ||
+      score.attackCount !== midi.attackCount ||
+      score.pitches.length !== midi.pitches.length ||
+      score.pitches.some((pitch, pitchIndex) => pitch !== midi.pitches[pitchIndex])
+    ) {
+      mismatches.push({ index, score, midi })
+    }
+  }
+
+  return {
+    scoreGroupCount: scoreGroups.length,
+    midiGroupCount: midiGroups.length,
+    matchedGroups: groupCount - mismatches.length,
+    mismatches,
+    consistent: scoreGroups.length === midiGroups.length && mismatches.length === 0
+  }
 }
 
 export function validateScoreAgainstMidi(

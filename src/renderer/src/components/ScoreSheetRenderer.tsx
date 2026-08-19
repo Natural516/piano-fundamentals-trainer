@@ -16,6 +16,12 @@ import { buildScoreTimeV2, INTERNAL_PPQ, type ScoreEventV2 } from '../score/scor
 import type { ScoreDocument, ScoreNoteModel } from '../score/musicXmlTypes'
 import { getVexDurationSpec } from '../score/scoreEngraving'
 import { buildScoreSheetLayout } from '../score/scoreSheetLayout'
+import {
+  calculateScoreNotationBounds,
+  SCORE_BASS_STAVE_Y,
+  SCORE_TREBLE_STAVE_Y,
+  type ScoreNotationBounds
+} from '../score/scoreSheetBounds'
 
 interface ScoreSheetRendererProps {
   score: ScoreDocument
@@ -25,9 +31,6 @@ interface ScoreSheetRendererProps {
   currentSourceEventIds?: string[]
   ariaLabel: string
 }
-
-const TREBLE_Y = 22
-const BASS_Y = 126
 
 const SHARP_STEPS = ['F', 'C', 'G', 'D', 'A', 'E', 'B']
 const FLAT_STEPS = ['B', 'E', 'A', 'D', 'G', 'C', 'F']
@@ -149,7 +152,23 @@ function drawSheet(
   )) || displayMeasures.some((measureNumber) =>
     (eventsByMeasure.get(measureNumber) ?? []).some((event) => event.staff === 2)
   )
-  const layout = buildScoreSheetLayout(displayMeasures, container.clientWidth || 920, hasBassStaff)
+  const baseLayout = buildScoreSheetLayout(displayMeasures, container.clientWidth || 920, hasBassStaff)
+  const notationBounds = new Map<number, ScoreNotationBounds>()
+  for (const system of baseLayout.systems) {
+    const measureSet = new Set(system.measureNumbers)
+    const systemNotes = score.parts.flatMap((part) =>
+      part.measures
+        .filter((measure) => measureSet.has(measure.number))
+        .flatMap((measure) => measure.notes)
+    )
+    notationBounds.set(system.index, calculateScoreNotationBounds(systemNotes, hasBassStaff, baseLayout.systemHeight))
+  }
+  const layout = buildScoreSheetLayout(
+    displayMeasures,
+    container.clientWidth || 920,
+    hasBassStaff,
+    baseLayout.systems.map((system) => notationBounds.get(system.index)?.systemHeight ?? baseLayout.systemHeight)
+  )
   const renderer = new Renderer(container, Renderer.Backends.SVG)
   renderer.resize(layout.width, layout.height)
   const context = renderer.getContext()
@@ -164,6 +183,8 @@ function drawSheet(
     systemIndex: number
     systemMeasureIndex: number
     systemTop: number
+    systemHeight: number
+    contentOffsetY: number
   }>()
   for (const system of layout.systems) {
     system.measureNumbers.forEach((measureNumber, systemMeasureIndex) => {
@@ -172,7 +193,9 @@ function drawSheet(
         startX: system.startX,
         systemIndex: system.index,
         systemMeasureIndex,
-        systemTop: system.top
+        systemTop: system.top,
+        systemHeight: system.height,
+        contentOffsetY: notationBounds.get(system.index)?.contentOffsetY ?? 0
       })
     })
   }
@@ -195,17 +218,19 @@ function drawSheet(
     const systemTop = placement.systemTop
     context.save()
     context.setFillStyle(currentMeasure === measureNumber ? 'rgba(121, 100, 242, 0.14)' : 'rgba(121, 100, 242, 0.035)')
-    context.fillRect(x, systemTop + 8, placement.measureWidth, layout.systemHeight - 16)
+    context.fillRect(x, systemTop + 8, placement.measureWidth, placement.systemHeight - 16)
     context.restore()
     if (currentMeasure === measureNumber) {
       context.save()
       context.setStrokeStyle('rgba(121, 100, 242, 0.55)')
-      context.beginPath().rect(x + 1, systemTop + 9, placement.measureWidth - 2, layout.systemHeight - 18).stroke().closePath()
+      context.beginPath().rect(x + 1, systemTop + 9, placement.measureWidth - 2, placement.systemHeight - 18).stroke().closePath()
       context.restore()
     }
 
-    const trebleStave = new Stave(x, systemTop + TREBLE_Y, placement.measureWidth)
-    const bassStave = hasBassStaff ? new Stave(x, systemTop + BASS_Y, placement.measureWidth) : null
+    const trebleStave = new Stave(x, systemTop + placement.contentOffsetY + SCORE_TREBLE_STAVE_Y, placement.measureWidth)
+    const bassStave = hasBassStaff
+      ? new Stave(x, systemTop + placement.contentOffsetY + SCORE_BASS_STAVE_Y, placement.measureWidth)
+      : null
     const keyName = FIFTHS_TO_KEY[fifths] ?? 'C'
     if (showHeader || index === 0) {
       trebleStave.addClef('treble').addKeySignature(keyName).addTimeSignature(`${beats}/${beatType}`)

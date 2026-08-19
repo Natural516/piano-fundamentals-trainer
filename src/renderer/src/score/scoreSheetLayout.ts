@@ -14,6 +14,7 @@ export interface ScoreSheetSystemLayout {
   measureWidth: number
   startX: number
   top: number
+  height: number
 }
 
 export interface ScoreSheetLayout {
@@ -41,7 +42,8 @@ export function getScoreMeasuresPerSystem(viewportWidth: number): number {
 export function buildScoreSheetLayout(
   measureNumbers: number[],
   viewportWidth: number,
-  grandStaff: boolean
+  grandStaff: boolean,
+  systemHeights: number[] = []
 ): ScoreSheetLayout {
   const width = safeViewportWidth(viewportWidth)
   const measuresPerSystem = getScoreMeasuresPerSystem(width)
@@ -51,6 +53,7 @@ export function buildScoreSheetLayout(
   const systemHeight = grandStaff ? SCORE_SHEET_GRAND_SYSTEM_HEIGHT : SCORE_SHEET_SINGLE_SYSTEM_HEIGHT
   const usableWidth = width - sideMargin * 2
   const systems: ScoreSheetSystemLayout[] = []
+  let systemTop = 0
 
   for (let offset = 0; offset < measureNumbers.length; offset += measuresPerSystem) {
     const systemMeasures = measureNumbers.slice(offset, offset + measuresPerSystem)
@@ -59,19 +62,20 @@ export function buildScoreSheetLayout(
       Math.floor(usableWidth / Math.max(1, systemMeasures.length))
     )
     const contentWidth = measureWidth * systemMeasures.length
+    const resolvedSystemHeight = Math.max(systemHeight, systemHeights[systems.length] ?? systemHeight)
     systems.push({
       index: systems.length,
       measureNumbers: systemMeasures,
       measureWidth,
       startX: Math.floor(sideMargin + (usableWidth - contentWidth) / 2),
-      top: systems.length * (systemHeight + SCORE_SHEET_SYSTEM_GAP)
+      top: systemTop,
+      height: resolvedSystemHeight
     })
+    systemTop += resolvedSystemHeight + SCORE_SHEET_SYSTEM_GAP
   }
 
   return {
-    height: systems.length > 0
-      ? systems.length * systemHeight + (systems.length - 1) * SCORE_SHEET_SYSTEM_GAP
-      : systemHeight,
+    height: systems.length > 0 ? systemTop - SCORE_SHEET_SYSTEM_GAP : systemHeight,
     measuresPerSystem,
     sideMargin,
     systemHeight,

@@ -1,80 +1,23 @@
 import type {
   ScoreDocument,
   ScoreExpectedUnit,
-  ScoreNoteModel,
   ScoreTimeline
 } from './musicXmlTypes'
-import { buildScoreTimeV2, mergeTiedPerformanceEvents } from './scoreTimeV2'
 import { buildPracticeSegment } from './practiceSegmentBuilder'
 
 /**
- * Builds expected units using integer score ticks (divisions * duration).
- * - per-voice tick cursors handle independent voices;
- * - <backup>/<forward> move cursors without emitting notes;
- * - chord tones share the previous note's onset in the same voice;
- * - multi-part measures merge by (measure number, onset tick) instead of
- *   being serialized part-by-part.
+ * Full-score timeline uses the same deterministic PracticeSegment attack
+ * grouping as selected Wait / Realtime practice. There is no parser-order or
+ * part/staff/voice-specific target path.
  */
 export function buildScoreTimeline(score: ScoreDocument): ScoreTimeline {
-  const { events } = buildScoreTimeV2(score)
-  const performanceAttackEventIds = new Set(
-    mergeTiedPerformanceEvents(events).map((event) => event.sourceEventIds[0])
-  )
-  const unitGroups = new Map<string, { expectedTick: number; onsetInMeasure: number; measure: number; notes: ScoreNoteModel[]; sourceEventIds: string[] }>()
-
-  for (const event of events) {
-    const note = score.parts[event.partIndex]?.measures[event.measureIndex]?.notes[event.noteIndex]
-    if (!note) continue
-    const unitKey = `${event.partIndex}-${event.measureNumber}:${event.onsetInMeasure}`
-    const group = unitGroups.get(unitKey) ?? {
-      expectedTick: event.absoluteOnset,
-      onsetInMeasure: event.onsetInMeasure,
-      measure: event.measureNumber,
-      notes: [],
-      sourceEventIds: []
-    }
-    group.notes.push(note)
-    group.sourceEventIds.push(event.id)
-    unitGroups.set(unitKey, group)
-  }
-
-  const units: ScoreExpectedUnit[] = [...unitGroups.entries()]
-    .map(([, group]) => {
-      const expectedMidi = group.notes
-        .filter((note, index) => (
-          note.type === 'note' &&
-          note.midiNumber !== null &&
-          performanceAttackEventIds.has(group.sourceEventIds[index])
-        ))
-        .map((note) => note.midiNumber as number)
-        .sort((left, right) => left - right)
-
-      return {
-        id: `unit-${group.measure}-${group.expectedTick}`,
-        onsetIndex: 0,
-        expectedTick: group.expectedTick,
-        measure: group.measure,
-        originalMeasure: group.measure,
-        originalBeat: group.onsetInMeasure / 480 + 1,
-        practiceTick: group.expectedTick,
-        notes: group.notes,
-        tieStart: group.notes.some((note) => note.tieStart),
-        rest: group.notes.every((note) => note.type === 'rest'),
-        expectedMidi: [...new Set(expectedMidi)],
-        staff: new Set(group.notes.map((note) => note.staff)).size === 1 ? group.notes[0]?.staff ?? null : null,
-        hand: (() : 'left' | 'right' | 'both' | null => {
-          const staffs = new Set(group.notes.filter((note) => note.midiNumber !== null).map((note) => note.staff))
-          if (staffs.size === 0) return null
-          if (staffs.size > 1) return 'both'
-          return [...staffs][0] === 2 ? 'left' : 'right'
-        })(),
-        sourceEventIds: group.sourceEventIds
-      }
-    })
-    .sort((left, right) => left.expectedTick - right.expectedTick)
-    .map((unit, index) => ({ ...unit, onsetIndex: index }))
-
-  return { units }
+  const measureNumbers = score.parts.flatMap((part) => part.measures.map((measure) => measure.number))
+  if (measureNumbers.length === 0) return { units: [] }
+  return buildSegmentTimeline(score, {
+    startMeasure: Math.min(...measureNumbers),
+    endMeasure: Math.max(...measureNumbers),
+    handMode: 'both'
+  })
 }
 
 export interface ScoreSegmentOptions {

@@ -87,6 +87,7 @@ export function buildScoreTimeV2(score: ScoreDocument): ScoreTimeDocumentV2 {
     part.measures.forEach((measure, measureIndex) => {
       attributes = resolveAttributes(attributes, measure)
       const measureStartTick = documentCursor
+      let furthestDocumentCursor = documentCursor
       measureStartTicks.push({
         partIndex,
         measureIndex,
@@ -102,6 +103,7 @@ export function buildScoreTimeV2(score: ScoreDocument): ScoreTimeDocumentV2 {
         }
         if (event.kind === 'forward') {
           documentCursor += toCanonicalTicks(event.duration, attributes.divisions)
+          furthestDocumentCursor = Math.max(furthestDocumentCursor, documentCursor)
           continue
         }
 
@@ -114,6 +116,7 @@ export function buildScoreTimeV2(score: ScoreDocument): ScoreTimeDocumentV2 {
 
         if (!note.isChordTone) {
           documentCursor = measureStartTick + onsetInMeasure + duration
+          furthestDocumentCursor = Math.max(furthestDocumentCursor, documentCursor)
           lastNoteOnset = onsetInMeasure
         }
 
@@ -138,6 +141,11 @@ export function buildScoreTimeV2(score: ScoreDocument): ScoreTimeDocumentV2 {
           type: note.type === 'rest' ? 'rest' : note.isChordTone ? 'chord' : 'note'
         })
       }
+
+      // MusicXML traversal can finish on a shorter voice after <backup>.
+      // The next measure starts after the furthest score position reached by
+      // any voice/staff, never at the traversal cursor's final position.
+      documentCursor = furthestDocumentCursor
     })
   })
 
@@ -164,6 +172,16 @@ export interface TieMergeWarning {
 export interface TieMergeResult {
   events: TiedPerformanceEvent[]
   warnings: TieMergeWarning[]
+}
+
+export interface PerformanceAttackGroup {
+  attackTick: number
+  events: TiedPerformanceEvent[]
+  pitches: number[]
+  sourceEventIds: string[]
+  measureNumbers: number[]
+  staffs: number[]
+  voices: string[]
 }
 
 /**
@@ -248,4 +266,43 @@ export function mergeTiedPerformanceEventsWithDiagnostics(events: ScoreEventV2[]
 
 export function mergeTiedPerformanceEvents(events: ScoreEventV2[]): TiedPerformanceEvent[] {
   return mergeTiedPerformanceEventsWithDiagnostics(events).events
+}
+
+/**
+ * Exact performance attack groups. Integer canonical ticks are the only
+ * simultaneity key: staff, hand, voice, part and parser traversal order never
+ * split or merge a target.
+ */
+export function groupPerformanceAttacks(events: TiedPerformanceEvent[]): PerformanceAttackGroup[] {
+  const groups = new Map<number, TiedPerformanceEvent[]>()
+  for (const event of [...events].sort((left, right) =>
+    left.attackTick - right.attackTick ||
+    left.midiPitch - right.midiPitch ||
+    left.partIndex - right.partIndex ||
+    left.staff - right.staff
+  )) {
+    const group = groups.get(event.attackTick) ?? []
+    group.push(event)
+    groups.set(event.attackTick, group)
+  }
+
+  return [...groups.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([attackTick, groupEvents]) => ({
+      attackTick,
+      events: groupEvents,
+      pitches: groupEvents.map((event) => event.midiPitch).sort((left, right) => left - right),
+      // Only the first notation event creates the attack. Tie continuation
+      // source IDs must never become a later/current Wait highlight.
+      sourceEventIds: groupEvents
+        .map((event) => event.sourceEventIds[0])
+        .filter((id): id is string => typeof id === 'string'),
+      measureNumbers: [...new Set(groupEvents.map((event) => event.measureNumber))].sort((left, right) => left - right),
+      staffs: [...new Set(groupEvents.map((event) => event.staff))].sort((left, right) => left - right),
+      voices: [...new Set(groupEvents.map((event) => event.voice))].sort()
+    }))
+}
+
+export function buildScorePerformanceAttackGroups(score: ScoreDocument): PerformanceAttackGroup[] {
+  return groupPerformanceAttacks(mergeTiedPerformanceEvents(buildScoreTimeV2(score).events))
 }

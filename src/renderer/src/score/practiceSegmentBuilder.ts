@@ -1,5 +1,5 @@
 import type { ScoreDocument } from './musicXmlTypes'
-import { buildScoreTimeV2, mergeTiedPerformanceEvents, type ScoreEventV2 } from './scoreTimeV2'
+import { buildScoreTimeV2, groupPerformanceAttacks, mergeTiedPerformanceEvents, type ScoreEventV2 } from './scoreTimeV2'
 
 export interface PracticeSegmentEvent {
   sourceEventId: string
@@ -74,8 +74,10 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
   const handMode = options.handMode ?? 'both'
   const segmentBoundaryRetrigger = options.segmentBoundaryRetrigger ?? false
   const { events: scoreEvents } = buildScoreTimeV2(score)
-  const performanceAttackEventIds = new Set(
-    mergeTiedPerformanceEvents(scoreEvents).map((event) => event.sourceEventIds[0])
+  const performanceAttackGroups = groupPerformanceAttacks(mergeTiedPerformanceEvents(scoreEvents))
+  const performanceAttackEventIds = new Set(performanceAttackGroups.flatMap((group) => group.sourceEventIds))
+  const performanceAttackOrder = new Map(
+    performanceAttackGroups.flatMap((group) => group.sourceEventIds).map((sourceEventId, index) => [sourceEventId, index])
   )
 
   const selected = scoreEvents
@@ -87,7 +89,12 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
     : 0
 
   const events: PracticeSegmentEvent[] = selected
-    .sort((left, right) => left.absoluteOnset - right.absoluteOnset || left.noteIndex - right.noteIndex)
+    .sort((left, right) =>
+      left.absoluteOnset - right.absoluteOnset ||
+      left.partIndex - right.partIndex ||
+      left.staff - right.staff ||
+      left.noteIndex - right.noteIndex
+    )
     .map((event) => ({
       sourceEventId: event.id,
       partIndex: event.partIndex,
@@ -107,7 +114,7 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
 
   const grouped = new Map<string, { practiceTick: number; originalAbsoluteTick: number; originalMeasure: number; originalBeat: number; segmentEvents: PracticeSegmentEvent[] }>()
   for (const event of events) {
-    const onsetKey = `${event.originalMeasure}:${event.practiceTick}`
+    const onsetKey = String(event.originalAbsoluteTick)
     const group = grouped.get(onsetKey) ?? {
       practiceTick: event.practiceTick,
       originalAbsoluteTick: event.originalAbsoluteTick,
@@ -129,6 +136,13 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
         })
         .map((event) => event.midiPitch as number)
         .sort((left, right) => left - right)
+      const attackSourceEventIds = group.segmentEvents
+        .filter((event) => {
+          if (segmentBoundaryRetrigger && group.practiceTick === 0 && event.tieStop) return event.midiPitch !== null
+          return performanceAttackEventIds.has(event.sourceEventId)
+        })
+        .map((event) => event.sourceEventId)
+        .sort((left, right) => (performanceAttackOrder.get(left) ?? 0) - (performanceAttackOrder.get(right) ?? 0))
       return {
         practiceTick: group.practiceTick,
         originalAbsoluteTick: group.originalAbsoluteTick,
@@ -146,7 +160,7 @@ export function buildPracticeSegment(score: ScoreDocument, options: PracticeSegm
           if (hands.size === 0) return null
           return hands.size === 1 ? [...hands][0] : 'both'
         })(),
-        sourceEventIds: group.segmentEvents.filter((event) => event.midiPitch !== null).map((event) => event.sourceEventId)
+        sourceEventIds: attackSourceEventIds
       }
     })
     .sort((left, right) => left.practiceTick - right.practiceTick)

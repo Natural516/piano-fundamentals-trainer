@@ -28,6 +28,7 @@ export class WaitScoreCore {
 
   constructor(timeline: ScoreTimeline) {
     this.units = timeline.units
+    this.advanceSkippable()
   }
 
   get currentIndex(): number {
@@ -51,6 +52,7 @@ export class WaitScoreCore {
     this.pressed.clear()
     this.sounding.clear()
     this.stepResults.length = 0
+    this.advanceSkippable()
   }
 
   processNoteOn(midiNumber: number, sourceEventId?: string): 'none' | 'wrong' | 'complete' {

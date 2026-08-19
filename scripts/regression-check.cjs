@@ -87,6 +87,7 @@ const evidenceResolver = require('../src/renderer/src/ai/evidenceResolver.ts')
 const scoreCoachProvider = require('../src/renderer/src/ai/scoreCoachProvider.ts')
 const scoreEngraving = require('../src/renderer/src/score/scoreEngraving.ts')
 const scoreSheetLayout = require('../src/renderer/src/score/scoreSheetLayout.ts')
+const scoreSheetBounds = require('../src/renderer/src/score/scoreSheetBounds.ts')
 
 function writeVlq(value) {
   const bytes = []
@@ -4120,6 +4121,54 @@ test('MusicXML 真实 MuseScore 结构：DOCTYPE/PI/CDATA/harmony/backup', () =>
   assert.equal(attacks.filter((event) => event.attackTick === 0).length, 2, 'backup 后双手应共享 onset')
 })
 
+test('Wait AttackGroup A-G：精确 onset 跨谱表分组、绝对排序、tie/repeat 与 partial chord', () => {
+  const xml = fs.readFileSync(require.resolve('./score-fixtures/wait-attack-groups.musicxml'), 'utf8')
+  const score = musicXmlParser.loadMusicXmlDocument(xml)
+  const scoreTime = scoreTimeV2.buildScoreTimeV2(score)
+  const groups = scoreTimeV2.buildScorePerformanceAttackGroups(score)
+
+  assert.deepEqual(groups.map((group) => group.attackTick), [0, 240, 1920, 2160, 3840, 5280])
+  assert.ok(groups.every((group, index) => index === 0 || group.attackTick > groups[index - 1].attackTick), 'target onset 必须严格单调递增')
+
+  const opening = groups[0]
+  assert.deepEqual(opening.pitches, [48, 60, 64, 67], '同 onset 的左右手必须形成一个完整 AttackGroup')
+  assert.deepEqual(opening.events.filter((event) => event.staff === 1).map((event) => event.midiPitch), [60, 64, 67], '同一 staff 三音和弦不得拆分')
+  assert.deepEqual(opening.staffs, [1, 2], '跨 G/F staff 不得先按 staff 拆组')
+  assert.equal(opening.sourceEventIds.length, 4, 'renderer 必须一次收到整个 attack group 的 source IDs')
+
+  assert.deepEqual(groups[2].pitches, [72])
+  assert.deepEqual(groups[3].pitches, [74])
+  assert.equal(groups[3].attackTick - groups[2].attackTick, 240, 'beat 1 与 beat 1.5 必须是两个 target')
+
+  const bassAtOpening = scoreTime.events.find((event) => event.measureNumber === 1 && event.staff === 2 && event.midiPitch === 48)
+  const upperLater = scoreTime.events.find((event) => event.measureNumber === 1 && event.staff === 1 && event.midiPitch === 72)
+  assert.ok(bassAtOpening && upperLater)
+  assert.ok(scoreTime.events.indexOf(bassAtOpening) > scoreTime.events.indexOf(upperLater), 'backup voice 在 XML traversal 中应后出现')
+  assert.ok(bassAtOpening.absoluteOnset < upperLater.absoluteOnset, '真实 absolute onset 必须覆盖 traversal order')
+
+  const repeatedC4 = groups.filter((group) => group.pitches.length === 1 && group.pitches[0] === 60)
+  assert.deepEqual(repeatedC4.map((group) => group.attackTick), [3840, 5280], 'tie chain 首次 attack 与普通重复音必须是两个 target')
+  assert.equal(repeatedC4[0].sourceEventIds.length, 1, 'tie continuation 不得进入 current attack source IDs')
+
+  const timeline = scoreTimeline.buildScoreTimeline(score)
+  const judgeable = timeline.units.filter((unit) => unit.expectedMidi.length > 0)
+  assert.deepEqual(judgeable.map((unit) => unit.expectedTick), groups.map((group) => group.attackTick))
+  assert.deepEqual(judgeable.map((unit) => unit.expectedMidi), groups.map((group) => [...new Set(group.pitches)]))
+  assert.deepEqual(judgeable.map((unit) => unit.sourceEventIds), groups.map((group) => group.sourceEventIds))
+
+  const rightHand = scoreTimeline.buildSegmentTimeline(score, { startMeasure: 1, endMeasure: 1, handMode: 'right' })
+  const wait = new waitScoreCore.WaitScoreCore(rightHand)
+  assert.deepEqual(wait.currentUnit.expectedMidi, [60, 64, 67])
+  const openingIds = [...wait.currentUnit.sourceEventIds]
+  wait.processNoteOn(60)
+  wait.processNoteOn(64)
+  assert.equal(wait.currentIndex, 0, 'partial chord 不得推进')
+  assert.deepEqual(wait.currentUnit.sourceEventIds, openingIds, 'partial chord 期间 current target/highlight 不得改变')
+  wait.processNoteOn(67)
+  assert.equal(wait.currentIndex, 1, '补齐最后一个 pitch 后才推进')
+  assert.deepEqual(wait.currentUnit.expectedMidi, [72])
+})
+
 test('Tie performance events：普通重复音、多 voice 与三段 tie 链', () => {
   const event = (id, onset, duration, options = {}) => ({
     id, partIndex: 0, measureIndex: Math.floor(onset / 480), measureNumber: Math.floor(onset / 480) + 1,
@@ -4567,6 +4616,46 @@ test('Grand Staff responsive layout：Case1 八小节在桌面分为 4+4，竖�
   }
 })
 
+test('Grand Staff notation bounds：Treble E6 与 Bass C1 ledger extents 均保留安全边距', () => {
+  const ledgerScore = musicXmlParser.loadMusicXmlDocument(
+    fs.readFileSync(require.resolve('./score-fixtures/grand-staff-ledger-extremes.musicxml'), 'utf8')
+  )
+  const notes = ledgerScore.parts[0].measures[0].notes
+  const treble = scoreSheetBounds.calculateScoreNotationBounds(
+    notes.filter((note) => note.staff === 1),
+    false,
+    scoreSheetLayout.SCORE_SHEET_SINGLE_SYSTEM_HEIGHT
+  )
+  assert.ok(treble.notationTop >= treble.safeMargin, 'E6 上加线/音符顶部不得越过 viewport safe margin')
+  assert.ok(treble.notationBottom <= treble.systemHeight - treble.safeMargin)
+
+  const bass = scoreSheetBounds.calculateScoreNotationBounds(
+    notes.filter((note) => note.staff === 2),
+    true,
+    scoreSheetLayout.SCORE_SHEET_GRAND_SYSTEM_HEIGHT
+  )
+  assert.ok(bass.systemHeight > scoreSheetLayout.SCORE_SHEET_GRAND_SYSTEM_HEIGHT, 'C1 必须按实际 ledger extent 扩展 system')
+  assert.ok(bass.notationBottom <= bass.systemHeight - bass.safeMargin, 'C1 下加线/音符底部不得越过 viewport safe margin')
+
+  const case1 = musicXmlParser.loadMusicXmlDocument(
+    fs.readFileSync(require.resolve('../fixtures/golden/case1/案例1.musicxml'), 'utf8')
+  )
+  const measures = [1, 2, 3, 4, 5, 6, 7, 8]
+  const base = scoreSheetLayout.buildScoreSheetLayout(measures, 1024, true)
+  const bounds = base.systems.map((system) => {
+    const measureSet = new Set(system.measureNumbers)
+    const systemNotes = case1.parts.flatMap((part) => part.measures.filter((measure) => measureSet.has(measure.number)).flatMap((measure) => measure.notes))
+    return scoreSheetBounds.calculateScoreNotationBounds(systemNotes, true, base.systemHeight)
+  })
+  const resolved = scoreSheetLayout.buildScoreSheetLayout(measures, 1024, true, bounds.map((entry) => entry.systemHeight))
+  assert.deepEqual(resolved.systems.map((system) => system.measureNumbers), [[1, 2, 3, 4], [5, 6, 7, 8]], '动态垂直 extent 不得破坏 4+4 wrapping')
+  assert.ok(resolved.systems[1].height > resolved.systems[0].height, '包含 C1 的第二 system 必须获得独立底部空间')
+  bounds.forEach((entry, index) => {
+    assert.ok(entry.notationTop >= entry.safeMargin, `system ${index + 1} 顶部 bounds`)
+    assert.ok(entry.notationBottom <= resolved.systems[index].height - entry.safeMargin, `system ${index + 1} 底部 bounds`)
+  })
+})
+
 test('Teaching Playback production controller：Stop/Panic 后 active voice=0', () => {
   let now = 0
   let id = 0
@@ -4830,6 +4919,17 @@ test('Golden Case1 E2E：用户原始 MusicXML + MIDI 硬断言', () => {
   assert.equal(report.onlyMidi.length, 0)
   assert.equal(report.matchRatio, 1)
   assert.equal(report.consistent, true)
+  const groupReport = referenceValidation.validateAttackGroupSequence(performance, midi)
+  assert.equal(groupReport.scoreGroupCount, 46)
+  assert.equal(groupReport.midiGroupCount, 46)
+  assert.equal(groupReport.matchedGroups, 46)
+  assert.deepEqual(groupReport.mismatches, [])
+  assert.equal(groupReport.consistent, true)
+  const goldenAttackGroups = scoreTimeV2.buildScorePerformanceAttackGroups(score)
+  const goldenWaitTargets = scoreTimeline.buildScoreTimeline(score).units.filter((unit) => unit.expectedMidi.length > 0)
+  assert.deepEqual(goldenWaitTargets.map((unit) => unit.expectedTick), goldenAttackGroups.map((group) => group.attackTick))
+  assert.deepEqual(goldenWaitTargets.map((unit) => unit.expectedMidi), goldenAttackGroups.map((group) => [...new Set(group.pitches)]))
+  assert.deepEqual(goldenWaitTargets.map((unit) => unit.sourceEventIds), goldenAttackGroups.map((group) => group.sourceEventIds))
   const demo = playback.buildPlaybackPlan(score, { startMeasure: 1, endMeasure: 8 })
   assert.equal(demo.events.filter((event) => event.type === 'noteOn').length, 80)
 

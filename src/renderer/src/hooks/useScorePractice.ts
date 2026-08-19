@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ScoreDocument, ScoreNoteModel, ScoreTimeline } from '../score/musicXmlTypes'
+import type { ScoreDocument } from '../score/musicXmlTypes'
 import { buildScoreTimeline } from '../score/scoreTimeline'
 import { buildSegmentTimeline, type ScoreSegmentOptions } from '../score/scoreTimeline'
 import { INTERNAL_PPQ } from '../score/scoreTimeV2'
-import { buildPracticeSegment } from '../score/practiceSegmentBuilder'
 import { WaitScoreCore } from '../score/waitScoreCore'
 import { RealtimeScoreCore } from '../score/realtimeScoreCore'
 import { FollowScoreCore } from '../score/followScoreCore'
@@ -92,12 +91,11 @@ export function useScorePractice(
     if (segmentStartMeasure === undefined && segmentEndMeasure === undefined && segmentHandMode === undefined) {
       return buildScoreTimeline(score)
     }
-    const segment = buildPracticeSegment(score, {
+    return buildSegmentTimeline(score, {
       startMeasure: segmentStartMeasure,
       endMeasure: segmentEndMeasure,
       handMode: segmentHandMode
     })
-    return buildSegmentTimelineFromSegment(segment)
   }, [score, segmentEndMeasure, segmentHandMode, segmentStartMeasure])
   const loop = options.loop ?? false
   const countInMs = options.countInMs ?? 0
@@ -419,40 +417,5 @@ function toFact(result: ScorePracticeFactLike): ScorePracticeFact {
     hand: typeof result.hand === 'string' ? result.hand : null,
     staff: typeof result.staff === 'number' ? result.staff : null,
     sourceEventIds: Array.isArray(result.sourceEventIds) ? result.sourceEventIds.map(String) : []
-  }
-}
-
-function buildSegmentTimelineFromSegment(segment: ReturnType<typeof buildPracticeSegment>): ScoreTimeline {
-  return {
-    units: segment.expectedUnits.map((unit, index) => ({
-      id: `seg-${unit.originalMeasure}-${unit.practiceTick}`,
-      onsetIndex: index,
-      expectedTick: unit.practiceTick,
-      measure: unit.originalMeasure,
-      originalMeasure: unit.originalMeasure,
-      originalBeat: unit.originalBeat,
-      practiceTick: unit.practiceTick,
-      notes: unit.events.map((event) => ({
-        id: `seg-${index}-${event.midiPitch ?? 'rest'}`,
-        type: (event.midiPitch === null ? 'rest' : 'note') as ScoreNoteModel['type'],
-        midiNumber: event.midiPitch,
-        step: '',
-        alter: 0,
-        octave: 4,
-        duration: event.duration,
-        voice: event.voice,
-        staff: event.staff,
-        isChordTone: event.type === 'chord',
-        tieStart: event.tieStart,
-        tieStop: event.tieStop,
-        accidental: null
-      })),
-      tieStart: unit.tieStart,
-      rest: unit.rest,
-      expectedMidi: unit.expectedMidi,
-      staff: unit.staff,
-      hand: unit.hand,
-      sourceEventIds: unit.sourceEventIds
-    }))
   }
 }
