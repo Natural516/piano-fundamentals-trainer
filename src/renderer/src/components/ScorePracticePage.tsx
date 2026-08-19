@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ActiveMidiNote } from '../types'
+import type { ActiveMidiNote, MidiConnectionState } from '../types'
 import { useScorePractice, type ScorePracticeMode } from '../hooks/useScorePractice'
 import type { UsePianoAudioResult } from '../hooks/usePianoAudio'
 import { loadMusicXmlDocument } from '../score/musicXmlParser'
@@ -13,7 +13,7 @@ import {
 } from '../playback/playback'
 import { buildDeterministicCoachResponse, type CoachContext, type CoachResponse } from '../ai/coach2'
 import { createOpenAiCompatibleClient } from '../ai/aiProvider'
-import { readAiSettings } from '../ai/aiSettings'
+import { loadAiSettings } from '../ai/aiSettings'
 import { requestScoreCoachFromProvider } from '../ai/scoreCoachProvider'
 import type { TemporarySessionEvidence } from '../ai/evidenceResolver'
 import { computeAbilityModelV2 } from '../ability/abilityModel'
@@ -22,7 +22,6 @@ import type { PracticeRecordV2 } from '../records/practiceRecordV2'
 import { practiceRecordRepository } from '../records/practiceRecordRepository'
 import { isExperimentalFeatureVisible } from '../featureFlags'
 import type { ScoreDocument } from '../score/musicXmlTypes'
-import type { PracticeSessionRecord } from '../utils/practiceRecordTypes'
 import {
   getScoreImport,
   readScoreImports,
@@ -48,7 +47,7 @@ import { PracticeReportModal } from './PracticeReportModal'
 import { PracticeStatBar } from './PracticeStatBar'
 import { ScoreSheetRenderer } from './ScoreSheetRenderer'
 import { buildScoreTimeV2 } from '../score/scoreTimeV2'
-import { readDailyPlanV2 } from '../plan/dailyPlanV2Storage'
+import { readTodayDailyPlanV2 } from '../plan/dailyPlanV2Storage'
 import type { ScorePracticePreset } from '../plan/planner'
 
 export interface ScorePracticeRequest extends ScorePracticePreset {
@@ -60,7 +59,7 @@ interface ScorePracticePageProps {
   exitPromptOpen: boolean
   initialSegment?: ScorePracticeRequest | null
   pianoAudio: UsePianoAudioResult
-  practiceRecords: PracticeSessionRecord[]
+  midiConnectionState: MidiConnectionState
   onPracticeRunningChange: (running: boolean) => void
 }
 
@@ -139,7 +138,7 @@ export function ScorePracticePage({
   exitPromptOpen,
   initialSegment,
   pianoAudio,
-  practiceRecords,
+  midiConnectionState,
   onPracticeRunningChange
 }: ScorePracticePageProps): JSX.Element {
   const [score, setScore] = useState<ScoreDocument | null>(null)
@@ -167,8 +166,10 @@ export function ScorePracticePage({
   const importedXmlRef = useRef('')
   const importedSourceTypeRef = useRef<'musicxml' | 'mxl'>('musicxml')
   const savedRecordIdRef = useRef('')
+  const recordSaveAttemptedRef = useRef('')
   const sessionRecordIdRef = useRef('')
   const pausedForExitRef = useRef(false)
+  const previousMidiConnectionRef = useRef(midiConnectionState)
   const sessionStartedAtRef = useRef('')
   const followVisible = isExperimentalFeatureVisible('FEATURE_SCORE_FOLLOWING')
   const effectiveMode: ScorePracticeMode = mode === 'follow' && !followVisible ? 'wait' : mode
@@ -202,7 +203,7 @@ export function ScorePracticePage({
     const records = practiceRecordRepository.list()
     const mastery = computeScoreMastery(records)
     const ability = computeAbilityModelV2(records, mastery)
-    const storedPlan = readDailyPlanV2()
+    const storedPlan = readTodayDailyPlanV2()
     const plan = storedPlan ? {
       date: storedPlan.date,
       totalTargetMinutes: storedPlan.items.reduce((sum, item) => sum + item.minutes, 0),
@@ -218,7 +219,7 @@ export function ScorePracticePage({
       .filter((event) => event.measureNumber >= startMeasure && event.measureNumber <= endMeasure && event.midiPitch !== null)
     const context: CoachContext = {
       selectedMeasures: { start: startMeasure, end: endMeasure },
-      recentRecords: practiceRecords.slice(0, 5),
+      recentRecords: records.slice(0, 5),
       ability,
       plan,
       userQuestion: question,
@@ -265,7 +266,7 @@ export function ScorePracticePage({
       })
     }
     if (!allowProvider) return
-    const settings = readAiSettings()
+    const settings = await loadAiSettings()
     if (!settings.enabled || !settings.config.endpoint || !settings.config.apiKey || !settings.config.model) return
     setCoachProviderStatus('AI provider 请求中…')
     const temporary: TemporarySessionEvidence | null = context.scoreSession?.sessionId ? {
@@ -301,7 +302,7 @@ export function ScorePracticePage({
         loop: providerDemo.loop
       })
     }
-  }, [effectiveMode, practice.facts, practiceRecords, score, startMeasure, endMeasure])
+  }, [effectiveMode, practice.facts, score, startMeasure, endMeasure])
 
   useEffect(() => {
     void refreshCoach('', false)
@@ -340,7 +341,7 @@ export function ScorePracticePage({
     setScoreTitle(demo.title)
     setImportTier('A')
     const state = readScoreImports()
-    writeScoreImports(upsertScoreImport(state, {
+    const savedDemo = writeScoreImports(upsertScoreImport(state, {
       id: demo.title,
       title: demo.title,
       xml: DEMO_SCORE_XML,
@@ -348,6 +349,7 @@ export function ScorePracticePage({
       importedAt: new Date().toISOString(),
       tier: 'A'
     }))
+    if (!savedDemo) setLoadError('示例乐谱已加载，但无法保存到本地曲谱库。')
   }, [
     initialCountIn,
     initialEndMeasure,
@@ -365,6 +367,15 @@ export function ScorePracticePage({
   }, [onPracticeRunningChange, practice.sessionActive])
 
   useEffect(() => {
+    const previous = previousMidiConnectionRef.current
+    previousMidiConnectionRef.current = midiConnectionState
+    if (previous === 'connected' && midiConnectionState !== 'connected' && practice.sessionActive) {
+      practice.interruptDevice()
+      setSavedMessage('MIDI 设备已断开，本次练习已暂停并保存恢复检查点')
+    }
+  }, [midiConnectionState, practice.interruptDevice, practice.sessionActive])
+
+  useEffect(() => {
     if (exitPromptOpen) {
       if (practice.phase === 'running' || practice.phase === 'count-in') {
         pausedForExitRef.current = true
@@ -377,10 +388,11 @@ export function ScorePracticePage({
   }, [exitPromptOpen, practice.phase, practice.pause, practice.resume])
 
   useEffect(() => {
-    if (practice.phase === 'finished' && score) {
+    if ((practice.phase === 'finished' || practice.phase === 'stopped') && score) {
       if (savedRecordIdRef.current) return
-      const key = sessionRecordIdRef.current || `score-session-${Date.now()}`
-      savedRecordIdRef.current = key
+      const key = practice.sessionId || sessionRecordIdRef.current || `score-session-${Date.now()}`
+      if (recordSaveAttemptedRef.current === key) return
+      recordSaveAttemptedRef.current = key
       const startedAt = sessionStartedAtRef.current || new Date().toISOString()
       const errorEvents = practice.facts
         .filter((entry) => entry.outcome === 'wrong' || entry.outcome === 'missing' || entry.outcome === 'extra' || entry.outcome === 'late' || entry.outcome === 'early')
@@ -399,12 +411,14 @@ export function ScorePracticePage({
       const record: PracticeRecordV2 = {
         id: key,
         schemaVersion: 2,
+        sessionId: practice.sessionId,
+        completionState: practice.completionState ?? (practice.phase === 'finished' ? 'completed' : 'stopped'),
         practiceType: 'score',
         sourceType: importTier === 'A' || importTier === 'B' ? importedSourceTypeRef.current : 'midi',
         sourceId: score.title,
         startedAt,
         endedAt: new Date().toISOString(),
-        durationMs: Math.round(practice.elapsedMs),
+        durationMs: Math.max(Math.round(practice.elapsedMs), Date.now() - new Date(startedAt).getTime()),
         tempo: bpm,
         mode: effectiveMode,
         handMode,
@@ -449,16 +463,26 @@ export function ScorePracticePage({
               sourceEventId: event.sourceEventIds?.[0] ?? null
             }))
         })),
+        iterations: practice.iterations,
         metadata: {
           importTier: importTier ?? 'A',
           referenceMidi: referenceMidiName || null,
           tempoRatio,
-          sessionId: sessionRecordIdRef.current
+          sessionId: practice.sessionId ?? sessionRecordIdRef.current,
+          completionState: practice.completionState ?? (practice.phase === 'finished' ? 'completed' : 'stopped'),
+          interruptionReason: practice.interruptionReason,
+          iterationCount: practice.iterations.length
         }
       }
-      practiceRecordRepository.add(record)
+      const saved = practiceRecordRepository.addResult(record)
+      if (!saved.success) {
+        setSavedMessage(`练习记录保存失败：${saved.error ?? saved.reason ?? '未知存储错误'}；恢复草稿已保留`)
+        return
+      }
+      savedRecordIdRef.current = key
+      practice.commitSession()
     }
-  }, [bpm, effectiveMode, handMode, importTier, practice.elapsedMs, practice.facts, practice.phase, practice.report, referenceMidiName, score, startMeasure, endMeasure, tempoRatio])
+  }, [bpm, effectiveMode, handMode, importTier, practice, referenceMidiName, score, startMeasure, endMeasure, tempoRatio])
 
   useEffect(() => {
     if (practice.phase === 'count-in' || (practice.phase === 'running' && !sessionStartedAtRef.current)) {
@@ -466,13 +490,14 @@ export function ScorePracticePage({
     }
     if (practice.phase === 'idle' && savedRecordIdRef.current) {
       savedRecordIdRef.current = ''
+      recordSaveAttemptedRef.current = ''
       sessionRecordIdRef.current = ''
     }
   }, [practice.phase])
 
-  const persistScoreImport = (title: string, xml: string, sourceType: 'musicxml' | 'mxl', tier: 'A' | 'B'): void => {
+  const persistScoreImport = (title: string, xml: string, sourceType: 'musicxml' | 'mxl', tier: 'A' | 'B'): boolean => {
     const state = readScoreImports()
-    writeScoreImports(upsertScoreImport(state, {
+    return writeScoreImports(upsertScoreImport(state, {
       id: title,
       title,
       xml,
@@ -492,7 +517,7 @@ export function ScorePracticePage({
         const document = payload.document
         importedXmlRef.current = payload.xmlText
         importedSourceTypeRef.current = 'mxl'
-        persistScoreImport(document.title, payload.xmlText, 'mxl', 'A')
+        const persisted = persistScoreImport(document.title, payload.xmlText, 'mxl', 'A')
         setScore(document)
         setScoreTitle(document.title)
         setImportTier('A')
@@ -500,6 +525,7 @@ export function ScorePracticePage({
         setEndMeasure(document.parts[0]?.measures.length ?? 1)
         setValidationReport(null)
         setReferenceMidiName('')
+        if (!persisted) setLoadError('MXL 已加载，但无法保存到本地曲谱库。')
         return
       }
 
@@ -508,7 +534,7 @@ export function ScorePracticePage({
         const document = loadMusicXmlDocument(text)
         importedXmlRef.current = text
         importedSourceTypeRef.current = 'musicxml'
-        persistScoreImport(document.title, text, 'musicxml', 'A')
+        const persisted = persistScoreImport(document.title, text, 'musicxml', 'A')
         setScore(document)
         setScoreTitle(document.title)
         setImportTier('A')
@@ -516,6 +542,7 @@ export function ScorePracticePage({
         setEndMeasure(document.parts[0]?.measures.length ?? 1)
         setValidationReport(null)
         setReferenceMidiName('')
+        if (!persisted) setLoadError('MusicXML 已加载，但无法保存到本地曲谱库。')
         return
       }
 
@@ -563,7 +590,8 @@ export function ScorePracticePage({
       if (report.consistent) {
         setImportTier('B')
         if (importedXmlRef.current) {
-          persistScoreImport(scoreTitle || score.title, importedXmlRef.current, importedSourceTypeRef.current, 'B')
+          const persisted = persistScoreImport(scoreTitle || score.title, importedXmlRef.current, importedSourceTypeRef.current, 'B')
+          if (!persisted) setLoadError('参考 MIDI 校验成功，但 B 级校验状态未能保存到本地曲谱库。')
         }
       } else {
         setLoadError('谱面与参考 MIDI 存在差异（MusicXML 未被修改），详见校验报告。')
@@ -593,7 +621,10 @@ export function ScorePracticePage({
       updatedAt: now
     }
     const next = upsertPracticeSegment(readPracticeSegments(), segment)
-    writePracticeSegments(next)
+    if (!writePracticeSegments(next)) {
+      setSavedMessage('片段保存失败，请检查本地存储权限')
+      return
+    }
     setSavedSegments(next.segments)
     setSegmentName('')
     setSavedMessage('片段已保存')
@@ -614,7 +645,10 @@ export function ScorePracticePage({
   const deleteSavedSegment = (id: string): void => {
     const state = readPracticeSegments()
     const next = { version: 1 as const, segments: state.segments.filter((entry) => entry.id !== id) }
-    writePracticeSegments(next)
+    if (!writePracticeSegments(next)) {
+      setSavedMessage('片段删除失败，原片段仍保留')
+      return
+    }
     setSavedSegments(next.segments)
     setSavedMessage('片段已删除')
   }
@@ -623,6 +657,7 @@ export function ScorePracticePage({
     sessionStartedAtRef.current = new Date().toISOString()
     sessionRecordIdRef.current = `score-session-${Date.now()}`
     savedRecordIdRef.current = ''
+    recordSaveAttemptedRef.current = ''
     practice.start()
   }
 
@@ -798,6 +833,8 @@ export function ScorePracticePage({
                 <AppButton onClick={practice.resume}>继续</AppButton>
               ) : practice.phase === 'finished' ? (
                 <AppButton onClick={handleStart}>再练一次</AppButton>
+              ) : practice.phase === 'stopped' ? (
+                <AppButton variant="secondary" onClick={handleReset}>返回设置</AppButton>
               ) : null}
               {practice.sessionActive ? (
                 <AppButton variant="ghost" onClick={practice.stop}>停止</AppButton>

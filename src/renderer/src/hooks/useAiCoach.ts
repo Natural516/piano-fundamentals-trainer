@@ -1,12 +1,12 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createOpenAiCompatibleClient } from '../ai/aiProvider'
-import { readAiSettings, writeAiSettings } from '../ai/aiSettings'
+import { loadAiSettings, readAiSettings, writeAiSettings, type AiSettingsStorageResult } from '../ai/aiSettings'
 import { buildCoachMessages, parseCoachResponse, validateCoachOutput, type CoachSnapshot } from '../ai/aiCoach'
 import type { AiRequestKind, AiSettingsState } from '../ai/aiTypes'
 
 export interface UseAiCoachResult {
   settings: AiSettingsState
-  setSettings: (settings: AiSettingsState) => void
+  setSettings: (settings: AiSettingsState) => Promise<AiSettingsStorageResult>
   testConnection: () => Promise<string>
   requestCoach: (kind: AiRequestKind, snapshot: CoachSnapshot) => Promise<{
     ok: boolean
@@ -17,19 +17,36 @@ export interface UseAiCoachResult {
 
 export function useAiCoach(): UseAiCoachResult {
   const [settings, setSettingsState] = useState<AiSettingsState>(() => readAiSettings())
+  const settingsRef = useRef(settings)
   const clientRef = useRef<ReturnType<typeof createOpenAiCompatibleClient> | null>(null)
+
+  useEffect(() => {
+    let active = true
+    void loadAiSettings().then((loaded) => {
+      if (!active) return
+      settingsRef.current = loaded
+      setSettingsState(loaded)
+      clientRef.current = null
+    })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const ensureClient = useCallback(() => {
     if (!clientRef.current) {
-      clientRef.current = createOpenAiCompatibleClient(settings.config)
+      clientRef.current = createOpenAiCompatibleClient(settingsRef.current.config)
     }
     return clientRef.current
-  }, [settings.config])
+  }, [])
 
-  const setSettings = useCallback((next: AiSettingsState) => {
+  const setSettings = useCallback(async (next: AiSettingsState) => {
+    const saved = await writeAiSettings(next)
+    if (!saved.success) return saved
+    settingsRef.current = next
     setSettingsState(next)
     clientRef.current = null
-    writeAiSettings(next)
+    return saved
   }, [])
 
   const testConnection = useCallback(async () => {
@@ -40,7 +57,7 @@ export function useAiCoach(): UseAiCoachResult {
   }, [ensureClient])
 
   const requestCoach = useCallback(async (kind: AiRequestKind, snapshot: CoachSnapshot) => {
-    if (!settings.enabled) {
+    if (!settingsRef.current.enabled) {
       return { ok: false, layers: { facts: [], interpretation: [], recommendation: [] }, error: 'AI 未启用' }
     }
 
@@ -54,7 +71,7 @@ export function useAiCoach(): UseAiCoachResult {
       return { ok: false, layers, error: 'AI 输出包含不允许的声称' }
     }
     return { ok: true, layers }
-  }, [ensureClient, settings.enabled])
+  }, [ensureClient])
 
   return {
     settings,

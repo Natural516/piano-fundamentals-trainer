@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ActiveMidiNote } from '../types'
+import type { ActiveMidiNote, MidiConnectionState } from '../types'
 import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { useScalePractice } from '../hooks/useScalePractice'
 import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
+import { useMidiDisconnectProtection } from '../hooks/useMidiDisconnectProtection'
 import { getJudgementLabel } from '../utils/judgement'
 import type { JudgementResult } from '../utils/practiceTypes'
 import { PRACTICE_DIFFICULTY_LABELS } from '../utils/practiceContentTypes'
@@ -21,6 +22,7 @@ import { PracticeStatBar } from './PracticeStatBar'
 interface ScalePracticePageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
+  midiConnectionState: MidiConnectionState
   onPracticeRunningChange: (running: boolean) => void
 }
 
@@ -42,6 +44,7 @@ function formatLatestMessage(result: JudgementResult | null): string {
 export function ScalePracticePage({
   activeNotes,
   exitPromptOpen,
+  midiConnectionState,
   onPracticeRunningChange
 }: ScalePracticePageProps): JSX.Element {
   const scale = useScalePractice()
@@ -66,9 +69,19 @@ export function ScalePracticePage({
     }),
     [scale.report, scale.selectedKey, scale.selectedMode, scale.toleranceLevel]
   )
-  const recorder = usePracticeSessionRecorder(scale.isComplete, createRecord)
+  const recorder = usePracticeSessionRecorder(scale.isComplete, createRecord, {
+    practiceType: 'scale',
+    exerciseId: `${scale.selectedKey}-${scale.selectedMode}`,
+    mode: scale.selectedMode,
+    tempo: scale.bpm
+  })
   const settingsLocked = scale.metronome.status !== 'idle' && !scale.isComplete
   const practiceActive = settingsLocked
+  const protectDisconnectedSession = useCallback(() => {
+    recorder.interruptDevice()
+    scale.pause()
+  }, [recorder.interruptDevice, scale.pause])
+  useMidiDisconnectProtection(midiConnectionState, practiceActive, protectDisconnectedSession)
 
   useEffect(() => {
     onPracticeRunningChange(practiceActive)
@@ -84,9 +97,11 @@ export function ScalePracticePage({
 
     if (exitPromptOpen && scale.metronome.status === 'running') {
       pausedForExitRef.current = true
+      recorder.checkpoint()
       scale.pause()
     } else if (!exitPromptOpen && pausedForExitRef.current) {
       pausedForExitRef.current = false
+      recorder.resumeSession()
       scale.start()
     }
   }, [exitPromptOpen, practiceActive, scale.metronome.status, scale.pause, scale.start])
@@ -94,18 +109,29 @@ export function ScalePracticePage({
   const startPractice = (): void => {
     setSettingsOpen(false)
     if (scale.isComplete) {
-      recorder.beginSession()
+      if (!recorder.beginSession()) return
       scale.restart()
       return
     }
-    if (scale.metronome.status !== 'paused') recorder.beginSession()
+    if (scale.metronome.status !== 'paused' && !recorder.beginSession()) return
+    if (scale.metronome.status === 'paused') recorder.resumeSession()
     scale.start()
   }
 
   const restartPractice = (): void => {
     setSettingsOpen(false)
-    recorder.beginSession()
+    if (!recorder.beginSession()) return
     scale.restart()
+  }
+
+  const pausePractice = (): void => {
+    recorder.checkpoint()
+    scale.pause()
+  }
+
+  const stopPractice = (): void => {
+    recorder.stopSession()
+    scale.stop()
   }
 
   const openSettings = (): void => {
@@ -178,9 +204,9 @@ export function ScalePracticePage({
           ) : null}
           <div className="practice-primary-actions">
             {scale.metronome.status === 'idle' || scale.isComplete ? <AppButton onClick={startPractice}>开始练习</AppButton> : null}
-            {scale.metronome.status === 'running' ? <AppButton variant="secondary" onClick={scale.pause}>暂停</AppButton> : null}
+            {scale.metronome.status === 'running' ? <AppButton variant="secondary" onClick={pausePractice}>暂停</AppButton> : null}
             {scale.metronome.status === 'paused' ? <AppButton onClick={startPractice}>继续练习</AppButton> : null}
-            {practiceActive ? <AppButton variant="secondary" onClick={scale.stop}>停止</AppButton> : null}
+            {practiceActive ? <AppButton variant="secondary" onClick={stopPractice}>停止</AppButton> : null}
             {practiceActive ? <AppButton variant="ghost" onClick={restartPractice}>重新开始</AppButton> : null}
           </div>
           {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}

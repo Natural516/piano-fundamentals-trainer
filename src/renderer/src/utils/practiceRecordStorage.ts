@@ -157,16 +157,22 @@ export function readPracticeRecords(): PracticeSessionRecord[] {
   }
 }
 
-export function savePracticeRecord(record: PracticeSessionRecord): PracticeStorageResult {
+export function savePracticeRecord(
+  record: PracticeSessionRecord,
+  completionState: 'completed' | 'stopped' | 'interrupted_device' | 'recovered' = record.status === 'stopped' ? 'stopped' : 'completed'
+): PracticeStorageResult {
   if (typeof window === 'undefined') return { success: false, message: '当前环境无法保存练习记录。' }
 
   try {
     const records = readPracticeRecords()
+    const v2Record = { ...fromLegacyRecord(record), sessionId: record.id, completionState }
+    if (!practiceRecordRepository.add(v2Record)) {
+      return { success: false, message: '练习事实未能写入统一 V2 记录，请检查本地存储权限。' }
+    }
     if (records.some((candidate) => candidate.id === record.id)) return { success: true }
 
     const nextRecords = sortNewestFirst([record, ...records]).slice(0, MAX_PRACTICE_RECORDS)
     window.localStorage.setItem(PRACTICE_RECORD_STORAGE_KEY, JSON.stringify(nextRecords))
-    practiceRecordRepository.add(fromLegacyRecord(record))
     notifyRecordsChanged()
     return { success: true }
   } catch (error) {

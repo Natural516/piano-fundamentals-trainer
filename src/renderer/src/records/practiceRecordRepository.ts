@@ -10,8 +10,15 @@ const MAX_RECORDS = 2000
 
 type RepositoryListener = () => void
 
+export interface PracticeRecordStorageResult {
+  success: boolean
+  reason?: 'read_failed' | 'write_failed' | 'invalid_import'
+  error?: string
+}
+
 export interface PracticeRecordRepository {
   add: (record: PracticeRecordV2) => boolean
+  addResult: (record: PracticeRecordV2) => PracticeRecordStorageResult
   list: () => PracticeRecordV2[]
   get: (id: string) => PracticeRecordV2 | null
   migrateLegacy: (legacyRecords: PracticeSessionRecord[]) => number
@@ -37,38 +44,45 @@ export function createPracticeRecordRepository(storage: StorageAdapter): Practic
     }
   }
 
-  const readAll = (): PracticeRecordV2[] => {
+  const readAllResult = (): { success: true; records: PracticeRecordV2[] } | { success: false; error: string } => {
     try {
       const raw = storage.getItem(PRACTICE_RECORD_V2_STORAGE_KEY)
-      if (!raw) return []
+      if (!raw) return { success: true, records: [] }
       const parsed = JSON.parse(raw) as unknown[]
-      if (!Array.isArray(parsed)) return []
-      return parsed
+      if (!Array.isArray(parsed)) return { success: true, records: [] }
+      return { success: true, records: parsed
         .map((entry) => parsePracticeRecordV2(JSON.stringify(entry)))
-        .filter((record): record is PracticeRecordV2 => record !== null)
-    } catch {
-      return []
+        .filter((record): record is PracticeRecordV2 => record !== null) }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
     }
   }
+  const readAll = (): PracticeRecordV2[] => {
+    const result = readAllResult()
+    return result.success ? result.records : []
+  }
 
-  const writeAll = (records: PracticeRecordV2[]): boolean => {
+  const writeAllResult = (records: PracticeRecordV2[]): PracticeRecordStorageResult => {
     try {
       storage.setItem(PRACTICE_RECORD_V2_STORAGE_KEY, JSON.stringify(records))
       notify()
-      return true
-    } catch {
-      return false
+      return { success: true }
+    } catch (error) {
+      return { success: false, reason: 'write_failed', error: error instanceof Error ? error.message : String(error) }
     }
   }
 
-  const add = (record: PracticeRecordV2): boolean => {
-    const current = readAll()
-    const next = [record, ...current.filter((entry) => entry.id !== record.id)].slice(0, MAX_RECORDS)
-    return writeAll(next)
+  const addResult = (record: PracticeRecordV2): PracticeRecordStorageResult => {
+    const read = readAllResult()
+    if (!read.success) return { success: false, reason: 'read_failed', error: read.error }
+    const next = [record, ...read.records.filter((entry) => entry.id !== record.id)].slice(0, MAX_RECORDS)
+    return writeAllResult(next)
   }
+  const add = (record: PracticeRecordV2): boolean => addResult(record).success
 
   return {
     add,
+    addResult,
     list: readAll,
     get(id) {
       return readAll().find((record) => record.id === id) ?? null
@@ -125,12 +139,16 @@ export function createPracticeRecordRepository(storage: StorageAdapter): Practic
       try {
         const parsed = JSON.parse(json) as { records?: unknown[] }
         if (!Array.isArray(parsed.records)) return { ok: false, imported: 0 }
-        let imported = 0
+        const valid: PracticeRecordV2[] = []
         for (const entry of parsed.records) {
           const record = parsePracticeRecordV2(JSON.stringify(entry))
-          if (record && add(record)) imported += 1
+          if (record) valid.push(record)
         }
-        return { ok: true, imported }
+        if (valid.length === 0 && parsed.records.length > 0) return { ok: false, imported: 0 }
+        const current = readAll()
+        const importedIds = new Set(valid.map((record) => record.id))
+        const next = [...valid, ...current.filter((record) => !importedIds.has(record.id))].slice(0, MAX_RECORDS)
+        return writeAllResult(next).success ? { ok: true, imported: valid.length } : { ok: false, imported: 0 }
       } catch {
         return { ok: false, imported: 0 }
       }

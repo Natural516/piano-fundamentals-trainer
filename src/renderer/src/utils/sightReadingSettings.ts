@@ -93,12 +93,14 @@ export function readSightReadingSettings(): SightReadingSettings {
   }
 }
 
-export function writeSightReadingSettings(settings: SightReadingSettings): void {
-  if (typeof window === 'undefined') return
+export function writeSightReadingSettings(settings: SightReadingSettings): boolean {
+  if (typeof window === 'undefined') return false
 
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(migrateSightReadingSettings(settings)))
+    return true
   } catch (error) {
     console.warn('[sight-reading] 保存练习设置失败。', error)
+    return false
   }
 }

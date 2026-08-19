@@ -89,6 +89,7 @@ export interface UseSightReadingPracticeResult {
   accuracy: number
   availableNotes: SightReadingNote[]
   report: SightReadingReport | null
+  settingsSaveError: string
   getRemainingTimeMs: () => number
   setStaffMode: (staffMode: SightReadingStaffMode) => void
   setKeySignature: (keySignature: MajorKeyId) => void
@@ -172,6 +173,7 @@ export function useSightReadingPractice(): UseSightReadingPracticeResult {
   if (initialSettingsRef.current === null) initialSettingsRef.current = readSightReadingSettings()
 
   const [settings, setSettings] = useState<SightReadingSettings>(initialSettingsRef.current)
+  const [settingsSaveError, setSettingsSaveError] = useState('')
   const [status, setStatus] = useState<SightReadingStatus>('idle')
   const [isPaused, setIsPaused] = useState(false)
   const [currentNote, setCurrentNote] = useState<SightReadingNote | null>(null)
@@ -461,7 +463,7 @@ export function useSightReadingPractice(): UseSightReadingPracticeResult {
   }, [])
 
   useEffect(() => {
-    writeSightReadingSettings(settings)
+    setSettingsSaveError(writeSightReadingSettings(settings) ? '' : '识谱设置保存失败，请检查本地存储权限。')
   }, [settings])
 
   useEffect(() => {
@@ -517,6 +519,7 @@ export function useSightReadingPractice(): UseSightReadingPracticeResult {
     accuracy,
     availableNotes,
     report,
+    settingsSaveError,
     getRemainingTimeMs,
     setStaffMode: (value) => updateSetting('staffMode', value),
     setKeySignature: (value) => updateSetting('keySignature', value),

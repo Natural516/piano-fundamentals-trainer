@@ -6,7 +6,7 @@ import { createArpeggioSequence, judgeVoicing, normalizeNotes, ArpeggioStateMach
 import { pickBassConstraint, validateVoicing } from '../chordV2/chordValidator'
 import { useMidiEventSubscription } from './useMidiEvents'
 
-type ChordV2Status = 'idle' | 'running' | 'finished'
+type ChordV2Status = 'idle' | 'running' | 'paused' | 'finished'
 type ChordV2FeedbackType = 'correct' | 'wrong' | 'missing' | 'extra' | 'wrong_bass' | null
 
 interface ChordV2Question {
@@ -56,7 +56,11 @@ export interface UseChordV2PracticeResult {
   completedQuestions: number
   report: ChordV2Report
   isRunning: boolean
+  isPaused: boolean
+  sessionActive: boolean
   start: () => void
+  pause: () => void
+  resume: () => void
   stop: () => void
   nextQuestion: () => void
 }
@@ -184,6 +188,7 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
   const blockNotesRef = useRef<number[]>([])
   const blockTimerRef = useRef<number | null>(null)
   const advanceTimerRef = useRef<number | null>(null)
+  const pendingAdvanceRef = useRef(false)
   const arpeggioMachineRef = useRef<ArpeggioStateMachine | null>(null)
   const lastEventIdRef = useRef<number | null>(null)
   const currentQuestionRef = useRef<ChordV2Question | null>(null)
@@ -198,7 +203,7 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
     missing: missingCount,
     extra: extraCount,
     wrongBass: wrongBassCount,
-    accuracy: questionCount > 0 ? Math.round((correctCount / questionCount) * 100) : 0
+    accuracy: completedQuestions > 0 ? Math.round((correctCount / completedQuestions) * 100) : 0
   }
 
   const clearTimers = useCallback(() => {
@@ -227,6 +232,7 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
   }, [completedQuestions])
 
   const advance = useCallback(() => {
+    pendingAdvanceRef.current = false
     blockNotesRef.current = []
     arpeggioMachineRef.current = null
     setInputNotes([])
@@ -257,6 +263,7 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
     const fb = createFeedback(result, question.symbol, question.judgeMode)
     setFeedback(fb)
     recordOutcome(question, fb, true)
+    pendingAdvanceRef.current = true
     advanceTimerRef.current = window.setTimeout(advance, ADVANCE_DELAY_MS)
   }, [advance, currentQuestion, recordOutcome])
 
@@ -270,6 +277,7 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
     setExtraCount(0)
     setWrongBassCount(0)
     setStatus('running')
+    pendingAdvanceRef.current = false
     setFeedback(null)
     setInputNotes([])
     setCurrentQuestion(createValidatedQuestion(difficulty, judgeMode, inversionMode, texture, spacing, 0))
@@ -277,12 +285,29 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
 
   const stop = useCallback(() => {
     clearTimers()
+    pendingAdvanceRef.current = false
     setStatus('idle')
     setCurrentQuestion(null)
     setFeedback(null)
     setInputNotes([])
     setCompletedQuestions(0)
   }, [clearTimers])
+
+  const pause = useCallback(() => {
+    if (statusRef.current !== 'running') return
+    clearTimers()
+    setStatus('paused')
+  }, [clearTimers])
+
+  const resume = useCallback(() => {
+    if (statusRef.current !== 'paused') return
+    setStatus('running')
+    if (pendingAdvanceRef.current) {
+      advanceTimerRef.current = window.setTimeout(advance, ADVANCE_DELAY_MS)
+    } else if (blockNotesRef.current.length > 0) {
+      blockTimerRef.current = window.setTimeout(evaluateBlock, BLOCK_WINDOW_MS)
+    }
+  }, [advance, evaluateBlock])
 
   const nextQuestion = useCallback(() => {
     if (statusRef.current !== 'running') return
@@ -319,6 +344,7 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
         const fb: ChordV2Feedback = { type: 'correct', message: '分解和弦顺序正确', missingNotes: [], extraNotes: [] }
         setFeedback(fb)
         recordOutcomeRef.current(question, fb, true)
+        pendingAdvanceRef.current = true
         advanceTimerRef.current = window.setTimeout(() => advanceRef.current(), ADVANCE_DELAY_MS)
       }
       return
@@ -384,7 +410,11 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
     completedQuestions,
     report,
     isRunning: status === 'running',
+    isPaused: status === 'paused',
+    sessionActive: status === 'running' || status === 'paused',
     start,
+    pause,
+    resume,
     stop,
     nextQuestion
   }

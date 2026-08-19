@@ -1,6 +1,7 @@
 import type { AbilityModelState, AbilitySkillId } from '../ability/abilityModel'
 import { getWeakestReliableSkills } from '../ability/abilityModel'
-import type { PracticeSessionRecord } from '../utils/practiceRecordTypes'
+import type { PracticeRecordV2 } from '../records/practiceRecordV2'
+import { formatCalendarDate } from '../utils/localCalendarDate'
 import { getExercisesForSkill, type ExerciseDefinition } from '../prescription/exerciseLibrary'
 import type { ScoreMasteryState } from '../ability/scoreMastery'
 import { getWeakestMeasures } from '../ability/scoreMastery'
@@ -79,7 +80,7 @@ export interface DailyTrainingPlan {
 
 export interface PlannerInput {
   ability: AbilityModelState
-  records: PracticeSessionRecord[]
+  records: PracticeRecordV2[]
   goal: string
   availableMinutes: number
   library: ExerciseDefinition[]
@@ -112,7 +113,7 @@ export function buildDailyPlan(input: PlannerInput): DailyTrainingPlan {
   const availableMinutes = Math.min(120, Math.max(10, Math.round(input.availableMinutes)))
   const rationale: string[] = []
   const items: PlanItem[] = []
-  const recentRecordIds = input.records
+  const recentRecordIds = [...input.records]
     .sort((left, right) => Date.parse(right.endedAt) - Date.parse(left.endedAt))
     .slice(0, 5)
     .map((record) => record.id)
@@ -233,7 +234,7 @@ export function buildDailyPlan(input: PlannerInput): DailyTrainingPlan {
   }
 
   return {
-    date: new Date().toISOString().slice(0, 10),
+    date: formatCalendarDate(),
     totalTargetMinutes: availableMinutes - remainingMinutes,
     rationale,
     items

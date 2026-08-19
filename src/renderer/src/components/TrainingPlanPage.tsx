@@ -43,10 +43,11 @@ import { practiceRecordRepository } from '../records/practiceRecordRepository'
 import {
   createDailyPlanV2,
   readPlannerPreferences,
-  readDailyPlanV2,
+  readDailyPlanV2ForDate,
+  readTodayDailyPlanV2,
   updateDailyPlanFromRecords,
   writePlannerPreferences,
-  writeDailyPlanV2,
+  writeDailyPlanV2Result,
   type DailyPlanV2State
 } from '../plan/dailyPlanV2Storage'
 import { AppButton } from './AppButton'
@@ -110,7 +111,7 @@ export function TrainingPlanPage({
   onOpenScoreSegment,
   practiceRecords
 }: TrainingPlanPageProps): JSX.Element {
-  const today = useMemo(() => new Date(), [])
+  const [today, setToday] = useState(() => new Date())
   const todayDate = formatLocalDate(today)
   const currentWeekStart = getLocalWeekStart(today)
   const [activeTab, setActiveTab] = useState<TrainingPlanTab>('stage')
@@ -119,7 +120,7 @@ export function TrainingPlanPage({
   const [selectedWeekStart, setSelectedWeekStart] = useState(currentWeekStart)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const [message, setMessage] = useState('')
-  const [plannerPlan, setPlannerPlan] = useState<DailyPlanV2State | null>(() => readDailyPlanV2())
+  const [plannerPlan, setPlannerPlan] = useState<DailyPlanV2State | null>(() => readTodayDailyPlanV2())
   const [plannerMessage, setPlannerMessage] = useState('')
   const [plannerPreferences, setPlannerPreferences] = useState(() => readPlannerPreferences())
 
@@ -129,30 +130,42 @@ export function TrainingPlanPage({
     return () => window.clearTimeout(timer)
   }, [message])
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setToday(new Date()), 30000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   const regeneratePlannerPlan = (): void => {
     const records = practiceRecordRepository.list()
     const mastery = computeScoreMastery(records)
     const ability = computeAbilityModelV2(records, mastery)
     const plan = buildDailyPlan({
       ability,
-      records: practiceRecords,
+      records,
       goal: plannerPreferences.goal,
       availableMinutes: plannerPreferences.availableMinutes,
       library: EXERCISE_LIBRARY,
       mastery
     })
     const stored = createDailyPlanV2(plan)
-    writeDailyPlanV2(stored)
+    const saved = writeDailyPlanV2Result(stored)
+    if (!saved.success) {
+      setPlannerMessage('今日计划生成成功，但保存失败，请检查本地存储权限')
+      return
+    }
     setPlannerPlan(stored)
     setPlannerMessage(`已按 ${records.length} 条 PracticeRecordV2 记录生成今日计划（${stored.items.length} 项）`)
   }
 
   useEffect(() => {
-    if (!readDailyPlanV2()) regeneratePlannerPlan()
-  }, [])
+    const stored = readTodayDailyPlanV2()
+    if (stored) setPlannerPlan(stored)
+    else regeneratePlannerPlan()
+    setSelectedDate(todayDate)
+  }, [todayDate])
 
   useEffect(() => practiceRecordRepository.subscribe(() => {
-    const current = readDailyPlanV2()
+    const current = readTodayDailyPlanV2()
     if (!current) {
       regeneratePlannerPlan()
       return
@@ -160,7 +173,11 @@ export function TrainingPlanPage({
     const records = practiceRecordRepository.list()
     const mastery = computeScoreMastery(records)
     const updated = updateDailyPlanFromRecords(current, records, mastery)
-    writeDailyPlanV2(updated.state)
+    const saved = writeDailyPlanV2Result(updated.state)
+    if (!saved.success) {
+      setPlannerMessage('练习事实已记录，但今日计划更新保存失败')
+      return
+    }
     setPlannerPlan(updated.state)
     setPlannerMessage(updated.changed ? '新练习已达到成功标准，今日任务已自动完成' : '新练习已计入能力与小节掌握度；今日任务顺序保持稳定')
   }), [plannerPreferences.availableMinutes, plannerPreferences.goal, practiceRecords])
@@ -171,7 +188,7 @@ export function TrainingPlanPage({
       goal: next.goal.slice(0, 200)
     }
     setPlannerPreferences(sanitized)
-    writePlannerPreferences(sanitized)
+    if (!writePlannerPreferences(sanitized)) setPlannerMessage('计划偏好保存失败，请检查本地存储权限')
   }
 
   const togglePlanItem = (exerciseId: string): void => {
@@ -183,7 +200,11 @@ export function TrainingPlanPage({
         [exerciseId]: plannerPlan.progress[exerciseId] === 'done' ? 'pending' : 'done'
       }
     }
-    writeDailyPlanV2(next)
+    const saved = writeDailyPlanV2Result(next)
+    if (!saved.success) {
+      setPlannerMessage('计划进度保存失败，未更新当前显示')
+      return
+    }
     setPlannerPlan(next)
     setPlannerMessage(next.progress[exerciseId] === 'done' ? '已标记完成' : '已恢复未完成')
   }
@@ -217,6 +238,9 @@ export function TrainingPlanPage({
     [practiceRecords, selectedDate]
   )
   const dailyRecord = planState.dailyRecords[selectedDate]
+  const displayedPlannerPlan = selectedDate === todayDate
+    ? plannerPlan
+    : readDailyPlanV2ForDate(selectedDate)
   const dailyCompletion = DAILY_TRAINING_PLAN.map((task) => {
     const manualStatus = dailyRecord?.taskOverrides[task.id]
     const autoCompleted = isDailyTaskAutoCompleted(task, completedModules)
@@ -446,23 +470,23 @@ export function TrainingPlanPage({
           <AppCard className="training-plan-summary training-plan-daily-summary">
             <div>
               <span className="eyebrow">Daily Practice · Planner 2.0</span>
-              <h3>{plannerPlan ? `今日计划（${plannerPlan.date}）` : '固定 90 分钟训练模板'}</h3>
+              <h3>{displayedPlannerPlan ? `${selectedDate === todayDate ? '今日计划' : '历史计划'}（${displayedPlannerPlan.date}）` : '固定 90 分钟训练模板'}</h3>
               <p>
-                {plannerPlan
+                {displayedPlannerPlan
                   ? '由 PracticeRecordV2 → Ability / Score Mastery → Planner 真实生成；每项包含 whyThis 与证据引用，完成后点击勾选更新进度。'
                   : '软件任务可读取所选日期的完成记录；任何手动切换都会优先于自动状态。'}
               </p>
             </div>
             <label className="training-plan-date-field"><span>训练日期</span><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
             <div className="training-plan-daily-progress">
-              <strong>{plannerPlan ? plannerPlan.items.reduce((sum, item) => sum + (plannerPlan.progress[item.exerciseId] === 'done' ? item.minutes : 0), 0) : completedMinutes}<small> / {plannerPlan ? plannerPlan.items.reduce((sum, item) => sum + item.minutes, 0) : DAILY_TRAINING_TOTAL_MINUTES} 分钟</small></strong>
+              <strong>{displayedPlannerPlan ? displayedPlannerPlan.items.reduce((sum, item) => sum + (displayedPlannerPlan.progress[item.exerciseId] === 'done' ? item.minutes : 0), 0) : completedMinutes}<small> / {displayedPlannerPlan ? displayedPlannerPlan.items.reduce((sum, item) => sum + item.minutes, 0) : DAILY_TRAINING_TOTAL_MINUTES} 分钟</small></strong>
               <div className="training-plan-progress"><i style={{ width: `${calculatePercentage(
-                plannerPlan ? plannerPlan.items.reduce((sum, item) => sum + (plannerPlan.progress[item.exerciseId] === 'done' ? item.minutes : 0), 0) : completedMinutes,
-                plannerPlan ? plannerPlan.items.reduce((sum, item) => sum + item.minutes, 0) : DAILY_TRAINING_TOTAL_MINUTES
+                displayedPlannerPlan ? displayedPlannerPlan.items.reduce((sum, item) => sum + (displayedPlannerPlan.progress[item.exerciseId] === 'done' ? item.minutes : 0), 0) : completedMinutes,
+                displayedPlannerPlan ? displayedPlannerPlan.items.reduce((sum, item) => sum + item.minutes, 0) : DAILY_TRAINING_TOTAL_MINUTES
               )}%` }} /></div>
             </div>
             <div className="training-plan-daily-actions">
-              {plannerPlan ? <AppButton variant="secondary" onClick={regeneratePlannerPlan}>重新生成</AppButton> : null}
+              {plannerPlan && selectedDate === todayDate ? <AppButton variant="secondary" onClick={regeneratePlannerPlan}>重新生成</AppButton> : null}
               <AppButton variant="ghost" onClick={() => setConfirmAction({ type: 'daily-reset' })}>重置当日状态</AppButton>
             </div>
           </AppCard>
@@ -503,10 +527,10 @@ export function TrainingPlanPage({
             <AppButton variant="secondary" onClick={regeneratePlannerPlan}>按设置更新计划</AppButton>
           </AppCard>
 
-          {plannerPlan ? (
+          {displayedPlannerPlan ? (
             <div className="daily-task-list">
-              {plannerPlan.items.map((item) => {
-                const done = plannerPlan.progress[item.exerciseId] === 'done'
+              {displayedPlannerPlan.items.map((item) => {
+                const done = displayedPlannerPlan.progress[item.exerciseId] === 'done'
                 const scoreMatch = /^score:(.+):(\d+)$/.exec(item.exerciseId)
                 const scorePreset = planItemToScorePracticePreset(item)
                 const skillLabel = item.targetSkillIds.join(' · ') || 'score-performance'
@@ -517,6 +541,7 @@ export function TrainingPlanPage({
                       className="daily-task-check"
                       type="button"
                       aria-label={done ? `将${item.exerciseId}标记为未完成` : `将${item.exerciseId}标记为完成`}
+                      disabled={selectedDate !== todayDate}
                       onClick={() => togglePlanItem(item.exerciseId)}
                     >{done ? '✓' : ''}</button>
                     <div className="daily-task-time"><strong>{item.minutes}</strong><span>分钟</span></div>

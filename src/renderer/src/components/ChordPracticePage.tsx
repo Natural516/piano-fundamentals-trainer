@@ -72,7 +72,11 @@ export function ChordPracticePage({
     }),
     [chord.inversionMode, chord.keySignature, chord.qualityFilter, chord.questionCount, chord.report, chord.roundCount, chord.selectedContent.category, chord.selectedContent.difficulty, chord.selectedContent.inputStyle, chord.selectedContent.name, chord.selectedContent.progressionId, chord.selectedContentId, chord.seventhQualityFilter]
   )
-  const recorder = usePracticeSessionRecorder(chord.status === 'finished', createRecord)
+  const recorder = usePracticeSessionRecorder(chord.status === 'finished', createRecord, {
+    practiceType: 'chord',
+    exerciseId: chord.selectedContentId,
+    mode: `${chord.selectedContent.category}:${chord.selectedContent.inputStyle}`
+  })
 
   useEffect(() => {
     onPracticeRunningChange(chord.isRunning)
@@ -88,6 +92,7 @@ export function ChordPracticePage({
 
     if (exitPromptOpen && !chord.isPaused) {
       pausedForExitRef.current = true
+      recorder.checkpoint()
       chord.pause()
     } else if (!exitPromptOpen && pausedForExitRef.current) {
       pausedForExitRef.current = false
@@ -99,6 +104,11 @@ export function ChordPracticePage({
     setSettingsOpen(false)
     recorder.beginSession()
     chord.start()
+  }
+
+  const stopPractice = (): void => {
+    recorder.stopSession()
+    chord.stop()
   }
 
   const openSettings = (): void => {
@@ -165,7 +175,7 @@ export function ChordPracticePage({
           </div>
           <ChordTargetView feedback={chord.feedback} showNoteNames={chord.showNoteNames} target={chord.currentTarget} />
           <div className="practice-primary-actions">
-            {chord.isRunning ? <AppButton variant="secondary" onClick={chord.stop}>停止练习</AppButton> : <AppButton onClick={startPractice}>开始练习</AppButton>}
+            {chord.isRunning ? <AppButton variant="secondary" onClick={stopPractice}>停止练习</AppButton> : <AppButton onClick={startPractice}>开始练习</AppButton>}
             {chord.feedback && chord.feedback.type !== 'correct' && chord.isRunning ? <AppButton variant="ghost" onClick={chord.nextQuestion}>下一题</AppButton> : null}
           </div>
           {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}

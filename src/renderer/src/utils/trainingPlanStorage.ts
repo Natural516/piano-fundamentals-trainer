@@ -15,6 +15,7 @@ import type {
   WeeklyTrainingRecord
 } from './trainingPlanTypes'
 import { createDefaultWeeklyGoals } from './weeklyTrainingPlan'
+import { formatCalendarDate } from './localCalendarDate'
 
 export const TRAINING_PLAN_STORAGE_KEY = 'piano-trainer.training-plan.v1'
 export const TRAINING_PLAN_CHANGED_EVENT = 'piano-trainer:training-plan-changed'
@@ -53,10 +54,7 @@ function parseLocalDate(value: string): Date | null {
 }
 
 export function formatLocalDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return formatCalendarDate(date)
 }
 
 export function getLocalWeekStart(date: Date): string {
@@ -291,4 +289,3 @@ export function ensureWeeklyTrainingRecord(
   })
   return { state: nextState, record: nextState.weeklyRecords[weekStart] }
 }
-

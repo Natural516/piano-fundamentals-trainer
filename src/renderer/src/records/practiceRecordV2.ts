@@ -52,6 +52,12 @@ export interface PracticeMetric {
   unit?: string
 }
 
+export interface PracticeRecordIteration {
+  index: number
+  completedAt: string
+  facts: unknown[]
+}
+
 export interface EvidenceRef {
   practiceRecordId?: string
   sessionId?: string
@@ -68,6 +74,8 @@ export interface EvidenceRef {
 export interface PracticeRecordV2 {
   id: string
   schemaVersion: 2
+  sessionId?: string | null
+  completionState?: 'completed' | 'stopped' | 'interrupted_device' | 'recovered'
   practiceType: string
   sourceType: 'builtin' | 'musicxml' | 'mxl' | 'midi' | 'image' | 'manual'
   sourceId?: string | null
@@ -83,6 +91,7 @@ export interface PracticeRecordV2 {
   errorEvents: PracticeErrorEvent[]
   evidenceRefs: EvidenceRef[]
   perMeasureMetrics?: PerMeasurePracticeMetrics[]
+  iterations?: PracticeRecordIteration[]
   metadata: Record<string, string | number | boolean | null>
 }
 
@@ -133,6 +142,8 @@ export function fromLegacyRecord(record: PracticeSessionRecord): PracticeRecordV
   return {
     id: record.id,
     schemaVersion: 2,
+    sessionId: record.id,
+    completionState: record.status === 'stopped' ? 'stopped' : 'completed',
     practiceType: record.module,
     sourceType: record.moduleName.includes('曲谱') ? 'musicxml' : 'builtin',
     sourceId: record.contentId ?? null,

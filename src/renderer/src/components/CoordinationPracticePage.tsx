@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ActiveMidiNote } from '../types'
+import type { ActiveMidiNote, MidiConnectionState } from '../types'
 import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { useCoordinationPractice } from '../hooks/useCoordinationPractice'
 import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
+import { useMidiDisconnectProtection } from '../hooks/useMidiDisconnectProtection'
 import type { CoordinationJudgementType } from '../utils/coordinationTypes'
 import { COORDINATION_CATEGORY_LABELS } from '../utils/coordinationPatterns'
 import { PRACTICE_DIFFICULTY_LABELS } from '../utils/practiceContentTypes'
@@ -23,6 +24,7 @@ import { PracticeStatBar } from './PracticeStatBar'
 interface CoordinationPracticePageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
+  midiConnectionState: MidiConnectionState
   onPracticeRunningChange: (isRunning: boolean) => void
 }
 
@@ -39,6 +41,7 @@ function formatOffset(offset: number | undefined): string {
 export function CoordinationPracticePage({
   activeNotes,
   exitPromptOpen,
+  midiConnectionState,
   onPracticeRunningChange
 }: CoordinationPracticePageProps): JSX.Element {
   const coordination = useCoordinationPractice()
@@ -58,9 +61,19 @@ export function CoordinationPracticePage({
     }),
     [coordination.report, coordination.selectedPattern.difficulty, coordination.selectedPatternId]
   )
-  const recorder = usePracticeSessionRecorder(coordination.isComplete, createRecord)
+  const recorder = usePracticeSessionRecorder(coordination.isComplete, createRecord, {
+    practiceType: 'coordination',
+    exerciseId: coordination.selectedPattern.id,
+    mode: coordination.selectedPattern.id,
+    tempo: coordination.bpm
+  })
   const settingsLocked = coordination.metronome.status !== 'idle' && !coordination.isComplete
   const pausedForExitRef = useRef(false)
+  const protectDisconnectedSession = useCallback(() => {
+    recorder.interruptDevice()
+    coordination.pause()
+  }, [coordination.pause, recorder.interruptDevice])
+  useMidiDisconnectProtection(midiConnectionState, settingsLocked, protectDisconnectedSession)
 
   useEffect(() => {
     onPracticeRunningChange(settingsLocked)
@@ -76,17 +89,30 @@ export function CoordinationPracticePage({
 
     if (exitPromptOpen && coordination.metronome.status === 'running') {
       pausedForExitRef.current = true
+      recorder.checkpoint()
       coordination.pause()
     } else if (!exitPromptOpen && pausedForExitRef.current) {
       pausedForExitRef.current = false
+      recorder.resumeSession()
       coordination.start()
     }
   }, [coordination.metronome.status, coordination.pause, coordination.start, exitPromptOpen, settingsLocked])
 
   const startPractice = (): void => {
     setSettingsOpen(false)
-    if (coordination.metronome.status === 'idle' || coordination.isComplete) recorder.beginSession()
+    if ((coordination.metronome.status === 'idle' || coordination.isComplete) && !recorder.beginSession()) return
+    if (coordination.metronome.status === 'paused') recorder.resumeSession()
     coordination.start()
+  }
+
+  const pausePractice = (): void => {
+    recorder.checkpoint()
+    coordination.pause()
+  }
+
+  const stopPractice = (): void => {
+    recorder.stopSession()
+    coordination.stop()
   }
 
   const openSettings = (): void => {
@@ -158,8 +184,8 @@ export function CoordinationPracticePage({
           <div className="practice-primary-actions">
             {coordination.metronome.status === 'idle' || coordination.isComplete ? (
               <AppButton onClick={startPractice}>{coordination.isComplete ? '再练一次' : '开始练习'}</AppButton>
-            ) : coordination.isRunning ? <AppButton variant="secondary" onClick={coordination.pause}>暂停练习</AppButton> : <AppButton onClick={startPractice}>继续练习</AppButton>}
-            {coordination.metronome.status !== 'idle' && !coordination.isComplete ? <AppButton variant="ghost" onClick={coordination.stop}>停止练习</AppButton> : null}
+            ) : coordination.isRunning ? <AppButton variant="secondary" onClick={pausePractice}>暂停练习</AppButton> : <AppButton onClick={startPractice}>继续练习</AppButton>}
+            {coordination.metronome.status !== 'idle' && !coordination.isComplete ? <AppButton variant="ghost" onClick={stopPractice}>停止练习</AppButton> : null}
           </div>
           {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
         </section>

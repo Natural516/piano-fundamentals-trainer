@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ActiveMidiNote } from '../types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ActiveMidiNote, MidiConnectionState } from '../types'
 import { useChordV2Practice } from '../hooks/useChordV2Practice'
 import { CHORD_V2_DIFFICULTY_LABELS, type ChordV2Difficulty, type ChordV2InversionMode, type ChordV2JudgeMode, type ChordV2Texture } from '../chordV2/chordV2Types'
 import { AppButton } from './AppButton'
@@ -10,10 +10,15 @@ import { PracticeSettingsDrawer } from './PracticeSettingsDrawer'
 import { PracticeStatBar } from './PracticeStatBar'
 import { ProgressionPracticePanel } from './ProgressionPracticePanel'
 import { isExperimentalFeatureVisible } from '../featureFlags'
+import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
+import { useMidiDisconnectProtection } from '../hooks/useMidiDisconnectProtection'
+import { createChordV2Record } from '../utils/practiceRecordAdapters'
+import type { PracticeSessionTiming } from '../utils/practiceRecordTypes'
 
 interface ChordV2PageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
+  midiConnectionState: MidiConnectionState
   onPracticeRunningChange: (running: boolean) => void
 }
 
@@ -36,6 +41,7 @@ const textureOptions: Array<{ id: ChordV2Texture; label: string }> = [
 export function ChordV2Page({
   activeNotes,
   exitPromptOpen,
+  midiConnectionState,
   onPracticeRunningChange
 }: ChordV2PageProps): JSX.Element {
   const chord = useChordV2Practice()
@@ -48,26 +54,63 @@ export function ChordV2Page({
   const [draftDifficulty, setDraftDifficulty] = useState<ChordV2Difficulty>(chord.difficulty)
   const [draftQuestionCount, setDraftQuestionCount] = useState(chord.questionCount)
   const pausedForExitRef = useRef(false)
+  const createRecord = useCallback((timing: PracticeSessionTiming) => createChordV2Record({
+    timing,
+    report: chord.report,
+    completedQuestions: chord.completedQuestions,
+    judgeMode: chord.judgeMode,
+    inversionMode: chord.inversionMode,
+    texture: chord.texture,
+    spacing: chord.spacing,
+    difficulty: chord.difficulty
+  }), [chord.completedQuestions, chord.difficulty, chord.inversionMode, chord.judgeMode, chord.report, chord.spacing, chord.texture])
+  const recorder = usePracticeSessionRecorder(chord.status === 'finished', createRecord, {
+    practiceType: 'chord',
+    exerciseId: `chord-v2-l${chord.difficulty}`,
+    mode: `${chord.judgeMode}:${chord.texture}`
+  })
+  const protectDisconnectedSession = useCallback(() => {
+    recorder.interruptDevice()
+    chord.pause()
+  }, [chord.pause, recorder.interruptDevice])
+  useMidiDisconnectProtection(midiConnectionState, chord.sessionActive, protectDisconnectedSession)
 
   useEffect(() => {
-    onPracticeRunningChange(chord.isRunning)
-  }, [chord.isRunning, onPracticeRunningChange])
+    onPracticeRunningChange(chord.sessionActive)
+  }, [chord.sessionActive, onPracticeRunningChange])
 
   useEffect(() => () => onPracticeRunningChange(false), [onPracticeRunningChange])
 
   useEffect(() => {
-    if (!chord.isRunning) {
+    if (!chord.sessionActive) {
       pausedForExitRef.current = false
       return
     }
     if (exitPromptOpen) {
       pausedForExitRef.current = true
-      chord.stop()
+      recorder.checkpoint()
+      chord.pause()
     } else if (pausedForExitRef.current) {
       pausedForExitRef.current = false
-      chord.start()
+      recorder.resumeSession()
+      chord.resume()
     }
-  }, [chord.isRunning, chord.start, chord.stop, exitPromptOpen])
+  }, [chord.pause, chord.resume, chord.sessionActive, exitPromptOpen, recorder.checkpoint, recorder.resumeSession])
+
+  const startPractice = (): void => {
+    if (chord.isPaused) {
+      recorder.resumeSession()
+      chord.resume()
+      return
+    }
+    if (!recorder.beginSession()) return
+    chord.start()
+  }
+
+  const stopPractice = (): void => {
+    recorder.stopSession()
+    chord.stop()
+  }
 
   const openSettings = (): void => {
     setDraftJudgeMode(chord.judgeMode)
@@ -125,7 +168,7 @@ export function ChordV2Page({
               <p>按当前判定模式弹出目标 Voicing；柱式 150ms 收齐，分解按顺序判定。</p>
             </div>
             <span className={`audio-status-badge status-${chord.isRunning ? 'ready' : 'suspended'}`}>
-              {chord.isRunning ? '练习中' : chord.status === 'finished' ? '已结束' : '未开始'}
+              {chord.isRunning ? '练习中' : chord.isPaused ? '已暂停' : chord.status === 'finished' ? '已结束' : '未开始'}
             </span>
           </div>
 
@@ -153,9 +196,10 @@ export function ChordV2Page({
           )}
 
           <div className="practice-primary-actions">
-            {!chord.isRunning ? <AppButton onClick={chord.start}>{chord.status === 'finished' ? '再练一次' : '开始练习'}</AppButton> : null}
-            {chord.isRunning ? <AppButton variant="secondary" onClick={chord.stop}>停止</AppButton> : null}
+            {!chord.isRunning ? <AppButton onClick={startPractice}>{chord.isPaused ? '继续练习' : chord.status === 'finished' ? '再练一次' : '开始练习'}</AppButton> : null}
+            {chord.sessionActive ? <AppButton variant="secondary" onClick={stopPractice}>停止</AppButton> : null}
           </div>
+          {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
         </section>
 
         <PracticeStatBar items={[
@@ -172,7 +216,7 @@ export function ChordV2Page({
       </div>
 
       <PracticeSettingsDrawer
-        isLocked={chord.isRunning}
+        isLocked={chord.sessionActive}
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onSave={saveSettings}
@@ -220,7 +264,7 @@ export function ChordV2Page({
       </PracticeSettingsDrawer>
 
       {chord.status === 'finished' ? (
-        <PracticeReportModal title="和弦练习完成" onBack={chord.stop} onRepeat={chord.start}>
+        <PracticeReportModal title="和弦练习完成" onBack={chord.stop} onRepeat={startPractice}>
           <div className="report-grid">
             <div><span>总题数</span><strong>{chord.report.totalQuestions}</strong></div>
             <div><span>正确</span><strong>{chord.report.correct}</strong></div>

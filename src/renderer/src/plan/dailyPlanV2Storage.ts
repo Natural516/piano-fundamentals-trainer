@@ -6,6 +6,7 @@ import {
 } from './planner'
 import type { PracticeRecordV2 } from '../records/practiceRecordV2'
 import type { ScoreMasteryState } from '../ability/scoreMastery'
+import { formatCalendarDate } from '../utils/localCalendarDate'
 
 export interface DailyPlanV2State {
   version: 1
@@ -23,6 +24,18 @@ export interface DailyPlanV2State {
 
 export const DAILY_PLAN_V2_STORAGE_KEY = 'training-plan.v2.daily.v1'
 export const PLANNER_PREFERENCES_STORAGE_KEY = 'training-plan.v2.preferences.v1'
+
+interface DailyPlanArchiveV2 {
+  version: 2
+  lastWrittenDate: string | null
+  plansByDate: Record<string, DailyPlanV2State>
+}
+
+export interface DailyPlanStorageResult {
+  success: boolean
+  reason?: 'write_failed'
+  error?: string
+}
 
 export interface PlannerPreferences {
   availableMinutes: number
@@ -233,24 +246,76 @@ export function sanitizeDailyPlanV2(value: unknown): DailyPlanV2State | null {
   }
 }
 
-export function readDailyPlanV2(storage: Pick<Storage, 'getItem'> = window.localStorage): DailyPlanV2State | null {
+function readDailyPlanArchive(storage: Pick<Storage, 'getItem'>): DailyPlanArchiveV2 {
   try {
     const raw = storage.getItem(DAILY_PLAN_V2_STORAGE_KEY)
-    if (!raw) return null
-    return sanitizeDailyPlanV2(JSON.parse(raw))
+    if (!raw) return { version: 2, lastWrittenDate: null, plansByDate: {} }
+    const parsed = JSON.parse(raw) as unknown
+    const legacy = sanitizeDailyPlanV2(parsed)
+    if (legacy) {
+      return { version: 2, lastWrittenDate: legacy.date, plansByDate: { [legacy.date]: legacy } }
+    }
+    if (!parsed || typeof parsed !== 'object') return { version: 2, lastWrittenDate: null, plansByDate: {} }
+    const candidate = parsed as Partial<DailyPlanArchiveV2>
+    if (candidate.version !== 2 || !candidate.plansByDate || typeof candidate.plansByDate !== 'object') {
+      return { version: 2, lastWrittenDate: null, plansByDate: {} }
+    }
+    const plansByDate = Object.fromEntries(Object.entries(candidate.plansByDate).flatMap(([date, value]) => {
+      const plan = sanitizeDailyPlanV2(value)
+      return plan ? [[date, plan]] : []
+    }))
+    return {
+      version: 2,
+      lastWrittenDate: typeof candidate.lastWrittenDate === 'string' && plansByDate[candidate.lastWrittenDate]
+        ? candidate.lastWrittenDate
+        : Object.keys(plansByDate).sort().at(-1) ?? null,
+      plansByDate
+    }
   } catch {
-    return null
+    return { version: 2, lastWrittenDate: null, plansByDate: {} }
+  }
+}
+
+export function readDailyPlanV2(storage: Pick<Storage, 'getItem'> = window.localStorage): DailyPlanV2State | null {
+  const archive = readDailyPlanArchive(storage)
+  return archive.lastWrittenDate ? archive.plansByDate[archive.lastWrittenDate] ?? null : null
+}
+
+export function readDailyPlanV2ForDate(
+  date: string,
+  storage: Pick<Storage, 'getItem'> = window.localStorage
+): DailyPlanV2State | null {
+  return readDailyPlanArchive(storage).plansByDate[date] ?? null
+}
+
+export function readTodayDailyPlanV2(
+  storage: Pick<Storage, 'getItem'> = window.localStorage,
+  now = new Date()
+): DailyPlanV2State | null {
+  return readDailyPlanV2ForDate(formatCalendarDate(now), storage)
+}
+
+export function writeDailyPlanV2Result(
+  state: DailyPlanV2State,
+  storage: Pick<Storage, 'getItem' | 'setItem'> = window.localStorage
+): DailyPlanStorageResult {
+  try {
+    const archive = readDailyPlanArchive(storage)
+    const next: DailyPlanArchiveV2 = {
+      version: 2,
+      lastWrittenDate: state.date,
+      plansByDate: { ...archive.plansByDate, [state.date]: state }
+    }
+    storage.setItem(DAILY_PLAN_V2_STORAGE_KEY, JSON.stringify(next))
+    return { success: true }
+  } catch (error) {
+    return { success: false, reason: 'write_failed', error: error instanceof Error ? error.message : String(error) }
   }
 }
 
 export function writeDailyPlanV2(
   state: DailyPlanV2State,
-  storage: Pick<Storage, 'setItem'> = window.localStorage
+  storage: Pick<Storage, 'getItem' | 'setItem'> = window.localStorage
 ): boolean {
-  try {
-    storage.setItem(DAILY_PLAN_V2_STORAGE_KEY, JSON.stringify(state))
-    return true
-  } catch {
-    return false
-  }
+  return writeDailyPlanV2Result(state, storage).success
 }

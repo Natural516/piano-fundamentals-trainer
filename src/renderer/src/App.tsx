@@ -251,30 +251,35 @@ function App(): JSX.Element {
           <SightReadingPage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
+            midiConnectionState={midi.sidebarStatus.connectionState}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'rhythm' ? (
           <RhythmPracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
+            midiConnectionState={midi.sidebarStatus.connectionState}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'scales' ? (
           <ScalePracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
+            midiConnectionState={midi.sidebarStatus.connectionState}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'chords' ? (
           <ChordV2Page
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
+            midiConnectionState={midi.sidebarStatus.connectionState}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'coordination' ? (
           <CoordinationPracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
+            midiConnectionState={midi.sidebarStatus.connectionState}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'free-practice' ? (
@@ -289,8 +294,8 @@ function App(): JSX.Element {
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
             initialSegment={scoreSegmentRequest}
+            midiConnectionState={midi.sidebarStatus.connectionState}
             pianoAudio={pianoAudio}
-            practiceRecords={practiceHistory.records}
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'analytics' ? (

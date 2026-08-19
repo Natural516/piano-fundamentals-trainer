@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ActiveMidiNote } from '../types'
+import type { ActiveMidiNote, MidiConnectionState } from '../types'
 import type {
   MajorKeyId,
   SightReadingNotePoolMode,
@@ -16,6 +16,7 @@ import { SIGHT_READING_NOTE_POOL_MODE_LABELS } from '../utils/sightReadingSettin
 import { createSightReadingRecord } from '../utils/practiceRecordAdapters'
 import type { PracticeSessionTiming } from '../utils/practiceRecordTypes'
 import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
+import { useMidiDisconnectProtection } from '../hooks/useMidiDisconnectProtection'
 import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { AppButton } from './AppButton'
 import { FullKeyboard } from './FullKeyboard'
@@ -29,6 +30,7 @@ import { SightReadingTimeBar } from './SightReadingTimeBar'
 interface SightReadingPageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
+  midiConnectionState: MidiConnectionState
   onPracticeRunningChange: (running: boolean) => void
 }
 
@@ -122,6 +124,7 @@ function SightNoteErrorDetails({
 export function SightReadingPage({
   activeNotes,
   exitPromptOpen,
+  midiConnectionState,
   onPracticeRunningChange
 }: SightReadingPageProps): JSX.Element {
   const practice = useSightReadingPractice()
@@ -139,8 +142,16 @@ export function SightReadingPage({
       : null,
     [practice.report, practice.showNoteName]
   )
-  const recorder = usePracticeSessionRecorder(practice.status === 'finished', createRecord)
+  const recorder = usePracticeSessionRecorder(practice.status === 'finished', createRecord, {
+    practiceType: 'sight-reading',
+    mode: practice.staffMode
+  })
   const isRunning = practice.status === 'running'
+  const protectDisconnectedSession = useCallback(() => {
+    recorder.interruptDevice()
+    practice.pause()
+  }, [practice.pause, recorder.interruptDevice])
+  useMidiDisconnectProtection(midiConnectionState, isRunning, protectDisconnectedSession)
 
   useEffect(() => {
     onPracticeRunningChange(isRunning)
@@ -150,14 +161,25 @@ export function SightReadingPage({
 
   useEffect(() => {
     if (!isRunning) return
-    if (exitPromptOpen) practice.pause()
-    else practice.resume()
+    if (exitPromptOpen) {
+      recorder.checkpoint()
+      practice.pause()
+    }
+    else {
+      recorder.resumeSession()
+      practice.resume()
+    }
   }, [exitPromptOpen, isRunning, practice.pause, practice.resume])
 
   const startPractice = (): void => {
     setSettingsOpen(false)
-    recorder.beginSession()
+    if (!recorder.beginSession()) return
     practice.start()
+  }
+
+  const stopPractice = (): void => {
+    recorder.stopSession()
+    practice.reset()
   }
 
   const openSettings = (): void => {
@@ -254,12 +276,13 @@ export function SightReadingPage({
 
           <div className="practice-primary-actions">
             {isRunning ? (
-              <AppButton variant="secondary" onClick={practice.reset}>停止练习</AppButton>
+              <AppButton variant="secondary" onClick={stopPractice}>停止练习</AppButton>
             ) : (
               <AppButton onClick={startPractice}>开始练习</AppButton>
             )}
           </div>
           {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
+          {practice.settingsSaveError ? <p className="practice-save-error">{practice.settingsSaveError}</p> : null}
         </section>
 
         <PracticeStatBar
@@ -444,6 +467,7 @@ export function SightReadingPage({
             timeoutNoteCounts={practice.report.timeoutNoteCounts}
           />
           {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
+          {practice.settingsSaveError ? <p className="practice-save-error">{practice.settingsSaveError}</p> : null}
         </PracticeReportModal>
       ) : null}
     </section>

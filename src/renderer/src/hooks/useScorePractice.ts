@@ -9,9 +9,10 @@ import { FollowScoreCore } from '../score/followScoreCore'
 import { useMidiEventSubscription } from './useMidiEvents'
 import { buildPracticeSummaryMetrics } from '../records/practiceMetrics'
 import type { PerMeasurePracticeMetrics } from '../records/practiceRecordV2'
+import { practiceSessionRepository } from '../records/practiceSessionRepository'
 
 export type ScorePracticeMode = 'wait' | 'realtime' | 'follow'
-export type ScorePracticePhase = 'idle' | 'count-in' | 'running' | 'paused' | 'finished'
+export type ScorePracticePhase = 'idle' | 'count-in' | 'running' | 'paused' | 'finished' | 'stopped'
 
 export interface ScorePracticeReport {
   totalUnits: number
@@ -49,6 +50,12 @@ export interface ScorePracticeFact {
   sourceEventIds: string[]
 }
 
+export interface ScorePracticeIteration {
+  index: number
+  completedAt: string
+  facts: ScorePracticeFact[]
+}
+
 export interface UseScorePracticeResult {
   phase: ScorePracticePhase
   mode: ScorePracticeMode
@@ -60,6 +67,11 @@ export interface UseScorePracticeResult {
   feedback: 'correct' | 'wrong' | null
   elapsedMs: number
   loopIterations: number
+  sessionId: string | null
+  iterations: ScorePracticeIteration[]
+  completionState: 'completed' | 'stopped' | 'interrupted_device' | null
+  interruptionReason: string | null
+  sessionError: string | null
   facts: ScorePracticeFact[]
   report: ScorePracticeReport
   isRunning: boolean
@@ -68,6 +80,8 @@ export interface UseScorePracticeResult {
   pause: () => void
   resume: () => void
   stop: () => void
+  interruptDevice: () => void
+  commitSession: () => boolean
   reset: () => void
 }
 
@@ -124,6 +138,11 @@ export function useScorePractice(
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
   const [loopIterations, setLoopIterations] = useState(0)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [iterations, setIterations] = useState<ScorePracticeIteration[]>([])
+  const [completionState, setCompletionState] = useState<'completed' | 'stopped' | 'interrupted_device' | null>(null)
+  const [interruptionReason, setInterruptionReason] = useState<string | null>(null)
+  const [sessionError, setSessionError] = useState<string | null>(null)
   const [interruptionMeasures, setInterruptionMeasures] = useState<number[]>([])
   const phaseRef = useRef(phase)
   phaseRef.current = phase
@@ -137,6 +156,9 @@ export function useScorePractice(
   const pausedFromCountInRef = useRef(false)
   const lastEventIdRef = useRef<number | null>(null)
   const loopIterationsRef = useRef(0)
+  const sessionIdRef = useRef<string | null>(null)
+  const completedIterationsRef = useRef<ScorePracticeIteration[]>([])
+  const lastCheckpointMeasureRef = useRef<number | null>(null)
   const completeLoopRef = useRef<() => void>(() => undefined)
 
   useEffect(() => {
@@ -156,6 +178,11 @@ export function useScorePractice(
     setFeedback(null)
     setElapsedMs(0)
     setLoopIterations(0)
+    setSessionId(null)
+    setIterations([])
+    setCompletionState(null)
+    setInterruptionReason(null)
+    setSessionError(null)
     setInterruptionMeasures([])
     countInRemainingRef.current = 0
     pausedFromCountInRef.current = false
@@ -163,6 +190,9 @@ export function useScorePractice(
     pausedAtRef.current = 0
     lastEventIdRef.current = null
     loopIterationsRef.current = 0
+    sessionIdRef.current = null
+    completedIterationsRef.current = []
+    lastCheckpointMeasureRef.current = null
     setPhase('idle')
   }, [msPerTick, timeline])
 
@@ -173,8 +203,20 @@ export function useScorePractice(
         ? realtimeCoreRef.current
         : followCoreRef.current
     if (!core) return
+    const currentFacts = core.results.map(toFact)
+    const combinedFacts = [...completedIterationsRef.current.flatMap((iteration) => iteration.facts), ...currentFacts]
     setCurrentIndex(core.currentIndex)
-    setFacts(core.results.map(toFact))
+    setFacts(combinedFacts)
+    const currentMeasure = core.currentUnit?.originalMeasure ?? null
+    if (
+      sessionIdRef.current &&
+      lastCheckpointMeasureRef.current !== null &&
+      currentMeasure !== null &&
+      currentMeasure !== lastCheckpointMeasureRef.current
+    ) {
+      practiceSessionRepository.checkpoint(sessionIdRef.current, { facts: combinedFacts, state: 'ACTIVE' })
+    }
+    lastCheckpointMeasureRef.current = currentMeasure
   }, [mode])
 
   const stopTicker = useCallback(() => {
@@ -202,17 +244,18 @@ export function useScorePractice(
   }, [mode, stopTicker, sync])
 
   const beginRun = useCallback(() => {
+    stopTicker()
     waitCoreRef.current?.reset()
     realtimeCoreRef.current?.reset()
     followCoreRef.current?.reset()
-    setFacts([])
+    setFacts(completedIterationsRef.current.flatMap((iteration) => iteration.facts))
     setFeedback(null)
     setElapsedMs(0)
-    setInterruptionMeasures([])
     pausedTotalRef.current = 0
     pausedAtRef.current = 0
     pausedFromCountInRef.current = false
     lastEventIdRef.current = null
+    lastCheckpointMeasureRef.current = null
     if (countInMs > 0) {
       setPhase('count-in')
       countInRemainingRef.current = countInMs
@@ -229,23 +272,83 @@ export function useScorePractice(
       startTicker()
     }
     sync()
-  }, [countInMs, startTicker, sync])
+  }, [countInMs, startTicker, stopTicker, sync])
 
   const completeLoop = useCallback(() => {
+    const core = mode === 'wait'
+      ? waitCoreRef.current
+      : mode === 'realtime'
+        ? realtimeCoreRef.current
+        : followCoreRef.current
+    const iteration: ScorePracticeIteration = {
+      index: completedIterationsRef.current.length + 1,
+      completedAt: new Date().toISOString(),
+      facts: core?.results.map(toFact) ?? []
+    }
+    completedIterationsRef.current = [...completedIterationsRef.current, iteration]
+    setIterations(completedIterationsRef.current)
+    const allFacts = completedIterationsRef.current.flatMap((entry) => entry.facts)
+    setFacts(allFacts)
+    if (sessionIdRef.current) {
+      practiceSessionRepository.checkpoint(sessionIdRef.current, {
+        facts: allFacts,
+        completedIteration: iteration,
+        state: loop ? 'ACTIVE' : 'COMPLETED',
+        completionState: loop ? null : 'completed'
+      })
+    }
     if (loop) {
       loopIterationsRef.current += 1
       setLoopIterations(loopIterationsRef.current)
       beginRun()
     } else {
+      if (sessionIdRef.current) {
+        const finished = practiceSessionRepository.finish(sessionIdRef.current, 'completed', allFacts)
+        if (!finished.success) setSessionError(finished.error ?? finished.reason ?? '练习会话完成状态保存失败')
+      }
+      setCompletionState('completed')
       setPhase('finished')
       stopTicker()
     }
-  }, [beginRun, loop])
+  }, [beginRun, loop, mode, stopTicker])
   completeLoopRef.current = completeLoop
 
   const start = useCallback(() => {
+    if (!score || timeline.units.length === 0) return
+    if (countInTimerRef.current !== null) {
+      window.clearTimeout(countInTimerRef.current)
+      countInTimerRef.current = null
+    }
+    stopTicker()
+    completedIterationsRef.current = []
+    setIterations([])
+    setFacts([])
+    loopIterationsRef.current = 0
+    setLoopIterations(0)
+    setCompletionState(null)
+    setInterruptionReason(null)
+    setSessionError(null)
+    setInterruptionMeasures([])
+    const created = practiceSessionRepository.start({
+      practiceType: 'score',
+      scoreId: score.title || null,
+      exerciseId: score.title || null,
+      mode,
+      startMeasure: segmentStartMeasure ?? timeline.units[0]?.originalMeasure ?? null,
+      endMeasure: segmentEndMeasure ?? timeline.units[timeline.units.length - 1]?.originalMeasure ?? null,
+      handMode: segmentHandMode ?? 'both',
+      tempo: score.defaultTempoBpm,
+      tempoRatio
+    })
+    if (!created.success || !created.value) {
+      setSessionError(created.error ?? created.reason ?? '无法创建练习会话')
+      setPhase('idle')
+      return
+    }
+    sessionIdRef.current = created.value.sessionId
+    setSessionId(created.value.sessionId)
     beginRun()
-  }, [beginRun])
+  }, [beginRun, mode, score, segmentEndMeasure, segmentHandMode, segmentStartMeasure, stopTicker, tempoRatio, timeline.units])
 
   const pause = useCallback(() => {
     if (phaseRef.current !== 'running' && phaseRef.current !== 'count-in') return
@@ -256,6 +359,13 @@ export function useScorePractice(
       }
       countInRemainingRef.current = Math.max(0, countInEndsAtRef.current - performance.now())
       pausedFromCountInRef.current = true
+      if (sessionIdRef.current) {
+        const paused = practiceSessionRepository.pause(
+          sessionIdRef.current,
+          completedIterationsRef.current.flatMap((iteration) => iteration.facts)
+        )
+        if (!paused.success) setSessionError(paused.error ?? paused.reason ?? '暂停检查点保存失败')
+      }
       setPhase('paused')
       return
     }
@@ -268,6 +378,14 @@ export function useScorePractice(
     if (typeof measure === 'number') setInterruptionMeasures((current) => [...current, measure])
     stopTicker()
     pausedAtRef.current = performance.now()
+    if (sessionIdRef.current) {
+      const currentFacts = core?.results.map(toFact) ?? []
+      const paused = practiceSessionRepository.pause(
+        sessionIdRef.current,
+        [...completedIterationsRef.current.flatMap((iteration) => iteration.facts), ...currentFacts]
+      )
+      if (!paused.success) setSessionError(paused.error ?? paused.reason ?? '暂停检查点保存失败')
+    }
     setPhase('paused')
   }, [mode, stopTicker])
 
@@ -277,6 +395,10 @@ export function useScorePractice(
       pausedFromCountInRef.current = false
       const remaining = countInRemainingRef.current
       setPhase('count-in')
+      if (sessionIdRef.current) {
+        const resumed = practiceSessionRepository.checkpoint(sessionIdRef.current, { state: 'ACTIVE' })
+        if (!resumed.success) setSessionError(resumed.error ?? resumed.reason ?? '恢复检查点保存失败')
+      }
       countInEndsAtRef.current = performance.now() + remaining
       countInTimerRef.current = window.setTimeout(() => {
         countInTimerRef.current = null
@@ -287,6 +409,10 @@ export function useScorePractice(
       return
     }
     pausedTotalRef.current += performance.now() - pausedAtRef.current
+    if (sessionIdRef.current) {
+      const resumed = practiceSessionRepository.checkpoint(sessionIdRef.current, { state: 'ACTIVE' })
+      if (!resumed.success) setSessionError(resumed.error ?? resumed.reason ?? '恢复检查点保存失败')
+    }
     setPhase('running')
     startTicker()
   }, [startTicker])
@@ -299,11 +425,66 @@ export function useScorePractice(
     stopTicker()
     pausedFromCountInRef.current = false
     countInRemainingRef.current = 0
-    setPhase('idle')
-  }, [stopTicker])
+    const core = mode === 'wait'
+      ? waitCoreRef.current
+      : mode === 'realtime'
+        ? realtimeCoreRef.current
+        : followCoreRef.current
+    const currentFacts = core?.results.map(toFact) ?? []
+    let nextIterations = completedIterationsRef.current
+    if (currentFacts.length > 0) {
+      nextIterations = [...nextIterations, {
+        index: nextIterations.length + 1,
+        completedAt: new Date().toISOString(),
+        facts: currentFacts
+      }]
+      completedIterationsRef.current = nextIterations
+      setIterations(nextIterations)
+    }
+    const allFacts = nextIterations.length > 0
+      ? nextIterations.flatMap((iteration) => iteration.facts)
+      : currentFacts
+    setFacts(allFacts)
+    const nextCompletionState = interruptionReason ? 'interrupted_device' : 'stopped'
+    if (sessionIdRef.current) {
+      const finished = practiceSessionRepository.finish(sessionIdRef.current, nextCompletionState, allFacts)
+      if (!finished.success) setSessionError(finished.error ?? finished.reason ?? '停止状态保存失败')
+    }
+    setCompletionState(nextCompletionState)
+    setPhase('stopped')
+  }, [interruptionReason, mode, stopTicker])
+
+  const interruptDevice = useCallback(() => {
+    if (phaseRef.current !== 'running' && phaseRef.current !== 'count-in' && phaseRef.current !== 'paused') return
+    if (phaseRef.current !== 'paused') pause()
+    const core = mode === 'wait'
+      ? waitCoreRef.current
+      : mode === 'realtime'
+        ? realtimeCoreRef.current
+        : followCoreRef.current
+    const currentFacts = core?.results.map(toFact) ?? []
+    const allFacts = [...completedIterationsRef.current.flatMap((iteration) => iteration.facts), ...currentFacts]
+    setInterruptionReason('midi_device_disconnected')
+    setCompletionState('interrupted_device')
+    if (sessionIdRef.current) {
+      const interrupted = practiceSessionRepository.interruptDevice(sessionIdRef.current, allFacts)
+      if (!interrupted.success) setSessionError(interrupted.error ?? interrupted.reason ?? '设备断线检查点保存失败')
+    }
+  }, [mode, pause])
+
+  const commitSession = useCallback((): boolean => {
+    if (!sessionIdRef.current) return false
+    const committed = practiceSessionRepository.commit(sessionIdRef.current)
+    if (!committed.success) {
+      setSessionError(committed.error ?? committed.reason ?? '练习会话提交失败')
+      return false
+    }
+    if (phaseRef.current === 'stopped') setPhase('idle')
+    return true
+  }, [])
 
   const reset = useCallback(() => {
-    stop()
+    if (phaseRef.current === 'running' || phaseRef.current === 'count-in' || phaseRef.current === 'paused') stop()
     waitCoreRef.current?.reset()
     realtimeCoreRef.current?.reset()
     followCoreRef.current?.reset()
@@ -311,6 +492,14 @@ export function useScorePractice(
     setElapsedMs(0)
     loopIterationsRef.current = 0
     setLoopIterations(0)
+    completedIterationsRef.current = []
+    setIterations([])
+    setFacts([])
+    setCompletionState(null)
+    setInterruptionReason(null)
+    setSessionId(null)
+    sessionIdRef.current = null
+    setPhase('idle')
     sync()
   }, [stop, sync])
 
@@ -352,11 +541,31 @@ export function useScorePractice(
   })
 
   useEffect(() => () => {
+    const core = mode === 'wait'
+      ? waitCoreRef.current
+      : mode === 'realtime'
+        ? realtimeCoreRef.current
+        : followCoreRef.current
+    if (sessionIdRef.current && (phaseRef.current === 'running' || phaseRef.current === 'count-in' || phaseRef.current === 'paused')) {
+      const currentFacts = core?.results.map(toFact) ?? []
+      practiceSessionRepository.checkpoint(sessionIdRef.current, {
+        facts: [...completedIterationsRef.current.flatMap((iteration) => iteration.facts), ...currentFacts],
+        state: phaseRef.current === 'paused' ? 'PAUSED' : 'ACTIVE',
+        interruptionReason: 'application_closed_before_commit'
+      })
+    }
     stopTicker()
     if (countInTimerRef.current !== null) window.clearTimeout(countInTimerRef.current)
-  }, [stopTicker])
+  }, [mode, stopTicker])
 
-  const report: ScorePracticeReport = buildPracticeSummaryMetrics(timeline, facts, tempoRatio, interruptionMeasures)
+  const reportIterationCount = Math.max(1, iterations.length)
+  const report: ScorePracticeReport = buildPracticeSummaryMetrics(
+    timeline,
+    facts,
+    tempoRatio,
+    interruptionMeasures,
+    reportIterationCount
+  )
   const core = mode === 'wait' ? waitCoreRef.current : mode === 'realtime' ? realtimeCoreRef.current : followCoreRef.current
 
   return {
@@ -370,6 +579,11 @@ export function useScorePractice(
     feedback,
     elapsedMs,
     loopIterations,
+    sessionId,
+    iterations,
+    completionState,
+    interruptionReason,
+    sessionError,
     facts,
     report,
     isRunning: phase === 'running',
@@ -378,6 +592,8 @@ export function useScorePractice(
     pause,
     resume,
     stop,
+    interruptDevice,
+    commitSession,
     reset
   }
 }

@@ -17,6 +17,8 @@ import type { MajorScaleKey, ScalePracticeMode, ScalePracticeReport } from './sc
 import type { PracticeDifficulty } from './practiceContentTypes'
 import { getMajorKeySignature } from './musicKeySignatures'
 import { getRangeDescription } from './sightReadingNotes'
+import type { ChordV2Report } from '../hooks/useChordV2Practice'
+import type { ChordV2Difficulty, ChordV2InversionMode, ChordV2JudgeMode, ChordV2Texture } from '../chordV2/chordV2Types'
 
 function createBaseRecord(
   timing: PracticeSessionTiming,
@@ -270,6 +272,55 @@ export function createChordRecord(input: {
       { label: report.mostMissedChord, count: report.wrong, type: 'chord' },
       { label: report.mostMissedNote, count: report.missingNote, type: 'missing_note' }
     ].filter((entry) => entry.count > 0 && entry.label !== '暂无')
+  }
+}
+
+export function createChordV2Record(input: {
+  timing: PracticeSessionTiming
+  report: ChordV2Report
+  completedQuestions: number
+  judgeMode: ChordV2JudgeMode
+  inversionMode: ChordV2InversionMode
+  texture: ChordV2Texture
+  spacing: 'close' | 'open'
+  difficulty: ChordV2Difficulty
+}): PracticeSessionRecord {
+  const { report } = input
+  return {
+    ...createBaseRecord(input.timing, {
+      module: 'chord',
+      moduleName: '和弦练习',
+      title: '和弦练习 V2',
+      subtitle: `${input.judgeMode} · ${input.texture} · L${input.difficulty}`,
+      totalEvents: input.completedQuestions,
+      correctEvents: report.correct,
+      accuracy: input.completedQuestions > 0 ? Math.round(report.correct / input.completedQuestions * 100) : 0
+    }),
+    wrongNoteCount: report.wrong,
+    missingNoteCount: report.missing,
+    extraNoteCount: report.extra,
+    contentId: `chord-v2-l${input.difficulty}`,
+    contentName: '和弦练习 V2',
+    difficulty: `L${input.difficulty}`,
+    practiceMode: `${input.judgeMode}:${input.texture}`,
+    settings: {
+      judgeMode: input.judgeMode,
+      inversionMode: input.inversionMode,
+      texture: input.texture,
+      spacing: input.spacing,
+      difficulty: input.difficulty,
+      questionCount: report.totalQuestions
+    },
+    details: {
+      completedQuestions: input.completedQuestions,
+      wrongBass: report.wrongBass
+    },
+    mistakes: [
+      { label: '和弦错误', count: report.wrong, type: 'chord' },
+      { label: '缺音', count: report.missing, type: 'missing_note' },
+      { label: '多音', count: report.extra, type: 'extra_note' },
+      { label: '低音/转位', count: report.wrongBass, type: 'wrong_bass' }
+    ].filter((entry) => entry.count > 0)
   }
 }
 

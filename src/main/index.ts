@@ -1,14 +1,28 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { inflateRawSync } from 'node:zlib'
+import { deleteAiApiKey, getAiApiKey, hasAiApiKey, setAiApiKey } from './secureSecrets'
 
 const APP_ID = 'com.piano.fundamentals.trainer'
 const INFLATE_RAW_CHANNEL = 'piano:inflate-raw'
+const SECRET_GET_CHANNEL = 'piano:secret:get-ai-api-key'
+const SECRET_SET_CHANNEL = 'piano:secret:set-ai-api-key'
+const SECRET_DELETE_CHANNEL = 'piano:secret:delete-ai-api-key'
+const SECRET_HAS_CHANNEL = 'piano:secret:has-ai-api-key'
 
 ipcMain.handle(INFLATE_RAW_CHANNEL, (_event, input: Uint8Array) => {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input)
   return Uint8Array.from(inflateRawSync(bytes))
 })
+
+ipcMain.handle(SECRET_GET_CHANNEL, () => getAiApiKey())
+ipcMain.handle(SECRET_SET_CHANNEL, (_event, value: unknown) => (
+  typeof value === 'string'
+    ? setAiApiKey(value)
+    : { success: false, reason: 'write_failed', error: 'API Key 必须是字符串' }
+))
+ipcMain.handle(SECRET_DELETE_CHANNEL, () => deleteAiApiKey())
+ipcMain.handle(SECRET_HAS_CHANNEL, () => hasAiApiKey())
 
 app.commandLine.appendSwitch('enable-features', 'WebMIDI')
 

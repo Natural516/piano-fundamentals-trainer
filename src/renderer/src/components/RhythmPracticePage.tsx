@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ActiveMidiNote } from '../types'
+import type { ActiveMidiNote, MidiConnectionState } from '../types'
 import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { useRhythmPractice } from '../hooks/useRhythmPractice'
 import { usePracticeSessionRecorder } from '../hooks/usePracticeSessionRecorder'
+import { useMidiDisconnectProtection } from '../hooks/useMidiDisconnectProtection'
 import { getJudgementLabel } from '../utils/judgement'
 import { midiNumberToNoteName } from '../utils/midiNotes'
 import type { JudgementResult, TargetEvent } from '../utils/practiceTypes'
@@ -23,6 +24,7 @@ import { PracticeStatBar } from './PracticeStatBar'
 interface RhythmPracticePageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
+  midiConnectionState: MidiConnectionState
   onPracticeRunningChange: (running: boolean) => void
 }
 
@@ -46,6 +48,7 @@ function formatLatestResult(result: JudgementResult | null): string {
 export function RhythmPracticePage({
   activeNotes,
   exitPromptOpen,
+  midiConnectionState,
   onPracticeRunningChange
 }: RhythmPracticePageProps): JSX.Element {
   const rhythm = useRhythmPractice()
@@ -68,9 +71,19 @@ export function RhythmPracticePage({
     }),
     [rhythm.bpm, rhythm.report, rhythm.selectedPattern.difficulty, rhythm.selectedPattern.name, rhythm.selectedPatternId, rhythm.toleranceLevel]
   )
-  const recorder = usePracticeSessionRecorder(rhythm.isComplete, createRecord)
+  const recorder = usePracticeSessionRecorder(rhythm.isComplete, createRecord, {
+    practiceType: 'rhythm',
+    exerciseId: rhythm.selectedPattern.id,
+    mode: 'rhythm-pattern',
+    tempo: rhythm.bpm
+  })
   const settingsLocked = rhythm.metronome.status !== 'idle' && !rhythm.isComplete
   const practiceActive = settingsLocked
+  const protectDisconnectedSession = useCallback(() => {
+    recorder.interruptDevice()
+    rhythm.pause()
+  }, [recorder.interruptDevice, rhythm.pause])
+  useMidiDisconnectProtection(midiConnectionState, practiceActive, protectDisconnectedSession)
 
   useEffect(() => {
     onPracticeRunningChange(practiceActive)
@@ -86,9 +99,11 @@ export function RhythmPracticePage({
 
     if (exitPromptOpen && rhythm.metronome.status === 'running') {
       pausedForExitRef.current = true
+      recorder.checkpoint()
       rhythm.pause()
     } else if (!exitPromptOpen && pausedForExitRef.current) {
       pausedForExitRef.current = false
+      recorder.resumeSession()
       rhythm.start()
     }
   }, [exitPromptOpen, practiceActive, rhythm.metronome.status, rhythm.pause, rhythm.start])
@@ -96,18 +111,29 @@ export function RhythmPracticePage({
   const startPractice = (): void => {
     setSettingsOpen(false)
     if (rhythm.isComplete) {
-      recorder.beginSession()
+      if (!recorder.beginSession()) return
       rhythm.restart()
       return
     }
-    if (rhythm.metronome.status !== 'paused') recorder.beginSession()
+    if (rhythm.metronome.status !== 'paused' && !recorder.beginSession()) return
+    if (rhythm.metronome.status === 'paused') recorder.resumeSession()
     rhythm.start()
   }
 
   const restartPractice = (): void => {
     setSettingsOpen(false)
-    recorder.beginSession()
+    if (!recorder.beginSession()) return
     rhythm.restart()
+  }
+
+  const pausePractice = (): void => {
+    recorder.checkpoint()
+    rhythm.pause()
+  }
+
+  const stopPractice = (): void => {
+    recorder.stopSession()
+    rhythm.stop()
   }
 
   const openSettings = (): void => {
@@ -199,9 +225,9 @@ export function RhythmPracticePage({
 
           <div className="practice-primary-actions">
               {rhythm.metronome.status === 'idle' || rhythm.isComplete ? <AppButton onClick={startPractice}>开始练习</AppButton> : null}
-              {rhythm.metronome.status === 'running' ? <AppButton variant="secondary" onClick={rhythm.pause}>暂停</AppButton> : null}
+              {rhythm.metronome.status === 'running' ? <AppButton variant="secondary" onClick={pausePractice}>暂停</AppButton> : null}
               {rhythm.metronome.status === 'paused' ? <AppButton onClick={startPractice}>继续练习</AppButton> : null}
-              {practiceActive ? <AppButton variant="secondary" onClick={rhythm.stop}>停止</AppButton> : null}
+              {practiceActive ? <AppButton variant="secondary" onClick={stopPractice}>停止</AppButton> : null}
               {practiceActive ? <AppButton variant="ghost" onClick={restartPractice}>重新开始</AppButton> : null}
           </div>
           {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}

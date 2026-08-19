@@ -161,6 +161,8 @@ const weeklyTrainingPlan = require('../src/renderer/src/utils/weeklyTrainingPlan
 const levelSixChecklist = require('../src/renderer/src/utils/levelSixChecklist.ts')
 const trainingPlanStorage = require('../src/renderer/src/utils/trainingPlanStorage.ts')
 const trainingPlanRecordLink = require('../src/renderer/src/utils/trainingPlanRecordLink.ts')
+const practiceSessionRepositoryModule = require('../src/renderer/src/records/practiceSessionRepository.ts')
+const localCalendarDate = require('../src/renderer/src/utils/localCalendarDate.ts')
 
 test('MIDI 音名与 88 键范围', () => {
   assert.equal(midiNotes.midiNumberToNoteName(21), 'A0')
@@ -2685,7 +2687,159 @@ test('曲谱练习三模式 Hook 与统计页面接线', () => {
   assert.match(appSource, /AnalyticsPage/)
 })
 
-test('AI 设置：默认停用、净化与安全导出不含 Key', () => {
+test('F0.1 Session Repository：三轮事实、Pause、Stop、断线恢复与幂等 commit', () => {
+  const values = new Map()
+  const storage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) },
+    removeItem(key) { values.delete(key) }
+  }
+  const repo = practiceSessionRepositoryModule.createPracticeSessionRepository(storage)
+  assert.equal(repo.start({ practiceType: 'score', scoreId: 'S', mode: 'wait' }, 'loop-session').success, true)
+  for (let index = 1; index <= 3; index += 1) {
+    const facts = [{ unitId: `u${index}`, outcome: 'correct' }]
+    assert.equal(repo.checkpoint('loop-session', {
+      facts: Array.from({ length: index }, (_, offset) => ({ unitId: `u${offset + 1}`, outcome: 'correct' })),
+      completedIteration: { index, completedAt: `2026-08-19T00:0${index}:00.000Z`, facts }
+    }).success, true)
+  }
+  assert.equal(repo.pause('loop-session', [{ unitId: 'u3', outcome: 'correct' }]).success, true)
+  assert.equal(repo.get('loop-session').state, 'PAUSED')
+  assert.equal(repo.get('loop-session').iterations.length, 3)
+  assert.equal(repo.finish('loop-session', 'stopped', repo.get('loop-session').currentFacts).success, true)
+  assert.equal(repo.get('loop-session').completionState, 'stopped')
+  assert.ok(repo.get('loop-session').currentFacts.length > 0, '循环停止后不得得到 0 条事实')
+  assert.equal(repo.commit('loop-session').success, true)
+  assert.equal(repo.commit('loop-session').success, true, '同一 session 重复 commit 必须幂等')
+  assert.equal(repo.get('loop-session'), null)
+
+  assert.equal(repo.start({ practiceType: 'scale', exerciseId: 'C-major' }, 'disconnect-session').success, true)
+  assert.equal(repo.interruptDevice('disconnect-session', [{ outcome: 'wrong_note' }]).success, true)
+  const restartedRepo = practiceSessionRepositoryModule.createPracticeSessionRepository(storage)
+  assert.equal(restartedRepo.getRecoveryState().status, 'RECOVERABLE_SESSION')
+  const recoverable = restartedRepo.getRecoverable().find((draft) => draft.sessionId === 'disconnect-session')
+  assert.equal(recoverable.state, 'INTERRUPTED')
+  assert.equal(recoverable.completionState, 'interrupted_device')
+  assert.equal(recoverable.currentFacts.length, 1)
+
+  const failingRepo = practiceSessionRepositoryModule.createPracticeSessionRepository({
+    getItem() { return null },
+    setItem() { throw new Error('quota exceeded') },
+    removeItem() {}
+  })
+  const failed = failingRepo.start({ practiceType: 'score' }, 'failed-session')
+  assert.equal(failed.success, false)
+  assert.equal(failed.reason, 'write_failed')
+})
+
+test('F0.1 Mastery：真实最近窗口与 hand/mode/tempo 条件隔离', () => {
+  const makeRecord = (id, accuracy, endedAt, overrides = {}) => ({
+    id,
+    schemaVersion: 2,
+    practiceType: 'score',
+    sourceType: 'musicxml',
+    sourceId: 'S',
+    scoreId: 'S',
+    startedAt: endedAt,
+    endedAt,
+    durationMs: 1000,
+    tempo: 80,
+    mode: 'wait',
+    handMode: 'right',
+    segment: '2-2',
+    metrics: [{ key: 'accuracy', value: accuracy }],
+    errorEvents: [],
+    evidenceRefs: [],
+    perMeasureMetrics: [{
+      measureNumber: 2,
+      expectedJudgeableCount: 1,
+      correct: accuracy === 100 ? 1 : 0,
+      wrong: accuracy === 0 ? 1 : 0,
+      missed: 0,
+      extra: 0,
+      pitchAccuracy: accuracy,
+      completionAccuracy: accuracy,
+      errorCount: accuracy === 100 ? 0 : 1,
+      isPerfect: accuracy === 100,
+      early: 0,
+      late: 0,
+      averageSignedOffsetMs: null,
+      medianAbsTimingErrorMs: null,
+      maxAbsoluteOffsetMs: null,
+      interruptionCount: 0,
+      tempoRatio: 1,
+      handStats: {},
+      evidenceRefs: []
+    }],
+    metadata: { tempoRatio: 1 },
+    ...overrides
+  })
+  const records = [
+    makeRecord('m1', 100, '2026-08-19T00:01:00.000Z'),
+    makeRecord('m2', 100, '2026-08-19T00:02:00.000Z'),
+    makeRecord('m3', 0, '2026-08-19T00:03:00.000Z'),
+    makeRecord('m4', 100, '2026-08-19T00:04:00.000Z', { handMode: 'left', mode: 'realtime', tempo: 120, metadata: { tempoRatio: 0.8 } })
+  ]
+  const mastery = scoreMastery.computeScoreMastery(records)
+  const measure = mastery.scores.S[2]
+  assert.equal(measure.contexts.length, 2)
+  const rightWait = measure.contexts.find((context) => context.handMode === 'right' && context.practiceMode === 'wait')
+  assert.equal(rightWait.sampleCount, 3)
+  assert.equal(rightWait.recentAccuracy, 66.67)
+  const leftRealtime = measure.contexts.find((context) => context.handMode === 'left' && context.practiceMode === 'realtime')
+  assert.equal(leftRealtime.sampleCount, 1)
+  assert.equal(leftRealtime.derivedState, 'insufficient_evidence')
+})
+
+test('F0.1 本地日期与 DailyPlan：跨日切换、历史浏览隔离和写失败反馈', () => {
+  assert.equal(localCalendarDate.formatCalendarDate(new Date('2026-08-18T15:59:00.000Z'), 'Asia/Hong_Kong'), '2026-08-18')
+  assert.equal(localCalendarDate.formatCalendarDate(new Date('2026-08-18T16:01:00.000Z'), 'Asia/Hong_Kong'), '2026-08-19')
+  const values = new Map()
+  const storage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) }
+  }
+  const makePlan = (date) => ({
+    version: 1,
+    planId: `plan-${date}`,
+    date,
+    generatedAt: `${date}T00:00:00.000Z`,
+    sourceEvidenceSnapshot: { recordCount: 0, masteryScoreCount: 0, planItemCount: 1 },
+    items: [{ exerciseId: 'scale-major', targetSkillIds: ['scale'], minutes: 10, targetTempo: null, mode: null, handMode: null, criteria: null, successCriteria: '完成', whyThis: '本地计划', evidenceRefs: [], fallback: null, harderVariant: null }],
+    progress: {}
+  })
+  assert.equal(dailyPlanV2Storage.writeDailyPlanV2Result(makePlan('2026-08-18'), storage).success, true)
+  assert.equal(dailyPlanV2Storage.writeDailyPlanV2Result(makePlan('2026-08-19'), storage).success, true)
+  const today = dailyPlanV2Storage.readDailyPlanV2ForDate('2026-08-19', storage)
+  assert.equal(today.date, '2026-08-19')
+  const history = dailyPlanV2Storage.readDailyPlanV2ForDate('2026-08-18', storage)
+  assert.equal(history.date, '2026-08-18')
+  assert.equal(dailyPlanV2Storage.readDailyPlanV2(storage).date, '2026-08-19', '浏览历史不得切换当前计划')
+  const failed = dailyPlanV2Storage.writeDailyPlanV2Result(makePlan('2026-08-20'), {
+    getItem() { return null },
+    setItem() { throw new Error('storage disabled') }
+  })
+  assert.equal(failed.success, false)
+  assert.equal(failed.reason, 'write_failed')
+})
+
+test('F0.1 PracticeRecordV2：read/write 异常必须返回失败', () => {
+  const base = {
+    id: 'storage-failure', schemaVersion: 2, practiceType: 'scale', sourceType: 'builtin',
+    startedAt: '2026-08-19T00:00:00.000Z', endedAt: '2026-08-19T00:01:00.000Z', durationMs: 60000,
+    metrics: [], errorEvents: [], evidenceRefs: [], metadata: {}
+  }
+  const readFailRepo = practiceRecordRepositoryModule.createPracticeRecordRepository({
+    getItem() { throw new Error('storage disabled') }, setItem() {}, removeItem() {}
+  })
+  assert.equal(readFailRepo.addResult(base).reason, 'read_failed')
+  const writeFailRepo = practiceRecordRepositoryModule.createPracticeRecordRepository({
+    getItem() { return null }, setItem() { throw new Error('quota') }, removeItem() {}
+  })
+  assert.equal(writeFailRepo.addResult(base).reason, 'write_failed')
+})
+
+test('AI 设置：默认停用、净化、安全存储且 Renderer localStorage 不含 Key', async () => {
   const defaults = aiSettings.createDefaultAiSettings()
   assert.equal(defaults.enabled, false)
   assert.equal(defaults.config.apiKey, '')
@@ -2709,8 +2863,24 @@ test('AI 设置：默认停用、净化与安全导出不含 Key', () => {
     getItem(key) { return values.has(key) ? values.get(key) : null },
     setItem(key, value) { values.set(key, String(value)) }
   }
-  assert.equal(aiSettings.writeAiSettings(sanitized, storage), true)
-  assert.equal(aiSettings.readAiSettings(storage).config.apiKey, 'sk-secret')
+  let secureValue = ''
+  const secretBridge = {
+    async getAiApiKey() { return { success: true, value: secureValue, configured: Boolean(secureValue) } },
+    async setAiApiKey(value) { secureValue = value; return { success: true, configured: Boolean(value) } },
+    async deleteAiApiKey() { secureValue = ''; return { success: true, configured: false } },
+    async hasAiApiKey() { return { success: true, configured: Boolean(secureValue) } }
+  }
+  const written = await aiSettings.writeAiSettings(sanitized, storage, secretBridge)
+  assert.equal(written.success, true)
+  assert.equal(aiSettings.readAiSettings(storage).config.apiKey, '')
+  assert.doesNotMatch(values.get('ai-settings.v1'), /sk-secret/)
+  assert.equal((await aiSettings.loadAiSettings(storage, secretBridge)).config.apiKey, 'sk-secret')
+  const secretFailure = await aiSettings.writeAiSettings(sanitized, storage, {
+    ...secretBridge,
+    async setAiApiKey() { return { success: false, reason: 'encryption_unavailable' } }
+  })
+  assert.equal(secretFailure.success, false)
+  assert.equal(secretFailure.reason, 'secret_write_failed')
 })
 
 test('AI 教练：快照不含 Key、消息分层、输出校验与回退', () => {
@@ -4102,7 +4272,7 @@ test('E2E 核心闭环：导入→选区→Wait→记录→Mastery→能力→�
   const mastery2 = scoreMastery.computeScoreMastery(repo.list(), new Date('2026-08-14T10:10:00.000Z'))
   const measure2After = mastery2.scores[score.title][2]
   assert.equal(measure2After.attempts, 2)
-  assert.equal(measure2After.pitchAccuracy, 88)
+  assert.equal(measure2After.pitchAccuracy, 87.5)
   assert.equal(measure2After.recentTrend, 'up')
   const plan2 = planner.buildDailyPlan({
     ability: abilityModel.computeAbilityModelV2(repo.list(), mastery2),
@@ -4865,11 +5035,17 @@ test('React lifecycle：Score Practice start/MIDI/render/pause/resume 保持状�
   const useScorePracticeModule = require('../src/renderer/src/hooks/useScorePractice.ts')
   const previousWindow = global.window
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  const lifecycleStorage = new Map()
   global.window = {
     setInterval,
     clearInterval,
     setTimeout,
-    clearTimeout
+    clearTimeout,
+    localStorage: {
+      getItem(key) { return lifecycleStorage.has(key) ? lifecycleStorage.get(key) : null },
+      setItem(key, value) { lifecycleStorage.set(key, String(value)) },
+      removeItem(key) { lifecycleStorage.delete(key) }
+    }
   }
   midiEventBus.resetMidiEventBusForTests()
   const score = musicXmlParser.loadMusicXmlDocument(fs.readFileSync(require.resolve('./score-fixtures/e2e-core-loop.xml'), 'utf8'))

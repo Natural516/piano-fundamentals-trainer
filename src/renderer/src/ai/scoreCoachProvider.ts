@@ -20,15 +20,25 @@ export function buildScoreCoachProviderMessages(
     score: context.scoreFacts,
     selectedMeasures: context.selectedMeasures,
     currentSession: context.scoreSession,
-    relevantHistoricalRecords: context.recentRecords.slice(0, 5).map((record) => ({
-      id: record.id,
-      module: record.module,
-      endedAt: record.endedAt,
-      accuracy: record.accuracy,
-      wrong: record.wrongNoteCount,
-      missing: record.missingNoteCount,
-      extra: record.extraNoteCount
-    })),
+    relevantHistoricalRecords: context.recentRecords.slice(0, 5).map((record) => {
+      const legacy = record as typeof record & {
+        module?: string
+        accuracy?: number
+        wrongNoteCount?: number
+        missingNoteCount?: number
+        extraNoteCount?: number
+      }
+      const metrics = Array.isArray(record.metrics) ? record.metrics : []
+      return {
+        id: record.id,
+        module: record.practiceType ?? legacy.module ?? 'unknown',
+        endedAt: record.endedAt,
+        accuracy: metrics.find((metric) => metric.key === 'accuracy')?.value ?? legacy.accuracy ?? 0,
+        wrong: metrics.find((metric) => metric.key === 'wrong' || metric.key === 'wrongNoteCount')?.value ?? legacy.wrongNoteCount ?? 0,
+        missing: metrics.find((metric) => metric.key === 'missing' || metric.key === 'missingNoteCount')?.value ?? legacy.missingNoteCount ?? 0,
+        extra: metrics.find((metric) => metric.key === 'extra' || metric.key === 'extraNoteCount')?.value ?? legacy.extraNoteCount ?? 0
+      }
+    }),
     relevantScoreRecords: context.scoreRecords?.slice(0, 5).map((record) => ({
       id: record.id,
       scoreId: record.scoreId,

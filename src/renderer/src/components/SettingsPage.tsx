@@ -1,7 +1,7 @@
 import { AppButton } from './AppButton'
 import { AppCard } from './AppCard'
 import { ThemeSwitcher } from './ThemeSwitcher'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { APP_LICENSES, APP_VERSION } from '../appInfo'
 import { buildBackup, collectCurrentStorageState, exportBackupToFile, restoreFromBackup, validateBackup } from '../storage/backup'
 import type { UsePianoAudioResult } from '../hooks/usePianoAudio'
@@ -21,6 +21,19 @@ export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX
   const [draftEndpoint, setDraftEndpoint] = useState(ai.settings.config.endpoint)
   const [draftModel, setDraftModel] = useState(ai.settings.config.model)
   const [draftApiKey, setDraftApiKey] = useState(ai.settings.config.apiKey)
+
+  useEffect(() => {
+    if (!draftApiKey && ai.settings.config.apiKey) setDraftApiKey(ai.settings.config.apiKey)
+  }, [ai.settings.config.apiKey, draftApiKey])
+
+  const persistAiSettings = async (next: typeof ai.settings): Promise<boolean> => {
+    const result = await ai.setSettings(next)
+    if (!result.success) {
+      setAiStatus(`保存失败：${result.error ?? result.reason ?? '安全存储不可用'}`)
+      return false
+    }
+    return true
+  }
 
   return (
     <section className="settings-page">
@@ -104,8 +117,8 @@ export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX
           </div>
           <div className="settings-ai">
             <div className="tolerance-control"><span>启用 AI 教练</span><div className="segmented-control">
-              <button className={ai.settings.enabled ? 'is-active' : ''} type="button" onClick={() => ai.setSettings({ ...ai.settings, enabled: true })}>启用</button>
-              <button className={!ai.settings.enabled ? 'is-active' : ''} type="button" onClick={() => ai.setSettings({ ...ai.settings, enabled: false })}>停用</button>
+              <button className={ai.settings.enabled ? 'is-active' : ''} type="button" onClick={() => void persistAiSettings({ ...ai.settings, enabled: true })}>启用</button>
+              <button className={!ai.settings.enabled ? 'is-active' : ''} type="button" onClick={() => void persistAiSettings({ ...ai.settings, enabled: false })}>停用</button>
             </div></div>
             <label className="midi-field"><span>Endpoint</span>
               <input className="midi-select" type="url" value={draftEndpoint} placeholder="https://api.deepseek.com/v1/chat/completions" onChange={(event) => setDraftEndpoint(event.target.value)} />
@@ -120,11 +133,12 @@ export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX
               <AppButton
                 variant="secondary"
                 onClick={() => {
-                  ai.setSettings({
+                  void persistAiSettings({
                     ...ai.settings,
                     config: { ...ai.settings.config, endpoint: draftEndpoint, model: draftModel, apiKey: draftApiKey }
+                  }).then((saved) => {
+                    if (saved) setAiStatus('已保存（Key 使用系统加密存储）')
                   })
-                  setAiStatus('已保存（Key 仅存本机）')
                 }}
               >
                 保存 AI 设置
@@ -132,11 +146,12 @@ export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX
               <AppButton
                 variant="ghost"
                 onClick={() => {
-                  ai.setSettings({
+                  void persistAiSettings({
                     ...ai.settings,
                     config: { ...ai.settings.config, endpoint: draftEndpoint, model: draftModel, apiKey: draftApiKey }
+                  }).then((saved) => {
+                    if (saved) void ai.testConnection().then(setAiStatus)
                   })
-                  void ai.testConnection().then(setAiStatus)
                 }}
               >
                 测试连接

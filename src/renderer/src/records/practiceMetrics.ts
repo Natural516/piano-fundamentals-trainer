@@ -46,8 +46,10 @@ export function buildPerMeasurePracticeMetrics(
   timeline: ScoreTimeline,
   facts: PracticeFactForMetrics[],
   tempoRatio: number,
-  interruptionMeasures: number[] = []
+  interruptionMeasures: number[] = [],
+  iterationCount = 1
 ): PerMeasurePracticeMetrics[] {
+  const normalizedIterationCount = Math.max(1, Math.floor(iterationCount))
   const measures = new Map<number, PerMeasurePracticeMetrics>()
   const ensure = (measureNumber: number): PerMeasurePracticeMetrics => {
     const existing = measures.get(measureNumber)
@@ -80,10 +82,10 @@ export function buildPerMeasurePracticeMetrics(
   for (const unit of timeline.units) {
     const measure = ensure(unit.originalMeasure)
     if (unit.rest || unit.expectedMidi.length === 0) continue
-    measure.expectedJudgeableCount += 1
+    measure.expectedJudgeableCount += normalizedIterationCount
     const hand = unit.hand ?? 'both'
     const handMetrics = measure.handStats[hand] ?? emptyHandMetrics()
-    handMetrics.expectedJudgeableCount += 1
+    handMetrics.expectedJudgeableCount += normalizedIterationCount
     measure.handStats[hand] = handMetrics
   }
 
@@ -147,9 +149,11 @@ export function buildPracticeSummaryMetrics(
   timeline: ScoreTimeline,
   facts: PracticeFactForMetrics[],
   tempoRatio: number,
-  interruptionMeasures: number[] = []
+  interruptionMeasures: number[] = [],
+  iterationCount = 1
 ): PracticeSummaryMetrics {
-  const judgeableUnitCount = timeline.units.filter((unit) => !unit.rest && unit.expectedMidi.length > 0).length
+  const normalizedIterationCount = Math.max(1, Math.floor(iterationCount))
+  const judgeableUnitCount = timeline.units.filter((unit) => !unit.rest && unit.expectedMidi.length > 0).length * normalizedIterationCount
   const correct = facts.filter((fact) => fact.outcome === 'correct' || fact.outcome === 'early' || fact.outcome === 'late').length
   const timing = facts
     .filter((fact) => (fact.outcome === 'correct' || fact.outcome === 'early' || fact.outcome === 'late') && typeof fact.offsetMs === 'number')
@@ -165,7 +169,7 @@ export function buildPracticeSummaryMetrics(
   const errorCount = wrong + missing + extra
   const pitchDenominator = judgeableUnitCount + wrong + extra
   return {
-    totalUnits: timeline.units.length,
+    totalUnits: timeline.units.length * normalizedIterationCount,
     judgeableUnitCount,
     correct,
     wrong,
@@ -181,6 +185,12 @@ export function buildPracticeSummaryMetrics(
     averageSignedOffsetMs: timing.length > 0 ? Math.round(timing.reduce((sum, value) => sum + value, 0) / timing.length) : null,
     medianAbsoluteOffsetMs: medianAbsolute === null ? null : Math.round(medianAbsolute),
     maxAbsoluteOffsetMs: absolute.length > 0 ? Math.max(...absolute) : null,
-    perMeasureMetrics: buildPerMeasurePracticeMetrics(timeline, facts, tempoRatio, interruptionMeasures)
+    perMeasureMetrics: buildPerMeasurePracticeMetrics(
+      timeline,
+      facts,
+      tempoRatio,
+      interruptionMeasures,
+      normalizedIterationCount
+    )
   }
 }

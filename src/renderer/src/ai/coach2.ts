@@ -1,5 +1,4 @@
 import type { AbilityModelState } from '../ability/abilityModel'
-import type { PracticeSessionRecord } from '../utils/practiceRecordTypes'
 import type { DailyTrainingPlan } from '../plan/planner'
 import type { PlanItem } from '../plan/planner'
 import type { PracticeRecordV2 } from '../records/practiceRecordV2'
@@ -47,7 +46,7 @@ export interface CoachResponse {
 
 export interface CoachContext {
   selectedMeasures?: { start: number; end: number } | null
-  recentRecords: PracticeSessionRecord[]
+  recentRecords: PracticeRecordV2[]
   ability: AbilityModelState
   plan: DailyTrainingPlan | null
   userQuestion: string
@@ -92,7 +91,7 @@ export interface CoachScoreSession {
   facts: CoachScoreSessionFact[]
 }
 
-function recordRef(record: PracticeSessionRecord, measure?: number): EvidenceRef {
+function recordRef(record: PracticeRecordV2, measure?: number): EvidenceRef {
   return { practiceRecordId: record.id, measure: measure ?? null }
 }
 
@@ -154,10 +153,20 @@ export function buildDeterministicCoachResponse(context: CoachContext): CoachRes
 
   if (!session && context.recentRecords.length > 0) {
     const latest = context.recentRecords[0]
+    const legacy = latest as PracticeRecordV2 & {
+      moduleName?: string
+      accuracy?: number
+      wrongNoteCount?: number
+      missingNoteCount?: number
+    }
     const latestRef = recordRef(latest)
+    const metrics = Array.isArray(latest.metrics) ? latest.metrics : []
+    const accuracy = metrics.find((metric) => metric.key === 'accuracy')?.value ?? legacy.accuracy ?? 0
+    const wrong = metrics.find((metric) => metric.key === 'wrong' || metric.key === 'wrongNoteCount')?.value ?? legacy.wrongNoteCount ?? 0
+    const missing = metrics.find((metric) => metric.key === 'missing' || metric.key === 'missingNoteCount')?.value ?? legacy.missingNoteCount ?? 0
     evidenceRefs.push(latestRef)
     observations.push({
-      text: `最近一次${latest.moduleName}正确率 ${latest.accuracy}%，错音 ${latest.wrongNoteCount}，漏音 ${latest.missingNoteCount}。`,
+      text: `最近一次${legacy.practiceType ?? legacy.moduleName ?? '基本功'}练习正确率 ${accuracy}%，错音 ${wrong}，漏音 ${missing}。`,
       evidenceRefs: [latestRef]
     })
     if (intent === 'WHY_ERROR') {
