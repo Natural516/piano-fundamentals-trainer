@@ -88,6 +88,13 @@ const scoreCoachProvider = require('../src/renderer/src/ai/scoreCoachProvider.ts
 const scoreEngraving = require('../src/renderer/src/score/scoreEngraving.ts')
 const scoreSheetLayout = require('../src/renderer/src/score/scoreSheetLayout.ts')
 const scoreSheetBounds = require('../src/renderer/src/score/scoreSheetBounds.ts')
+const scoreSheetTimeAxis = require('../src/renderer/src/score/scoreSheetTimeAxis.ts')
+const {
+  Element: VexElement,
+  Stave: VexStave,
+  StaveNote: VexStaveNote,
+  Voice: VexVoice
+} = require('vexflow/bravura')
 
 function writeVlq(value) {
   const bytes = []
@@ -4616,6 +4623,168 @@ test('Grand Staff responsive layout：Case1 八小节在桌面分为 4+4，竖�
   }
 })
 
+function buildGrandStaffAxisDiagnostic(score, measureNumber) {
+  VexElement.setTextMeasurementCanvas({
+    getContext: () => ({
+      font: '',
+      measureText: (text) => ({
+        width: String(text).length * 10,
+        fontBoundingBoxAscent: 10,
+        fontBoundingBoxDescent: 3,
+        actualBoundingBoxAscent: 10,
+        actualBoundingBoxDescent: 3,
+        actualBoundingBoxLeft: 0,
+        actualBoundingBoxRight: String(text).length * 10
+      })
+    })
+  })
+
+  const measure = score.parts[0].measures.find((entry) => entry.number === measureNumber)
+  assert.ok(measure)
+  const events = scoreTimeV2.buildScoreTimeV2(score).events
+    .filter((event) => event.partIndex === 0 && event.measureNumber === measureNumber)
+  const beats = measure.timeBeats ?? 4
+  const beatType = measure.timeBeatType ?? 4
+  const totalTicks = Math.round(beats * 480 * 4 / beatType)
+  const treble = new VexStave(28, 22, 232)
+  const bass = new VexStave(28, 126, 232)
+  const headers = scoreSheetTimeAxis.configureScoreSheetHeaders(treble, bass, {
+    showHeader: true,
+    keySignature: 'C',
+    timeSignature: `${beats}/${beatType}`
+  })
+  const entries = []
+  const positions = []
+
+  const makeStaveNote = (noteModels, duration, staff, isRest) => {
+    const spec = scoreEngraving.getVexDurationSpec(noteModels[0] ?? null, duration)
+    const note = new VexStaveNote({
+      keys: isRest ? ['b/4'] : noteModels.map((model) => `${model.step.toLowerCase()}/${model.octave}`),
+      duration: `${spec.duration}${'d'.repeat(spec.dotCount)}${isRest ? 'r' : ''}`,
+      clef: staff === 2 ? 'bass' : 'treble'
+    })
+    return note
+  }
+
+  for (const [staff, stave] of [[1, treble], [2, bass]]) {
+    const staffEvents = events.filter((event) => event.staff === staff)
+    const eventsByVoice = new Map()
+    for (const event of staffEvents) {
+      const voiceEvents = eventsByVoice.get(event.voice) ?? []
+      voiceEvents.push(event)
+      eventsByVoice.set(event.voice, voiceEvents)
+    }
+    for (const voiceEvents of eventsByVoice.values()) {
+      const onsetGroups = new Map()
+      for (const event of voiceEvents) {
+        const group = onsetGroups.get(event.onsetInMeasure) ?? []
+        group.push(event)
+        onsetGroups.set(event.onsetInMeasure, group)
+      }
+      const tickables = []
+      let cursor = 0
+      for (const [onset, group] of [...onsetGroups.entries()].sort((left, right) => left[0] - right[0])) {
+        if (onset > cursor) tickables.push(makeStaveNote([], onset - cursor, staff, true))
+        const models = group.map((event) => measure.notes[event.noteIndex]).filter(Boolean)
+        const isRest = group.every((event) => event.type === 'rest')
+        const duration = Math.max(1, group[0].duration)
+        const staveNote = makeStaveNote(models, duration, staff, isRest)
+        tickables.push(staveNote)
+        if (!isRest) {
+          group.forEach((event) => positions.push({
+            midiPitch: event.midiPitch,
+            onset: event.onsetInMeasure,
+            sourceEventId: event.id,
+            staff,
+            staveNote
+          }))
+        }
+        cursor = Math.max(cursor, onset + duration)
+      }
+      if (cursor < totalTicks) tickables.push(makeStaveNote([], totalTicks - cursor, staff, true))
+      const voice = new VexVoice({ numBeats: beats, beatValue: beatType })
+      voice.setMode(VexVoice.Mode.SOFT).addTickables(tickables)
+      entries.push({ voice, stave })
+    }
+  }
+
+  const axis = scoreSheetTimeAxis.formatScoreSheetVoices(entries)
+  return {
+    axis,
+    headers,
+    positions: positions.map((position) => ({ ...position, x: position.staveNote.getAbsoluteX() }))
+  }
+}
+
+test('Grand Staff header/time-axis：双谱表 4/4 与共享 tick X，覆盖 Case1、同时和先后 onset', () => {
+  const case1 = musicXmlParser.loadMusicXmlDocument(
+    fs.readFileSync(require.resolve('../fixtures/golden/case1/案例1.musicxml'), 'utf8')
+  )
+  const case1Layout = buildGrandStaffAxisDiagnostic(case1, 1)
+  assert.deepEqual(case1Layout.headers.map((header) => ({
+    staff: header.staff,
+    clef: header.clef,
+    timeSignature: header.timeSignature
+  })), [
+    { staff: 1, clef: 'treble', timeSignature: '4/4' },
+    { staff: 2, clef: 'bass', timeSignature: '4/4' }
+  ])
+  assert.equal(case1Layout.headers[0].measureContentStartX, case1Layout.headers[1].measureContentStartX)
+  assert.equal(case1Layout.axis.measureContentStartX, case1Layout.headers[0].measureContentStartX)
+  const firstTarget = case1Layout.positions.filter((position) => position.onset === 0)
+  assert.deepEqual(firstTarget.map((position) => position.midiPitch).sort((left, right) => left - right), [41, 65, 69, 72])
+  assert.equal(new Set(firstTarget.map((position) => position.x)).size, 1, 'Case1 F2/F4/A4/C5 必须共享严格相同 X')
+  const targetX = firstTarget[0].x
+  console.log([
+    'DIAGNOSTIC Case1 System 1',
+    `Treble: clef=G timeSignature=4/4 measureContentStartX=${case1Layout.headers[0].measureContentStartX}`,
+    `Bass: clef=F timeSignature=4/4 measureContentStartX=${case1Layout.headers[1].measureContentStartX}`,
+    `Target 1: F2.x=${targetX} F4.x=${targetX} A4.x=${targetX} C5.x=${targetX}`
+  ].join('\n'))
+
+  const simultaneous = musicXmlParser.loadMusicXmlDocument(
+    fs.readFileSync(require.resolve('./score-fixtures/grand-staff-shared-onset.musicxml'), 'utf8')
+  )
+  const simultaneousLayout = buildGrandStaffAxisDiagnostic(simultaneous, 1)
+  const simultaneousNotes = simultaneousLayout.positions.filter((position) => position.midiPitch !== null)
+  assert.deepEqual(simultaneousNotes.map((position) => position.midiPitch).sort((left, right) => left - right), [48, 72])
+  assert.equal(simultaneousNotes[0].x, simultaneousNotes[1].x)
+  assert.ok(simultaneousLayout.headers.every((header) => header.timeSignature === '4/4'))
+
+  const sequential = musicXmlParser.loadMusicXmlDocument(
+    fs.readFileSync(require.resolve('./score-fixtures/grand-staff-sequential-onset.musicxml'), 'utf8')
+  )
+  const sequentialLayout = buildGrandStaffAxisDiagnostic(sequential, 1)
+  const bassC3 = sequentialLayout.positions.find((position) => position.midiPitch === 48)
+  const trebleC5 = sequentialLayout.positions.find((position) => position.midiPitch === 72)
+  assert.ok(bassC3 && trebleC5)
+  assert.equal(bassC3.onset, 0)
+  assert.equal(trebleC5.onset, 480)
+  assert.ok(bassC3.x < trebleC5.x, '不同 onset 必须保持真实先后顺序')
+})
+
+test('Golden Case1 Wait target 1：缺少 F2 的 partial chord 不推进，补齐后才推进', () => {
+  const case1 = musicXmlParser.loadMusicXmlDocument(
+    fs.readFileSync(require.resolve('../fixtures/golden/case1/案例1.musicxml'), 'utf8')
+  )
+  const wait = new waitScoreCore.WaitScoreCore(scoreTimeline.buildScoreTimeline(case1))
+  assert.deepEqual(wait.currentUnit.expectedMidi, [41, 65, 69, 72])
+  const firstIndex = wait.currentIndex
+  wait.processNoteOn(65)
+  wait.processNoteOn(69)
+  wait.processNoteOn(72)
+  const partialAdvanced = wait.currentIndex !== firstIndex
+  assert.equal(partialAdvanced, false, '只弹右手 FAC 不得推进')
+  assert.equal(wait.processNoteOn(41), 'none')
+  const completedAdvanced = wait.currentIndex === firstIndex + 1
+  assert.equal(completedAdvanced, true, '补齐左手 F2 后才允许推进')
+  console.log([
+    'DIAGNOSTIC Case1 Wait target 1 expectedMidi=[41,65,69,72]',
+    `Partial chord [65,69,72]: advanced=${partialAdvanced}`,
+    `After MIDI 41: advanced=${completedAdvanced}`
+  ].join('\n'))
+})
+
 test('Grand Staff notation bounds：Treble E6 与 Bass C1 ledger extents 均保留安全边距', () => {
   const ledgerScore = musicXmlParser.loadMusicXmlDocument(
     fs.readFileSync(require.resolve('./score-fixtures/grand-staff-ledger-extremes.musicxml'), 'utf8')
@@ -4636,6 +4805,10 @@ test('Grand Staff notation bounds：Treble E6 与 Bass C1 ledger extents 均保�
   )
   assert.ok(bass.systemHeight > scoreSheetLayout.SCORE_SHEET_GRAND_SYSTEM_HEIGHT, 'C1 必须按实际 ledger extent 扩展 system')
   assert.ok(bass.notationBottom <= bass.systemHeight - bass.safeMargin, 'C1 下加线/音符底部不得越过 viewport safe margin')
+  assert.ok(
+    scoreSheetBounds.calculateScoreSvgHeight(bass.systemHeight, bass.notationBottom) >= bass.notationBottom + bass.safeMargin,
+    '实际 notation bottom 后仍须保留 SVG 安全边距'
+  )
 
   const case1 = musicXmlParser.loadMusicXmlDocument(
     fs.readFileSync(require.resolve('../fixtures/golden/case1/案例1.musicxml'), 'utf8')

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Accidental,
   Dot,
-  Formatter,
   Renderer,
   Stave,
   StaveConnector,
@@ -17,11 +16,17 @@ import type { ScoreDocument, ScoreNoteModel } from '../score/musicXmlTypes'
 import { getVexDurationSpec } from '../score/scoreEngraving'
 import { buildScoreSheetLayout } from '../score/scoreSheetLayout'
 import {
+  calculateScoreSvgHeight,
   calculateScoreNotationBounds,
   SCORE_BASS_STAVE_Y,
   SCORE_TREBLE_STAVE_Y,
   type ScoreNotationBounds
 } from '../score/scoreSheetBounds'
+import {
+  configureScoreSheetHeaders,
+  formatScoreSheetVoices,
+  type ScoreSheetVoiceEntry
+} from '../score/scoreSheetTimeAxis'
 
 interface ScoreSheetRendererProps {
   score: ScoreDocument
@@ -113,6 +118,7 @@ interface RenderedNote {
   systemIndex: number
   tieStart: boolean
   tieStop: boolean
+  sourceEventId: string
 }
 
 function drawSheet(
@@ -175,6 +181,7 @@ function drawSheet(
   const style = { fillStyle: inkColor, strokeStyle: inkColor }
   const tieQueue = new Map<string, Array<{ note: RenderedNote }>>()
   const ties: StaveTie[] = []
+  let actualNotationBottom = 0
 
   container.dataset.systemCount = String(layout.systems.length)
   const measurePlacement = new Map<number, {
@@ -231,18 +238,19 @@ function drawSheet(
     const bassStave = hasBassStaff
       ? new Stave(x, systemTop + placement.contentOffsetY + SCORE_BASS_STAVE_Y, placement.measureWidth)
       : null
-    const keyName = FIFTHS_TO_KEY[fifths] ?? 'C'
-    if (showHeader || index === 0) {
-      trebleStave.addClef('treble').addKeySignature(keyName).addTimeSignature(`${beats}/${beatType}`)
-      bassStave?.addClef('bass').addKeySignature(keyName)
-    }
-
     const staffs: Array<{ stave: Stave; staffNumber: number }> = [{ stave: trebleStave, staffNumber: 1 }]
     if (bassStave) staffs.push({ stave: bassStave, staffNumber: 2 })
-
-    for (const { stave, staffNumber } of staffs) {
+    for (const { stave } of staffs) {
       stave.setStyle(style)
       stave.setContext(context)
+    }
+    const keyName = FIFTHS_TO_KEY[fifths] ?? 'C'
+    const headerDiagnostic = configureScoreSheetHeaders(trebleStave, bassStave, {
+      showHeader: showHeader || index === 0,
+      keySignature: keyName,
+      timeSignature: `${beats}/${beatType}`
+    })
+    for (const { stave } of staffs) {
       stave.drawWithStyle()
     }
 
@@ -258,18 +266,22 @@ function drawSheet(
     }
 
     const renderedNotes: RenderedNote[] = []
+    const voiceEntries: ScoreSheetVoiceEntry[] = []
+    const tuplets: Tuplet[] = []
     for (const { stave, staffNumber } of staffs) {
       const staffEvents = events.filter((event) => event.staff === staffNumber)
       if (staffEvents.length === 0) {
         const voice = new Voice({ numBeats: beats, beatValue: beatType })
         voice.setMode(Voice.Mode.SOFT)
         const restSpec = getVexDurationSpec(null, measureTicks(beats, beatType))
-        const rest = new StaveNote({ keys: ['b/4'], duration: `${restSpec.duration}r` })
+        const rest = new StaveNote({
+          keys: ['b/4'],
+          duration: `${restSpec.duration}${'d'.repeat(restSpec.dotCount)}r`
+        })
         addDots(rest, restSpec.dotCount)
         rest.setStyle(style)
         voice.addTickables([rest])
-        new Formatter().joinVoices([voice]).formatToStave([voice], stave)
-        voice.draw(context, stave)
+        voiceEntries.push({ voice, stave })
         continue
       }
 
@@ -280,7 +292,6 @@ function drawSheet(
         eventsByVoice.set(event.voice, voiceEvents)
       }
       const voices: Voice[] = []
-      const tuplets: Tuplet[] = []
       for (const voiceEvents of eventsByVoice.values()) {
         const groups = new Map<number, ScoreEventV2[]>()
         for (const event of voiceEvents) {
@@ -294,7 +305,10 @@ function drawSheet(
         for (const [onset, group] of [...groups.entries()].sort((left, right) => left[0] - right[0])) {
           if (onset > cursor) {
             const gapSpec = getVexDurationSpec(null, onset - cursor)
-            const gapRest = new StaveNote({ keys: ['b/4'], duration: `${gapSpec.duration}r` })
+            const gapRest = new StaveNote({
+              keys: ['b/4'],
+              duration: `${gapSpec.duration}${'d'.repeat(gapSpec.dotCount)}r`
+            })
             addDots(gapRest, gapSpec.dotCount)
             gapRest.setStyle(style)
             tickables.push(gapRest)
@@ -305,7 +319,7 @@ function drawSheet(
           const spec = getVexDurationSpec(notes[0] ?? null, duration)
           const staveNote = new StaveNote({
             keys: isRest ? ['b/4'] : notes.map(vexKey),
-            duration: `${spec.duration}${isRest ? 'r' : ''}`,
+            duration: `${spec.duration}${'d'.repeat(spec.dotCount)}${isRest ? 'r' : ''}`,
             clef: staffNumber === 2 ? 'bass' : 'treble'
           })
           addDots(staveNote, spec.dotCount)
@@ -344,7 +358,8 @@ function drawSheet(
               measureNumber,
               systemIndex: placement.systemIndex,
               tieStart: event.tieStart,
-              tieStop: event.tieStop
+              tieStop: event.tieStop,
+              sourceEventId: event.id
             }))
           }
           cursor = Math.max(cursor, onset + duration)
@@ -352,7 +367,10 @@ function drawSheet(
         const total = measureTicks(beats, beatType)
         if (cursor < total) {
           const fillSpec = getVexDurationSpec(null, total - cursor)
-          const fillRest = new StaveNote({ keys: ['b/4'], duration: `${fillSpec.duration}r` })
+          const fillRest = new StaveNote({
+            keys: ['b/4'],
+            duration: `${fillSpec.duration}${'d'.repeat(fillSpec.dotCount)}r`
+          })
           addDots(fillRest, fillSpec.dotCount)
           fillRest.setStyle(style)
           tickables.push(fillRest)
@@ -362,9 +380,30 @@ function drawSheet(
         voice.addTickables(tickables)
         voices.push(voice)
       }
-      new Formatter().joinVoices(voices).formatToStave(voices, stave)
-      for (const voice of voices) voice.draw(context, stave)
-      for (const tuplet of tuplets) tuplet.setContext(context).draw()
+      voices.forEach((voice) => voiceEntries.push({ voice, stave }))
+    }
+
+    const timeAxisDiagnostic = formatScoreSheetVoices(voiceEntries, context)
+    for (const entry of voiceEntries) entry.voice.draw(context, entry.stave)
+    for (const tuplet of tuplets) tuplet.setContext(context).draw()
+    for (const rendered of renderedNotes) {
+      const bounds = rendered.staveNote.getBoundingBox()
+      actualNotationBottom = Math.max(actualNotationBottom, bounds.getY() + bounds.getH())
+    }
+
+    if (index === 0) {
+      const notePositions = renderedNotes.map((rendered) => ({
+        sourceEventId: rendered.sourceEventId,
+        midiPitch: rendered.midiPitch,
+        staff: rendered.staff,
+        x: rendered.staveNote.getAbsoluteX()
+      }))
+      container.dataset.firstMeasureLayout = JSON.stringify({
+        system: 1,
+        headers: headerDiagnostic,
+        measureContentStartX: timeAxisDiagnostic.measureContentStartX,
+        notes: notePositions
+      })
     }
 
     for (const rendered of renderedNotes) {
@@ -407,6 +446,9 @@ function drawSheet(
 
   const svg = container.querySelector('svg')
   if (svg) {
+    const resolvedHeight = calculateScoreSvgHeight(layout.height, actualNotationBottom)
+    if (resolvedHeight > layout.height) renderer.resize(layout.width, resolvedHeight)
+    container.dataset.svgHeight = String(resolvedHeight)
     svg.style.background = paperColor
   }
 

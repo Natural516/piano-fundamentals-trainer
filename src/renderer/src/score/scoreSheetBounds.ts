@@ -29,6 +29,17 @@ export interface ScoreNotationBounds {
   safeMargin: number
 }
 
+export function calculateScoreSvgHeight(
+  layoutHeight: number,
+  actualNotationBottom: number,
+  safeMargin = SCORE_NOTATION_SAFE_MARGIN
+): number {
+  return Math.max(
+    Math.ceil(layoutHeight),
+    Math.ceil(actualNotationBottom + safeMargin)
+  )
+}
+
 function diatonicIndex(step: string, octave: number): number {
   return octave * 7 + (STEP_INDEX[step.toUpperCase()] ?? 0)
 }
