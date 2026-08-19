@@ -2034,6 +2034,159 @@ test('自由练习回放时间线有序并支持跳转与速度', () => {
   assert.equal(cursor.isFinished(), true)
 })
 
+test('F0 Free Practice integrity：统一 Session、真实 checkpoint、断线恢复、成功提交与失败重试', async () => {
+  const React = require('react')
+  const TestRenderer = require('react-test-renderer')
+  const { act } = TestRenderer
+  const previousWindow = global.window
+  const previousCustomEvent = global.CustomEvent
+  const values = new Map()
+  const listeners = new Map()
+  let failV2Write = false
+  const localStorage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) {
+      if (failV2Write && key === practiceRecordRepositoryModule.PRACTICE_RECORD_V2_STORAGE_KEY) {
+        throw new Error('simulated V2 quota failure')
+      }
+      values.set(key, String(value))
+    },
+    removeItem(key) { values.delete(key) }
+  }
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  global.CustomEvent = class CustomEvent {
+    constructor(type, init = {}) { this.type = type; this.detail = init.detail }
+  }
+  global.window = {
+    localStorage,
+    setInterval,
+    clearInterval,
+    setTimeout,
+    clearTimeout,
+    dispatchEvent(event) {
+      for (const listener of listeners.get(event.type) ?? []) listener(event)
+      return true
+    },
+    addEventListener(type, listener) { listeners.set(type, [...(listeners.get(type) ?? []), listener]) },
+    removeEventListener(type, listener) {
+      listeners.set(type, (listeners.get(type) ?? []).filter((entry) => entry !== listener))
+    }
+  }
+  midiEventBus.resetMidiEventBusForTests()
+
+  const pagePath = require.resolve('../src/renderer/src/components/FreePracticePage.tsx')
+  delete require.cache[pagePath]
+  const { FreePracticePage } = require(pagePath)
+  const audio = {
+    mode: 'builtin', setMode: () => undefined, pianoVolume: 80, setPianoVolume: () => undefined,
+    samplerStatus: { state: 'ready', samplePackLoaded: true, sampleCount: 88, activeVoices: 0, message: 'ready' },
+    enableAudio: async () => undefined, testPlayChord: async () => undefined,
+    playNote: () => undefined, stopNote: () => undefined, setSustain: () => undefined, stopAllNotes: () => undefined
+  }
+  const baseProps = {
+    activeNotes: [],
+    exitPromptOpen: false,
+    midiConnectionState: 'connected',
+    pianoAudio: audio,
+    onPracticeRunningChange: () => undefined
+  }
+  const buttonText = (node) => node.children.flat(Infinity).join('')
+  let renderer
+  const findButton = (label) => renderer.root.findAllByType('button').find((button) => buttonText(button) === label)
+
+  try {
+    practiceRecordRepositoryModule.practiceRecordRepository.clear()
+    values.delete(practiceSessionRepositoryModule.PRACTICE_SESSION_STORAGE_KEY)
+    await act(async () => { renderer = TestRenderer.create(React.createElement(FreePracticePage, baseProps)) })
+
+    await act(async () => findButton('开始练习').props.onClick())
+    let recovery = practiceSessionRepositoryModule.practiceSessionRepository.getRecoveryState()
+    assert.equal(recovery.status, 'RECOVERABLE_SESSION')
+    assert.equal(recovery.sessions.length, 1)
+    const firstSessionId = recovery.sessions[0].sessionId
+    assert.equal(recovery.sessions[0].state, 'ACTIVE', 'A: start 必须创建 ACTIVE session')
+
+    const now = Date.now()
+    await act(async () => {
+      midiEventBus.publishMidiEvent({ id: 1, type: 'noteOn', timestamp: now, deviceName: 'Regression MIDI', midiNumber: 48, velocity: 72 })
+      midiEventBus.publishMidiEvent({ id: 2, type: 'noteOn', timestamp: now + 10, deviceName: 'Regression MIDI', midiNumber: 72, velocity: 104 })
+      midiEventBus.publishMidiEvent({ id: 3, type: 'controlChange', timestamp: now + 20, deviceName: 'Regression MIDI', controllerNumber: 64, value: 127, sustainPedalDown: true })
+      renderer.root.findByType('textarea').props.onChange({ target: { value: '断线前事实' } })
+    })
+    await act(async () => findButton('暂停').props.onClick())
+    let draft = practiceSessionRepositoryModule.practiceSessionRepository.get(firstSessionId)
+    assert.equal(draft.state, 'PAUSED', 'B: Pause 必须写 PAUSED checkpoint')
+    assert.equal(draft.currentFacts.length, 1)
+    assert.equal(draft.currentFacts[0].factType, 'free_practice_snapshot')
+    assert.equal(draft.currentFacts[0].noteOnCount, 2)
+    assert.equal(draft.currentFacts[0].midiEvents.length, 3)
+    assert.equal(draft.currentFacts[0].notes, '断线前事实')
+    assert.equal('accuracy' in draft.currentFacts[0], false, '自由练习 checkpoint 不得伪造正确率')
+
+    await act(async () => findButton('继续').props.onClick())
+    draft = practiceSessionRepositoryModule.practiceSessionRepository.get(firstSessionId)
+    assert.equal(draft.state, 'ACTIVE', 'C: Resume 必须恢复 ACTIVE')
+
+    await act(async () => {
+      renderer.update(React.createElement(FreePracticePage, { ...baseProps, midiConnectionState: 'disconnected' }))
+    })
+    draft = practiceSessionRepositoryModule.practiceSessionRepository.get(firstSessionId)
+    assert.equal(draft.state, 'INTERRUPTED', 'D: MIDI disconnect 必须进入 INTERRUPTED')
+    assert.equal(draft.completionState, 'interrupted_device')
+    assert.equal(draft.currentFacts[0].noteOnCount, 2)
+    assert.equal(practiceSessionRepositoryModule.practiceSessionRepository.getRecoveryState().status, 'RECOVERABLE_SESSION')
+    assert.ok(findButton('继续'), '断线后不得继续显示为录制中')
+
+    await act(async () => {
+      renderer.update(React.createElement(FreePracticePage, baseProps))
+      findButton('继续').props.onClick()
+    })
+    await act(async () => findButton('结束').props.onClick())
+    const completedRecord = practiceRecordRepositoryModule.practiceRecordRepository.get(firstSessionId)
+    assert.ok(completedRecord, 'E: 正常 Finish 必须生成 V2 record')
+    assert.equal(completedRecord.completionState, 'completed')
+    assert.equal(completedRecord.metadata.notes, '断线前事实')
+    assert.equal(completedRecord.metrics.some((metric) => metric.key === 'accuracy'), false)
+    assert.equal(completedRecord.iterations[0].facts[0].noteOnCount, 2)
+    assert.equal(completedRecord.iterations[0].facts[0].midiEvents.length, 3)
+    assert.equal(practiceSessionRepositoryModule.practiceSessionRepository.isCommitted(firstSessionId), true)
+    assert.equal(practiceSessionRepositoryModule.practiceSessionRepository.getRecoveryState().status, 'NONE')
+
+    await act(async () => findButton('开始练习').props.onClick())
+    recovery = practiceSessionRepositoryModule.practiceSessionRepository.getRecoveryState()
+    const failedSessionId = recovery.sessions[0].sessionId
+    await act(async () => {
+      midiEventBus.publishMidiEvent({ id: 4, type: 'noteOn', timestamp: Date.now(), deviceName: 'Regression MIDI', midiNumber: 60, velocity: 90 })
+    })
+    failV2Write = true
+    await act(async () => findButton('结束').props.onClick())
+    draft = practiceSessionRepositoryModule.practiceSessionRepository.get(failedSessionId)
+    assert.equal(draft.state, 'COMPLETED', 'F: V2 失败后 completed draft 必须保留')
+    assert.equal(draft.currentFacts[0].noteOnCount, 1)
+    assert.equal(practiceSessionRepositoryModule.practiceSessionRepository.isCommitted(failedSessionId), false)
+    assert.equal(practiceSessionRepositoryModule.practiceSessionRepository.getRecoveryState().status, 'RECOVERABLE_SESSION')
+    assert.equal(practiceRecordRepositoryModule.practiceRecordRepository.get(failedSessionId), null)
+    assert.ok(renderer.root.findAllByProps({ className: 'practice-save-error' })
+      .some((node) => node.children.join('').includes('练习已完成，但记录保存失败；恢复草稿已保留。')))
+    assert.ok(findButton('重试保存'), '失败后页面必须提供重试，不能被提前 savedSessionId 阻止')
+
+    failV2Write = false
+    await act(async () => findButton('重试保存').props.onClick())
+    assert.ok(practiceRecordRepositoryModule.practiceRecordRepository.get(failedSessionId), 'G: write failure 后重试必须成功写入 V2')
+    assert.equal(practiceSessionRepositoryModule.practiceSessionRepository.isCommitted(failedSessionId), true)
+    assert.equal(practiceSessionRepositoryModule.practiceSessionRepository.getRecoveryState().status, 'NONE')
+  } finally {
+    failV2Write = false
+    if (renderer) await act(async () => renderer.unmount())
+    practiceRecordRepositoryModule.practiceRecordRepository.clear()
+    delete require.cache[pagePath]
+    midiEventBus.resetMidiEventBusForTests()
+    global.window = previousWindow
+    global.CustomEvent = previousCustomEvent
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT
+  }
+})
+
 test('教材目录：哈农元数据、车尔尼100目录与真实音阶/协调练习', () => {
   const hanon = curriculumCatalog.getCurriculumBook('hanon')
   const czerny = curriculumCatalog.getCurriculumBook('czerny-599')

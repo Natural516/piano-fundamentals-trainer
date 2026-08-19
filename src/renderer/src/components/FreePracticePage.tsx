@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ActiveMidiNote } from '../types'
+import { useEffect, useRef } from 'react'
+import type { ActiveMidiNote, MidiConnectionState } from '../types'
 import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { useFreePractice } from '../hooks/useFreePractice'
+import { useMidiDisconnectProtection } from '../hooks/useMidiDisconnectProtection'
 import type { UsePianoAudioResult } from '../hooks/usePianoAudio'
-import { createFreePracticeRecord } from '../utils/practiceRecordAdapters'
-import { savePracticeRecord } from '../utils/practiceRecordStorage'
 import { AppButton } from './AppButton'
 import { FullKeyboard } from './FullKeyboard'
 import { PracticePageHeader } from './PracticePageHeader'
@@ -13,6 +12,7 @@ import { PracticeStatBar } from './PracticeStatBar'
 interface FreePracticePageProps {
   activeNotes: ActiveMidiNote[]
   exitPromptOpen: boolean
+  midiConnectionState: MidiConnectionState
   pianoAudio: UsePianoAudioResult
   onPracticeRunningChange: (running: boolean) => void
 }
@@ -27,6 +27,7 @@ function formatDuration(ms: number): string {
 export function FreePracticePage({
   activeNotes,
   exitPromptOpen,
+  midiConnectionState,
   pianoAudio,
   onPracticeRunningChange
 }: FreePracticePageProps): JSX.Element {
@@ -36,8 +37,13 @@ export function FreePracticePage({
     stopNote: pianoAudio.stopNote,
     setSustain: pianoAudio.setSustain
   })
-  const savedSessionIdRef = useRef('')
+  const pausedForExitRef = useRef(false)
   const isRunning = practice.isRecording || practice.isPaused
+  useMidiDisconnectProtection(
+    midiConnectionState,
+    practice.isRecording,
+    practice.interruptDevice
+  )
 
   useEffect(() => {
     onPracticeRunningChange(isRunning)
@@ -46,30 +52,18 @@ export function FreePracticePage({
   useEffect(() => () => onPracticeRunningChange(false), [onPracticeRunningChange])
 
   useEffect(() => {
-    if (!isRunning) return
-    if (exitPromptOpen) practice.pause()
-    else if (practice.isPaused) practice.resume()
-  }, [exitPromptOpen, isRunning, practice.isPaused, practice.pause, practice.resume])
-
-  useEffect(() => {
-    const session = practice.session
-    if (practice.status !== 'finished' || !practice.stats || !session) return
-    if (savedSessionIdRef.current === session.id) return
-
-    savedSessionIdRef.current = session.id
-    const endedAtMs = Date.now()
-    const record = createFreePracticeRecord({
-      timing: {
-        id: session.id,
-        startedAt: new Date(session.startedAtMs).toISOString(),
-        endedAt: new Date(endedAtMs).toISOString(),
-        durationMs: Math.max(0, endedAtMs - session.startedAtMs)
-      },
-      stats: practice.stats,
-      notes: practice.notes
-    })
-    savePracticeRecord(record)
-  }, [practice.notes, practice.session, practice.stats, practice.status])
+    if (!isRunning) {
+      pausedForExitRef.current = false
+      return
+    }
+    if (exitPromptOpen && practice.isRecording) {
+      pausedForExitRef.current = true
+      practice.pause()
+    } else if (!exitPromptOpen && pausedForExitRef.current) {
+      pausedForExitRef.current = false
+      practice.resume()
+    }
+  }, [exitPromptOpen, isRunning, practice.isPaused, practice.isRecording, practice.pause, practice.resume])
 
   const stats = practice.stats
   const statusLabel = practice.status === 'recording'
@@ -108,14 +102,17 @@ export function FreePracticePage({
           </div>
 
           <div className="practice-primary-actions">
-            {practice.status === 'idle' || practice.status === 'finished' ? (
+            {practice.status === 'idle' || (practice.status === 'finished' && !practice.saveError) ? (
               <AppButton onClick={practice.start}>开始练习</AppButton>
             ) : null}
             {practice.status === 'recording' ? <AppButton variant="secondary" onClick={practice.pause}>暂停</AppButton> : null}
             {practice.status === 'paused' ? <AppButton onClick={practice.resume}>继续</AppButton> : null}
             {practice.isRecording || practice.isPaused ? <AppButton variant="secondary" onClick={practice.finish}>结束</AppButton> : null}
-            {practice.status === 'finished' ? <AppButton variant="ghost" onClick={practice.reset}>返回空闲</AppButton> : null}
+            {practice.status === 'finished' && practice.saveError ? <AppButton onClick={practice.retrySave}>重试保存</AppButton> : null}
+            {practice.status === 'finished' && !practice.saveError ? <AppButton variant="ghost" onClick={practice.reset}>返回空闲</AppButton> : null}
           </div>
+
+          {practice.saveError ? <p className="practice-save-error">{practice.saveError}</p> : null}
 
           <label className="free-practice__notes">
             <span>备注</span>

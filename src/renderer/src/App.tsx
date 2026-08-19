@@ -281,6 +281,7 @@ function App(): JSX.Element {
           <FreePracticePage
             activeNotes={midi.activeNotes}
             exitPromptOpen={pendingNavigation !== null}
+            midiConnectionState={midi.sidebarStatus.connectionState}
             pianoAudio={pianoAudio}
             onPracticeRunningChange={handlePracticeRunningChange}
           />

@@ -32,6 +32,13 @@ export interface RecordingStats {
   rightRegionNoteOnCount: number
 }
 
+export interface RecordingSnapshotFact extends RecordingStats {
+  factType: 'free_practice_snapshot'
+  capturedAt: string
+  notes: string | null
+  midiEvents: RecordedMidiEvent[]
+}
+
 export interface PlaybackAction {
   timeMs: number
   type: 'noteOn' | 'noteOff' | 'controlChange'
@@ -119,6 +126,20 @@ export function summarizeRecording(session: RecordingSession, endedAtMs?: number
     densityPerSecond: endTime > 0 ? Math.round((noteOns.length / endTime) * 1000 * 10) / 10 : null,
     leftRegionNoteOnCount: noteOns.filter((event) => (event.midiNumber as number) < 60).length,
     rightRegionNoteOnCount: noteOns.filter((event) => (event.midiNumber as number) >= 60).length
+  }
+}
+
+export function createRecordingSnapshotFact(
+  session: RecordingSession,
+  capturedAtMs: number,
+  notes: string
+): RecordingSnapshotFact {
+  return {
+    factType: 'free_practice_snapshot',
+    capturedAt: new Date(capturedAtMs).toISOString(),
+    ...summarizeRecording(session, capturedAtMs),
+    notes: notes.trim() || null,
+    midiEvents: session.events.map((event) => ({ ...event }))
   }
 }
 
