@@ -87,10 +87,10 @@ const DEMO_SCORE_XML = `<?xml version="1.0" encoding="UTF-8"?>
     </measure>
     <measure number="2">
       <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><tie type="start"/></note>
-      <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice></note>
-      <note><pitch><step>G</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice></note>
-      <note><chord/><pitch><step>C</step><octave>5</octave></pitch><duration>1</duration><voice>2</voice></note>
       <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><tie type="stop"/></note>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><chord/><pitch><step>C</step><octave>5</octave></pitch><duration>1</duration><voice>1</voice></note>
+      <note><rest/><duration>1</duration><voice>1</voice></note>
     </measure>
   </part>
 </score-partwise>`

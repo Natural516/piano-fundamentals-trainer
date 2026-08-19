@@ -17,6 +17,7 @@ const moduleTones: Record<PracticeModule, string> = {
   scale: 'cyan',
   chord: 'amber',
   coordination: 'rose',
+  score: 'cyan',
   'free-practice': 'cyan'
 }
 

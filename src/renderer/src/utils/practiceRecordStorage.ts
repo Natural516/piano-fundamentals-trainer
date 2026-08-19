@@ -7,6 +7,7 @@ import {
 } from './practiceRecordTypes'
 import { practiceRecordRepository } from '../records/practiceRecordRepository'
 import { fromLegacyRecord } from '../records/practiceRecordV2'
+import { toPracticeSessionRecordViewModels } from '../records/practiceRecordViewModel'
 import { DAILY_PLAN_V2_STORAGE_KEY } from '../plan/dailyPlanV2Storage'
 
 export const PRACTICE_RECORD_STORAGE_KEY = 'piano-trainer.practice-records.v1'
@@ -18,7 +19,7 @@ export interface PracticeStorageResult {
   message?: string
 }
 
-const modules = new Set<PracticeModule>(['sight-reading', 'rhythm', 'scale', 'chord', 'coordination', 'free-practice'])
+const modules = new Set<PracticeModule>(['sight-reading', 'rhythm', 'scale', 'chord', 'coordination', 'score', 'free-practice'])
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -132,7 +133,7 @@ function notifyRecordsChanged(): void {
   }
 }
 
-export function readPracticeRecords(): PracticeSessionRecord[] {
+function readLegacyPracticeRecords(): PracticeSessionRecord[] {
   if (typeof window === 'undefined') return []
 
   try {
@@ -157,6 +158,16 @@ export function readPracticeRecords(): PracticeSessionRecord[] {
   }
 }
 
+/**
+ * Canonical user-facing history. V1 is read only to perform the idempotent
+ * compatibility migration; every returned item is rebuilt from V2.
+ */
+export function readPracticeRecords(): PracticeSessionRecord[] {
+  if (typeof window === 'undefined') return []
+  practiceRecordRepository.migrateLegacy(readLegacyPracticeRecords())
+  return toPracticeSessionRecordViewModels(practiceRecordRepository.list()).slice(0, MAX_PRACTICE_RECORDS)
+}
+
 export function savePracticeRecord(
   record: PracticeSessionRecord,
   completionState: 'completed' | 'stopped' | 'interrupted_device' | 'recovered' = record.status === 'stopped' ? 'stopped' : 'completed'
@@ -164,15 +175,11 @@ export function savePracticeRecord(
   if (typeof window === 'undefined') return { success: false, message: '当前环境无法保存练习记录。' }
 
   try {
-    const records = readPracticeRecords()
     const v2Record = { ...fromLegacyRecord(record), sessionId: record.id, completionState }
-    if (!practiceRecordRepository.add(v2Record)) {
-      return { success: false, message: '练习事实未能写入统一 V2 记录，请检查本地存储权限。' }
+    const saved = practiceRecordRepository.addResult(v2Record)
+    if (!saved.success) {
+      return { success: false, message: `练习事实未能写入统一 V2 记录：${saved.error ?? saved.reason ?? '请检查本地存储权限'}` }
     }
-    if (records.some((candidate) => candidate.id === record.id)) return { success: true }
-
-    const nextRecords = sortNewestFirst([record, ...records]).slice(0, MAX_PRACTICE_RECORDS)
-    window.localStorage.setItem(PRACTICE_RECORD_STORAGE_KEY, JSON.stringify(nextRecords))
     notifyRecordsChanged()
     return { success: true }
   } catch (error) {

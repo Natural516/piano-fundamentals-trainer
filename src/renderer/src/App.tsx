@@ -23,7 +23,6 @@ import { pageTitles } from './data'
 import { useMidi } from './hooks/useMidi'
 import { usePianoAudio } from './hooks/usePianoAudio'
 import { usePracticeHistory } from './hooks/usePracticeHistory'
-import { practiceRecordRepository } from './records/practiceRecordRepository'
 import type { ScorePracticePreset } from './plan/planner'
 import type { PageId } from './types'
 import {
@@ -75,10 +74,6 @@ function App(): JSX.Element {
   const midi = useMidi()
   const pianoAudio = usePianoAudio()
   const practiceHistory = usePracticeHistory()
-
-  useEffect(() => {
-    practiceRecordRepository.migrateLegacy(practiceHistory.records)
-  }, [practiceHistory.records])
 
   const currentTitle = useMemo(() => pageTitles[currentPage], [currentPage])
   const isHomePage = currentPage === 'home'

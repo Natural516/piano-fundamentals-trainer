@@ -2734,6 +2734,49 @@ test('F0.1 Session Repository：三轮事实、Pause、Stop、断线恢复与幂
   assert.equal(failed.reason, 'write_failed')
 })
 
+test('F0 audit Session recovery：COMPLETED 未持久化记录仍可恢复，commit 后消失', () => {
+  const sessionValues = new Map()
+  const sessionStorage = {
+    getItem(key) { return sessionValues.has(key) ? sessionValues.get(key) : null },
+    setItem(key, value) { sessionValues.set(key, String(value)) },
+    removeItem(key) { sessionValues.delete(key) }
+  }
+  const sessionRepo = practiceSessionRepositoryModule.createPracticeSessionRepository(sessionStorage)
+  const facts = [{ unitId: 'm2-b1', outcome: 'correct', expectedMidi: [60], actualMidi: 60 }]
+  assert.equal(sessionRepo.start({ practiceType: 'score', scoreId: 'S' }, 'completed-uncommitted').success, true)
+  assert.equal(sessionRepo.finish('completed-uncommitted', 'completed', facts).success, true)
+
+  const record = {
+    id: 'completed-uncommitted', sessionId: 'completed-uncommitted', schemaVersion: 2,
+    completionState: 'completed', practiceType: 'score', sourceType: 'musicxml', sourceId: 'S', scoreId: 'S',
+    startedAt: '2026-08-20T00:00:00.000Z', endedAt: '2026-08-20T00:01:00.000Z', durationMs: 60000,
+    metrics: [{ key: 'accuracy', value: 100 }], errorEvents: [], evidenceRefs: [], metadata: {}
+  }
+  const failingRecordRepo = practiceRecordRepositoryModule.createPracticeRecordRepository({
+    getItem() { return null },
+    setItem() { throw new Error('quota exceeded') },
+    removeItem() {}
+  })
+  assert.equal(failingRecordRepo.addResult(record).success, false)
+
+  const restarted = practiceSessionRepositoryModule.createPracticeSessionRepository(sessionStorage)
+  const recovery = restarted.getRecoveryState()
+  assert.equal(recovery.status, 'RECOVERABLE_SESSION')
+  assert.equal(recovery.sessions[0].state, 'COMPLETED')
+  assert.equal(recovery.sessions[0].completionState, 'completed')
+  assert.deepEqual(recovery.sessions[0].currentFacts, facts)
+
+  const recordValues = new Map()
+  const successfulRecordRepo = practiceRecordRepositoryModule.createPracticeRecordRepository({
+    getItem(key) { return recordValues.has(key) ? recordValues.get(key) : null },
+    setItem(key, value) { recordValues.set(key, String(value)) },
+    removeItem(key) { recordValues.delete(key) }
+  })
+  assert.equal(successfulRecordRepo.addResult(record).success, true)
+  assert.equal(restarted.commit('completed-uncommitted').success, true)
+  assert.equal(practiceSessionRepositoryModule.createPracticeSessionRepository(sessionStorage).getRecoveryState().status, 'NONE')
+})
+
 test('F0.1 Mastery：真实最近窗口与 hand/mode/tempo 条件隔离', () => {
   const makeRecord = (id, accuracy, endedAt, overrides = {}) => ({
     id,
@@ -2841,6 +2884,92 @@ test('F0.1 PracticeRecordV2：read/write 异常必须返回失败', () => {
   assert.equal(writeFailRepo.addResult(base).reason, 'write_failed')
 })
 
+test('F0 audit V2 canonical history：首页/历史/统计不依赖新写 V1，legacy migration 幂等', async () => {
+  const React = require('react')
+  const TestRenderer = require('react-test-renderer')
+  const { act } = TestRenderer
+  const storageModule = require('../src/renderer/src/utils/practiceRecordStorage.ts')
+  const usePracticeHistoryModule = require('../src/renderer/src/hooks/usePracticeHistory.ts')
+  const previousWindow = global.window
+  const previousCustomEvent = global.CustomEvent
+  const values = new Map()
+  const listeners = new Map()
+  const localStorage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) {
+      if (key === storageModule.PRACTICE_RECORD_STORAGE_KEY) throw new Error('legacy V1 is read-only')
+      values.set(key, String(value))
+    },
+    removeItem(key) { values.delete(key) }
+  }
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  global.CustomEvent = class CustomEvent { constructor(type) { this.type = type } }
+  global.window = {
+    localStorage,
+    dispatchEvent(event) { for (const listener of listeners.get(event.type) ?? []) listener(event); return true },
+    addEventListener(type, listener) { listeners.set(type, [...(listeners.get(type) ?? []), listener]) },
+    removeEventListener(type, listener) { listeners.set(type, (listeners.get(type) ?? []).filter((entry) => entry !== listener)) }
+  }
+  let renderer
+  let latest = null
+  try {
+    storageModule.clearPracticeRecords()
+    const timestamp = new Date().toISOString()
+    const saved = storageModule.savePracticeRecord({
+      id: 'v2-only-home-history', schemaVersion: 1, module: 'scale', moduleName: '音阶练习',
+      title: 'V2 独立事实源', startedAt: timestamp, endedAt: timestamp, durationMs: 120000,
+      status: 'completed', totalEvents: 10, correctEvents: 9, accuracy: 90, wrongNoteCount: 1,
+      missingNoteCount: 0, extraNoteCount: 0, earlyCount: 0, lateCount: 0, restErrorCount: 0,
+      syncWarningCount: 0, contentId: 'C-major', contentName: 'C 大调', bpm: 80, loopCount: 1,
+      settings: { key: 'C' }, details: {}, mistakes: [{ label: 'D4', count: 1, type: 'wrong_note' }]
+    })
+    assert.equal(saved.success, true)
+    assert.equal(values.has(storageModule.PRACTICE_RECORD_STORAGE_KEY), false, '新练习不得写 V1')
+    assert.equal(JSON.parse(values.get(practiceRecordRepositoryModule.PRACTICE_RECORD_V2_STORAGE_KEY)).length, 1)
+
+    const Harness = () => {
+      latest = usePracticeHistoryModule.usePracticeHistory()
+      return React.createElement('output', null, `${latest.records.length}:${latest.todayStats.completedSessions}`)
+    }
+    await act(async () => { renderer = TestRenderer.create(React.createElement(Harness)) })
+    assert.equal(latest.records.length, 1, 'History 必须从 V2 ViewModel 看到记录')
+    assert.equal(latest.recentRecords[0].title, 'V2 独立事实源', '首页最近练习必须从 V2 看到记录')
+    assert.equal(latest.todayStats.completedSessions, 1, '首页 Today stats 必须从 V2 计算')
+    assert.equal(latest.todayStats.accuracy, 90)
+    assert.equal(periodStats.computePeriodStats(latest.records, new Date(), 'today').sessions, 1, 'Analytics 必须消费同一 V2 ViewModel')
+  } finally {
+    if (renderer) await act(async () => renderer.unmount())
+    practiceRecordRepositoryModule.practiceRecordRepository.clear()
+    global.window = previousWindow
+    global.CustomEvent = previousCustomEvent
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT
+  }
+
+  const legacyValues = new Map()
+  const legacyStorage = {
+    getItem(key) { return legacyValues.has(key) ? legacyValues.get(key) : null },
+    setItem(key, value) { legacyValues.set(key, String(value)) },
+    removeItem(key) { legacyValues.delete(key) }
+  }
+  const legacyTimestamp = '2026-08-20T01:00:00.000Z'
+  legacyValues.set(storageModule.PRACTICE_RECORD_STORAGE_KEY, JSON.stringify([{
+    id: 'legacy-once', schemaVersion: 1, module: 'rhythm', moduleName: '节奏与切分', title: '旧记录',
+    startedAt: legacyTimestamp, endedAt: legacyTimestamp, durationMs: 1000, status: 'completed',
+    totalEvents: 1, correctEvents: 1, accuracy: 100, wrongNoteCount: 0, missingNoteCount: 0,
+    extraNoteCount: 0, earlyCount: 0, lateCount: 0, restErrorCount: 0, syncWarningCount: 0,
+    settings: {}, details: {}, mistakes: []
+  }]))
+  global.window = { localStorage: legacyStorage, dispatchEvent() { return true } }
+  try {
+    assert.equal(storageModule.readPracticeRecords().length, 1)
+    assert.equal(storageModule.readPracticeRecords().length, 1)
+    assert.equal(practiceRecordRepositoryModule.practiceRecordRepository.list().filter((record) => record.id === 'legacy-once').length, 1)
+  } finally {
+    practiceRecordRepositoryModule.practiceRecordRepository.clear()
+    global.window = previousWindow
+  }
+})
+
 test('AI 设置：默认停用、净化、安全存储且 Renderer localStorage 不含 Key', async () => {
   const defaults = aiSettings.createDefaultAiSettings()
   assert.equal(defaults.enabled, false)
@@ -2883,6 +3012,39 @@ test('AI 设置：默认停用、净化、安全存储且 Renderer localStorage 
   })
   assert.equal(secretFailure.success, false)
   assert.equal(secretFailure.reason, 'secret_write_failed')
+
+  const migrationValues = new Map([['ai-settings.v1', JSON.stringify(sanitized)]])
+  const migrationStorage = {
+    getItem(key) { return migrationValues.has(key) ? migrationValues.get(key) : null },
+    setItem(key, value) { migrationValues.set(key, String(value)) }
+  }
+  const migrationFailure = await aiSettings.loadAiSettings(migrationStorage, {
+    ...secretBridge,
+    async setAiApiKey() { return { success: false, reason: 'encryption_unavailable' } }
+  })
+  assert.equal(migrationFailure.config.apiKey, '', '安全迁移失败后不得使用旧明文 Key')
+  assert.equal(migrationFailure.securityError?.reason, 'secret_migration_failed')
+  assert.match(migrationFailure.securityError?.error ?? '', /encryption_unavailable/)
+  assert.match(migrationValues.get('ai-settings.v1'), /sk-secret/, '安全迁移失败不得擦除旧明文，等待用户处理')
+
+  const previousWindow = global.window
+  global.window = { localStorage: storage }
+  try {
+    const missingBridge = await aiSettings.writeAiSettings(sanitized, storage)
+    assert.equal(missingBridge.success, false, '生产 preload secret bridge 缺失不得伪装保存成功')
+    assert.equal(missingBridge.reason, 'secret_write_failed')
+    assert.equal(missingBridge.error, 'secret_bridge_unavailable')
+  } finally {
+    global.window = previousWindow
+  }
+
+  secureValue = ''
+  migrationValues.set('ai-settings.v1', JSON.stringify(sanitized))
+  const migrated = await aiSettings.loadAiSettings(migrationStorage, secretBridge)
+  assert.equal(migrated.securityError, undefined)
+  assert.equal(migrated.config.apiKey, 'sk-secret')
+  assert.equal(secureValue, 'sk-secret')
+  assert.doesNotMatch(migrationValues.get('ai-settings.v1'), /sk-secret/, '安全迁移成功后必须 scrub 旧明文')
 })
 
 test('AI 教练：快照不含 Key、消息分层、输出校验与回退', () => {
@@ -5101,6 +5263,89 @@ test('React lifecycle：Score Practice start/MIDI/render/pause/resume 保持状�
   }
 })
 
+test('F0 audit Score Practice 默认入口：无 initialSegment 真实 mount 且 Demo 通过 Profile', async () => {
+  const React = require('react')
+  const TestRenderer = require('react-test-renderer')
+  const { act } = TestRenderer
+  const previousWindow = global.window
+  const previousCustomEvent = global.CustomEvent
+  const values = new Map()
+  const localStorage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) },
+    removeItem(key) { values.delete(key) }
+  }
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  global.CustomEvent = class CustomEvent { constructor(type) { this.type = type } }
+  global.window = {
+    localStorage,
+    setInterval,
+    clearInterval,
+    setTimeout,
+    clearTimeout,
+    dispatchEvent: () => true
+  }
+  midiEventBus.resetMidiEventBusForTests()
+
+  const scoreRendererPath = require.resolve('../src/renderer/src/components/ScoreSheetRenderer.tsx')
+  const pagePath = require.resolve('../src/renderer/src/components/ScorePracticePage.tsx')
+  const previousScoreRendererCache = require.cache[scoreRendererPath]
+  let renderedScore = null
+  require.cache[scoreRendererPath] = {
+    id: scoreRendererPath,
+    filename: scoreRendererPath,
+    loaded: true,
+    exports: {
+      ScoreSheetRenderer: ({ score }) => {
+        renderedScore = score
+        return React.createElement('div', { 'data-score-renderer': score.title })
+      }
+    },
+    children: [],
+    paths: []
+  }
+  delete require.cache[pagePath]
+  let renderer
+  try {
+    const { ScorePracticePage } = require(pagePath)
+    const audio = {
+      mode: 'builtin', setMode: () => undefined, pianoVolume: 80, setPianoVolume: () => undefined,
+      samplerStatus: { state: 'idle', samplePackLoaded: false, sampleCount: 0, activeVoices: 0, message: '' },
+      enableAudio: async () => undefined, testPlayChord: async () => undefined,
+      playNote: () => undefined, stopNote: () => undefined, setSustain: () => undefined, stopAllNotes: () => undefined
+    }
+    await act(async () => {
+      renderer = TestRenderer.create(React.createElement(ScorePracticePage, {
+        activeNotes: [],
+        exitPromptOpen: false,
+        initialSegment: null,
+        pianoAudio: audio,
+        midiConnectionState: 'connected',
+        onPracticeRunningChange: () => undefined
+      }))
+      await Promise.resolve()
+    })
+    assert.ok(renderedScore, '默认入口必须渲染示例谱面')
+    assert.equal(renderedScore.title, 'Wait Demo')
+    assert.equal(renderedScore.trainingProfile?.trainingSafe, true)
+    const buttonText = (node) => node.children.flat(Infinity).join('')
+    assert.ok(renderer.root.findAllByType('button').some((button) => buttonText(button) === '开始练习'))
+    const loadExample = renderer.root.findAllByType('button').find((button) => buttonText(button) === '加载示例')
+    assert.ok(loadExample)
+    await act(async () => loadExample.props.onClick())
+    assert.equal(renderedScore.trainingProfile?.trainingSafe, true, '加载示例按钮不得绕过 Validator')
+  } finally {
+    if (renderer) await act(async () => renderer.unmount())
+    delete require.cache[pagePath]
+    if (previousScoreRendererCache) require.cache[scoreRendererPath] = previousScoreRendererCache
+    else delete require.cache[scoreRendererPath]
+    midiEventBus.resetMidiEventBusForTests()
+    global.window = previousWindow
+    global.CustomEvent = previousCustomEvent
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT
+  }
+})
+
 test('React page lifecycle + MXL provenance：父级等值 rerender 不重载，plan preset/record 保持 mxl', async () => {
   const React = require('react')
   const TestRenderer = require('react-test-renderer')
@@ -5183,7 +5428,7 @@ test('React page lifecycle + MXL provenance：父级等值 rerender 不重载，
 
     const criteria = { type: 'score-segment', scoreId: 'MXL Provenance', startMeasure: 2, endMeasure: 2, mode: 'wait', handMode: 'both', tempoRatio: 0.6, requiredConsecutiveSuccesses: 3, requireNoErrors: true, minimumPitchAccuracy: 100, minimumTimingAccuracy: null }
     const planItem = { exerciseId: 'score:MXL Provenance:2', targetSkillIds: ['score-performance'], minutes: 10, mode: 'wait', handMode: 'both', criteria, successCriteria: planner.formatScoreSuccessCriteria(criteria), whyThis: 'weak', evidenceRefs: [] }
-    localStorage.setItem(dailyPlanV2Storage.DAILY_PLAN_V2_STORAGE_KEY, JSON.stringify({ version: 1, planId: 'plan', date: new Date().toISOString().slice(0, 10), generatedAt: new Date().toISOString(), sourceEvidenceSnapshot: { recordCount: 0, masteryScoreCount: 1, planItemCount: 1 }, items: [planItem], progress: {} }))
+    localStorage.setItem(dailyPlanV2Storage.DAILY_PLAN_V2_STORAGE_KEY, JSON.stringify({ version: 1, planId: 'plan', date: localCalendarDate.formatCalendarDate(new Date()), generatedAt: new Date().toISOString(), sourceEvidenceSnapshot: { recordCount: 0, masteryScoreCount: 1, planItemCount: 1 }, items: [planItem], progress: {} }))
     const { TrainingPlanPage } = require('../src/renderer/src/components/TrainingPlanPage.tsx')
     let openedPreset = null
     await act(async () => {

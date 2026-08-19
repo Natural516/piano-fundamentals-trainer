@@ -6,6 +6,7 @@ import {
   clearPracticeRecords,
   readPracticeRecords
 } from '../utils/practiceRecordStorage'
+import { PRACTICE_RECORD_V2_STORAGE_KEY, practiceRecordRepository } from '../records/practiceRecordRepository'
 import type { PracticeSessionRecord, TodayPracticeStats } from '../utils/practiceRecordTypes'
 
 export interface UsePracticeHistoryResult {
@@ -27,12 +28,14 @@ export function usePracticeHistory(): UsePracticeHistoryResult {
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent): void => {
-      if (event.key === PRACTICE_RECORD_STORAGE_KEY) refresh()
+      if (event.key === PRACTICE_RECORD_STORAGE_KEY || event.key === PRACTICE_RECORD_V2_STORAGE_KEY) refresh()
     }
 
+    const unsubscribe = practiceRecordRepository.subscribe(refresh)
     window.addEventListener(PRACTICE_RECORDS_CHANGED_EVENT, refresh)
     window.addEventListener('storage', handleStorage)
     return () => {
+      unsubscribe()
       window.removeEventListener(PRACTICE_RECORDS_CHANGED_EVENT, refresh)
       window.removeEventListener('storage', handleStorage)
     }
@@ -56,4 +59,3 @@ export function usePracticeHistory(): UsePracticeHistoryResult {
     clearAll
   }
 }
-

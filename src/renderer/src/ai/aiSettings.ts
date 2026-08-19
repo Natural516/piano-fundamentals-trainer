@@ -7,6 +7,19 @@ export interface AiSettingsStorageResult {
   error?: string
 }
 
+export type AiSettingsSecurityErrorReason =
+  | 'secret_bridge_unavailable'
+  | 'secret_migration_failed'
+  | 'secret_read_failed'
+  | 'metadata_scrub_failed'
+
+export interface AiSettingsLoadResult extends AiSettingsState {
+  securityError?: {
+    reason: AiSettingsSecurityErrorReason
+    error: string
+  }
+}
+
 interface SecretResult<T = null> {
   success: boolean
   value?: T
@@ -22,23 +35,10 @@ export interface AiSecretBridge {
   hasAiApiKey: () => Promise<SecretResult>
 }
 
-let volatileApiKey = ''
-
-const volatileSecretBridge: AiSecretBridge = {
-  getAiApiKey: async () => ({ success: true, value: volatileApiKey, configured: Boolean(volatileApiKey) }),
-  setAiApiKey: async (value) => {
-    volatileApiKey = value
-    return { success: true, configured: Boolean(value) }
-  },
-  deleteAiApiKey: async () => {
-    volatileApiKey = ''
-    return { success: true, configured: false }
-  },
-  hasAiApiKey: async () => ({ success: true, configured: Boolean(volatileApiKey) })
-}
-
-function resolveSecretBridge(bridge?: AiSecretBridge): AiSecretBridge {
-  return bridge ?? window.pianoApp?.secrets ?? volatileSecretBridge
+function resolveSecretBridge(bridge?: AiSecretBridge): AiSecretBridge | null {
+  if (bridge) return bridge
+  if (typeof window === 'undefined') return null
+  return window.pianoApp?.secrets ?? null
 }
 
 export function createDefaultAiSettings(): AiSettingsState {
@@ -92,7 +92,7 @@ export function readAiSettings(storage: Pick<Storage, 'getItem'> = window.localS
 export async function loadAiSettings(
   storage: Pick<Storage, 'getItem' | 'setItem'> = window.localStorage,
   secretBridge?: AiSecretBridge
-): Promise<AiSettingsState> {
+): Promise<AiSettingsLoadResult> {
   let parsed = createDefaultAiSettings()
   try {
     const raw = storage.getItem(AI_SETTINGS_STORAGE_KEY)
@@ -101,21 +101,65 @@ export async function loadAiSettings(
     parsed = createDefaultAiSettings()
   }
   const bridge = resolveSecretBridge(secretBridge)
-  let apiKey = ''
+  const metadata: AiSettingsState = { ...parsed, config: { ...parsed.config, apiKey: '' } }
   if (parsed.config.apiKey) {
+    if (!bridge) {
+      return {
+        ...metadata,
+        securityError: {
+          reason: 'secret_bridge_unavailable',
+          error: '安全凭据桥不可用，旧 API Key 尚未迁移且未被使用或删除。'
+        }
+      }
+    }
     const migrated = await bridge.setAiApiKey(parsed.config.apiKey)
-    if (migrated.success) apiKey = parsed.config.apiKey
-  } else {
-    const stored = await bridge.getAiApiKey()
-    if (stored.success && typeof stored.value === 'string') apiKey = stored.value
+    if (!migrated.success) {
+      return {
+        ...metadata,
+        securityError: {
+          reason: 'secret_migration_failed',
+          error: `旧 API Key 安全迁移失败（${migrated.error ?? migrated.reason ?? 'unknown'}），明文副本已保留但不会用于请求。`
+        }
+      }
+    }
+    try {
+      storage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(metadata))
+    } catch (error) {
+      return {
+        ...metadata,
+        config: { ...metadata.config, apiKey: parsed.config.apiKey },
+        securityError: {
+          reason: 'metadata_scrub_failed',
+          error: `API Key 已进入安全存储，但旧明文元数据清理失败：${error instanceof Error ? error.message : String(error)}`
+        }
+      }
+    }
+    return { ...metadata, config: { ...metadata.config, apiKey: parsed.config.apiKey } }
   }
-  const metadata = { ...parsed, config: { ...parsed.config, apiKey: '' } }
-  try {
-    storage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(metadata))
-  } catch {
-    // Loading remains usable even if legacy metadata cannot be scrubbed yet.
+
+  if (!bridge) {
+    return {
+      ...metadata,
+      securityError: {
+        reason: 'secret_bridge_unavailable',
+        error: '安全凭据桥不可用，无法读取或保存 API Key。'
+      }
+    }
   }
-  return { ...metadata, config: { ...metadata.config, apiKey } }
+  const stored = await bridge.getAiApiKey()
+  if (!stored.success) {
+    return {
+      ...metadata,
+      securityError: {
+        reason: 'secret_read_failed',
+        error: `安全凭据读取失败：${stored.error ?? stored.reason ?? 'unknown'}`
+      }
+    }
+  }
+  return {
+    ...metadata,
+    config: { ...metadata.config, apiKey: typeof stored.value === 'string' ? stored.value : '' }
+  }
 }
 
 export async function writeAiSettings(
@@ -125,6 +169,13 @@ export async function writeAiSettings(
 ): Promise<AiSettingsStorageResult> {
   const sanitized = sanitizeAiSettings(state)
   const bridge = resolveSecretBridge(secretBridge)
+  if (!bridge) {
+    return {
+      success: false,
+      reason: 'secret_write_failed',
+      error: 'secret_bridge_unavailable'
+    }
+  }
   const secretResult = sanitized.config.apiKey
     ? await bridge.setAiApiKey(sanitized.config.apiKey)
     : await bridge.deleteAiApiKey()

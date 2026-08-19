@@ -249,7 +249,9 @@ export function createPracticeSessionRepository(storage: StorageAdapter): Practi
     },
     getRecoverable() {
       const read = readState()
-      return read.success ? read.value?.drafts.filter((draft) => draft.state !== 'COMPLETED') ?? [] : []
+      if (!read.success || !read.value) return []
+      const committed = new Set(read.value.committedSessionIds)
+      return read.value.drafts.filter((draft) => !committed.has(draft.sessionId))
     },
     getRecoveryState() {
       const sessions = this.getRecoverable()

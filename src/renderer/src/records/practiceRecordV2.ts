@@ -119,6 +119,8 @@ export function fromLegacyRecord(record: PracticeSessionRecord): PracticeRecordV
   pushMetric(METRIC_MAP.extra, record.extraNoteCount)
   pushMetric(METRIC_MAP.early, record.earlyCount)
   pushMetric(METRIC_MAP.late, record.lateCount)
+  pushMetric('restErrorCount', record.restErrorCount)
+  pushMetric('syncWarningCount', record.syncWarningCount)
   pushMetric(METRIC_MAP.accuracy, record.accuracy, '%')
   pushMetric('averageOffsetMs', record.averageOffsetMs, 'ms')
   pushMetric('totalEvents', record.totalEvents)
@@ -161,7 +163,15 @@ export function fromLegacyRecord(record: PracticeSessionRecord): PracticeRecordV
       practiceRecordId: record.id,
       errorEventId: event.id
     })),
-    metadata: { ...record.settings, legacyTitle: record.title }
+    metadata: {
+      ...record.settings,
+      legacyTitle: record.title,
+      legacySubtitle: record.subtitle ?? null,
+      legacyContentName: record.contentName ?? null,
+      legacyDifficulty: record.difficulty ?? null,
+      legacyLoopCount: record.loopCount ?? null,
+      legacyKeySignature: record.keySignature ?? null
+    }
   }
 }
 

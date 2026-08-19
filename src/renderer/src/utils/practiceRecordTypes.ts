@@ -4,6 +4,7 @@ export type PracticeModule =
   | 'scale'
   | 'chord'
   | 'coordination'
+  | 'score'
   | 'free-practice'
 
 export type PracticeSessionStatus = 'completed' | 'stopped'
@@ -69,5 +70,6 @@ export const PRACTICE_MODULE_NAMES: Record<PracticeModule, string> = {
   scale: '音阶练习',
   chord: '和弦练习',
   coordination: '左右手协调',
+  score: '曲谱练习',
   'free-practice': '自由练习'
 }
