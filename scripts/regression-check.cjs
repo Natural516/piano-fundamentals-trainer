@@ -1341,7 +1341,7 @@ test('虚拟键盘偏好按模块独立存储且默认隐藏', () => {
       values.set(key, String(value))
     }
   }
-  const scopes = ['midi-test', 'sight-reading', 'rhythm', 'scales', 'chords', 'coordination', 'free-practice']
+  const scopes = ['midi-test', 'sight-reading', 'rhythm', 'scales', 'chords', 'coordination', 'score-practice', 'free-practice']
   const keys = scopes.map((scope) => displayPreferences.DISPLAY_PREFERENCES_STORAGE_KEYS[scope])
 
   assert.equal(new Set(keys).size, scopes.length)
@@ -2663,6 +2663,12 @@ test('曲谱 Wait 练习 Hook 与页面接入逐事件总线且路由存在', ()
   assert.match(pageSource, /importMxlFile/)
   assert.match(hookSource, /trainingProfile\?\.trainingSafe !== true/)
   assert.match(pageSource, /accept="\.xml,\.musicxml,\.mxl,\.mid,\.midi,\.png,\.jpg,\.jpeg,\.pdf"/)
+  assert.match(pageSource, /readDisplayPreferences\('score-practice'\)/)
+  assert.match(pageSource, /writeDisplayPreferences\('score-practice'/)
+  assert.match(pageSource, /显示键盘提示/)
+  assert.match(pageSource, /showVirtualKeyboard && practice\.expectedMidi\.length > 0/)
+  assert.match(pageSource, /FullKeyboard/)
+  assert.doesNotMatch(pageSource, /MiniKeyboard/)
   assert.match(appSource, /ScorePracticePage/)
   assert.doesNotMatch(pageSource, /返回首页/)
 })

@@ -10,6 +10,7 @@ export type DisplayPreferenceScope =
   | 'scales'
   | 'chords'
   | 'coordination'
+  | 'score-practice'
   | 'free-practice'
 
 export const DISPLAY_PREFERENCES_STORAGE_KEY = 'piano-trainer.display-preferences.v1'
@@ -21,6 +22,7 @@ export const DISPLAY_PREFERENCES_STORAGE_KEYS: Record<DisplayPreferenceScope, st
   scales: 'piano-trainer.display-preferences.v2.scales',
   chords: 'piano-trainer.display-preferences.v2.chords',
   coordination: 'piano-trainer.display-preferences.v2.coordination',
+  'score-practice': 'piano-trainer.display-preferences.v2.score-practice',
   'free-practice': 'piano-trainer.display-preferences.v2.free-practice'
 }
 

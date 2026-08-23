@@ -1490,9 +1490,47 @@ summary:focus-visible {
   font-size: 21px;
 }
 
-.is-practice-focus .f2-live-target .mini-keyboard {
-  height: 62px;
+.is-practice-focus .f2-live-target:not(.has-keyboard-hint) {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 54px;
+}
+
+.f2-score-keyboard-hint {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.is-practice-focus .f2-score-keyboard-hint .full-keyboard-shell {
   margin: 0;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.is-practice-focus .f2-score-keyboard-hint .keyboard-scroll {
+  overflow: hidden;
+  padding: 4px 7px 6px;
+}
+
+.is-practice-focus .f2-score-keyboard-hint .full-keyboard {
+  width: 100%;
+  min-width: 0;
+  height: 62px;
+  filter: none;
+}
+
+.is-practice-focus .f2-score-keyboard-hint .full-white-key {
+  border-radius: 0 0 3px 3px;
+}
+
+.is-practice-focus .f2-score-keyboard-hint .full-black-key {
+  width: calc(100% / 52 * 0.62);
+  height: 39px;
+  border-radius: 0 0 3px 3px;
+}
+
+.is-practice-focus .f2-score-keyboard-hint .full-white-key span,
+.is-practice-focus .f2-score-keyboard-hint .full-black-key span {
+  display: none;
 }
 
 @media (max-height: 800px) {

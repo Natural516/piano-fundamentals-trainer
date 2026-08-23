@@ -41,13 +41,14 @@ import {
   type PracticeSegment
 } from '../score/practiceSegment'
 import { AppButton } from './AppButton'
-import { MiniKeyboard } from './MiniKeyboard'
+import { FullKeyboard } from './FullKeyboard'
 import { PracticePageHeader } from './PracticePageHeader'
 import { PracticeReportModal } from './PracticeReportModal'
 import { ScoreSheetRenderer } from './ScoreSheetRenderer'
 import { buildScoreTimeV2 } from '../score/scoreTimeV2'
 import { readTodayDailyPlanV2 } from '../plan/dailyPlanV2Storage'
 import type { ScorePracticePreset } from '../plan/planner'
+import { readDisplayPreferences, writeDisplayPreferences } from '../utils/displayPreferences'
 import { midiNumberToNoteName } from '../utils/midiNotes'
 import { getHandLabel, getPracticeModeLabel } from '../utils/practicePresentation'
 
@@ -142,6 +143,9 @@ export function ScorePracticePage({
   midiConnectionState,
   onPracticeRunningChange
 }: ScorePracticePageProps): JSX.Element {
+  const [showVirtualKeyboard, setShowVirtualKeyboard] = useState(
+    () => readDisplayPreferences('score-practice').showVirtualKeyboard
+  )
   const [score, setScore] = useState<ScoreDocument | null>(null)
   const [scoreTitle, setScoreTitle] = useState('')
   const [loadError, setLoadError] = useState('')
@@ -198,6 +202,12 @@ export function ScorePracticePage({
     score ? buildPlaybackPlan(score, demoRequest) : null
   ), [demoRequest, score])
   const demo = usePlaybackDemo(demoPlan, pianoAudio)
+
+  const updateShowVirtualKeyboard = (visible: boolean): void => {
+    if (writeDisplayPreferences('score-practice', { version: 2, showVirtualKeyboard: visible })) {
+      setShowVirtualKeyboard(visible)
+    }
+  }
 
   const refreshCoach = useCallback(async (question: string, allowProvider = true): Promise<void> => {
     if (!score) return
@@ -855,20 +865,22 @@ export function ScorePracticePage({
           )}
 
           {practice.sessionActive ? (
-            <div className="f2-live-target">
+            <div className={`f2-live-target ${showVirtualKeyboard && practice.expectedMidi.length > 0 ? 'has-keyboard-hint' : ''}`}>
               <div>
                 <span>当前目标</span>
                 <strong>{practice.expectedMidi.length > 0
                   ? practice.expectedMidi.map(midiNumberToNoteName).join(' / ')
                   : '休止或延音'}</strong>
               </div>
-              {practice.expectedMidi.length > 0 ? (
-                <MiniKeyboard
-                  activeNotes={activeNotes}
-                  targetNotes={practice.expectedMidi}
-                  correctNotes={practice.feedback === 'correct' ? practice.expectedMidi : []}
-                  wrongNotes={practice.feedback === 'wrong' ? activeNotes.map((note) => note.midiNumber) : []}
-                />
+              {showVirtualKeyboard && practice.expectedMidi.length > 0 ? (
+                <div className="f2-score-keyboard-hint">
+                  <FullKeyboard
+                    activeNotes={activeNotes}
+                    targetNotes={practice.expectedMidi}
+                    correctNotes={practice.feedback === 'correct' ? practice.expectedMidi : []}
+                    wrongNotes={practice.feedback === 'wrong' ? activeNotes.map((note) => note.midiNumber) : []}
+                  />
+                </div>
               ) : null}
               {practice.feedback ? (
                 <p key={`${practice.feedback}-${practice.currentIndex}`} className={`f2-live-feedback ${practice.feedback === 'correct' ? 'is-correct' : 'is-wrong'}`}>
@@ -913,6 +925,10 @@ export function ScorePracticePage({
                   <div className="tolerance-control"><span>其他</span><div className="segmented-control">
                     <button className={loop ? 'is-active' : ''} type="button" onClick={() => setLoop((value) => !value)}>循环</button>
                     <button className={countIn ? 'is-active' : ''} type="button" onClick={() => setCountIn((value) => !value)}>预备拍</button>
+                  </div></div>
+                  <div className="tolerance-control"><span>显示键盘提示</span><div className="segmented-control">
+                    <button className={showVirtualKeyboard ? 'is-active' : ''} type="button" onClick={() => updateShowVirtualKeyboard(true)}>显示</button>
+                    <button className={!showVirtualKeyboard ? 'is-active' : ''} type="button" onClick={() => updateShowVirtualKeyboard(false)}>隐藏</button>
                   </div></div>
                 </div>
               </details>
