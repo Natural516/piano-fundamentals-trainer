@@ -25,7 +25,7 @@ export function FirstRunWelcome({ onClose }: FirstRunWelcomeProps): JSX.Element 
   return (
     <div className="first-run-backdrop">
       <section className="first-run-card" role="dialog" aria-modal="true" aria-labelledby="first-run-title">
-        <span className="eyebrow">Getting Started · {stepIndex + 1}/{STEPS.length}</span>
+        <span className="eyebrow">首次使用 · {stepIndex + 1}/{STEPS.length}</span>
         <h3 id="first-run-title">{step.title}</h3>
         <p>{step.body}</p>
         <div className="first-run-actions">

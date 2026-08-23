@@ -77,7 +77,7 @@ export function FreePracticePage({
   return (
     <section className="free-practice-page practice-workspace-page">
       <PracticePageHeader
-        eyebrow="Free Practice"
+        eyebrow="自由记录"
         title="自由练习"
         summary={stats
           ? `时长 ${formatDuration(stats.durationMs)} · ${stats.noteOnCount} 个音 · 音域 ${stats.lowestMidi ?? '-'}–${stats.highestMidi ?? '-'}`

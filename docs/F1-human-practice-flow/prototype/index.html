@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>钢琴基本功训练器 · F1 Human Practice Flow</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="prototype-app" id="regular-app">
+      <aside class="sidebar" aria-label="主导航">
+        <a class="brand" href="#home" data-go="home" aria-label="钢琴基本功训练器首页">
+          <span class="brand-keys" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span><strong>基本功训练器</strong><small>PIANO PRACTICE</small></span>
+        </a>
+
+        <nav class="main-nav">
+          <a href="#home" data-go="home" data-nav="home"><span class="nav-mark"></span>首页</a>
+          <a href="#plan" data-go="plan" data-nav="plan"><span class="nav-mark"></span>今日训练</a>
+          <a href="#score-pre" data-go="score-pre" data-nav="score"><span class="nav-mark"></span>曲谱练习</a>
+          <a href="#fundamentals" data-go="fundamentals" data-nav="fundamentals"><span class="nav-mark"></span>全部练习</a>
+          <a href="#home" data-toast="近期进步页面不在本轮 6 屏原型范围" data-nav="progress"><span class="nav-mark"></span>近期进步</a>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <a class="settings-link" href="#home" data-go="home"><span class="settings-glyph" aria-hidden="true"></span>设置</a>
+          <div class="device-mini">
+            <span class="status-light" aria-hidden="true"></span>
+            <span><strong>设备已就绪</strong><small>Yamaha P-125</small></span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="stage">
+        <section class="screen-panel home-screen" data-screen="home" aria-labelledby="home-title">
+          <header class="page-head home-head">
+            <div>
+              <p class="kicker">8 月 19 日 · 星期三</p>
+              <h1 id="home-title">下午好，今天先练 20 分钟</h1>
+            </div>
+            <div class="device-status"><span class="status-light"></span><strong>设备已就绪</strong><span>Yamaha P-125</span></div>
+          </header>
+
+          <article class="today-hero paper-card">
+            <div class="hero-copy">
+              <span class="section-label">今日训练</span>
+              <h2>按这个顺序开始</h2>
+              <p>3 项 · 预计 20 分钟</p>
+              <div class="day-progress" aria-label="今日训练完成 0%"><i></i></div>
+              <span class="progress-copy">0 / 20 分钟</span>
+            </div>
+            <ol class="hero-tasks">
+              <li><span>01</span><div><strong>C 大调音阶</strong><small>双手 · 60 BPM · 5 分钟</small></div></li>
+              <li><span>02</span><div><strong>八分音符与休止</strong><small>节奏 · 72 BPM · 5 分钟</small></div></li>
+              <li><span>03</span><div><strong>《案例 1》第 1–8 小节</strong><small>双手 · 10 分钟</small></div></li>
+            </ol>
+            <button class="primary-button hero-button" type="button" data-go="fundamentals">开始今日训练 <span aria-hidden="true">→</span></button>
+          </article>
+
+          <div class="home-secondary-grid">
+            <article class="paper-card continue-card">
+              <div class="card-topline"><span class="section-label">继续上次</span><time>昨天 20:42</time></div>
+              <h2>《案例 1》</h2>
+              <p>第 1–8 小节 · 双手 · 弹对后继续</p>
+              <div class="continue-footer">
+                <span class="mini-staff" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><b>♪</b></span>
+                <button class="secondary-button" type="button" data-go="score-pre">继续练习</button>
+              </div>
+            </article>
+
+            <article class="paper-card trend-card">
+              <div class="card-topline"><span class="section-label">近期状态</span><button class="text-button" type="button" data-toast="近期进步页面不在本轮 6 屏原型范围">查看进步</button></div>
+              <div class="trend-summary"><strong>4</strong><span>近 7 天<br />练习天数</span><div class="week-dots" aria-label="近 7 天练习 4 天"><i class="done"></i><i class="done"></i><i></i><i class="done"></i><i></i><i class="done"></i><i></i></div></div>
+              <div class="state-line"><span class="state-badge amber">正在巩固</span><p><strong>节奏稳定性</strong><small>相同条件下，最近 3 次波动变小</small></p></div>
+            </article>
+          </div>
+
+          <section class="all-practice-strip" aria-labelledby="all-practice-title">
+            <div><span class="section-label">按自己的节奏</span><h2 id="all-practice-title">全部练习</h2></div>
+            <div class="practice-links">
+              <button type="button" data-go="fundamentals"><span>识</span>识谱</button>
+              <button type="button" data-go="fundamentals"><span>拍</span>节奏</button>
+              <button type="button" data-go="fundamentals"><span>阶</span>音阶</button>
+              <button type="button" data-go="fundamentals"><span>和</span>和弦</button>
+              <button type="button" data-go="fundamentals"><span>双</span>左右手协调</button>
+              <button type="button" data-go="score-pre"><span>谱</span>曲谱练习</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="screen-panel score-pre-screen" data-screen="score-pre" aria-labelledby="score-pre-title">
+          <header class="page-head compact-head">
+            <div>
+              <p class="breadcrumb"><button type="button" data-go="home">首页</button><span>/</span>曲谱练习</p>
+              <h1 id="score-pre-title">案例 1</h1>
+            </div>
+            <div class="device-status"><span class="status-light"></span><strong>设备已就绪</strong><span>Yamaha P-125</span></div>
+          </header>
+
+          <article class="score-paper paper-card" aria-label="案例 1 第 1 到 8 小节大谱表">
+            <div class="score-paper-head"><div><span class="section-label">当前练习片段</span><strong>Moderato</strong></div><span>1–8 小节</span></div>
+            <svg class="score-svg" viewBox="0 0 1000 330" role="img" aria-label="案例 1 大谱表静态示意">
+              <rect class="score-selection" x="64" y="18" width="866" height="285" rx="12" />
+              <g class="staff-lines">
+                <path d="M70 70H930 M70 86H930 M70 102H930 M70 118H930 M70 134H930" />
+                <path d="M70 194H930 M70 210H930 M70 226H930 M70 242H930 M70 258H930" />
+              </g>
+              <g class="bar-lines"><path d="M70 70V258 M285 70V258 M500 70V258 M715 70V258 M930 70V258" /></g>
+              <g class="bracket"><path d="M60 70Q49 70 49 84V244Q49 258 60 258 M54 164H67" /></g>
+              <g class="clefs"><text x="78" y="130">𝄞</text><text x="80" y="250">𝄢</text></g>
+              <g class="time-signature"><text x="124" y="101">4</text><text x="124" y="133">4</text><text x="124" y="225">4</text><text x="124" y="257">4</text></g>
+              <g class="notes">
+                <g transform="translate(165 0)"><ellipse cx="0" cy="118" rx="8" ry="6"/><path d="M7 118V75"/></g>
+                <g transform="translate(205 0)"><ellipse cx="0" cy="110" rx="8" ry="6"/><path d="M7 110V67"/></g>
+                <g transform="translate(245 0)"><ellipse cx="0" cy="102" rx="8" ry="6"/><path d="M7 102V59"/></g>
+                <g transform="translate(330 0)"><ellipse cx="0" cy="94" rx="8" ry="6"/><path d="M7 94V51"/></g>
+                <g transform="translate(370 0)"><ellipse cx="0" cy="102" rx="8" ry="6"/><path d="M7 102V59"/></g>
+                <g transform="translate(410 0)"><ellipse cx="0" cy="110" rx="8" ry="6"/><path d="M7 110V67"/></g>
+                <g transform="translate(450 0)"><ellipse cx="0" cy="118" rx="8" ry="6"/><path d="M7 118V75"/></g>
+                <g transform="translate(545 0)"><ellipse cx="0" cy="126" rx="8" ry="6"/><path d="M7 126V83"/></g>
+                <g transform="translate(585 0)"><ellipse cx="0" cy="118" rx="8" ry="6"/><path d="M7 118V75"/></g>
+                <g transform="translate(625 0)"><ellipse cx="0" cy="110" rx="8" ry="6"/><path d="M7 110V67"/></g>
+                <g transform="translate(665 0)"><ellipse cx="0" cy="102" rx="8" ry="6"/><path d="M7 102V59"/></g>
+                <g transform="translate(760 0)"><ellipse cx="0" cy="94" rx="8" ry="6"/><path d="M7 94V51"/></g>
+                <g transform="translate(805 0)"><ellipse cx="0" cy="102" rx="8" ry="6"/><path d="M7 102V59"/></g>
+                <g transform="translate(850 0)"><ellipse cx="0" cy="110" rx="8" ry="6"/><path d="M7 110V67"/></g>
+                <g transform="translate(165 0)"><ellipse cx="0" cy="226" rx="8" ry="6"/><path d="M7 226V183"/></g>
+                <g transform="translate(245 0)"><ellipse cx="0" cy="218" rx="8" ry="6"/><path d="M7 218V175"/></g>
+                <g transform="translate(330 0)"><ellipse cx="0" cy="210" rx="8" ry="6"/><path d="M7 210V167"/></g>
+                <g transform="translate(410 0)"><ellipse cx="0" cy="218" rx="8" ry="6"/><path d="M7 218V175"/></g>
+                <g transform="translate(545 0)"><ellipse cx="0" cy="226" rx="8" ry="6"/><path d="M7 226V183"/></g>
+                <g transform="translate(625 0)"><ellipse cx="0" cy="234" rx="8" ry="6"/><path d="M7 234V191"/></g>
+                <g transform="translate(760 0)"><ellipse cx="0" cy="226" rx="8" ry="6"/><path d="M7 226V183"/></g>
+                <g transform="translate(850 0)"><ellipse cx="0" cy="218" rx="8" ry="6"/><path d="M7 218V175"/></g>
+              </g>
+              <g class="measure-numbers"><text x="72" y="52">1</text><text x="287" y="52">3</text><text x="502" y="52">5</text><text x="717" y="52">7</text></g>
+            </svg>
+          </article>
+
+          <div class="score-action-bar paper-card">
+            <div class="score-summary"><span class="piece-icon" aria-hidden="true"></span><div><strong>第 1–8 小节</strong><span>双手 <i></i> 弹对后继续</span></div></div>
+            <p class="mode-note"><span aria-hidden="true">i</span> 弹对后自动进入下一处，不限速度</p>
+            <button class="primary-button" type="button" data-go="score-focus">开始练习 <span aria-hidden="true">→</span></button>
+          </div>
+
+          <div class="disclosure-row">
+            <button type="button" data-modal="practice-settings"><span>⌄</span><strong>练习设置</strong><small>练习方式、手别、重复、预备拍</small></button>
+            <button type="button" data-modal="advanced-tools"><span>⌄</span><strong>高级工具</strong><small>参考演奏、曲谱检查、练习建议</small></button>
+          </div>
+        </section>
+
+        <section class="screen-panel result-screen" data-screen="result" aria-labelledby="result-title">
+          <header class="page-head compact-head result-head">
+            <div>
+              <p class="kicker">本轮完成 · 8 分 42 秒</p>
+              <h1 id="result-title">案例 1 · 第 1–8 小节</h1>
+              <p class="head-subtitle">双手 · 跟随速度 · 72 BPM</p>
+            </div>
+            <span class="saved-state"><i></i>练习记录已保存</span>
+          </header>
+
+          <div class="result-grid">
+            <article class="feedback-card positive paper-card">
+              <span class="feedback-icon" aria-hidden="true">✓</span>
+              <div><span class="section-label">做得最好</span><h2>第 1–3 小节的节奏很稳定</h2><p>连续 3 个小节都跟住了拍点，左右手也保持同步。</p></div>
+            </article>
+            <article class="feedback-card attention paper-card">
+              <span class="feedback-icon" aria-hidden="true">!</span>
+              <div><span class="section-label">最需要处理</span><h2>第 4 小节右手 F♯ 连续弹错两次</h2><p>两次都发生在第 3 拍，比偶发错音更值得先处理。</p></div>
+            </article>
+          </div>
+
+          <article class="evidence-strip">
+            <span>为什么先练这里</span>
+            <p>相同位置、相同音连续出现问题，说明这一处还没有形成稳定动作。本轮其他小节没有出现同样模式。</p>
+          </article>
+
+          <article class="next-practice-card paper-card">
+            <div class="recommendation-mark" aria-hidden="true"><span>4</span><i></i></div>
+            <div class="recommendation-copy"><span class="section-label">下一步</span><h2>先练右手第 4 小节</h2><div class="recommendation-tags"><span>右手</span><span>第 4 小节</span><span>60 BPM</span><span>重复 3 次</span></div></div>
+            <button class="primary-button" type="button" data-go="score-pre" data-recommended="true">按建议再练 <span aria-hidden="true">→</span></button>
+          </article>
+
+          <footer class="result-footer">
+            <button class="detail-button" type="button" data-modal="result-detail"><span>⌄</span>查看详细数据</button>
+            <div><button class="text-button" type="button" data-go="home">回到首页</button><button class="secondary-button" type="button" data-go="plan">完成</button></div>
+          </footer>
+        </section>
+
+        <section class="screen-panel fundamentals-screen" data-screen="fundamentals" aria-labelledby="fundamentals-title">
+          <header class="page-head compact-head">
+            <div>
+              <p class="breadcrumb"><button type="button" data-go="home">全部练习</button><span>/</span>音阶</p>
+              <h1 id="fundamentals-title">C 大调音阶</h1>
+            </div>
+            <div class="time-estimate"><span>预计用时</span><strong>5 分钟</strong></div>
+          </header>
+
+          <article class="fundamental-main paper-card">
+            <div class="fundamental-title-row"><div><span class="section-label">当前练习</span><h2>双手同向 · 两组八度</h2></div><span class="state-badge neutral">基础练习</span></div>
+            <div class="scale-route" aria-label="C 大调音阶上行再下行示意">
+              <div class="route-line"></div>
+              <span style="--x:3;--y:6"><b>C</b><small>1</small></span>
+              <span style="--x:15;--y:5"><b>D</b><small>2</small></span>
+              <span style="--x:27;--y:4"><b>E</b><small>3</small></span>
+              <span style="--x:39;--y:3"><b>F</b><small>1</small></span>
+              <span style="--x:51;--y:2"><b>G</b><small>2</small></span>
+              <span style="--x:63;--y:1"><b>A</b><small>3</small></span>
+              <span style="--x:75;--y:0"><b>B</b><small>4</small></span>
+              <span style="--x:87;--y:-1"><b>C</b><small>5</small></span>
+              <i class="route-arrow">上行 → 再下行</i>
+            </div>
+            <div class="keyboard-range" aria-hidden="true">
+              <span class="white active"></span><span class="white"></span><span class="black"></span><span class="white active"></span><span class="black"></span><span class="white active"></span><span class="white active"></span><span class="black"></span><span class="white active"></span><span class="black"></span><span class="white active"></span><span class="black"></span><span class="white active"></span><span class="white active"></span>
+            </div>
+          </article>
+
+          <div class="fundamental-action paper-card">
+            <div class="condition-group"><span><small>速度</small><strong>60 BPM</strong></span><i></i><span><small>节奏</small><strong>每拍 2 音</strong></span><i></i><span><small>重复</small><strong>3 次</strong></span></div>
+            <button class="primary-button" type="button" data-toast="已准备基础练习专注模式">开始音阶练习 <span aria-hidden="true">→</span></button>
+          </div>
+          <button class="single-disclosure" type="button" data-modal="fundamental-settings"><span>⌄</span><strong>练习设置</strong><small>调性、手别与方向、音域、速度、节奏、重复次数</small></button>
+        </section>
+
+        <section class="screen-panel plan-screen" data-screen="plan" aria-labelledby="plan-title">
+          <header class="page-head compact-head plan-head">
+            <div><p class="kicker">8 月 19 日 · 星期三</p><h1 id="plan-title">今日训练</h1><p class="head-subtitle">按顺序完成 3 项，预计 20 分钟</p></div>
+            <div class="plan-progress"><span><strong>8</strong> / 20 分钟</span><div><i></i></div></div>
+          </header>
+
+          <section class="plan-list" aria-label="今日训练任务">
+            <article class="plan-item done paper-card">
+              <div class="plan-number"><span>✓</span><i></i></div>
+              <div class="plan-copy"><span class="section-label">已完成 · 5 分钟</span><h2>C 大调音阶</h2><p>双手同向 · 两组八度 · 60 BPM</p></div>
+              <div class="plan-result"><span class="state-badge green">基本稳定</span><small>节奏均匀</small></div>
+              <button class="text-button" type="button" data-go="result">查看结果</button>
+            </article>
+            <article class="plan-item current paper-card">
+              <div class="plan-number"><span>2</span><i></i></div>
+              <div class="plan-copy"><span class="section-label">下一项 · 5 分钟</span><h2>八分音符与休止</h2><p>节奏练习 · 72 BPM · 4 小节</p></div>
+              <span class="why-this">根据上周练习：休止后重新进入拍点仍有波动</span>
+              <button class="primary-button" type="button" data-go="fundamentals">开始下一项 <span aria-hidden="true">→</span></button>
+            </article>
+            <article class="plan-item waiting paper-card">
+              <div class="plan-number"><span>3</span></div>
+              <div class="plan-copy"><span class="section-label">待练 · 10 分钟</span><h2>《案例 1》第 1–8 小节</h2><p>曲谱练习 · 双手 · 跟随速度</p></div>
+              <span class="state-badge neutral">稍后</span>
+              <button class="text-button" type="button" data-go="score-pre">查看</button>
+            </article>
+          </section>
+
+          <div class="plan-bottom-grid">
+            <button class="adjust-plan paper-card" type="button" data-modal="adjust-plan"><span class="adjust-icon" aria-hidden="true"></span><span><strong>调整今天安排</strong><small>改变顺序或练习时长</small></span><b>→</b></button>
+            <article class="weekly-focus paper-card"><span class="section-label">本周重点</span><h2>稳定休止后的拍点</h2><p>本周目标练习 4 天</p><div class="week-track"><i class="done"></i><i class="done"></i><i class="done"></i><i></i></div></article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <section class="focus-screen" data-screen="score-focus" aria-labelledby="focus-title">
+      <header class="focus-head">
+        <button class="focus-exit" type="button" data-go="score-pre"><span aria-hidden="true">×</span>结束练习</button>
+        <div><h1 id="focus-title">案例 1</h1><p>第 1–8 小节 · 双手 · 72 BPM</p></div>
+        <div class="focus-device"><span class="status-light"></span>设备已就绪</div>
+      </header>
+      <div class="focus-content">
+        <article class="focus-paper">
+          <div class="focus-position"><span>第 4 小节</span><small>第 3 拍</small></div>
+          <svg class="focus-score-svg" viewBox="0 0 1220 465" role="img" aria-label="专注练习中的大谱表">
+            <rect class="focus-range" x="62" y="28" width="1092" height="382" rx="8" />
+            <rect class="current-measure" x="575" y="28" width="270" height="382" />
+            <g class="staff-lines"><path d="M75 100H1140 M75 120H1140 M75 140H1140 M75 160H1140 M75 180H1140 M75 275H1140 M75 295H1140 M75 315H1140 M75 335H1140 M75 355H1140" /></g>
+            <g class="bar-lines"><path d="M75 100V355 M310 100V355 M575 100V355 M845 100V355 M1140 100V355" /></g>
+            <g class="clefs"><text x="88" y="178">𝄞</text><text x="90" y="348">𝄢</text></g>
+            <g class="notes">
+              <g transform="translate(170 0)"><ellipse cx="0" cy="160" rx="10" ry="7"/><path d="M9 160V102"/></g><g transform="translate(225 0)"><ellipse cx="0" cy="150" rx="10" ry="7"/><path d="M9 150V92"/></g><g transform="translate(275 0)"><ellipse cx="0" cy="140" rx="10" ry="7"/><path d="M9 140V82"/></g>
+              <g transform="translate(380 0)"><ellipse cx="0" cy="130" rx="10" ry="7"/><path d="M9 130V72"/></g><g transform="translate(445 0)"><ellipse cx="0" cy="140" rx="10" ry="7"/><path d="M9 140V82"/></g><g transform="translate(510 0)"><ellipse cx="0" cy="150" rx="10" ry="7"/><path d="M9 150V92"/></g>
+              <g class="note-error" transform="translate(645 0)"><text x="-28" y="143">♯</text><ellipse cx="0" cy="150" rx="10" ry="7"/><path d="M9 150V92"/></g><g transform="translate(715 0)"><ellipse cx="0" cy="140" rx="10" ry="7"/><path d="M9 140V82"/></g><g transform="translate(785 0)"><ellipse cx="0" cy="130" rx="10" ry="7"/><path d="M9 130V72"/></g>
+              <g transform="translate(920 0)"><ellipse cx="0" cy="120" rx="10" ry="7"/><path d="M9 120V62"/></g><g transform="translate(990 0)"><ellipse cx="0" cy="130" rx="10" ry="7"/><path d="M9 130V72"/></g><g transform="translate(1060 0)"><ellipse cx="0" cy="140" rx="10" ry="7"/><path d="M9 140V82"/></g>
+              <g transform="translate(170 0)"><ellipse cx="0" cy="315" rx="10" ry="7"/><path d="M9 315V257"/></g><g transform="translate(275 0)"><ellipse cx="0" cy="305" rx="10" ry="7"/><path d="M9 305V247"/></g><g transform="translate(380 0)"><ellipse cx="0" cy="295" rx="10" ry="7"/><path d="M9 295V237"/></g><g transform="translate(510 0)"><ellipse cx="0" cy="305" rx="10" ry="7"/><path d="M9 305V247"/></g>
+              <g transform="translate(645 0)"><ellipse cx="0" cy="315" rx="10" ry="7"/><path d="M9 315V257"/></g><g transform="translate(785 0)"><ellipse cx="0" cy="325" rx="10" ry="7"/><path d="M9 325V267"/></g><g transform="translate(920 0)"><ellipse cx="0" cy="315" rx="10" ry="7"/><path d="M9 315V257"/></g><g transform="translate(1060 0)"><ellipse cx="0" cy="305" rx="10" ry="7"/><path d="M9 305V247"/></g>
+            </g>
+            <path class="playhead" d="M690 48V390" />
+            <g class="measure-numbers"><text x="78" y="82">1</text><text x="312" y="82">3</text><text x="577" y="82">4</text><text x="847" y="82">6</text></g>
+          </svg>
+          <div class="inline-feedback"><span>右手</span><strong>F♯ 弹成了 F</strong><small>再试一次这一拍</small></div>
+        </article>
+      </div>
+      <footer class="focus-controls">
+        <div class="measure-progress"><span>第 4 / 8 小节</span><div><i></i></div><strong>46%</strong></div>
+        <div class="focus-actions"><button class="focus-pause" id="pause-button" type="button"><span class="pause-icon" aria-hidden="true"></span>暂停</button><button class="focus-stop" type="button" data-go="result"><span class="stop-icon" aria-hidden="true"></span>停止</button></div>
+        <span class="shortcut-hint">空格键暂停</span>
+      </footer>
+      <div class="pause-overlay" id="pause-overlay" aria-live="polite"><div><span class="pause-large" aria-hidden="true"></span><h2>练习已暂停</h2><p>准备好后继续</p><button class="primary-button" id="resume-button" type="button">继续练习</button></div></div>
+    </section>
+
+    <div class="sheet-backdrop" id="sheet-backdrop" hidden>
+      <aside class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+        <header><div><span class="section-label" id="sheet-kicker">练习设置</span><h2 id="sheet-title">应用到本轮</h2></div><button class="sheet-close" type="button" aria-label="关闭">×</button></header>
+        <div class="sheet-body" id="sheet-body"></div>
+        <footer><button class="secondary-button sheet-close" type="button">取消</button><button class="primary-button sheet-apply" type="button">应用到本轮</button></footer>
+      </aside>
+    </div>
+    <div class="prototype-toast" id="prototype-toast" role="status" aria-live="polite"></div>
+
+    <template id="template-practice-settings">
+      <div class="setting-grid">
+        <label><span>练习方式</span><select><option>弹对后继续</option><option>跟随速度</option><option>跟着示范弹</option></select><small>此方式不限速度，因此不显示 BPM。</small></label>
+        <div class="setting-block"><span>练习手别</span><div class="segmented"><button>左手</button><button>右手</button><button class="active">双手</button></div></div>
+        <div class="setting-block"><span>重复次数</span><div class="segmented"><button class="active">1 次</button><button>3 次</button><button>5 次</button></div></div>
+        <div class="setting-block"><span>预备拍</span><div class="segmented"><button>无</button><button class="active">1 小节</button></div></div>
+      </div>
+    </template>
+    <template id="template-advanced-tools">
+      <div class="advanced-list">
+        <button><span>参考演奏</span><small>添加或试听参考 MIDI</small><b>→</b></button>
+        <button><span>曲谱检查</span><small>曲谱可正常练习 · 查看校验详情</small><b>→</b></button>
+        <button><span>练习建议</span><small>基于最近练习记录查看建议</small><b>→</b></button>
+        <button><span>分段示范与片段管理</span><small>高级教学和片段工具</small><b>→</b></button>
+      </div>
+    </template>
+    <template id="template-result-detail">
+      <div class="detail-stats"><div><span>完成事件</span><strong>64</strong></div><div><span>正确</span><strong>56</strong></div><div><span>错音</span><strong>3</strong></div><div><span>漏音</span><strong>2</strong></div><div><span>稍早 / 稍晚</span><strong>1 / 2</strong></div><div><span>平均偏移</span><strong>+34 ms</strong></div></div>
+      <p class="detail-note">详细数据用于复盘，不代表教师对能力的绝对判断。当前条件：双手 · 72 BPM · 第 1–8 小节。</p>
+    </template>
+    <template id="template-fundamental-settings">
+      <div class="setting-grid three-col">
+        <label><span>调性</span><select><option>C 大调</option><option>G 大调</option><option>F 大调</option></select></label>
+        <label><span>手别与方向</span><select><option>双手同向</option><option>右手</option><option>左手</option></select></label>
+        <label><span>音域</span><select><option>两组八度</option><option>一组八度</option></select></label>
+        <label><span>速度（BPM）</span><input type="number" value="60" min="40" max="200" /></label>
+        <label><span>每拍音符</span><select><option>每拍 2 音</option><option>每拍 1 音</option><option>每拍 4 音</option></select></label>
+        <label><span>重复次数</span><input type="number" value="3" min="1" max="20" /></label>
+      </div>
+    </template>
+    <template id="template-adjust-plan">
+      <div class="adjust-list"><div><span>1</span><p><strong>C 大调音阶</strong><small>5 分钟 · 已完成</small></p><b>↕</b></div><div><span>2</span><p><strong>八分音符与休止</strong><small>5 分钟</small></p><b>↕</b></div><div><span>3</span><p><strong>《案例 1》第 1–8 小节</strong><small>10 分钟</small></p><b>↕</b></div></div>
+    </template>
+
+    <script src="prototype.js"></script>
+  </body>
+</html>

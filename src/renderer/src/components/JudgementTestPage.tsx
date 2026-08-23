@@ -155,7 +155,7 @@ export function JudgementTestPage(): JSX.Element {
     <section className="judgement-page">
       <header className="midi-page-header judgement-header">
         <div>
-          <span className="eyebrow">Practice Clock / Judgement Engine</span>
+          <span className="eyebrow">节拍与判定测试</span>
           <h2>节拍器与判定测试</h2>
           <p>验证 BPM、预备拍、目标事件、MIDI 输入与通用判定结果。</p>
         </div>

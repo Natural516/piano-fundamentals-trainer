@@ -182,6 +182,16 @@ export function SightReadingPage({
     practice.reset()
   }
 
+  const pausePractice = (): void => {
+    recorder.checkpoint()
+    practice.pause()
+  }
+
+  const resumePractice = (): void => {
+    recorder.resumeSession()
+    practice.resume()
+  }
+
   const openSettings = (): void => {
     setDraftStaffMode(practice.staffMode)
     setDraftKeySignature(practice.keySignature)
@@ -216,12 +226,16 @@ export function SightReadingPage({
       : practice.result === 'timeout'
         ? '超时'
         : ''
+  const hasClearPriority = Boolean(practice.report && (
+    practice.report.wrong + practice.report.timeout > 0
+    && (practice.report.mostWrongNote !== '—' || practice.report.mostTimedOutNote !== '—')
+  ))
 
   return (
     <section className="sight-page practice-workspace-page">
       <header className="midi-page-header sight-page-header practice-page-header">
         <div>
-          <span className="eyebrow">Sight Reading</span>
+          <span className="eyebrow">练习目标</span>
           <h2>识谱练习</h2>
           <p className="practice-settings-summary">{settingsSummary}</p>
         </div>
@@ -245,9 +259,10 @@ export function SightReadingPage({
               <h3>当前题目</h3>
               <p>根据谱面，在答题时限内按下第一个判断音。</p>
             </div>
-            {feedbackLabel ? (
-              <span className={`sight-inline-feedback result-${practice.result}`}>{feedbackLabel}</span>
-            ) : null}
+            <div className="f2-focus-status">
+              <span className="f2-focus-progress">第 {Math.min(practice.completedQuestions + 1, practice.questionCount)} / {practice.questionCount} 题</span>
+              {feedbackLabel ? <span className={`sight-inline-feedback result-${practice.result}`}>{feedbackLabel}</span> : null}
+            </div>
           </div>
 
           <SightReadingTimeBar
@@ -276,7 +291,12 @@ export function SightReadingPage({
 
           <div className="practice-primary-actions">
             {isRunning ? (
-              <AppButton variant="secondary" onClick={stopPractice}>停止练习</AppButton>
+              <>
+                {practice.isPaused
+                  ? <AppButton onClick={resumePractice}>继续练习</AppButton>
+                  : <AppButton variant="secondary" onClick={pausePractice}>暂停</AppButton>}
+                <AppButton variant="ghost" onClick={stopPractice}>停止练习</AppButton>
+              </>
             ) : (
               <AppButton onClick={startPractice}>开始练习</AppButton>
             )}
@@ -319,6 +339,7 @@ export function SightReadingPage({
           <div>
             <strong>练习已暂停</strong>
             <span>返回应用后将从当前题的剩余时间继续。</span>
+            <AppButton onClick={resumePractice}>继续练习</AppButton>
           </div>
         </div>
       ) : null}
@@ -447,8 +468,20 @@ export function SightReadingPage({
       </PracticeSettingsDrawer>
 
       {practice.status === 'finished' && practice.report ? (
-        <PracticeReportModal title="识谱练习完成" onBack={practice.reset} onRepeat={startPractice}>
-          <div className="sight-report-grid">
+        <PracticeReportModal
+          title="这一轮识谱完成了"
+          onBack={practice.reset}
+          onRepeat={startPractice}
+          primaryAction={hasClearPriority ? 'repeat' : 'back'}
+          repeatLabel={hasClearPriority ? '按建议再练' : '再练一轮'}
+        >
+          <div className="f2-result-story">
+            <section><span>做得最好</span><h4>本轮最高连续答对 {practice.report.bestStreak} 题。</h4></section>
+            <section><span>最需要处理</span><h4>{practice.report.mostWrongNote !== '—' ? `${practice.report.mostWrongNote} 是本轮最常认错的音。` : practice.report.mostTimedOutNote !== '—' ? `${practice.report.mostTimedOutNote} 最容易来不及判断。` : '本轮没有集中在某一个音上的错误。'}</h4></section>
+            <section><span>为什么优先处理</span><p>{practice.report.wrong + practice.report.timeout > 0 ? '这是本轮真实出现的错音或超时，先缩小到具体音符更容易建立反应。' : '现有记录没有指出明确弱点，不额外猜测。'}</p></section>
+            <section className="is-next"><span>下一步练法</span><h4>{hasClearPriority ? '保持当前谱表与调性，再练一轮，留意上面这个音。' : '当前没有明确优先问题，可以完成这一项；想确认稳定性时再练一轮。'}</h4></section>
+          </div>
+          <details className="f2-result-details"><summary>查看详细数据</summary><div className="sight-report-grid">
             <div><span>题数</span><strong>{practice.report.totalQuestions}</strong></div>
             <div><span>完成题数</span><strong>{practice.report.completedQuestions}</strong></div>
             <div><span>正确</span><strong>{practice.report.correct}</strong></div>
@@ -465,7 +498,7 @@ export function SightReadingPage({
           <SightNoteErrorDetails
             wrongNoteCounts={practice.report.wrongNoteCounts}
             timeoutNoteCounts={practice.report.timeoutNoteCounts}
-          />
+          /></details>
           {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
           {practice.settingsSaveError ? <p className="practice-save-error">{practice.settingsSaveError}</p> : null}
         </PracticeReportModal>

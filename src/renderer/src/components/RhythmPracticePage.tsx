@@ -168,12 +168,13 @@ export function RhythmPracticePage({
   const wrongNotes = latestResult && latestResult.type !== 'correct' ? latestResult.inputNotes : []
   const judgedCount = rhythm.report.correct + rhythm.report.wrongNote + rhythm.report.missingNote +
     rhythm.report.extraNote + rhythm.report.early + rhythm.report.late + rhythm.report.restError + rhythm.report.extraInput
+  const hasClearPriority = judgedCount > rhythm.report.correct
 
   return (
     <section className="rhythm-page practice-workspace-page">
       <PracticePageHeader
         controls={<MetronomeVolumeControl id="rhythm-header-metronome-volume" value={rhythm.metronomeSound.volume} onChange={rhythm.metronomeSound.setVolume} />}
-        eyebrow="Rhythm Practice"
+        eyebrow="练习目标"
         onOpenSettings={openSettings}
         summary={settingsSummary}
         title="节奏与切分"
@@ -216,7 +217,7 @@ export function RhythmPracticePage({
 
           {latestResult ? (
             <PracticeFeedbackNotice
-              detail={`${latestResult.message} / offset ${formatOffset(latestResult.timeOffsetMs)}`}
+              detail={`${latestResult.message} · ${formatOffset(latestResult.timeOffsetMs)}`}
               label="最近结果"
               resultType={latestResult.type}
               title={formatLatestResult(latestResult)}
@@ -299,9 +300,20 @@ export function RhythmPracticePage({
       </PracticeSettingsDrawer>
 
       {rhythm.isComplete ? (
-        <PracticeReportModal title="节奏练习完成" onBack={rhythm.reset} onRepeat={restartPractice}>
-          <p className="practice-report-summary">{settingsSummary}</p>
-          <div className="report-grid">
+        <PracticeReportModal
+          title="这一轮节奏完成了"
+          onBack={rhythm.reset}
+          onRepeat={restartPractice}
+          primaryAction={hasClearPriority ? 'repeat' : 'back'}
+          repeatLabel={hasClearPriority ? '按建议再练' : '再练一轮'}
+        >
+          <div className="f2-result-story">
+            <section><span>做得最好</span><h4>{rhythm.report.correct > 0 ? `${rhythm.report.correct} 个节奏点落在目标范围内。` : '你完成了整段节奏输入。'}</h4></section>
+            <section><span>最需要处理</span><h4>{rhythm.report.early >= rhythm.report.late && rhythm.report.early > 0 ? '本轮更常提前落键。' : rhythm.report.late > 0 ? '本轮更常晚于拍点落键。' : rhythm.report.missingNote > 0 ? '本轮有需要补上的漏拍。' : '没有出现集中的节拍问题。'}</h4></section>
+            <section><span>为什么优先处理</span><p>{rhythm.report.early + rhythm.report.late + rhythm.report.missingNote > 0 ? '建议来自本轮实际的提前、延后与漏拍记录。' : '当前样本没有指出明确弱点，因此不制造额外判断。'}</p></section>
+            <section className="is-next"><span>下一步练法</span><h4>{hasClearPriority ? '保持当前速度再练一轮，先听清拍点，再让落键贴近它。' : '当前没有明确优先问题，可以完成这一项；想确认稳定性时再练一轮。'}</h4></section>
+          </div>
+          <details className="f2-result-details"><summary>查看详细数据</summary><p className="practice-report-summary">{settingsSummary}</p><div className="report-grid">
             <div><span>总节奏事件</span><strong>{rhythm.report.totalTargets}</strong></div>
             <div><span>正确次数</span><strong>{rhythm.report.correct}</strong></div>
             <div><span>早弹次数</span><strong>{rhythm.report.early}</strong></div>
@@ -311,7 +323,7 @@ export function RhythmPracticePage({
             <div><span>多余输入</span><strong>{rhythm.report.extraInput}</strong></div>
             <div><span>平均偏移</span><strong>{rhythm.report.averageOffsetMs}ms</strong></div>
             <div><span>节奏准确率</span><strong>{rhythm.report.accuracy}%</strong></div>
-          </div>
+          </div></details>
         </PracticeReportModal>
       ) : null}
     </section>

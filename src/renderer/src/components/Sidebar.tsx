@@ -1,25 +1,11 @@
 import { navigationItems } from '../data'
 import type { MidiSidebarStatus, PageId } from '../types'
 import { AppButton } from './AppButton'
-import { AppCard } from './AppCard'
-import { StatusBadge } from './StatusBadge'
 
 interface SidebarProps {
   currentPage: PageId
   midiStatus: MidiSidebarStatus
   onNavigate: (page: PageId) => void
-}
-
-function getMidiTone(connectionState: MidiSidebarStatus['connectionState']): 'danger' | 'success' | 'warning' {
-  if (connectionState === 'connected') {
-    return 'success'
-  }
-
-  if (connectionState === 'pending') {
-    return 'warning'
-  }
-
-  return 'danger'
 }
 
 export function Sidebar({ currentPage, midiStatus, onNavigate }: SidebarProps): JSX.Element {
@@ -34,7 +20,7 @@ export function Sidebar({ currentPage, midiStatus, onNavigate }: SidebarProps): 
         </div>
         <div>
           <h1>钢琴基本功训练器</h1>
-          <p>Piano Fundamentals Trainer</p>
+          <p>专注练好每一轮</p>
         </div>
       </div>
 
@@ -54,22 +40,13 @@ export function Sidebar({ currentPage, midiStatus, onNavigate }: SidebarProps): 
         ))}
       </nav>
 
-      <AppCard as="section" className="midi-card midi-card--compact" aria-label="MIDI 状态">
-        <div className="midi-card__header">
-          <span>MIDI 设备</span>
-          <StatusBadge className={`status-pill status-${midiStatus.connectionState}`} tone={getMidiTone(midiStatus.connectionState)}>
-            {midiStatus.statusLabel}
-          </StatusBadge>
+      <div className={`midi-status-compact is-${midiStatus.connectionState}`} aria-label={`MIDI ${midiStatus.statusLabel}`}>
+        <i aria-hidden="true" />
+        <div>
+          <span>{midiStatus.statusLabel}</span>
+          <small>{midiStatus.deviceName}</small>
         </div>
-        <div className="midi-device">{midiStatus.deviceName}</div>
-        <AppButton
-          className={`secondary-button ${currentPage === 'midi-test' ? 'is-active' : ''}`}
-          variant="secondary"
-          onClick={() => onNavigate('midi-test')}
-        >
-          MIDI 测试
-        </AppButton>
-      </AppCard>
+      </div>
     </aside>
   )
 }

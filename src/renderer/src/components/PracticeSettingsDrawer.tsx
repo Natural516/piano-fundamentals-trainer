@@ -61,7 +61,7 @@ export function PracticeSettingsDrawer({
       <aside className="practice-settings-drawer" role="dialog" aria-modal="true" aria-labelledby="practice-settings-title">
         <header className="practice-settings-drawer__header">
           <div>
-            <span>Practice Settings</span>
+            <span>按需要调整</span>
             <h3 id="practice-settings-title">{title}</h3>
           </div>
           <button

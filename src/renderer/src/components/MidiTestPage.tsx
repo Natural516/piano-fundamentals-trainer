@@ -151,7 +151,7 @@ export function MidiTestPage({ midi }: MidiTestPageProps): JSX.Element {
     <section className="midi-test-page">
       <header className="midi-page-header">
         <div>
-          <span className="eyebrow">Web MIDI API</span>
+          <span className="eyebrow">连接与输入</span>
           <h2>MIDI 输入测试</h2>
           <p>选择输入设备后，按下电钢琴或 MIDI 键盘即可查看实时事件。</p>
         </div>

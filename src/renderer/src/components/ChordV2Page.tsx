@@ -25,7 +25,7 @@ interface ChordV2PageProps {
 const judgeModeOptions: Array<{ id: ChordV2JudgeMode; label: string }> = [
   { id: 'identity', label: '和弦身份' },
   { id: 'inversion', label: '转位' },
-  { id: 'exact', label: '指定 Voicing' }
+  { id: 'exact', label: '指定排列' }
 ]
 const inversionModeOptions: Array<{ id: ChordV2InversionMode; label: string }> = [
   { id: 'all', label: '全部' },
@@ -112,6 +112,11 @@ export function ChordV2Page({
     chord.stop()
   }
 
+  const pausePractice = (): void => {
+    recorder.checkpoint()
+    chord.pause()
+  }
+
   const openSettings = (): void => {
     setDraftJudgeMode(chord.judgeMode)
     setDraftInversionMode(chord.inversionMode)
@@ -135,21 +140,22 @@ export function ChordV2Page({
   const question = chord.currentQuestion
   const feedbackType = chord.feedback?.type
   const settingsSummary = `${judgeModeOptions.find((option) => option.id === chord.judgeMode)?.label} · ${textureOptions.find((option) => option.id === chord.texture)?.label} · ${CHORD_V2_DIFFICULTY_LABELS[chord.difficulty]}`
+  const hasClearPriority = chord.report.wrong + chord.report.missing + chord.report.extra + chord.report.wrongBass > 0
 
   return (
     <section className="chord-v2-page practice-workspace-page">
       <PracticePageHeader
-        eyebrow="Chord Practice V2"
+        eyebrow="练习目标"
         onOpenSettings={openSettings}
         summary={settingsSummary}
-        title="和弦练习 V2"
+        title="和弦练习"
       />
 
       <div className="practice-single-column">
         {isExperimentalFeatureVisible('FEATURE_EXPERIMENTAL_HARMONY_GENERATOR') ? (
           <div className="practice-content-toggle">
             <button className={content === 'chord' ? 'is-active' : ''} type="button" onClick={() => setContent('chord')}>单和弦</button>
-            <button className={content === 'progression' ? 'is-active' : ''} type="button" onClick={() => setContent('progression')}>进行训练（Experimental）</button>
+            <button className={content === 'progression' ? 'is-active' : ''} type="button" onClick={() => setContent('progression')}>和声进行</button>
           </div>
         ) : null}
 
@@ -165,7 +171,7 @@ export function ChordV2Page({
           <div className="panel-title-row">
             <div>
               <h3>当前目标</h3>
-              <p>按当前判定模式弹出目标 Voicing；柱式 150ms 收齐，分解按顺序判定。</p>
+              <p>看清和弦名称与低音位置，再按当前方式完整弹出目标和弦。</p>
             </div>
             <span className={`audio-status-badge status-${chord.isRunning ? 'ready' : 'suspended'}`}>
               {chord.isRunning ? '练习中' : chord.isPaused ? '已暂停' : chord.status === 'finished' ? '已结束' : '未开始'}
@@ -176,7 +182,7 @@ export function ChordV2Page({
             <>
               <div className="chord-v2-target">
                 <strong>{question.symbol}</strong>
-                <span>{question.identity.quality} · {question.judgeMode === 'inversion' ? '转位判定' : question.judgeMode === 'exact' ? '精确 Voicing' : '和弦身份'}</span>
+                <span>{question.identity.quality} · {question.judgeMode === 'inversion' ? '转位判定' : question.judgeMode === 'exact' ? '指定排列' : '和弦识别'}</span>
               </div>
               <MiniKeyboard
                 activeNotes={activeNotes}
@@ -197,7 +203,8 @@ export function ChordV2Page({
 
           <div className="practice-primary-actions">
             {!chord.isRunning ? <AppButton onClick={startPractice}>{chord.isPaused ? '继续练习' : chord.status === 'finished' ? '再练一次' : '开始练习'}</AppButton> : null}
-            {chord.sessionActive ? <AppButton variant="secondary" onClick={stopPractice}>停止</AppButton> : null}
+            {chord.isRunning ? <AppButton variant="secondary" onClick={pausePractice}>暂停</AppButton> : null}
+            {chord.sessionActive ? <AppButton variant="ghost" onClick={stopPractice}>停止</AppButton> : null}
           </div>
           {recorder.saveError ? <p className="practice-save-error">{recorder.saveError}</p> : null}
         </section>
@@ -264,8 +271,20 @@ export function ChordV2Page({
       </PracticeSettingsDrawer>
 
       {chord.status === 'finished' ? (
-        <PracticeReportModal title="和弦练习完成" onBack={chord.stop} onRepeat={startPractice}>
-          <div className="report-grid">
+        <PracticeReportModal
+          title="这一轮和弦完成了"
+          onBack={chord.stop}
+          onRepeat={startPractice}
+          primaryAction={hasClearPriority ? 'repeat' : 'back'}
+          repeatLabel={hasClearPriority ? '按建议再练' : '再练一轮'}
+        >
+          <div className="f2-result-story">
+            <section><span>做得最好</span><h4>本轮完整弹对 {chord.report.correct} 个和弦。</h4></section>
+            <section><span>最需要处理</span><h4>{chord.report.wrongBass > 0 ? '先留意转位和最低音的位置。' : chord.report.missing > 0 ? '先把每个和弦的组成音弹完整。' : chord.report.wrong > 0 || chord.report.extra > 0 ? '先处理不属于目标和弦的音。' : '本轮没有集中的和弦错误。'}</h4></section>
+            <section><span>为什么优先处理</span><p>{chord.report.wrong + chord.report.missing + chord.report.extra + chord.report.wrongBass > 0 ? '优先项来自本轮实际记录的低音、漏音与多音。' : '当前记录没有指出明确弱点，不额外猜测。'}</p></section>
+            <section className="is-next"><span>下一步练法</span><h4>{hasClearPriority ? '保持当前题型再练一轮，弹之前先在心里确认组成音和最低音。' : '当前没有明确优先问题，可以完成这一项；想确认稳定性时再练一轮。'}</h4></section>
+          </div>
+          <details className="f2-result-details"><summary>查看详细数据</summary><div className="report-grid">
             <div><span>总题数</span><strong>{chord.report.totalQuestions}</strong></div>
             <div><span>正确</span><strong>{chord.report.correct}</strong></div>
             <div><span>错误</span><strong>{chord.report.wrong}</strong></div>
@@ -273,7 +292,7 @@ export function ChordV2Page({
             <div><span>多音</span><strong>{chord.report.extra}</strong></div>
             <div><span>转位错误</span><strong>{chord.report.wrongBass}</strong></div>
             <div><span>正确率</span><strong>{chord.report.accuracy}%</strong></div>
-          </div>
+          </div></details>
         </PracticeReportModal>
       ) : null}
     </section>

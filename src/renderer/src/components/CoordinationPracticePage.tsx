@@ -150,12 +150,13 @@ export function CoordinationPracticePage({
     + coordination.report.restError
     + coordination.report.early
     + coordination.report.late
+  const hasClearPriority = judgedCount - coordination.report.correct + coordination.report.syncWarning > 0
 
   return (
     <section className="coordination-page practice-workspace-page">
       <PracticePageHeader
         controls={<MetronomeVolumeControl id="coordination-header-metronome-volume" value={coordination.metronomeSound.volume} onChange={coordination.metronomeSound.setVolume} />}
-        eyebrow="Hand Coordination"
+        eyebrow="练习目标"
         onOpenSettings={openSettings}
         summary={settingsSummary}
         title="左右手协调"
@@ -243,9 +244,20 @@ export function CoordinationPracticePage({
       </PracticeSettingsDrawer>
 
       {coordination.isComplete ? (
-        <PracticeReportModal title="左右手协调练习完成" onBack={coordination.reset} onRepeat={startPractice}>
-          <p className="practice-report-summary">{settingsSummary}</p>
-          <div className="report-grid coordination-report-grid">
+        <PracticeReportModal
+          title="这一轮协调练习完成了"
+          onBack={coordination.reset}
+          onRepeat={startPractice}
+          primaryAction={hasClearPriority ? 'repeat' : 'back'}
+          repeatLabel={hasClearPriority ? '按建议再练' : '再练一轮'}
+        >
+          <div className="f2-result-story">
+            <section><span>做得最好</span><h4>本轮有 {coordination.report.correct} 个位置准确完成。</h4></section>
+            <section><span>最需要处理</span><h4>{coordination.report.leftWrongCount > coordination.report.rightWrongCount ? `左手在本轮出现更多错误，先留意 ${coordination.report.hardestPosition}。` : coordination.report.rightWrongCount > 0 ? `右手在本轮出现更多或相同数量错误，先留意 ${coordination.report.hardestPosition}。` : coordination.report.syncWarning > 0 ? '音高基本明确，下一步先处理双手同步。' : '本轮没有集中的协调错误。'}</h4></section>
+            <section><span>为什么优先处理</span><p>{judgedCount > 0 ? '左右手优先级来自本轮实际的分手错误与同步记录。' : '当前样本不足，不额外判断哪只手更弱。'}</p></section>
+            <section className="is-next"><span>下一步练法</span><h4>{hasClearPriority ? '保持当前模板和速度再练一轮，先看清双手落点，再一起落键。' : '当前没有明确优先问题，可以完成这一项；想确认稳定性时再练一轮。'}</h4></section>
+          </div>
+          <details className="f2-result-details"><summary>查看详细数据</summary><p className="practice-report-summary">{settingsSummary}</p><div className="report-grid coordination-report-grid">
             <div><span>模板</span><strong>{coordination.report.patternName}</strong></div><div><span>BPM</span><strong>{coordination.report.bpm}</strong></div><div><span>小节数</span><strong>{coordination.report.measureCount}</strong></div>
             <div><span>完成循环数</span><strong>{coordination.report.completedLoops}</strong></div>
             <div><span>总格子数</span><strong>{coordination.report.totalCells}</strong></div><div><span>需弹格子</span><strong>{coordination.report.playableCells}</strong></div><div><span>正确</span><strong>{coordination.report.correct}</strong></div>
@@ -254,7 +266,7 @@ export function CoordinationPracticePage({
             <div><span>同步警告</span><strong>{coordination.report.syncWarning}</strong></div><div><span>平均偏移</span><strong>{coordination.report.averageOffsetMs}ms</strong></div><div><span>正确率</span><strong>{coordination.report.accuracy}%</strong></div>
             <div><span>左手错误</span><strong>{coordination.report.leftWrongCount}</strong></div><div><span>右手错误</span><strong>{coordination.report.rightWrongCount}</strong></div><div><span>未归属多音</span><strong>{coordination.report.generalExtraCount}</strong></div>
             <div><span>最易错位置</span><strong>{coordination.report.hardestPosition}</strong></div>
-          </div>
+          </div></details>
         </PracticeReportModal>
       ) : null}
     </section>

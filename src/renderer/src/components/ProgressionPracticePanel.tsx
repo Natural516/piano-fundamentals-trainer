@@ -75,7 +75,7 @@ export function ProgressionPracticePanel({
 
       <div className="progression-step-display">
         <strong>{step ? stepSymbol : progression.status === 'finished' ? '进行完成' : '准备开始'}</strong>
-        {step ? <span>功能：{step.function ?? '其他'} · 目标 Voicing：[{step.voicing.exactNotes.join(', ')}]</span> : null}
+        {step ? <span>和声作用：{step.function ?? '其他'} · 目标音：[{step.voicing.exactNotes.join(', ')}]</span> : null}
       </div>
 
       {step ? (

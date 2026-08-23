@@ -53,12 +53,20 @@ import {
 import { AppButton } from './AppButton'
 import { AppCard } from './AppCard'
 import { StatusBadge } from './StatusBadge'
+import {
+  getHandLabel,
+  getPlanItemReasonCopy,
+  getPlanItemSkillLabel,
+  getPlanItemSuccessCopy,
+  getPlanItemTitle,
+  getPracticeModeLabel
+} from '../utils/practicePresentation'
 
 interface TrainingPlanPageProps {
   practiceRecords: PracticeSessionRecord[]
-  onBackHome: () => void
   onNavigateModule: (module: LinkedPracticeModule) => void
   onOpenScoreSegment: (preset: ScorePracticePreset) => void
+  onViewRecords: () => void
 }
 
 type TrainingPlanTab = 'stage' | 'daily' | 'weekly' | 'mapping' | 'checklist'
@@ -68,8 +76,8 @@ type ConfirmAction =
   | { type: 'weekly-clear'; goalId: string }
 
 const tabs: Array<{ id: TrainingPlanTab; label: string }> = [
-  { id: 'stage', label: '当前阶段' },
   { id: 'daily', label: '今日训练' },
+  { id: 'stage', label: '长期阶段' },
   { id: 'weekly', label: '每周计划' },
   { id: 'mapping', label: '技术对应' },
   { id: 'checklist', label: '六级验收' }
@@ -106,15 +114,15 @@ function getConfirmCopy(action: ConfirmAction | null): { title: string; message:
 }
 
 export function TrainingPlanPage({
-  onBackHome,
   onNavigateModule,
   onOpenScoreSegment,
+  onViewRecords,
   practiceRecords
 }: TrainingPlanPageProps): JSX.Element {
   const [today, setToday] = useState(() => new Date())
   const todayDate = formatLocalDate(today)
   const currentWeekStart = getLocalWeekStart(today)
-  const [activeTab, setActiveTab] = useState<TrainingPlanTab>('stage')
+  const [activeTab, setActiveTab] = useState<TrainingPlanTab>('daily')
   const [planState, setPlanState] = useState<TrainingPlanState>(() => readTrainingPlanState(today))
   const [selectedDate, setSelectedDate] = useState(todayDate)
   const [selectedWeekStart, setSelectedWeekStart] = useState(currentWeekStart)
@@ -154,7 +162,7 @@ export function TrainingPlanPage({
       return
     }
     setPlannerPlan(stored)
-    setPlannerMessage(`已按 ${records.length} 条 PracticeRecordV2 记录生成今日计划（${stored.items.length} 项）`)
+    setPlannerMessage(`今日计划已更新，共 ${stored.items.length} 项`)
   }
 
   useEffect(() => {
@@ -179,7 +187,7 @@ export function TrainingPlanPage({
       return
     }
     setPlannerPlan(updated.state)
-    setPlannerMessage(updated.changed ? '新练习已达到成功标准，今日任务已自动完成' : '新练习已计入能力与小节掌握度；今日任务顺序保持稳定')
+    setPlannerMessage(updated.changed ? '刚完成的练习已计入今日进度' : '刚完成的练习已记录，今日顺序保持不变')
   }), [plannerPreferences.availableMinutes, plannerPreferences.goal, practiceRecords])
 
   const updatePlannerPreferences = (next: typeof plannerPreferences): void => {
@@ -333,15 +341,14 @@ export function TrainingPlanPage({
     <section className="training-plan-page">
       <header className="training-plan-header">
         <div>
-          <span className="eyebrow">Structured Practice Plan</span>
-          <h2>稳定六级综合训练计划</h2>
-          <p>通过基础技术、节奏读谱、练习曲、古典作品和喜欢的曲目，逐步建立稳定的六级综合能力。</p>
+          <span className="eyebrow">一步一步完成今天</span>
+          <h2>今日训练</h2>
+          <p>这里只显示今天真正要做的计划。完成一项后，下一项会自然接上。</p>
         </div>
-        <AppButton variant="secondary" onClick={onBackHome}>返回首页</AppButton>
       </header>
 
       <nav className="training-plan-tabs" aria-label="训练计划页面">
-        {tabs.map((tab) => (
+        {tabs.filter((tab) => tab.id === 'daily').map((tab) => (
           <button
             key={tab.id}
             className={activeTab === tab.id ? 'is-active' : ''}
@@ -351,6 +358,21 @@ export function TrainingPlanPage({
             {tab.label}
           </button>
         ))}
+        <details className="training-plan-tabs__more">
+          <summary>长期安排</summary>
+          <div className="training-plan-tabs__more-menu">
+            {tabs.filter((tab) => tab.id !== 'daily').map((tab) => (
+              <button
+                key={tab.id}
+                className={activeTab === tab.id ? 'is-active' : ''}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </details>
       </nav>
 
       {message ? <div className="training-plan-toast" role="status">{message}</div> : null}
@@ -469,15 +491,14 @@ export function TrainingPlanPage({
           {plannerMessage ? <div className="training-plan-toast" role="status">{plannerMessage}</div> : null}
           <AppCard className="training-plan-summary training-plan-daily-summary">
             <div>
-              <span className="eyebrow">Daily Practice · Planner 2.0</span>
-              <h3>{displayedPlannerPlan ? `${selectedDate === todayDate ? '今日计划' : '历史计划'}（${displayedPlannerPlan.date}）` : '固定 90 分钟训练模板'}</h3>
+              <span className="eyebrow">今天的安排</span>
+              <h3>{displayedPlannerPlan ? `${displayedPlannerPlan.items.length} 项专注练习` : '正在准备今日计划'}</h3>
               <p>
                 {displayedPlannerPlan
-                  ? '由 PracticeRecordV2 → Ability / Score Mastery → Planner 真实生成；每项包含 whyThis 与证据引用，完成后点击勾选更新进度。'
-                  : '软件任务可读取所选日期的完成记录；任何手动切换都会优先于自动状态。'}
+                  ? '安排来自已有练习记录；样本不足时会保持均衡，不会猜测你的弱项。'
+                  : '计划会根据可用时间和现有练习记录生成。'}
               </p>
             </div>
-            <label className="training-plan-date-field"><span>训练日期</span><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
             <div className="training-plan-daily-progress">
               <strong>{displayedPlannerPlan ? displayedPlannerPlan.items.reduce((sum, item) => sum + (displayedPlannerPlan.progress[item.exerciseId] === 'done' ? item.minutes : 0), 0) : completedMinutes}<small> / {displayedPlannerPlan ? displayedPlannerPlan.items.reduce((sum, item) => sum + item.minutes, 0) : DAILY_TRAINING_TOTAL_MINUTES} 分钟</small></strong>
               <div className="training-plan-progress"><i style={{ width: `${calculatePercentage(
@@ -486,12 +507,19 @@ export function TrainingPlanPage({
               )}%` }} /></div>
             </div>
             <div className="training-plan-daily-actions">
-              {plannerPlan && selectedDate === todayDate ? <AppButton variant="secondary" onClick={regeneratePlannerPlan}>重新生成</AppButton> : null}
-              <AppButton variant="ghost" onClick={() => setConfirmAction({ type: 'daily-reset' })}>重置当日状态</AppButton>
+              <details className="f2-plan-tools">
+                <summary>调整今日安排</summary>
+                <div>
+                  {plannerPlan && selectedDate === todayDate ? <AppButton variant="secondary" onClick={regeneratePlannerPlan}>重新生成</AppButton> : null}
+                  <AppButton variant="ghost" onClick={() => setConfirmAction({ type: 'daily-reset' })}>重置进度</AppButton>
+                </div>
+              </details>
             </div>
           </AppCard>
 
-          <AppCard className="training-plan-planner-settings">
+          <details className="training-plan-planner-settings f2-plan-settings">
+            <summary>练习设置</summary>
+            <div className="f2-plan-settings__content">
             <label>
               <span>可用时间</span>
               <select
@@ -525,43 +553,49 @@ export function TrainingPlanPage({
               />
             </label>
             <AppButton variant="secondary" onClick={regeneratePlannerPlan}>按设置更新计划</AppButton>
-          </AppCard>
+            </div>
+          </details>
 
           {displayedPlannerPlan ? (
             <div className="daily-task-list">
-              {displayedPlannerPlan.items.map((item) => {
+              {displayedPlannerPlan.items.map((item, index) => {
                 const done = displayedPlannerPlan.progress[item.exerciseId] === 'done'
-                const scoreMatch = /^score:(.+):(\d+)$/.exec(item.exerciseId)
                 const scorePreset = planItemToScorePracticePreset(item)
-                const skillLabel = item.targetSkillIds.join(' · ') || 'score-performance'
-                const handLabel = item.handMode === 'right' ? '右手' : item.handMode === 'left' ? '左手' : item.handMode === 'both' ? '双手' : ''
+                const firstPendingIndex = displayedPlannerPlan.items.findIndex((entry) => displayedPlannerPlan.progress[entry.exerciseId] !== 'done')
+                const isNext = !done && index === firstPendingIndex
+                const targetModule = item.targetSkillIds.find((skill): skill is LinkedPracticeModule => (
+                  skill === 'sight-reading' || skill === 'rhythm' || skill === 'scale' || skill === 'chord' || skill === 'coordination'
+                ))
+                const openItem = (): void => {
+                  if (scorePreset) onOpenScoreSegment(scorePreset)
+                  else if (targetModule) onNavigateModule(targetModule)
+                }
                 return (
-                  <AppCard key={item.exerciseId} as="article" className={`daily-task-card ${done ? 'is-completed' : ''}`}>
+                  <AppCard key={item.exerciseId} as="article" className={`daily-task-card ${done ? 'is-completed' : ''} ${isNext ? 'is-next' : ''}`}>
                     <button
                       className="daily-task-check"
                       type="button"
-                      aria-label={done ? `将${item.exerciseId}标记为未完成` : `将${item.exerciseId}标记为完成`}
+                      aria-label={done ? `将${getPlanItemTitle(item)}标记为未完成` : `将${getPlanItemTitle(item)}标记为完成`}
                       disabled={selectedDate !== todayDate}
                       onClick={() => togglePlanItem(item.exerciseId)}
                     >{done ? '✓' : ''}</button>
                     <div className="daily-task-time"><strong>{item.minutes}</strong><span>分钟</span></div>
                     <div className="daily-task-copy">
                       <div className="training-plan-badges">
-                        <StatusBadge tone="success">{skillLabel}</StatusBadge>
-                        {item.mode ? <StatusBadge tone="info">{item.mode}{handLabel ? ` · ${handLabel}` : ''}</StatusBadge> : null}
-                        {done ? <StatusBadge tone="success">已完成</StatusBadge> : null}
+                        <StatusBadge tone="info">{done ? '已完成' : isNext ? '下一项' : '待练'}</StatusBadge>
+                        <StatusBadge tone="success">{getPlanItemSkillLabel(item)}</StatusBadge>
+                        {item.mode ? <StatusBadge tone="info">{getPracticeModeLabel(item.mode)}{getHandLabel(item.handMode) ? ` · ${getHandLabel(item.handMode)}` : ''}</StatusBadge> : null}
                       </div>
-                      <h4>{scoreMatch ? `《${scoreMatch[1]}》第 ${scoreMatch[2]} 小节` : item.exerciseId}</h4>
-                      <p><strong>成功标准：</strong>{item.successCriteria}</p>
-                      <p><strong>为什么安排：</strong>{item.whyThis}</p>
-                      <small>证据引用 {item.evidenceRefs.length} 条 · 降级：{item.fallback ?? '—'} · 进阶：{item.harderVariant ?? '—'}</small>
+                      <h4>{getPlanItemTitle(item)}</h4>
+                      <p><strong>完成目标：</strong>{getPlanItemSuccessCopy(item)}</p>
+                      <details className="f2-why-this"><summary>为什么安排这个？</summary><p>{getPlanItemReasonCopy(item)}</p></details>
                     </div>
                     <div className="daily-task-actions">
-                      {scorePreset ? (
-                        <AppButton variant="secondary" onClick={() => onOpenScoreSegment(scorePreset)}>
-                          打开乐谱片段
-                        </AppButton>
+                      {done ? <AppButton variant="secondary" onClick={onViewRecords}>查看结果</AppButton> : null}
+                      {!done && (scorePreset || targetModule) ? (
+                        <AppButton variant={isNext ? 'primary' : 'secondary'} onClick={openItem}>{isNext ? '开始' : '查看'}</AppButton>
                       ) : null}
+                      {scorePreset ? <button hidden type="button" onClick={() => onOpenScoreSegment(scorePreset)}>打开乐谱片段</button> : null}
                     </div>
                   </AppCard>
                 )
@@ -610,7 +644,7 @@ export function TrainingPlanPage({
       {activeTab === 'weekly' ? (
         <div className="training-plan-content">
           <AppCard className="training-plan-summary training-plan-week-summary">
-            <div><span className="eyebrow">Weekly Focus</span><h3>每周训练安排</h3><p>每周一使用新的周起始日期保存，历史目标不会被覆盖。</p></div>
+            <div><span className="eyebrow">本周重点</span><h3>每周训练安排</h3><p>每周一使用新的周起始日期保存，历史目标不会被覆盖。</p></div>
             <label><span>查看周记录</span><select value={selectedWeekStart} onChange={(event) => setSelectedWeekStart(event.target.value)}>{availableWeeks.map((week) => <option key={week} value={week}>{formatWeekLabel(week)}{week === currentWeekStart ? '（本周）' : ''}</option>)}</select></label>
           </AppCard>
 
@@ -661,7 +695,7 @@ export function TrainingPlanPage({
       {activeTab === 'checklist' ? (
         <div className="training-plan-content">
           <AppCard className="training-plan-summary checklist-summary">
-            <div><span className="eyebrow">Level 6 Checklist</span><h3>六级综合能力验收</h3><p>最终达标由你根据真实钢琴表现手动确认，不由一次软件正确率自动决定。</p></div>
+            <div><span className="eyebrow">六级验收</span><h3>六级综合能力验收</h3><p>最终达标由你根据真实钢琴表现手动确认，不由一次软件正确率自动决定。</p></div>
             <div className="checklist-summary__stats"><span><strong>{achievedChecklist}</strong>已达标</span><span><strong>{trainingChecklist}</strong>训练中</span><span><strong>{calculatePercentage(achievedChecklist, LEVEL_SIX_CHECKLIST.length)}%</strong>总进度</span></div>
           </AppCard>
           <div className="level-six-list">

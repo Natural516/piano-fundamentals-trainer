@@ -2,9 +2,9 @@ import type { NavigationItem, PageId, PracticeModule } from './types'
 
 export const navigationItems: NavigationItem[] = [
   { id: 'home', label: '首页', glyph: '⌂' },
-  { id: 'training-plan', label: '训练计划', glyph: '▦' },
-  { id: 'records', label: '练习记录', glyph: '□' },
-  { id: 'analytics', label: '统计分析', glyph: '▥' },
+  { id: 'training-plan', label: '今日训练', glyph: '▦' },
+  { id: 'records', label: '练习历史', glyph: '□' },
+  { id: 'analytics', label: '近期进步', glyph: '▥' },
   { id: 'settings', label: '设置', glyph: '⚙' }
 ]
 
@@ -61,7 +61,7 @@ export const practiceModules: PracticeModule[] = [
     id: 'score-practice',
     number: '07',
     title: '曲谱练习',
-    description: 'MusicXML / MXL 曲谱的 Wait 模式练习',
+    description: '导入曲谱，按自己的节奏逐段练习',
     visual: 'staff',
     accent: 'indigo'
   }
@@ -69,9 +69,9 @@ export const practiceModules: PracticeModule[] = [
 
 export const pageTitles: Record<PageId, string> = {
   home: '首页',
-  'training-plan': '稳定六级综合训练计划',
-  records: '练习记录',
-  analytics: '统计分析',
+  'training-plan': '今日训练',
+  records: '练习历史',
+  analytics: '近期进步',
   badges: '成就徽章',
   settings: '设置',
   'sight-reading': '识谱练习',

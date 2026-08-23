@@ -13,10 +13,6 @@ import { PracticeReportPanel } from './PracticeReportPanel'
 import { getMajorKeySignature } from '../utils/musicKeySignatures'
 import { SIGHT_READING_NOTE_POOL_MODE_LABELS } from '../utils/sightReadingSettings'
 
-interface PracticeHistoryPageProps {
-  onBackHome: () => void
-}
-
 type HistoryFilter = 'all' | PracticeModule
 
 const filterOptions: Array<{ id: HistoryFilter; label: string }> = [
@@ -136,7 +132,7 @@ function getPrimarySettings(record: PracticeSessionRecord): string {
     : '无额外设置'
 }
 
-export function PracticeHistoryPage({ onBackHome }: PracticeHistoryPageProps): JSX.Element {
+export function PracticeHistoryPage(): JSX.Element {
   const history = usePracticeHistory()
   const [filter, setFilter] = useState<HistoryFilter>('all')
   const [expandedId, setExpandedId] = useState('')
@@ -162,13 +158,10 @@ export function PracticeHistoryPage({ onBackHome }: PracticeHistoryPageProps): J
     <section className="practice-history-page">
       <header className="midi-page-header history-page-header">
         <div>
-          <span className="eyebrow">Practice History</span>
+          <span className="eyebrow">每一轮都有迹可循</span>
           <h2>练习记录</h2>
           <p>本地保存最近 200 次已完成练习。</p>
         </div>
-        <AppButton className="secondary-inline-button" variant="secondary" onClick={onBackHome}>
-          返回首页
-        </AppButton>
       </header>
 
       <section className="midi-panel history-toolbar">

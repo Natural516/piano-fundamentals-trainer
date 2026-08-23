@@ -6,20 +6,26 @@ interface PracticeReportModalProps {
   title: string
   onBack?: () => void
   onRepeat?: () => void
+  primaryAction?: 'repeat' | 'back'
+  backLabel?: string
+  repeatLabel?: string
 }
 
 export function PracticeReportModal({
   children,
   title,
   onBack,
-  onRepeat
+  onRepeat,
+  primaryAction = 'repeat',
+  backLabel = '完成',
+  repeatLabel = '再练一次'
 }: PracticeReportModalProps): JSX.Element {
   return (
     <div className="practice-report-backdrop">
       <section className="practice-report-modal" role="dialog" aria-modal="true" aria-labelledby="practice-report-title">
         <header className="practice-report-modal__header">
           <div>
-            <span>Practice Report</span>
+            <span>本轮回顾</span>
             <h3 id="practice-report-title">{title}</h3>
           </div>
           {onBack ? (
@@ -37,8 +43,17 @@ export function PracticeReportModal({
         <div className="practice-report-modal__body">{children}</div>
         {onBack || onRepeat ? (
           <footer className="practice-report-actions">
-            {onRepeat ? <AppButton onClick={onRepeat}>再练一次</AppButton> : null}
-            {onBack ? <AppButton variant="secondary" onClick={onBack}>返回</AppButton> : null}
+            {primaryAction === 'back' ? (
+              <>
+                {onRepeat ? <AppButton variant="secondary" onClick={onRepeat}>{repeatLabel}</AppButton> : null}
+                {onBack ? <AppButton onClick={onBack}>{backLabel}</AppButton> : null}
+              </>
+            ) : (
+              <>
+                {onRepeat ? <AppButton onClick={onRepeat}>{repeatLabel}</AppButton> : null}
+                {onBack ? <AppButton variant="secondary" onClick={onBack}>{backLabel}</AppButton> : null}
+              </>
+            )}
           </footer>
         ) : null}
       </section>

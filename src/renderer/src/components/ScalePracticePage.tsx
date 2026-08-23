@@ -38,7 +38,7 @@ function formatLatestResult(result: JudgementResult | null): string {
 function formatLatestMessage(result: JudgementResult | null): string {
   if (!result) return '开始后按顺序弹奏当前音阶'
   if (result.type === 'missing_note') return `${result.message}，请补弹当前目标音`
-  return `${result.message} / offset ${formatOffset(result.timeOffsetMs)}`
+  return `${result.message} · 时间偏差 ${formatOffset(result.timeOffsetMs)}`
 }
 
 export function ScalePracticePage({
@@ -170,7 +170,7 @@ export function ScalePracticePage({
     <section className="scale-page practice-workspace-page">
       <PracticePageHeader
         controls={<MetronomeVolumeControl id="scale-header-metronome-volume" value={scale.metronomeSound.volume} onChange={scale.metronomeSound.setVolume} />}
-        eyebrow="Scale Practice"
+        eyebrow="练习目标"
         onOpenSettings={openSettings}
         summary={settingsSummary}
         title="音阶练习"
@@ -278,16 +278,27 @@ export function ScalePracticePage({
       </PracticeSettingsDrawer>
 
       {scale.isComplete ? (
-        <PracticeReportModal title="音阶练习完成" onBack={scale.reset} onRepeat={restartPractice}>
-          <p className="practice-report-summary">{settingsSummary}</p>
-          <div className="report-grid">
+        <PracticeReportModal
+          title="这一轮音阶完成了"
+          onBack={scale.reset}
+          onRepeat={restartPractice}
+          primaryAction={errorCount > 0 ? 'repeat' : 'back'}
+          repeatLabel={errorCount > 0 ? '按建议再练' : '再练一轮'}
+        >
+          <div className="f2-result-story">
+            <section><span>做得最好</span><h4>本轮最高连续弹对 {scale.report.bestStreak} 个音。</h4></section>
+            <section><span>最需要处理</span><h4>{scale.report.mostMissedNote !== '—' ? `${scale.report.mostMissedNote} 是本轮最常出问题的音。` : errorCount > 0 ? '本轮仍有零散的错音、漏音或多音。' : '本轮没有出现音高错误。'}</h4></section>
+            <section><span>为什么优先处理</span><p>{errorCount > 0 ? '这个结论只来自本轮实际记录的音符错误。' : '当前记录没有指出具体弱音，不额外猜测。'}</p></section>
+            <section className="is-next"><span>下一步练法</span><h4>{errorCount > 0 ? '保持当前速度与手型，再练一轮，经过这个音时先保证落键准确。' : '当前没有明确优先问题，可以完成这一项；想确认稳定性时再练一轮。'}</h4></section>
+          </div>
+          <details className="f2-result-details"><summary>查看详细数据</summary><p className="practice-report-summary">{settingsSummary}</p><div className="report-grid">
             <div><span>调性</span><strong>{scale.report.keyName}</strong></div><div><span>模式</span><strong>{scale.report.modeName}</strong></div><div><span>BPM</span><strong>{scale.report.bpm}</strong></div>
             <div><span>循环次数</span><strong>{scale.report.loopCount}</strong></div><div><span>每拍音符</span><strong>{scale.report.notesPerBeat}</strong></div><div><span>完成音符数</span><strong>{scale.report.completedNotes}</strong></div>
             <div><span>总音符数</span><strong>{scale.report.totalNotes}</strong></div><div><span>正确数量</span><strong>{scale.report.correct}</strong></div><div><span>错音数量</span><strong>{scale.report.wrongNote}</strong></div>
             <div><span>漏音数量</span><strong>{scale.report.missingNote}</strong></div><div><span>多音数量</span><strong>{scale.report.extraNote}</strong></div><div><span>早弹数量</span><strong>{scale.report.early}</strong></div>
             <div><span>晚弹数量</span><strong>{scale.report.late}</strong></div><div><span>平均偏移</span><strong>{scale.report.averageOffsetMs}ms</strong></div><div><span>正确率</span><strong>{scale.report.accuracy}%</strong></div>
             <div><span>最高连续正确</span><strong>{scale.report.bestStreak}</strong></div><div><span>最容易错的音</span><strong>{scale.report.mostMissedNote}</strong></div>
-          </div>
+          </div></details>
         </PracticeReportModal>
       ) : null}
     </section>

@@ -9,13 +9,13 @@ import { PIANO_AUDIO_MODE_LABELS, type PianoAudioMode } from '../audio/pianoAudi
 import { useAiCoach } from '../hooks/useAiCoach'
 
 interface SettingsPageProps {
-  onBackHome: () => void
+  onOpenMidiTest: () => void
   pianoAudio: UsePianoAudioResult
 }
 
 const audioModeOptions: PianoAudioMode[] = ['builtin', 'silent', 'external']
 
-export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX.Element {
+export function SettingsPage({ onOpenMidiTest, pianoAudio }: SettingsPageProps): JSX.Element {
   const ai = useAiCoach()
   const [aiStatus, setAiStatus] = useState('')
   const [draftEndpoint, setDraftEndpoint] = useState(ai.settings.config.endpoint)
@@ -39,33 +39,26 @@ export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX
     <section className="settings-page">
       <header className="midi-page-header">
         <div>
-          <span className="eyebrow">Preferences</span>
+          <span className="eyebrow">按需要调整</span>
           <h2>设置</h2>
-          <p>调整钢琴基本功训练器的本地显示偏好。</p>
+          <p>常用的外观设置直接可见，其余选项只在需要时展开。</p>
         </div>
-        <AppButton className="ghost-button" variant="ghost" onClick={onBackHome}>
-          返回首页
-        </AppButton>
       </header>
 
       <div className="settings-content">
-        <AppCard as="section" className="settings-card">
+        <AppCard as="section" className="settings-card f2-theme-card">
           <div className="panel-title-row">
             <div>
-              <h3>外观 / 主题</h3>
+              <h3>外观主题</h3>
               <p>主题切换会立即生效，不会中断 MIDI 输入或正在进行的练习。</p>
             </div>
           </div>
           <ThemeSwitcher />
         </AppCard>
 
-        <AppCard as="section" className="settings-card">
-          <div className="panel-title-row">
-            <div>
-              <h3>音频 / 钢琴发声</h3>
-              <p>选择钢琴发声方式；静音与外部软音源模式下判定与节拍器不受影响。</p>
-            </div>
-          </div>
+        <details className="settings-card f2-settings-accordion">
+          <summary>钢琴发声<small>音源方式、音量与试听</small></summary>
+          <div className="f2-settings-accordion__body">
           <div className="settings-audio">
             <div className="settings-audio__row">
               <span>钢琴发声</span>
@@ -97,36 +90,34 @@ export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX
               </div>
             </div>
             <p className="settings-audio__status">
-              状态：{pianoAudio.samplerStatus.message}
+              当前状态：{pianoAudio.samplerStatus.message}
               {pianoAudio.samplerStatus.sampleCount > 0
-                ? `（${pianoAudio.samplerStatus.sampleCount} 个采样锚点）`
-                : ' — 可放置 Salamander Grand Piano V2（CC BY 3.0）到 assets/samples/salamander 后自动加载'}
+                ? `（已加载 ${pianoAudio.samplerStatus.sampleCount} 个采样）`
+                : '。没有安装采样音色时仍可正常练习与判定。'}
             </p>
             <div className="settings-audio__actions">
               <AppButton variant="secondary" onClick={() => void pianoAudio.testPlayChord()}>测试发声</AppButton>
+              <AppButton variant="ghost" onClick={onOpenMidiTest}>MIDI 输入与测试</AppButton>
             </div>
           </div>
-        </AppCard>
+          </div>
+        </details>
 
-        <AppCard as="section" className="settings-card">
-          <div className="panel-title-row">
-            <div>
-              <h3>AI 教练</h3>
-              <p>OpenAI 兼容接口（支持 DeepSeek 等）。API Key 仅保存在本机，不写入日志与备份导出。</p>
-            </div>
-          </div>
+        <details className="settings-card f2-settings-accordion">
+          <summary>练习助理<small>可选的补充建议；不影响基础练习功能</small></summary>
+          <div className="f2-settings-accordion__body">
           <div className="settings-ai">
             <div className="tolerance-control"><span>启用 AI 教练</span><div className="segmented-control">
               <button className={ai.settings.enabled ? 'is-active' : ''} type="button" onClick={() => void persistAiSettings({ ...ai.settings, enabled: true })}>启用</button>
               <button className={!ai.settings.enabled ? 'is-active' : ''} type="button" onClick={() => void persistAiSettings({ ...ai.settings, enabled: false })}>停用</button>
             </div></div>
-            <label className="midi-field"><span>Endpoint</span>
-              <input className="midi-select" type="url" value={draftEndpoint} placeholder="https://api.deepseek.com/v1/chat/completions" onChange={(event) => setDraftEndpoint(event.target.value)} />
+            <label className="midi-field"><span>接口地址</span>
+              <input className="midi-select" type="url" value={draftEndpoint} placeholder="https://your-service.example/chat/completions" onChange={(event) => setDraftEndpoint(event.target.value)} />
             </label>
-            <label className="midi-field"><span>Model</span>
+            <label className="midi-field"><span>模型名称</span>
               <input className="midi-select" type="text" value={draftModel} placeholder="deepseek-chat" onChange={(event) => setDraftModel(event.target.value)} />
             </label>
-            <label className="midi-field"><span>API Key（仅本机保存）</span>
+            <label className="midi-field"><span>访问密钥（仅保存在本机）</span>
               <input className="midi-select" type="password" value={draftApiKey} placeholder="sk-..." onChange={(event) => setDraftApiKey(event.target.value)} />
             </label>
             <div className="settings-audio__actions">
@@ -141,7 +132,7 @@ export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX
                   })
                 }}
               >
-                保存 AI 设置
+                保存助理设置
               </AppButton>
               <AppButton
                 variant="ghost"
@@ -160,15 +151,13 @@ export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX
             {aiStatus ? <p className="settings-audio__status">{aiStatus}</p> : null}
             <p className="settings-audio__status">未配置 AI 时，识谱、节奏、和弦、教材、曲谱、记录、统计与计划全部正常。</p>
           </div>
-        </AppCard>
-
-        <AppCard as="section" className="settings-card">
-          <div className="panel-title-row">
-            <div>
-              <h3>数据</h3>
-              <p>统一备份与恢复；备份不包含 AI API Key（仅保留已配置标记）。</p>
-            </div>
           </div>
+        </details>
+
+        <details className="settings-card f2-settings-accordion">
+          <summary>备份与恢复<small>导出或恢复本机练习数据</small></summary>
+          <div className="f2-settings-accordion__body">
+          <p className="settings-audio__status">备份不会包含练习助理的访问密钥。</p>
           <div className="settings-audio__actions">
             <AppButton variant="secondary" onClick={() => exportBackupToFile(buildBackup(collectCurrentStorageState(), APP_VERSION))}>
               下载备份
@@ -201,19 +190,20 @@ export function SettingsPage({ onBackHome, pianoAudio }: SettingsPageProps): JSX
               input?.click()
             }}>恢复备份</AppButton>
           </div>
-        </AppCard>
-
-        <AppCard as="section" className="settings-card">
-          <div className="panel-title-row">
-            <div><h3>关于</h3><p>版本与第三方许可。</p></div>
           </div>
-          <p className="settings-audio__status">钢琴基本功训练器 · 版本 {APP_VERSION}（Release Candidate）</p>
+        </details>
+
+        <details className="settings-card f2-settings-accordion">
+          <summary>关于<small>版本与第三方许可</small></summary>
+          <div className="f2-settings-accordion__body">
+          <p className="settings-audio__status">钢琴基本功训练器 · 版本 {APP_VERSION}</p>
           <ul className="settings-about-licenses">
             {APP_LICENSES.map((entry) => (
               <li key={entry.name}>{entry.name} {entry.version} · {entry.license} · {entry.usage}</li>
             ))}
           </ul>
-        </AppCard>
+          </div>
+        </details>
 
       </div>
     </section>

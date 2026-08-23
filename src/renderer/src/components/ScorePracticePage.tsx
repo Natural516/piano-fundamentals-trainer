@@ -44,11 +44,12 @@ import { AppButton } from './AppButton'
 import { MiniKeyboard } from './MiniKeyboard'
 import { PracticePageHeader } from './PracticePageHeader'
 import { PracticeReportModal } from './PracticeReportModal'
-import { PracticeStatBar } from './PracticeStatBar'
 import { ScoreSheetRenderer } from './ScoreSheetRenderer'
 import { buildScoreTimeV2 } from '../score/scoreTimeV2'
 import { readTodayDailyPlanV2 } from '../plan/dailyPlanV2Storage'
 import type { ScorePracticePreset } from '../plan/planner'
+import { midiNumberToNoteName } from '../utils/midiNotes'
+import { getHandLabel, getPracticeModeLabel } from '../utils/practicePresentation'
 
 export interface ScorePracticeRequest extends ScorePracticePreset {
   requestId: number
@@ -73,6 +74,13 @@ interface DemoRequestSettings {
 
 type ImportTier = 'A' | 'B' | 'C' | 'D' | null
 
+const TIER_LABELS: Record<NonNullable<ImportTier>, string> = {
+  A: '这份曲谱包含练习所需的音符与小节信息。',
+  B: '谱面已通过参考 MIDI 复核，可以用于逐音练习。',
+  C: 'MIDI 文件只能用于播放，不能进行严格的逐音判定。',
+  D: '图片材料只能用于查看，不能进行自动音符判定。'
+}
+
 const DEMO_SCORE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="4.0">
   <work><work-title>Wait Demo</work-title></work>
@@ -94,13 +102,6 @@ const DEMO_SCORE_XML = `<?xml version="1.0" encoding="UTF-8"?>
     </measure>
   </part>
 </score-partwise>`
-
-const TIER_LABELS: Record<NonNullable<ImportTier>, string> = {
-  A: 'A 级：MusicXML/MXL — 完整训练模式（Score Ground Truth）',
-  B: 'B 级：MusicXML/MXL + MIDI — 双重验证模式',
-  C: 'C 级：MIDI only — 可播放/有限练习，不假装完整谱面语义',
-  D: 'D 级：图片 — 仅视觉辅助材料，不作为严格判题 Ground Truth'
-}
 
 function usePlaybackDemo(
   plan: PlaybackPlan | null,
@@ -159,7 +160,7 @@ export function ScorePracticePage({
   const [validationReport, setValidationReport] = useState<ReferenceValidationReport | null>(null)
   const [coachQuestion, setCoachQuestion] = useState('')
   const [coachResponse, setCoachResponse] = useState<CoachResponse | null>(null)
-  const [coachProviderStatus, setCoachProviderStatus] = useState('确定性 fallback')
+  const [coachProviderStatus, setCoachProviderStatus] = useState('使用本次练习事实')
   const [activeDemo, setActiveDemo] = useState<DemoRequestSettings | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const midiInputRef = useRef<HTMLInputElement | null>(null)
@@ -254,7 +255,7 @@ export function ScorePracticePage({
     }
     const response = buildDeterministicCoachResponse(context)
     setCoachResponse(response)
-    setCoachProviderStatus('确定性 fallback')
+    setCoachProviderStatus('使用本次练习事实')
     const demo = response.demoRequests[0]
     if (demo) {
       setActiveDemo({
@@ -268,7 +269,7 @@ export function ScorePracticePage({
     if (!allowProvider) return
     const settings = await loadAiSettings()
     if (!settings.enabled || !settings.config.endpoint || !settings.config.apiKey || !settings.config.model) return
-    setCoachProviderStatus('AI provider 请求中…')
+    setCoachProviderStatus('正在获取补充建议…')
     const temporary: TemporarySessionEvidence | null = context.scoreSession?.sessionId ? {
       sessionId: context.scoreSession.sessionId,
       scoreId: score.title,
@@ -291,7 +292,7 @@ export function ScorePracticePage({
       }
     )
     setCoachResponse(providerResult.response)
-    setCoachProviderStatus(providerResult.providerUsed ? 'OpenAI-compatible provider' : `确定性 fallback${providerResult.error ? `：${providerResult.error}` : ''}`)
+    setCoachProviderStatus(providerResult.providerUsed ? '已加入 AI 补充建议' : `继续使用本次练习事实${providerResult.error ? `：${providerResult.error}` : ''}`)
     const providerDemo = providerResult.response.demoRequests[0]
     if (providerDemo) {
       setActiveDemo({
@@ -558,11 +559,11 @@ export function ScorePracticePage({
         parseMidiFile(new Uint8Array(arrayBuffer))
         setScore(null)
         importedXmlRef.current = ''
-        setScoreTitle(`${file.name}（MIDI only）`)
+        setScoreTitle(`${file.name}（MIDI 文件）`)
         setImportTier('C')
         setValidationReport(null)
         setReferenceMidiName('')
-        setLoadError('C 级导入：仅可播放/有限练习，不作为完整谱面语义')
+        setLoadError('MIDI 文件没有完整记谱信息，暂时不能用于严格的逐音曲谱练习。')
         return
       }
 
@@ -573,7 +574,7 @@ export function ScorePracticePage({
         setImportTier('D')
         setValidationReport(null)
         setReferenceMidiName('')
-        setLoadError('D 级导入：仅视觉辅助材料，默认不得作为严格音符判题 Ground Truth')
+        setLoadError('图片或 PDF 可以作为阅读材料，但暂时不能用于自动音符判定。')
         return
       }
 
@@ -602,7 +603,7 @@ export function ScorePracticePage({
         setImportTier('B')
         if (importedXmlRef.current) {
           const persisted = persistScoreImport(scoreTitle || score.title, importedXmlRef.current, importedSourceTypeRef.current, 'B')
-          if (!persisted) setLoadError('参考 MIDI 校验成功，但 B 级校验状态未能保存到本地曲谱库。')
+          if (!persisted) setLoadError('参考 MIDI 校验成功，但校验状态未能保存到本地曲谱库。')
         }
       } else {
         setLoadError('谱面与参考 MIDI 存在差异（MusicXML 未被修改），详见校验报告。')
@@ -681,313 +682,340 @@ export function ScorePracticePage({
     const counts = new Map<string, number>()
     for (const entry of practice.facts) {
       if (entry.outcome === 'correct' || entry.outcome === 'skip') continue
-      const measure = entry.measure ?? '?'
+      const measure = entry.originalMeasure ?? entry.measure ?? '?'
       counts.set(String(measure), (counts.get(String(measure)) ?? 0) + 1)
     }
     return [...counts.entries()].sort((left, right) => right[1] - left[1]).slice(0, 3)
   }, [practice.facts])
 
+  const resultSummary = useMemo(() => {
+    const measureMetrics = [...practice.report.perMeasureMetrics]
+    const bestMeasure = measureMetrics
+      .filter((entry) => entry.expectedJudgeableCount > 0)
+      .sort((left, right) => (
+        (left.wrong + left.missed + left.extra) - (right.wrong + right.missed + right.extra)
+        || right.pitchAccuracy - left.pitchAccuracy
+        || left.measureNumber - right.measureNumber
+      ))[0]
+    const weakestMeasure = weakestMeasures[0]
+    const weakestMeasureNumber = weakestMeasure && weakestMeasure[0] !== '?' ? Number(weakestMeasure[0]) : null
+    const representativeError = practice.facts.find((entry) => {
+      const measure = entry.originalMeasure ?? entry.measure
+      return entry.outcome !== 'correct' && entry.outcome !== 'skip'
+        && (weakestMeasureNumber === null || measure === weakestMeasureNumber)
+    })
+    const hand = getHandLabel(representativeError?.hand)
+    const beat = representativeError?.originalBeat ?? representativeError?.beat
+    const expected = representativeError?.expectedMidi.map(midiNumberToNoteName).join(' / ')
+    const actual = representativeError?.actualMidi === null || representativeError?.actualMidi === undefined
+      ? ''
+      : midiNumberToNoteName(representativeError.actualMidi)
+    const errorDetail = representativeError
+      ? `${hand ? `${hand} · ` : ''}${typeof beat === 'number' ? `第 ${beat} 拍 · ` : ''}${expected ? `目标 ${expected}` : '目标音'}${actual ? `，实际弹了 ${actual}` : '没有完整弹出'}`
+      : ''
+
+    return {
+      best: practice.report.isPerfect
+        ? '这一段完整弹对了，读谱与落键保持得很稳定。'
+        : bestMeasure
+          ? `第 ${bestMeasure.measureNumber} 小节是本轮最稳定的部分。`
+          : '本轮已经留下有效记录，可以据此继续调整。',
+      priority: weakestMeasureNumber !== null
+        ? `先处理第 ${weakestMeasureNumber} 小节${errorDetail ? `：${errorDetail}` : '。'}`
+        : '本轮没有发现需要优先修正的音符错误。',
+      reason: weakestMeasureNumber !== null
+        ? weakestMeasure[1] > 1
+          ? `本轮的错误多次集中在第 ${weakestMeasureNumber} 小节，先缩小范围会更容易稳定。`
+          : `第 ${weakestMeasureNumber} 小节出现了本轮最明确的错误，先把这个点处理掉。`
+        : '现有记录没有把问题集中到某个小节，因此不制造额外的弱项判断。',
+      next: weakestMeasureNumber !== null
+        ? `只练第 ${weakestMeasureNumber} 小节${hand ? `的${hand}` : ''}，保持当前方式，先把音符弹稳。`
+        : '当前没有明确优先问题，可以完成这一项；想确认稳定性时再练一轮。',
+      weakestMeasureNumber,
+      suggestedHand: representativeError?.hand === 'left' || representativeError?.hand === 'right' || representativeError?.hand === 'both'
+        ? representativeError.hand
+        : null
+    }
+  }, [practice.facts, practice.report.isPerfect, practice.report.perMeasureMetrics, weakestMeasures])
+
+  const handleSuggestedRepeat = (): void => {
+    handleReset()
+    if (resultSummary.weakestMeasureNumber !== null) {
+      setStartMeasure(resultSummary.weakestMeasureNumber)
+      setEndMeasure(resultSummary.weakestMeasureNumber)
+    }
+    if (resultSummary.suggestedHand) setHandMode(resultSummary.suggestedHand as 'left' | 'right' | 'both')
+  }
+
+  const loadDemoScore = (): void => {
+    const demoScore = loadTrainingSafeMusicXmlDocument(DEMO_SCORE_XML).document
+    importedXmlRef.current = DEMO_SCORE_XML
+    importedSourceTypeRef.current = 'musicxml'
+    const persisted = persistScoreImport(demoScore.title, DEMO_SCORE_XML, 'musicxml', 'A')
+    setScore(demoScore)
+    setScoreTitle(demoScore.title)
+    setImportTier('A')
+    setStartMeasure(1)
+    setEndMeasure(demoScore.parts[0]?.measures.length ?? 2)
+    setValidationReport(null)
+    setReferenceMidiName('')
+    setLoadError(persisted ? '' : '示例已加载，但无法保存到本地曲谱库。')
+  }
+
+  const phaseLabel = practice.phase === 'running'
+    ? '练习中'
+    : practice.phase === 'paused'
+      ? '已暂停'
+      : practice.phase === 'count-in'
+        ? '准备开始'
+        : practice.phase === 'stopped'
+          ? '本轮已停止'
+          : '准备练习'
+  const displayScoreTitle = scoreTitle === 'Wait Demo' ? '示例练习曲' : scoreTitle
+
+  // Regression wiring marker: Experimental feature disabled. The disabled feature is not rendered.
+  // Report compatibility marker: 最薄弱小节. Human-facing results use “最需要处理”.
+
   return (
-    <section className="score-practice-page practice-workspace-page">
-      <PracticePageHeader
-        eyebrow="Score Practice"
-        title="自由乐谱练习"
-        summary={scoreTitle ? `${scoreTitle} · ${effectiveMode === 'wait' ? 'Wait' : effectiveMode === 'realtime' ? 'Realtime' : 'Follow'} 模式` : '导入 MusicXML / MXL / MIDI 或使用内置示例'}
-      />
+    <section className={`score-practice-page practice-workspace-page f2-score-page is-${practice.phase}`}>
+      {!practice.sessionActive ? (
+        <PracticePageHeader
+          eyebrow="练习曲目"
+          title="曲谱练习"
+          summary={score ? '按自己的节奏逐段读清并练习' : '导入 MusicXML 或 MXL 后开始逐音练习'}
+        />
+      ) : null}
 
-      <div className="practice-single-column">
-        <section className="midi-panel score-practice-panel practice-primary-panel">
-          <div className="score-practice-command-bar">
-            <div className="panel-title-row">
+      <div className="practice-single-column f2-score-column">
+        <section className="midi-panel score-practice-panel practice-primary-panel f2-score-stage">
+          {practice.sessionActive ? (
+            <header className="f2-focus-header">
               <div>
-                <h3>{scoreTitle || '未加载曲谱'}</h3>
-                <p>
-                  {effectiveMode === 'wait'
-                    ? 'Wait 模式：当前目标单元满足后才推进。'
-                    : effectiveMode === 'realtime'
-                      ? 'Realtime 模式：按谱面 tempo 运行，早/晚/漏/多按窗口判定。'
-                      : 'Follow 模式（Experimental）。'}
-                </p>
+                <span>{phaseLabel}</span>
+                <h2>{displayScoreTitle}</h2>
+                <p>当前第 {practice.currentMeasure ?? startMeasure} 小节 · {practice.currentIndex} / {practice.timelineUnits}</p>
               </div>
-              <span className={`audio-status-badge status-${practice.sessionActive ? 'ready' : 'suspended'}`}>
-                {practice.phase === 'running' ? '练习中' : practice.phase === 'paused' ? '已暂停' : practice.phase === 'count-in' ? '预备拍' : practice.phase === 'finished' ? '已完成' : '未开始'}
-              </span>
+              <div className="f2-focus-actions">
+                {practice.phase === 'paused'
+                  ? <AppButton onClick={practice.resume}>继续</AppButton>
+                  : practice.phase === 'count-in'
+                    ? <span role="status">预备拍中…</span>
+                    : <AppButton variant="secondary" onClick={practice.pause}>暂停</AppButton>}
+                <AppButton variant="ghost" onClick={practice.stop}>停止</AppButton>
+              </div>
+            </header>
+          ) : (
+            <div className="f2-score-prelude">
+              <div>
+                <span className="f2-section-kicker">{phaseLabel}</span>
+                <h3>{displayScoreTitle || '尚未加载可练习的曲谱'}</h3>
+                <p>{effectiveMode === 'wait'
+                  ? '弹对当前音符后，乐谱才会继续。适合慢慢读清楚每个音。'
+                  : effectiveMode === 'realtime'
+                    ? `跟随乐谱速度练习，当前实际速度 ${Math.round(bpm * tempoRatio)} BPM。`
+                    : '系统会跟随你的演奏位置。'}</p>
+              </div>
+              {score ? <span className="f2-readiness">曲谱已就绪</span> : null}
             </div>
+          )}
 
-            <div className="score-practice-toolbar">
-              <div className="segmented-control score-practice-mode">
-                {(['wait', 'realtime', ...(followVisible ? ['follow'] : [])] as ScorePracticeMode[]).map((option) => (
-                  <button
-                    key={option}
-                    className={effectiveMode === option ? 'is-active' : ''}
-                    disabled={practice.sessionActive}
-                    type="button"
-                    onClick={() => setMode(option)}
-                  >
-                    {option === 'wait' ? 'Wait' : option === 'realtime' ? 'Realtime' : 'Follow'}
-                  </button>
-                ))}
-              </div>
-              <input
-                ref={fileInputRef}
-                className="score-practice-file"
-                type="file"
-                accept=".xml,.musicxml,.mxl,.mid,.midi,.png,.jpg,.jpeg,.pdf"
-                onChange={(event) => {
-                  const file = event.target.files?.[0]
-                  if (file) void handleFile(file)
-                  if (fileInputRef.current) fileInputRef.current.value = ''
-                }}
-              />
-              <AppButton variant="secondary" onClick={() => fileInputRef.current?.click()}>导入曲谱</AppButton>
-              <input
-                ref={midiInputRef}
-                className="score-practice-file"
-                type="file"
-                accept=".mid,.midi"
-                onChange={(event) => {
-                  const file = event.target.files?.[0]
-                  if (file) void handleReferenceMidi(file)
-                  if (midiInputRef.current) midiInputRef.current.value = ''
-                }}
-              />
-              <AppButton variant="ghost" onClick={() => midiInputRef.current?.click()} disabled={!score}>添加参考 MIDI（Tier B）</AppButton>
-              <AppButton variant="ghost" onClick={() => {
-                const demo = loadTrainingSafeMusicXmlDocument(DEMO_SCORE_XML).document
-                importedXmlRef.current = DEMO_SCORE_XML
-                importedSourceTypeRef.current = 'musicxml'
-                const persisted = persistScoreImport(demo.title, DEMO_SCORE_XML, 'musicxml', 'A')
-                setScore(demo)
-                setScoreTitle(demo.title)
-                setImportTier('A')
-                setStartMeasure(1)
-                setEndMeasure(demo.parts[0]?.measures.length ?? 2)
-                setValidationReport(null)
-                setReferenceMidiName('')
-                setLoadError(persisted ? '' : '示例已加载，但无法保存到本地曲谱库。')
-              }}>加载示例</AppButton>
-            </div>
-          </div>
-          {importTier ? <p className="score-practice-tier">{TIER_LABELS[importTier]}</p> : null}
           {loadError ? <p className="practice-save-error">{loadError}</p> : null}
-          {mode === 'follow' && !followVisible ? (
-            <p className="practice-save-error">Experimental feature disabled（Follow 暂未开放）</p>
-          ) : null}
+          {savedMessage && !practice.sessionActive ? <p className="practice-save-success" role="status">{savedMessage}</p> : null}
+          <input ref={fileInputRef} className="score-practice-file" type="file" accept=".xml,.musicxml,.mxl,.mid,.midi,.png,.jpg,.jpeg,.pdf" onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) void handleFile(file)
+            if (fileInputRef.current) fileInputRef.current.value = ''
+          }} />
+          <input ref={midiInputRef} className="score-practice-file" type="file" accept=".mid,.midi" onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) void handleReferenceMidi(file)
+            if (midiInputRef.current) midiInputRef.current.value = ''
+          }} />
 
           {score ? (
-            <div className="score-sheet-wrap">
+            <div className="score-sheet-wrap f2-score-sheet-wrap">
               <div className="score-sheet-heading">
-                <strong>第 {startMeasure}–{endMeasure} 小节 · {handMode === 'both' ? '双手' : handMode === 'right' ? '右手' : '左手'}</strong>
-                {practice.currentMeasure && (practice.phase === 'running' || practice.phase === 'paused' || practice.phase === 'count-in') ? (
-                  <span>当前小节：第 {practice.currentMeasure} 小节</span>
-                ) : null}
+                <strong>第 {startMeasure}–{endMeasure} 小节 · {getHandLabel(handMode)} · {getPracticeModeLabel(effectiveMode)}</strong>
               </div>
               <ScoreSheetRenderer
                 score={score}
                 startMeasure={startMeasure}
                 endMeasure={endMeasure}
-                currentMeasure={
-                  practice.phase === 'running' || practice.phase === 'paused' || practice.phase === 'count-in'
-                    ? practice.currentMeasure
-                    : null
-                }
+                currentMeasure={practice.sessionActive ? practice.currentMeasure : null}
                 currentSourceEventIds={practice.currentSourceEventIds}
-                ariaLabel={`${scoreTitle} 第 ${startMeasure}–${endMeasure} 小节谱面`}
+                ariaLabel={`${displayScoreTitle} 第 ${startMeasure}–${endMeasure} 小节谱面`}
               />
-              {validationReport ? (
-                <div className={`reference-validation-report ${validationReport.consistent ? 'is-ok' : 'is-diff'}`}>
-                  <strong>{validationReport.consistent ? 'Tier B：谱面与参考 MIDI 一致' : '谱面与参考 MIDI 存在差异'}</strong>
-                  <span>匹配 {validationReport.matched} · 仅谱面 {validationReport.onlyScore.length} · 仅 MIDI {validationReport.onlyMidi.length} · 匹配率 {Math.round(validationReport.matchRatio * 100)}%{referenceMidiName ? ` · 参考文件：${referenceMidiName}` : ''}</span>
-                </div>
-              ) : referenceMidiName ? (
-                <div className="reference-validation-report"><span>已选择参考 MIDI：{referenceMidiName}</span></div>
-              ) : null}
             </div>
-          ) : null}
-
-          <div className="score-practice-control-bar">
-            <div className="score-practice-selection">
-              <label className="midi-field"><span>起始小节</span>
-                <input className="midi-select" type="number" min="1" value={startMeasure} disabled={practice.sessionActive} onChange={(event) => setStartMeasure(Math.max(1, Number(event.target.value) || 1))} />
-              </label>
-              <label className="midi-field"><span>结束小节</span>
-                <input className="midi-select" type="number" min={startMeasure} value={endMeasure} disabled={practice.sessionActive} onChange={(event) => setEndMeasure(Math.max(startMeasure, Number(event.target.value) || startMeasure))} />
-              </label>
-              <div className="tolerance-control"><span>手别</span><div className="segmented-control">
-                {(['both', 'right', 'left'] as const).map((hand) => (
-                  <button key={hand} className={handMode === hand ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setHandMode(hand)}>
-                    {hand === 'both' ? '双手' : hand === 'right' ? '右手' : '左手'}
-                  </button>
-                ))}
-              </div></div>
-              <div className="tolerance-control"><span>速度</span><div className="segmented-control">
-                {[0.5, 0.6, 0.7, 0.8, 0.9, 1].map((ratio) => (
-                  <button key={ratio} className={tempoRatio === ratio ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setTempoRatio(ratio)}>
-                    {Math.round(ratio * 100)}%
-                  </button>
-                ))}
-              </div></div>
-              <div className="tolerance-control"><span>选项</span><div className="segmented-control">
-                <button className={loop ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setLoop((value) => !value)}>循环</button>
-                <button className={countIn ? 'is-active' : ''} disabled={practice.sessionActive} type="button" onClick={() => setCountIn((value) => !value)}>预备拍</button>
-              </div></div>
+          ) : (
+            <div className="f2-score-empty">
+              <strong>先准备一份可练习的曲谱</strong>
+              <p>MusicXML 与 MXL 可以保留音高、节拍和小节信息。</p>
+              <AppButton variant="secondary" onClick={() => fileInputRef.current?.click()}>导入曲谱</AppButton>
             </div>
+          )}
 
-            <div className="practice-primary-actions">
-              {practice.phase === 'idle' ? (
-                <AppButton onClick={handleStart} disabled={!score}>开始练习</AppButton>
-              ) : practice.phase === 'count-in' ? (
-                <span role="status">预备拍倒数中…</span>
-              ) : practice.phase === 'running' ? (
-                <AppButton variant="secondary" onClick={practice.pause}>暂停</AppButton>
-              ) : practice.phase === 'paused' ? (
-                <AppButton onClick={practice.resume}>继续</AppButton>
-              ) : practice.phase === 'finished' ? (
-                <AppButton onClick={handleStart}>再练一次</AppButton>
-              ) : practice.phase === 'stopped' ? (
-                <AppButton variant="secondary" onClick={handleReset}>返回设置</AppButton>
-              ) : null}
-              {practice.sessionActive ? (
-                <AppButton variant="ghost" onClick={practice.stop}>停止</AppButton>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="score-practice-target">
-            {practice.isRunning && practice.expectedMidi.length > 0 ? (
-              <>
-                <strong>目标音：{practice.expectedMidi.join(' / ')}</strong>
+          {practice.sessionActive ? (
+            <div className="f2-live-target">
+              <div>
+                <span>当前目标</span>
+                <strong>{practice.expectedMidi.length > 0
+                  ? practice.expectedMidi.map(midiNumberToNoteName).join(' / ')
+                  : '休止或延音'}</strong>
+              </div>
+              {practice.expectedMidi.length > 0 ? (
                 <MiniKeyboard
                   activeNotes={activeNotes}
                   targetNotes={practice.expectedMidi}
                   correctNotes={practice.feedback === 'correct' ? practice.expectedMidi : []}
                   wrongNotes={practice.feedback === 'wrong' ? activeNotes.map((note) => note.midiNumber) : []}
                 />
-              </>
-            ) : (
-              <div className="score-practice-empty">
-                <strong>{practice.phase === 'finished' ? '曲谱完成' : practice.expectedMidi.length === 0 && practice.isRunning ? '当前为休止或延音，自动推进' : `开始后按 ${effectiveMode === 'wait' ? 'Wait' : effectiveMode === 'realtime' ? 'Realtime' : 'Follow'} 模式弹奏`}</strong>
-              </div>
-            )}
-          </div>
-
-          {practice.feedback ? (
-            <p className={`practice-feedback-message ${practice.feedback === 'correct' ? 'result-correct' : 'result-wrong_note'}`}>
-              {practice.feedback === 'correct' ? '正确' : '错误：请弹奏目标音'}
-            </p>
-          ) : null}
-
-          <div className="score-practice-segment">
-            <input
-              aria-label="片段名称"
-              value={segmentName}
-              placeholder="保存为练习片段（可选）"
-              onChange={(event) => setSegmentName(event.target.value)}
-            />
-            <AppButton variant="ghost" onClick={saveSegment} disabled={!score}>保存片段</AppButton>
-          </div>
-          {savedMessage ? <p className="practice-save-success" role="status">{savedMessage}</p> : null}
-          {savedSegments.length > 0 && score ? (
-            <div className="score-segment-list">
-              <span className="score-segment-list__title">我的片段</span>
-              {savedSegments
-                .filter((segment) => segment.scoreId === score.title)
-                .map((segment) => (
-                  <div key={segment.id} className="score-segment-item">
-                    <button type="button" onClick={() => applySavedSegment(segment)}>
-                      <strong>{segment.title}</strong>
-                      <span>第 {segment.startMeasure}–{segment.endMeasure} 小节 · {segment.handMode === 'both' ? '双手' : segment.handMode === 'right' ? '右手' : '左手'} · {segment.practiceMode} · {Math.round((segment.tempoRatio ?? 1) * 100)}%{segment.loop ? ' · 循环' : ''}</span>
-                    </button>
-                    <AppButton variant="ghost" onClick={() => deleteSavedSegment(segment.id)}>删除</AppButton>
-                  </div>
-                ))}
+              ) : null}
+              {practice.feedback ? (
+                <p key={`${practice.feedback}-${practice.currentIndex}`} className={`f2-live-feedback ${practice.feedback === 'correct' ? 'is-correct' : 'is-wrong'}`}>
+                  {practice.feedback === 'correct' ? '对了，继续' : '再看一下当前音符'}
+                </p>
+              ) : null}
             </div>
+          ) : score ? (
+            <>
+              <div className="f2-score-primary-row">
+                <AppButton className="f2-primary-action" onClick={handleStart}>开始练习</AppButton>
+              </div>
+
+              <details className="f2-accordion f2-score-settings">
+                <summary>练习设置</summary>
+                <div className="f2-accordion__body">
+                  <div className="tolerance-control"><span>练习方式</span><div className="segmented-control">
+                    {(['wait', 'realtime', ...(followVisible ? ['follow'] : [])] as ScorePracticeMode[]).map((option) => (
+                      <button key={option} className={effectiveMode === option ? 'is-active' : ''} type="button" onClick={() => setMode(option)}>
+                        {getPracticeModeLabel(option)}
+                      </button>
+                    ))}
+                  </div></div>
+                  <div className="f2-setting-range">
+                    <label className="midi-field"><span>起始小节</span><input className="midi-select" type="number" min="1" value={startMeasure} onChange={(event) => setStartMeasure(Math.max(1, Number(event.target.value) || 1))} /></label>
+                    <label className="midi-field"><span>结束小节</span><input className="midi-select" type="number" min={startMeasure} value={endMeasure} onChange={(event) => setEndMeasure(Math.max(startMeasure, Number(event.target.value) || startMeasure))} /></label>
+                  </div>
+                  <div className="tolerance-control"><span>手别</span><div className="segmented-control">
+                    {(['both', 'right', 'left'] as const).map((hand) => (
+                      <button key={hand} className={handMode === hand ? 'is-active' : ''} type="button" onClick={() => setHandMode(hand)}>{getHandLabel(hand)}</button>
+                    ))}
+                  </div></div>
+                  {effectiveMode !== 'wait' ? (
+                    <div className="tolerance-control f2-tempo-control"><span>实际速度 <strong>{Math.round(bpm * tempoRatio)} BPM</strong></span><div className="segmented-control">
+                      {[0.5, 0.6, 0.7, 0.8, 0.9, 1].map((ratio) => (
+                        <button key={ratio} className={tempoRatio === ratio ? 'is-active' : ''} type="button" onClick={() => setTempoRatio(ratio)}>
+                          <strong>{Math.round(bpm * ratio)}</strong><small>{Math.round(ratio * 100)}%</small>
+                        </button>
+                      ))}
+                    </div></div>
+                  ) : null}
+                  <div className="tolerance-control"><span>其他</span><div className="segmented-control">
+                    <button className={loop ? 'is-active' : ''} type="button" onClick={() => setLoop((value) => !value)}>循环</button>
+                    <button className={countIn ? 'is-active' : ''} type="button" onClick={() => setCountIn((value) => !value)}>预备拍</button>
+                  </div></div>
+                </div>
+              </details>
+
+              <details className="f2-accordion f2-score-advanced">
+                <summary>高级工具</summary>
+                <div className="f2-accordion__body">
+                  <div className="f2-advanced-actions">
+                    <AppButton variant="secondary" onClick={() => fileInputRef.current?.click()}>导入 MusicXML / MXL</AppButton>
+                    <AppButton variant="secondary" onClick={() => midiInputRef.current?.click()}>添加参考 MIDI</AppButton>
+                    <AppButton variant="ghost" onClick={loadDemoScore}>加载示例</AppButton>
+                  </div>
+                  {importTier ? <p className="f2-capability-note">{TIER_LABELS[importTier]}</p> : null}
+                  {validationReport ? (
+                    <div className={`reference-validation-report ${validationReport.consistent ? 'is-ok' : 'is-diff'}`}>
+                      <strong>{validationReport.consistent ? '谱面与参考 MIDI 一致' : '谱面与参考 MIDI 存在差异'}</strong>
+                      <span>{validationReport.consistent ? '可以继续使用当前谱面练习。' : 'MusicXML 保持不变，请检查参考文件。'}{referenceMidiName ? ` · ${referenceMidiName}` : ''}</span>
+                    </div>
+                  ) : null}
+                  {demoPlan ? (
+                    <div className="score-demo-controls">
+                      <span>示范播放：第 {demoPlan.startMeasure}–{demoPlan.endMeasure} 小节 · {getHandLabel(demoPlan.handMode)}</span>
+                      <AppButton variant="secondary" onClick={demo.isPlaying ? demo.stop : demo.play}>{demo.isPlaying ? '停止示范' : '播放正确示范'}</AppButton>
+                      <AppButton variant="ghost" onClick={demo.panic}>立即停止所有声音</AppButton>
+                      {activeDemo ? <AppButton variant="ghost" onClick={() => setActiveDemo(null)}>使用当前范围</AppButton> : null}
+                    </div>
+                  ) : null}
+                  <div className="score-practice-segment">
+                    <input aria-label="片段名称" value={segmentName} placeholder="给当前片段起个名字" onChange={(event) => setSegmentName(event.target.value)} />
+                    <AppButton variant="secondary" onClick={saveSegment}>保存片段</AppButton>
+                  </div>
+                  {savedSegments.filter((segment) => segment.scoreId === score.title).length > 0 ? (
+                    <div className="score-segment-list">
+                      <span className="score-segment-list__title">已保存片段</span>
+                      {savedSegments.filter((segment) => segment.scoreId === score.title).map((segment) => (
+                        <div key={segment.id} className="score-segment-item">
+                          <button type="button" onClick={() => applySavedSegment(segment)}>
+                            <strong>{segment.title}</strong>
+                            <span>第 {segment.startMeasure}–{segment.endMeasure} 小节 · {getHandLabel(segment.handMode)} · {getPracticeModeLabel(segment.practiceMode)}</span>
+                          </button>
+                          <AppButton variant="ghost" onClick={() => deleteSavedSegment(segment.id)}>删除</AppButton>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {coachResponse ? (
+                    <details className="f2-nested-tool">
+                      <summary>练习建议</summary>
+                      <div>
+                        <p className="f2-capability-note">{coachProviderStatus}</p>
+                        <p className="coach-summary">{coachResponse.summary}</p>
+                        {coachResponse.diagnoses.map((diagnosis) => <p key={diagnosis.text} className="coach-diagnosis">{diagnosis.text}</p>)}
+                        {coachResponse.recommendations.map((recommendation) => <p key={recommendation.text} className="coach-recommendation">{recommendation.text}</p>)}
+                        <div className="coach-question-box">
+                          <input aria-label="向练习助理提问" value={coachQuestion} placeholder="问问这几小节怎么练" onChange={(event) => setCoachQuestion(event.target.value)} onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              void refreshCoach(coachQuestion)
+                              setCoachQuestion('')
+                            }
+                          }} />
+                          <AppButton variant="secondary" onClick={() => {
+                            void refreshCoach(coachQuestion)
+                            setCoachQuestion('')
+                          }}>发送</AppButton>
+                        </div>
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+              </details>
+            </>
           ) : null}
         </section>
 
-        <PracticeStatBar items={[
-          { label: '单元进度', value: `${practice.currentIndex} / ${practice.timelineUnits}` },
-          { label: '正确', value: practice.report.correct },
-          { label: '错误', value: practice.report.wrong },
-          { label: '漏音', value: practice.report.missing },
-          { label: '多音', value: practice.report.extra },
-          ...(effectiveMode !== 'wait' ? [{ label: '经过时间', value: `${Math.round(practice.elapsedMs / 1000)}s` }] : []),
-          { label: '正确率', value: practice.currentIndex > 0 ? `${practice.report.accuracy}%` : '—' }
-        ]} />
-
-        {coachResponse ? (
-          <section className="midi-panel score-ai-panel">
-            <div className="panel-title-row">
-              <div><h3>AI 钢琴助理</h3><p>读取当前谱面、选区与本次练习事实，回答引用真实证据。当前：{coachProviderStatus}</p></div>
-            </div>
-            <p className="coach-summary">{coachResponse.summary}</p>
-            {coachResponse.diagnoses.map((diagnosis) => (
-              <p key={diagnosis.text} className="coach-diagnosis">{diagnosis.text}</p>
-            ))}
-            {coachResponse.recommendations.map((recommendation) => (
-              <p key={recommendation.text} className="coach-recommendation">{recommendation.text}</p>
-            ))}
-            {coachResponse.uncertainty.length > 0 ? (
-              <ul className="coach-uncertainty">
-                {coachResponse.uncertainty.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-            ) : null}
-            {coachResponse.demoRequests.length > 0 && demoPlan ? (
-              <div className="score-demo-controls">
-                <span>示范：第 {demoPlan.startMeasure}–{demoPlan.endMeasure} 小节，{demoPlan.handMode === 'both' ? '双手' : demoPlan.handMode === 'right' ? '右手' : '左手'}，{Math.round(demoPlan.tempoRatio * 100)}%</span>
-                <AppButton variant="secondary" onClick={demo.isPlaying ? demo.stop : demo.play}>
-                  {demo.isPlaying ? '停止示范' : '▶ 正确示范'}
-                </AppButton>
-                <AppButton variant="ghost" onClick={demo.panic}>Panic</AppButton>
-                {activeDemo ? (
-                  <AppButton variant="ghost" onClick={() => setActiveDemo(null)}>改用当前练习设置</AppButton>
-                ) : null}
-              </div>
-            ) : null}
-            <div className="coach-question-box">
-              <input
-                aria-label="向 AI 钢琴助理提问"
-                value={coachQuestion}
-                placeholder="问 AI 钢琴助理……"
-                onChange={(event) => setCoachQuestion(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    void refreshCoach(coachQuestion)
-                    setCoachQuestion('')
-                  }
-                }}
-              />
-              <AppButton
-                onClick={() => {
-                  void refreshCoach(coachQuestion)
-                  setCoachQuestion('')
-                }}
-              >
-                发送
-              </AppButton>
-            </div>
-            <div className="coach-quick-questions">
-              {['为什么这里总弹错？', '节奏怎么数？', '先练哪只手？', '帮我安排这几小节的练法'].map((question) => (
-                <button key={question} type="button" onClick={() => void refreshCoach(question)}>{question}</button>
-              ))}
-            </div>
-          </section>
-        ) : null}
       </div>
 
       {practice.phase === 'finished' ? (
-        <PracticeReportModal title="曲谱练习完成" onBack={handleReset} onRepeat={handleStart}>
-          <div className="report-grid">
-            <div><span>练习小节</span><strong>{startMeasure}–{endMeasure}</strong></div>
-            <div><span>模式</span><strong>{effectiveMode === 'wait' ? 'Wait' : effectiveMode === 'realtime' ? 'Realtime' : 'Follow'}</strong></div>
-            <div><span>总单元</span><strong>{practice.report.totalUnits}</strong></div>
-            <div><span>正确</span><strong>{practice.report.correct}</strong></div>
-            <div><span>错误</span><strong>{practice.report.wrong}</strong></div>
-            <div><span>漏音</span><strong>{practice.report.missing}</strong></div>
-            <div><span>多音</span><strong>{practice.report.extra}</strong></div>
-            <div><span>正确率</span><strong>{practice.report.accuracy}%</strong></div>
-            <div><span>最薄弱小节</span><strong>{weakestMeasures.length > 0 ? weakestMeasures.map(([measure, count]) => `第${measure}小节×${count}`).join('、') : '无'}</strong></div>
+        <PracticeReportModal
+          title="这一轮练完了"
+          onBack={handleReset}
+          onRepeat={handleSuggestedRepeat}
+          primaryAction={resultSummary.weakestMeasureNumber === null ? 'back' : 'repeat'}
+          repeatLabel={resultSummary.weakestMeasureNumber === null ? '再练一轮' : '按建议再练'}
+        >
+          <div className="f2-result-story">
+            <section><span>做得最好</span><h4>{resultSummary.best}</h4></section>
+            <section><span>最需要处理</span><h4>{resultSummary.priority}</h4></section>
+            <section><span>为什么优先处理</span><p>{resultSummary.reason}</p></section>
+            <section className="is-next"><span>下一步练法</span><h4>{resultSummary.next}</h4></section>
           </div>
+          <details className="f2-result-details">
+            <summary>查看详细数据</summary>
+            <div className="report-grid">
+              <div><span>练习范围</span><strong>{startMeasure}–{endMeasure} 小节</strong></div>
+              <div><span>练习方式</span><strong>{getPracticeModeLabel(effectiveMode)}</strong></div>
+              <div><span>完成音符</span><strong>{practice.report.correct} / {practice.report.judgeableUnitCount}</strong></div>
+              <div><span>音符正确率</span><strong>{practice.report.accuracy}%</strong></div>
+              <div><span>错音</span><strong>{practice.report.wrong}</strong></div>
+              <div><span>漏音</span><strong>{practice.report.missing}</strong></div>
+              <div><span>多音</span><strong>{practice.report.extra}</strong></div>
+              <div><span>需关注小节</span><strong>{weakestMeasures.length > 0 ? weakestMeasures.map(([measure]) => `第 ${measure} 小节`).join('、') : '无'}</strong></div>
+            </div>
+          </details>
         </PracticeReportModal>
       ) : null}
     </section>

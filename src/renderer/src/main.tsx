@@ -10,6 +10,7 @@ import './components.css'
 import './styles/themes.css'
 import './styles/practice-usability.css'
 import './styles/training-plan.css'
+import './styles/f2-ui.css'
 
 initializeTheme()
 

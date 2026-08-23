@@ -1817,9 +1817,10 @@ test('练习 Hook 与页面不再把 latestEvent 当作判定事件队列', () =
   }
 })
 
-test('结果报告返回行为统一且识谱报告精简', () => {
+test('结果报告完成与再练行为统一且识谱报告精简', () => {
   const reportModal = fs.readFileSync(require.resolve('../src/renderer/src/components/PracticeReportModal.tsx'), 'utf8')
-  assert.match(reportModal, />返回</)
+  assert.match(reportModal, /primaryAction\?: 'repeat' \| 'back'/)
+  assert.match(reportModal, /backLabel = '完成'/)
   assert.match(reportModal, /aria-label="关闭报告"/)
   assert.doesNotMatch(reportModal, /返回首页/)
 

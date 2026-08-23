@@ -12,7 +12,6 @@ import { MidiTestPage } from './components/MidiTestPage'
 import { PlaceholderPage } from './components/PlaceholderPage'
 import { PracticeHistoryPage } from './components/PracticeHistoryPage'
 import { PracticeExitConfirmModal } from './components/PracticeExitConfirmModal'
-import { RightInfoPanel } from './components/RightInfoPanel'
 import { RhythmPracticePage } from './components/RhythmPracticePage'
 import { ScalePracticePage } from './components/ScalePracticePage'
 import { SettingsPage } from './components/SettingsPage'
@@ -62,6 +61,7 @@ function getInitialPage(): PageId {
 function App(): JSX.Element {
   const [currentPage, setCurrentPage] = useState<PageId>(getInitialPage)
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null)
+  const [practiceRunning, setPracticeRunning] = useState(false)
   const [showFirstRun, setShowFirstRun] = useState(() => isFirstRun())
   const [scoreSegmentRequest, setScoreSegmentRequest] = useState<(ScorePracticePreset & { requestId: number }) | null>(null)
   const currentPageRef = useRef(currentPage)
@@ -77,6 +77,16 @@ function App(): JSX.Element {
 
   const currentTitle = useMemo(() => pageTitles[currentPage], [currentPage])
   const isHomePage = currentPage === 'home'
+  const isPracticePage = [
+    'sight-reading',
+    'rhythm',
+    'scales',
+    'chords',
+    'coordination',
+    'free-practice',
+    'score-practice'
+  ].includes(currentPage)
+  const isPracticeFocus = isPracticePage && practiceRunning
 
   const updatePendingNavigation = useCallback((navigation: PendingNavigation | null) => {
     pendingNavigationRef.current = navigation
@@ -99,6 +109,7 @@ function App(): JSX.Element {
 
   const handlePracticeRunningChange = useCallback((running: boolean) => {
     practiceRunningRef.current = running
+    setPracticeRunning(running)
   }, [])
 
   useEffect(() => {
@@ -206,6 +217,7 @@ function App(): JSX.Element {
     if (!navigation) return
 
     practiceRunningRef.current = false
+    setPracticeRunning(false)
 
     if (navigation.kind === 'page') {
       updatePendingNavigation(null)
@@ -224,21 +236,27 @@ function App(): JSX.Element {
 
   return (
     <>
-      <div className={`app-shell ${isHomePage ? 'is-home' : 'is-page'}`}>
-        <Sidebar currentPage={currentPage} midiStatus={midi.sidebarStatus} onNavigate={handleNavigate} />
-        <main className={`workspace ${isHomePage ? 'workspace-home' : 'workspace-page'}`}>
+      <div className={`app-shell ${isHomePage ? 'is-home' : 'is-page'} ${isPracticeFocus ? 'is-practice-focus' : ''}`}>
+        {!isPracticeFocus ? <Sidebar currentPage={currentPage} midiStatus={midi.sidebarStatus} onNavigate={handleNavigate} /> : null}
+        <main className={`workspace ${isHomePage ? 'workspace-home' : 'workspace-page'} ${isPracticeFocus ? 'workspace-focus' : ''}`}>
           {isHomePage ? (
-          <HomePage onNavigate={handleNavigate} />
+          <HomePage
+            onNavigate={handleNavigate}
+            onOpenScoreSegment={openScoreSegment}
+            recentRecords={practiceHistory.recentRecords}
+            records={practiceHistory.records}
+            todayStats={practiceHistory.todayStats}
+          />
         ) : currentPage === 'settings' ? (
-          <SettingsPage onBackHome={() => handleNavigate('home')} pianoAudio={pianoAudio} />
+          <SettingsPage onOpenMidiTest={() => handleNavigate('midi-test')} pianoAudio={pianoAudio} />
         ) : currentPage === 'records' ? (
-          <PracticeHistoryPage onBackHome={() => handleNavigate('home')} />
+          <PracticeHistoryPage />
         ) : currentPage === 'training-plan' ? (
           <TrainingPlanPage
             practiceRecords={practiceHistory.records}
-            onBackHome={() => handleNavigate('home')}
             onNavigateModule={(module) => handleNavigate(trainingModulePages[module])}
             onOpenScoreSegment={openScoreSegment}
+            onViewRecords={() => handleNavigate('records')}
           />
         ) : currentPage === 'midi-test' ? (
           <MidiTestPage midi={midi} />
@@ -295,20 +313,14 @@ function App(): JSX.Element {
             onPracticeRunningChange={handlePracticeRunningChange}
           />
         ) : currentPage === 'analytics' ? (
-          <AnalyticsPage onBackHome={() => handleNavigate('home')} practiceRecords={practiceHistory.records} />
+          <AnalyticsPage practiceRecords={practiceHistory.records} />
         ) : currentPage === 'metronome' ? (
           <JudgementTestPage />
         ) : (
-          <PlaceholderPage title={currentTitle} onBackHome={() => handleNavigate('home')} />
+          <PlaceholderPage title={currentTitle} />
         )}
         </main>
         {showFirstRun ? <FirstRunWelcome onClose={() => setShowFirstRun(false)} /> : null}
-        {isHomePage ? (
-          <RightInfoPanel
-            recentRecords={practiceHistory.recentRecords}
-            todayStats={practiceHistory.todayStats}
-          />
-        ) : null}
       </div>
 
       <PracticeExitConfirmModal
