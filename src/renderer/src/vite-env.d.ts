@@ -4,6 +4,9 @@ interface Window {
   pianoApp?: {
     platform: string
     inflateRaw: (bytes: Uint8Array) => Promise<Uint8Array>
+    pianoSamples: {
+      readFile: (relativePath: string) => Promise<PianoSampleBridgeResult>
+    }
     secrets: {
       getAiApiKey: () => Promise<SecureSecretBridgeResult<string>>
       setAiApiKey: (value: string) => Promise<SecureSecretBridgeResult>
@@ -11,6 +14,12 @@ interface Window {
       hasAiApiKey: () => Promise<SecureSecretBridgeResult>
     }
   }
+}
+
+interface PianoSampleBridgeResult {
+  success: boolean
+  bytes?: Uint8Array
+  error?: string
 }
 
 interface SecureSecretBridgeResult<T = null> {

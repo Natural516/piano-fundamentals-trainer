@@ -8,6 +8,7 @@ const rendererPath = path.join(root, 'out', 'renderer', 'index.html')
 const preloadPath = path.join(root, 'out', 'preload', 'index.js')
 const userDataPath = path.join(root, 'artifacts', 'f2-qa-user-data')
 const logPath = path.join(root, 'artifacts', 'f2-capture.log')
+const pianoSampleRoot = path.join(root, 'resources', 'piano-samples')
 const sizes = [
   { width: 1366, height: 768, label: '1366x768' },
   { width: 1536, height: 864, label: '1536x864' }
@@ -113,6 +114,25 @@ ipcMain.handle('piano:secret:get-ai-api-key', () => ({ success: true, value: '',
 ipcMain.handle('piano:secret:set-ai-api-key', () => ({ success: false, reason: 'write_failed', error: 'QA capture is read-only' }))
 ipcMain.handle('piano:secret:delete-ai-api-key', () => ({ success: true }))
 ipcMain.handle('piano:secret:has-ai-api-key', () => ({ success: true, configured: false }))
+ipcMain.handle('piano:samples:read', (_event, requestedPath) => {
+  if (typeof requestedPath !== 'string' || requestedPath.length === 0 || path.isAbsolute(requestedPath)) {
+    return { success: false, error: '无效的内置钢琴采样路径' }
+  }
+  const segments = requestedPath.split('/')
+  if (segments.some((segment) => !segment || segment === '.' || segment === '..' || segment.includes('\\'))) {
+    return { success: false, error: '无效的内置钢琴采样路径' }
+  }
+  const candidate = path.resolve(pianoSampleRoot, ...segments)
+  const relativePath = path.relative(pianoSampleRoot, candidate)
+  if (!relativePath || relativePath.startsWith(`..${path.sep}`) || relativePath === '..' || path.isAbsolute(relativePath)) {
+    return { success: false, error: '无效的内置钢琴采样路径' }
+  }
+  try {
+    return { success: true, bytes: Uint8Array.from(fs.readFileSync(candidate)) }
+  } catch {
+    return { success: false, error: `缺少内置钢琴采样：${requestedPath}` }
+  }
+})
 log('script loaded')
 
 app.whenReady().then(async () => {
@@ -234,6 +254,13 @@ app.whenReady().then(async () => {
     await captureAtSizes(window, 'analytics')
 
     await navigate(window, '#/settings', '外观主题')
+    await waitFor(
+      window.webContents,
+      `document.querySelector('.settings-audio__status')?.textContent.includes('内置钢琴已就绪')`,
+      'Salamander samples decoded and ready',
+      15000
+    )
+    log('Salamander samples decoded and ready')
     log('capture settings')
     await captureAtSizes(window, 'settings')
 

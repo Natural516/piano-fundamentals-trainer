@@ -1,4 +1,4 @@
-export type PianoAudioMode = 'builtin' | 'silent' | 'external'
+export type PianoAudioMode = 'builtin' | 'silent'
 
 export interface SampleAnchor {
   sample: string
@@ -35,6 +35,5 @@ export interface PianoSamplerStatus {
 
 export const PIANO_AUDIO_MODE_LABELS: Record<PianoAudioMode, string> = {
   builtin: '内置钢琴',
-  silent: '静音',
-  external: '外部软音源'
+  silent: '关闭'
 }

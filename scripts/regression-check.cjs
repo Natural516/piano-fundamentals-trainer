@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const path = require('node:path')
 const ts = require('typescript')
 
 const transpileTypeScriptModule = (module, filename) => {
@@ -37,7 +38,12 @@ const midiEventBus = require('../src/renderer/src/midi/midiEventBus.ts')
 const midiMessages = require('../src/renderer/src/midi/midiMessages.ts')
 const samplePackLoader = require('../src/renderer/src/audio/samplePackLoader.ts')
 const audioModeSettings = require('../src/renderer/src/audio/audioModeSettings.ts')
+const bundledPianoSamplePack = require('../src/renderer/src/audio/bundledPianoSamplePack.ts')
+const pianoMidiRouter = require('../src/renderer/src/audio/pianoMidiRouter.ts')
+const pianoSampler = require('../src/renderer/src/audio/pianoSampler.ts')
+const salamanderSamplePack = require('../src/renderer/src/audio/salamanderSamplePack.ts')
 const voicePolicy = require('../src/renderer/src/audio/voicePolicy.ts')
+const pianoSampleResources = require('../src/main/pianoSampleResources.ts')
 const midiRecording = require('../src/renderer/src/midi/midiRecording.ts')
 const curriculumCatalog = require('../src/renderer/src/curriculum/curriculumCatalog.ts')
 const curriculumProgress = require('../src/renderer/src/curriculum/curriculumProgress.ts')
@@ -1848,6 +1854,84 @@ test('结果报告完成与再练行为统一且识谱报告精简', () => {
   assert.doesNotMatch(themesCss, /sight-clef-report-grid/)
 })
 
+function createFakeAudioContext() {
+  const sources = []
+  const gains = []
+
+  const createAudioParam = (initialValue = 1) => ({
+    value: initialValue,
+    events: [],
+    setValueAtTime(value, time) {
+      this.value = value
+      this.events.push({ type: 'set', value, time })
+    },
+    setTargetAtTime(value, time, constant) {
+      this.value = value
+      this.events.push({ type: 'target', value, time, constant })
+    },
+    linearRampToValueAtTime(value, time) {
+      this.value = value
+      this.events.push({ type: 'linear', value, time })
+    },
+    exponentialRampToValueAtTime(value, time) {
+      this.value = value
+      this.events.push({ type: 'exponential', value, time })
+    },
+    cancelScheduledValues(time) {
+      this.events.push({ type: 'cancel', time })
+    }
+  })
+
+  const context = {
+    currentTime: 10,
+    state: 'running',
+    destination: {},
+    createGain() {
+      const node = {
+        gain: createAudioParam(),
+        connected: false,
+        connect() { this.connected = true },
+        disconnect() { this.connected = false }
+      }
+      gains.push(node)
+      return node
+    },
+    createBufferSource() {
+      const node = {
+        buffer: null,
+        playbackRate: createAudioParam(),
+        onended: null,
+        startCalls: [],
+        stopCalls: [],
+        connected: false,
+        connect() { this.connected = true },
+        disconnect() { this.connected = false },
+        start(time) { this.startCalls.push(time) },
+        stop(time) { this.stopCalls.push(time) }
+      }
+      sources.push(node)
+      return node
+    },
+    async decodeAudioData() {
+      return { duration: 8, sampleRate: 48000 }
+    },
+    async resume() {
+      this.state = 'running'
+    }
+  }
+
+  return { context, gains, sources }
+}
+
+async function createLoadedFakeSampler(options = {}) {
+  const fake = createFakeAudioContext()
+  const sampler = new pianoSampler.PianoSampler(fake.context, options)
+  await sampler.loadSamplePack([
+    { sample: 'C4.ogg', lokey: 21, hikey: 108, pitchKeycenter: 60, loopMode: 'no_loop' }
+  ], async () => ({ duration: 8, sampleRate: 48000 }))
+  return { ...fake, sampler }
+}
+
 test('SFZ 采样包解析：锚点、键区、循环与分组默认值', () => {
   const sfz = `
     // Salamander Grand Piano V2 子集
@@ -1892,7 +1976,9 @@ test('采样锚点选择与移调 playbackRate 计算正确', () => {
   assert.equal(samplePackLoader.selectSampleAndRate(anchors, 96).anchor.sample, 'high.wav')
   assert.equal(samplePackLoader.selectSampleAndRate([], 60), null)
 
-  assert.equal(samplePackLoader.getVelocityGain(0), 0.28)
+  assert.equal(samplePackLoader.getVelocityGain(0), 0)
+  assert.equal(samplePackLoader.getVelocityGain(1), 0.05)
+  assert.ok(Math.abs(samplePackLoader.getVelocityGain(64) - 64 / 127) < 1e-12)
   assert.equal(samplePackLoader.getVelocityGain(127), 1)
   assert.equal(samplePackLoader.clampPianoVolume(150), 100)
   assert.equal(samplePackLoader.clampPianoVolume(-5), 0)
@@ -1911,13 +1997,13 @@ test('钢琴音频模式设置默认内置并安全读写', () => {
 
   assert.equal(audioModeSettings.sanitizeAudioMode('builtin'), 'builtin')
   assert.equal(audioModeSettings.sanitizeAudioMode('silent'), 'silent')
-  assert.equal(audioModeSettings.sanitizeAudioMode('external'), 'external')
+  assert.equal(audioModeSettings.sanitizeAudioMode('external'), 'silent', '旧 external 设置必须迁移为关闭内置发声')
   assert.equal(audioModeSettings.sanitizeAudioMode('bogus'), 'builtin')
   assert.equal(audioModeSettings.sanitizeAudioMode(null), 'builtin')
 
   assert.equal(audioModeSettings.readAudioMode(storage), 'builtin')
-  assert.equal(audioModeSettings.writeAudioMode('external', storage), true)
-  assert.equal(audioModeSettings.readAudioMode(storage), 'external')
+  assert.equal(audioModeSettings.writeAudioMode('silent', storage), true)
+  assert.equal(audioModeSettings.readAudioMode(storage), 'silent')
   assert.equal(audioModeSettings.readPianoVolume(storage), 70)
   assert.equal(audioModeSettings.writePianoVolume(88, storage), true)
   assert.equal(audioModeSettings.readPianoVolume(storage), 88)
@@ -1962,8 +2048,149 @@ test('钢琴音频层接入逐事件总线且不使用 latestEvent', () => {
   assert.match(samplerSource, /setSustain/)
   assert.match(samplerSource, /pickVoiceToSteal/)
   assert.match(samplerSource, /loadSamplePack/)
+  assert.doesNotMatch(samplerSource, /createOscillator|FallbackVoice|createFallbackVoice/)
   assert.match(audioHook, /readAudioMode/)
   assert.match(audioHook, /writePianoVolume/)
+  assert.match(audioHook, /loadBundledPianoSamplePack/)
+  assert.match(audioHook, /getInternalPianoMidiAction/)
+})
+
+test('Salamander 参考资产：30 个 OGG 原字节、锚点与 CC BY attribution 完整', () => {
+  const sampleRoot = path.resolve(__dirname, '../resources/piano-samples/salamander')
+  const sampleFiles = fs.readdirSync(sampleRoot)
+    .filter((name) => name.endsWith('.ogg'))
+    .sort()
+  const anchorFiles = salamanderSamplePack.SALAMANDER_SAMPLE_ANCHORS
+    .map((anchor) => anchor.sample)
+    .sort()
+  assert.deepEqual(sampleFiles, anchorFiles)
+  assert.equal(sampleFiles.length, 30)
+  assert.equal(
+    sampleFiles.reduce((total, name) => total + fs.statSync(path.join(sampleRoot, name)).size, 0),
+    salamanderSamplePack.SALAMANDER_SAMPLE_BYTES
+  )
+  const readme = fs.readFileSync(path.join(sampleRoot, 'README'), 'utf8')
+  assert.match(readme, /Salamander Grand Piano V2/)
+  assert.match(readme, /Yamaha C5/)
+  assert.match(readme, /CC-by/)
+  assert.match(readme, /Alexander Holm/)
+})
+
+test('Electron 采样资源路径：dev/package 分离、阻止越界且缺资产显式报错', async () => {
+  const devRoot = pianoSampleResources.getPianoSampleRoot({
+    isPackaged: false,
+    resourcesPath: 'C:\\Program Files\\Piano\\resources',
+    appPath: 'C:\\repo\\piano'
+  })
+  const packagedRoot = pianoSampleResources.getPianoSampleRoot({
+    isPackaged: true,
+    resourcesPath: 'C:\\Program Files\\Piano\\resources',
+    appPath: 'C:\\Program Files\\Piano\\resources\\app.asar'
+  })
+  assert.equal(path.normalize(devRoot), path.normalize('C:\\repo\\piano\\resources\\piano-samples'))
+  assert.equal(path.normalize(packagedRoot), path.normalize('C:\\Program Files\\Piano\\resources\\piano-samples'))
+  assert.ok(pianoSampleResources.resolvePianoSampleResource(devRoot, 'salamander/C4.ogg'))
+  assert.equal(pianoSampleResources.resolvePianoSampleResource(devRoot, '../secret.txt'), null)
+  assert.equal(pianoSampleResources.resolvePianoSampleResource(devRoot, 'salamander\\..\\secret.txt'), null)
+  const missing = await pianoSampleResources.readPianoSampleResource(devRoot, 'salamander/missing.ogg')
+  assert.equal(missing.success, false)
+  assert.match(missing.error, /缺少内置钢琴采样/)
+
+  const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'))
+  assert.deepEqual(packageJson.build.extraResources[0], {
+    from: 'resources/piano-samples',
+    to: 'piano-samples',
+    filter: ['**/*']
+  })
+})
+
+test('内置采样器确定性行为：noteOn/noteOff、力度、CC64、重复音、和弦与 Panic', async () => {
+  const velocityCase = await createLoadedFakeSampler()
+  assert.equal(velocityCase.sampler.noteOn(60, 1), true)
+  assert.equal(velocityCase.sampler.noteOn(64, 127), true)
+  assert.equal(velocityCase.sources.length, 2)
+  assert.equal(velocityCase.sources[0].startCalls.length, 1)
+  const quietPeak = velocityCase.gains[1].gain.events.find((event) => event.type === 'linear').value
+  const loudPeak = velocityCase.gains[2].gain.events.find((event) => event.type === 'linear').value
+  assert.equal(quietPeak, 0.05)
+  assert.equal(loudPeak, 1)
+  velocityCase.sampler.noteOff(60)
+  assert.equal(velocityCase.sources[0].stopCalls.length, 1, 'noteOff 必须进入 release')
+
+  const sustainCase = await createLoadedFakeSampler()
+  sustainCase.sampler.noteOn(60, 90)
+  sustainCase.sampler.setSustain(true)
+  sustainCase.sampler.noteOff(60)
+  assert.equal(sustainCase.sources[0].stopCalls.length, 0, 'CC64 down 后松键不得提前 release')
+  sustainCase.sampler.setSustain(false)
+  assert.equal(sustainCase.sources[0].stopCalls.length, 1, 'CC64 up 必须释放踏板保持声部')
+  assert.equal(sustainCase.sampler.isPedalDown, false)
+
+  const repeatedCase = await createLoadedFakeSampler()
+  repeatedCase.sampler.noteOn(60, 70)
+  repeatedCase.sampler.noteOn(60, 90)
+  assert.equal(repeatedCase.sources.length, 2)
+  assert.equal(repeatedCase.sampler.status.activeVoices, 2, '重复音必须拥有独立声部')
+  repeatedCase.sampler.noteOff(60)
+  assert.equal(repeatedCase.sources.filter((source) => source.stopCalls.length === 1).length, 2)
+
+  const chordCase = await createLoadedFakeSampler()
+  for (const midiNumber of [48, 52, 55, 60, 64, 67, 72, 76]) {
+    chordCase.sampler.noteOn(midiNumber, 100)
+  }
+  assert.equal(chordCase.sources.length, 8)
+  assert.equal(chordCase.sampler.status.activeVoices, 8)
+  chordCase.sampler.panic()
+  assert.equal(chordCase.sampler.status.activeVoices, 0)
+  assert.ok(chordCase.sources.every((source) => source.stopCalls.length >= 1))
+})
+
+test('内置发声关闭：不创建声部但同一 MIDI 事件仍到达判定订阅者', () => {
+  const event = {
+    id: 91,
+    type: 'noteOn',
+    midiNumber: 60,
+    velocity: 96,
+    timestamp: 1000,
+    deviceName: 'Roland FP-30X'
+  }
+  assert.equal(pianoMidiRouter.getInternalPianoMidiAction(event, false), null)
+  assert.deepEqual(pianoMidiRouter.getInternalPianoMidiAction(event, true), {
+    type: 'noteOn', midiNumber: 60, velocity: 96
+  })
+
+  midiEventBus.resetMidiEventBusForTests()
+  let judgementEvents = 0
+  let audioActions = 0
+  const stopJudgement = midiEventBus.subscribeMidiEvents(() => { judgementEvents += 1 })
+  const stopAudio = midiEventBus.subscribeMidiEvents((midiEvent) => {
+    if (pianoMidiRouter.getInternalPianoMidiAction(midiEvent, false)) audioActions += 1
+  })
+  midiEventBus.publishMidiEvent(event)
+  stopAudio()
+  stopJudgement()
+  assert.equal(judgementEvents, 1)
+  assert.equal(audioActions, 0)
+  midiEventBus.resetMidiEventBusForTests()
+})
+
+test('缺失采样不启用 synth fallback，并向设置层返回明确错误', async () => {
+  const fake = createFakeAudioContext()
+  const sampler = new pianoSampler.PianoSampler(fake.context)
+  await assert.rejects(
+    () => bundledPianoSamplePack.loadBundledPianoSamplePack(sampler, {
+      readFile: async (relativePath) => ({
+        success: false,
+        error: `缺少内置钢琴采样：${relativePath}`
+      })
+    }),
+    /缺少内置钢琴采样：salamander\//
+  )
+  assert.equal(sampler.status.state, 'error')
+  assert.equal(sampler.status.samplePackLoaded, false)
+  assert.equal(sampler.status.activeVoices, 0)
+  assert.equal(sampler.noteOn(60, 100), false)
+  assert.equal(fake.sources.length, 0)
 })
 
 test('自由练习 MIDI 录制逐条捕获并生成事实统计', () => {

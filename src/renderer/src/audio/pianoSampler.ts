@@ -1,8 +1,6 @@
-import { midiNumberToFrequency } from '../utils/audioNotes'
 import { getVelocityGain, selectSampleAndRate } from './samplePackLoader'
 import type { PianoSamplerStatus, SampleAnchor, SelectedSample } from './pianoAudioTypes'
 import {
-  createPedalVoiceState,
   pickVoiceToSteal,
   pedalAllNotesOff,
   pedalKeyDown,
@@ -13,19 +11,14 @@ import {
 
 interface SamplerVoice {
   descriptor: VoiceDescriptor
-  sources: Array<AudioBufferSourceNode | OscillatorNode>
-  cleanupNodes: AudioNode[]
   release: (releaseMs: number) => void
   stopImmediate: () => void
 }
 
-interface FallbackVoice {
-  sources: OscillatorNode[]
-  gain: GainNode
-  cleanupNodes: AudioNode[]
-}
-
 const DEFAULT_MAX_POLYPHONY = 64
+const NOTE_RELEASE_MS = 1_000
+const PEDAL_RELEASE_MS = 1_100
+const ALL_NOTES_RELEASE_MS = 120
 
 export interface PianoSamplerOptions {
   maxPolyphony?: number
@@ -37,66 +30,22 @@ function getVolumeGain(volume: number): number {
   return normalized ** 1.65
 }
 
-function createFallbackVoice(
-  audioContext: AudioContext,
-  midiNumber: number,
-  velocity: number
-): FallbackVoice {
-  const now = audioContext.currentTime
-  const baseFrequency = midiNumberToFrequency(midiNumber)
-  const velocityCurve = 0.2 + getVelocityGain(velocity) * 0.8
-  const gain = audioContext.createGain()
-  const filter = audioContext.createBiquadFilter()
-  const attackEnd = now + 0.008
-  const decayEnd = attackEnd + 0.32
-  const naturalEnd = now + 4.8
-  const peakGain = 0.8 * velocityCurve
+function getDecibelGain(decibels: number | undefined): number {
+  return typeof decibels === 'number' ? 10 ** (decibels / 20) : 1
+}
 
-  gain.gain.setValueAtTime(0.0001, now)
-  gain.gain.linearRampToValueAtTime(peakGain, attackEnd)
-  gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain * 0.24), decayEnd)
-  gain.gain.exponentialRampToValueAtTime(0.0006, naturalEnd)
-
-  filter.type = 'lowpass'
-  filter.frequency.setValueAtTime(Math.min(7600, Math.max(2400, baseFrequency * 9)), now)
-  filter.frequency.exponentialRampToValueAtTime(Math.min(3600, Math.max(1100, baseFrequency * 3.4)), now + 0.7)
-  filter.Q.setValueAtTime(0.5, now)
-  filter.connect(gain)
-
-  const partials: Array<{ type: OscillatorType; multiplier: number; detune: number; level: number }> = [
-    { type: 'triangle', multiplier: 1, detune: -2, level: 0.78 },
-    { type: 'sine', multiplier: 2, detune: 4, level: 0.18 },
-    { type: 'sine', multiplier: 3, detune: -5, level: 0.06 },
-    { type: 'triangle', multiplier: 4, detune: 2, level: 0.02 }
-  ]
-  const sources = partials.map((partial) => {
-    const oscillator = audioContext.createOscillator()
-    const partialGain = audioContext.createGain()
-    oscillator.type = partial.type
-    oscillator.frequency.setValueAtTime(baseFrequency * partial.multiplier, now)
-    oscillator.detune.setValueAtTime(partial.detune, now)
-    partialGain.gain.setValueAtTime(partial.level, now)
-    oscillator.connect(partialGain)
-    partialGain.connect(filter)
-    oscillator.start(now)
-    oscillator.stop(naturalEnd + 0.08)
-    return oscillator
-  })
-
-  return {
-    sources,
-    gain,
-    cleanupNodes: [filter, gain]
-  }
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : '未知采样读取错误'
 }
 
 /**
- * Web Audio piano voice engine.
+ * Web Audio sample-only piano voice engine.
  *
- * - Uses nearest sample anchors with playbackRate pitch shifting when a sample
- *   pack is loaded; otherwise falls back to a built-in synthesized voice.
- * - Supports polyphony, voice stealing, repeated-note retrigger, CC64 sustain
- *   and pedal release, per-note velocity gain, master piano volume and cleanup.
+ * Sample selection follows the migrated Salamander/Yamaha C5 anchor map.
+ * Every key press owns a distinct voice ID, so repeated notes and chords do
+ * not overwrite one another. CC64 only delays release; it never becomes a
+ * training fact source. Missing assets remain an explicit error and never
+ * fall back to a synthesized instrument.
  */
 export class PianoSampler {
   private readonly audioContext: AudioContext
@@ -106,6 +55,7 @@ export class PianoSampler {
   private anchors: SampleAnchor[] = []
   private buffers = new Map<string, AudioBuffer>()
   private samplePackLoaded = false
+  private loadError: string | null = null
   private nextVoiceId = 1
   private volume = 70
   private pedalDown = false
@@ -119,149 +69,112 @@ export class PianoSampler {
     this.masterGain.connect(audioContext.destination)
   }
 
-  async loadSamplePack(anchors: SampleAnchor[], loadBuffer: (sample: string) => Promise<AudioBuffer>): Promise<number> {
-    this.anchors = anchors
+  async loadSamplePack(
+    anchors: SampleAnchor[],
+    loadBuffer: (sample: string) => Promise<AudioBuffer>
+  ): Promise<number> {
+    this.panic()
+    this.anchors = []
     this.buffers.clear()
-    let loaded = 0
+    this.samplePackLoaded = false
+    this.loadError = null
 
-    for (const anchor of anchors) {
-      if (this.buffers.has(anchor.sample)) {
-        continue
-      }
-
-      try {
-        const buffer = await loadBuffer(anchor.sample)
-        this.buffers.set(anchor.sample, buffer)
-        loaded += 1
-      } catch {
-        // Missing/unreadable sample files are skipped; anchors pointing to
-        // them fall back to the synthesized voice.
-      }
+    const uniqueSamples = [...new Set(anchors.map((anchor) => anchor.sample).filter(Boolean))]
+    if (anchors.length === 0 || uniqueSamples.length === 0) {
+      this.loadError = '采样清单为空'
+      throw new Error(this.loadError)
     }
 
-    this.samplePackLoaded = loaded > 0
-    return loaded
+    try {
+      const loadedBuffers = await Promise.all(uniqueSamples.map(async (sample) => ({
+        sample,
+        buffer: await loadBuffer(sample)
+      })))
+      for (const { sample, buffer } of loadedBuffers) this.buffers.set(sample, buffer)
+      this.anchors = [...anchors]
+      this.samplePackLoaded = true
+      return loadedBuffers.length
+    } catch (error) {
+      this.anchors = []
+      this.buffers.clear()
+      this.loadError = getErrorMessage(error)
+      throw new Error(this.loadError)
+    }
   }
 
-  noteOn(midiNumber: number, velocity: number): void {
-    const existing = this.voices.get(midiNumber)
+  noteOn(midiNumber: number, velocity: number): boolean {
+    if (!this.samplePackLoaded || velocity <= 0) {
+      if (velocity <= 0) this.noteOff(midiNumber)
+      return false
+    }
 
-    if (existing) {
-      existing.stopImmediate()
-      this.voices.delete(midiNumber)
+    const selected = selectSampleAndRate(this.anchors, midiNumber)
+    if (!selected || !this.buffers.has(selected.anchor.sample)) {
+      this.loadError = `缺少音符 ${midiNumber} 对应的内置钢琴采样`
+      return false
     }
 
     const stealTarget = pickVoiceToSteal(
       [...this.voices.values()].map((voice) => voice.descriptor),
       this.maxPolyphony
     )
-
     if (stealTarget) {
-      const voiceToSteal = this.voices.get(stealTarget.midiNumber)
-      if (voiceToSteal) {
-        voiceToSteal.stopImmediate()
-        this.voices.delete(stealTarget.midiNumber)
-      }
+      const voiceToSteal = this.voices.get(stealTarget.id)
+      voiceToSteal?.stopImmediate()
+      this.voices.delete(stealTarget.id)
     }
 
     const descriptor: VoiceDescriptor = {
       id: this.nextVoiceId++,
       midiNumber,
-      ...pedalKeyDown(createPedalVoiceState()),
+      ...pedalKeyDown({ physicalKeyDown: false, sustainedByPedal: false, released: false }),
       startedAt: this.audioContext.currentTime
     }
-    const selected = selectSampleAndRate(this.anchors, midiNumber)
-
-    if (selected && this.buffers.has(selected.anchor.sample)) {
-      const voice = this.createSampleVoice(descriptor, selected, velocity)
-      if (voice) {
-        this.voices.set(midiNumber, voice)
-      }
-      return
-    }
-
-    const fallback = createFallbackVoice(this.audioContext, midiNumber, velocity)
-    fallback.gain.connect(this.masterGain)
-    const voice: SamplerVoice = {
-      descriptor,
-      sources: fallback.sources,
-      cleanupNodes: fallback.cleanupNodes,
-      release: (releaseMs) => {
-        const now = this.audioContext.currentTime
-        const releaseEnd = now + releaseMs / 1000
-        fallback.gain.gain.cancelScheduledValues(now)
-        fallback.gain.gain.setValueAtTime(Math.max(0.0001, fallback.gain.gain.value), now)
-        fallback.gain.gain.exponentialRampToValueAtTime(0.0001, releaseEnd)
-        for (const source of fallback.sources) {
-          try {
-            source.stop(releaseEnd + 0.04)
-          } catch {
-            // Already stopped.
-          }
-        }
-      },
-      stopImmediate: () => {
-        for (const source of fallback.sources) {
-          try {
-            source.stop()
-          } catch {
-            // Already stopped.
-          }
-        }
-        for (const node of fallback.cleanupNodes) {
-          try {
-            node.disconnect()
-          } catch {
-            // Already disconnected.
-          }
-        }
-      }
-    }
-    this.voices.set(midiNumber, voice)
+    const voice = this.createSampleVoice(descriptor, selected, velocity)
+    if (!voice) return false
+    this.voices.set(descriptor.id, voice)
+    return true
   }
 
   noteOff(midiNumber: number): void {
-    const voice = this.voices.get(midiNumber)
-    if (!voice || voice.descriptor.released || !voice.descriptor.physicalKeyDown) return
-
-    const next = pedalKeyUp(voice.descriptor, this.pedalDown)
-    voice.descriptor = { ...voice.descriptor, ...next }
-
-    if (next.released) {
-      voice.release(220)
-      this.voices.delete(midiNumber)
+    const matchingVoices = [...this.voices.values()]
+      .filter((candidate) => (
+        candidate.descriptor.midiNumber === midiNumber
+        && candidate.descriptor.physicalKeyDown
+        && !candidate.descriptor.released
+      ))
+    for (const voice of matchingVoices) {
+      const next = pedalKeyUp(voice.descriptor, this.pedalDown)
+      voice.descriptor = { ...voice.descriptor, ...next }
+      if (next.released) voice.release(NOTE_RELEASE_MS)
     }
   }
 
   setSustain(down: boolean): void {
+    if (this.pedalDown === down) return
     this.pedalDown = down
-
-    if (down) {
-      return
-    }
+    if (down) return
 
     for (const voice of [...this.voices.values()]) {
       const next = pedalPedalUp(voice.descriptor)
       voice.descriptor = { ...voice.descriptor, ...next }
-      if (next.released) {
-        voice.release(260)
-        this.voices.delete(voice.descriptor.midiNumber)
-      }
+      if (next.released) voice.release(PEDAL_RELEASE_MS)
     }
   }
 
   allNotesOff(): void {
-    for (const voice of this.voices.values()) {
+    this.pedalDown = false
+    for (const voice of [...this.voices.values()]) {
       const next = pedalAllNotesOff(voice.descriptor)
       voice.descriptor = { ...voice.descriptor, ...next }
-      voice.release(180)
+      voice.release(ALL_NOTES_RELEASE_MS)
     }
-    this.voices.clear()
   }
 
   panic(): void {
-    this.allNotesOff()
     this.pedalDown = false
+    for (const voice of [...this.voices.values()]) voice.stopImmediate()
+    this.voices.clear()
   }
 
   get isPedalDown(): boolean {
@@ -274,24 +187,31 @@ export class PianoSampler {
   }
 
   get status(): PianoSamplerStatus {
-    const contextState = this.audioContext.state
+    if (this.loadError) {
+      return {
+        state: 'error',
+        samplePackLoaded: false,
+        sampleCount: 0,
+        activeVoices: this.voices.size,
+        message: `内置钢琴采样不可用：${this.loadError}`
+      }
+    }
 
+    const contextState = this.audioContext.state
     return {
-      state: contextState === 'running' ? 'ready' : contextState === 'suspended' ? 'suspended' : 'error',
+      state: this.samplePackLoaded
+        ? (contextState === 'running' ? 'ready' : 'suspended')
+        : 'idle',
       samplePackLoaded: this.samplePackLoaded,
-      sampleCount: this.anchors.length,
+      sampleCount: this.buffers.size,
       activeVoices: this.voices.size,
-      message: this.samplePackLoaded
-        ? `采样包已加载（${this.anchors.length} 个锚点）`
-        : '未安装采样包，使用内置合成音色'
+      message: this.samplePackLoaded ? '内置钢琴已就绪' : '内置钢琴采样尚未加载'
     }
   }
 
   async resume(): Promise<boolean> {
     try {
-      if (this.audioContext.state !== 'running') {
-        await this.audioContext.resume()
-      }
+      if (this.audioContext.state !== 'running') await this.audioContext.resume()
       return this.audioContext.state === 'running'
     } catch {
       return false
@@ -303,19 +223,20 @@ export class PianoSampler {
   }
 
   dispose(): void {
-    for (const voice of this.voices.values()) {
-      voice.stopImmediate()
-    }
-    this.voices.clear()
+    this.panic()
     this.buffers.clear()
     this.anchors = []
     this.samplePackLoaded = false
-    this.pedalDown = false
+    this.loadError = null
     try {
       this.masterGain.disconnect()
     } catch {
       // Already disconnected.
     }
+  }
+
+  private finishVoice(voiceId: number): void {
+    this.voices.delete(voiceId)
   }
 
   private createSampleVoice(
@@ -329,59 +250,47 @@ export class PianoSampler {
     const now = this.audioContext.currentTime
     const source = this.audioContext.createBufferSource()
     const gain = this.audioContext.createGain()
-    const velocityCurve = 0.25 + getVelocityGain(velocity) * 0.75
-    const peakGain = 0.9 * velocityCurve
-    const attackEnd = now + 0.004
-    const decayEnd = attackEnd + 0.5
+    const peakGain = getVelocityGain(velocity) * getDecibelGain(selected.anchor.volume)
+    let disconnected = false
+    let releaseStarted = false
 
     source.buffer = buffer
     source.playbackRate.setValueAtTime(selected.playbackRate, now)
-
-    if (selected.anchor.loopMode === 'continuous' && buffer.duration > 0) {
-      source.loop = true
-      if (typeof selected.anchor.loopStart === 'number') {
-        source.loopStart = selected.anchor.loopStart / buffer.sampleRate
-      }
-      if (typeof selected.anchor.loopEnd === 'number') {
-        source.loopEnd = selected.anchor.loopEnd / buffer.sampleRate
-      }
-    }
-
-    gain.gain.setValueAtTime(0.0001, now)
-    gain.gain.linearRampToValueAtTime(peakGain, attackEnd)
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain * 0.32), decayEnd)
-    gain.gain.exponentialRampToValueAtTime(0.0008, now + 6)
-
     source.connect(gain)
     gain.connect(this.masterGain)
-    source.start(now)
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.linearRampToValueAtTime(Math.max(0.0001, peakGain), now + 0.003)
 
-    const disconnectNodes = (): void => {
+    const disconnect = (): void => {
+      if (disconnected) return
+      disconnected = true
       try {
         source.disconnect()
         gain.disconnect()
       } catch {
         // Already disconnected.
       }
+      this.finishVoice(descriptor.id)
     }
+
+    source.onended = disconnect
+    source.start(now)
 
     return {
       descriptor,
-      sources: [source],
-      cleanupNodes: [gain],
       release: (releaseMs) => {
+        if (releaseStarted) return
+        releaseStarted = true
         const releaseNow = this.audioContext.currentTime
         const releaseEnd = releaseNow + releaseMs / 1000
         gain.gain.cancelScheduledValues(releaseNow)
         gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), releaseNow)
         gain.gain.exponentialRampToValueAtTime(0.0001, releaseEnd)
         try {
-          source.stop(releaseEnd + 0.05)
+          source.stop(releaseEnd + 0.03)
         } catch {
-          // Already stopped.
+          disconnect()
         }
-        const timeout = window.setTimeout(disconnectNodes, releaseMs + 80)
-        window.setTimeout(() => window.clearTimeout(timeout), releaseMs + 200)
       },
       stopImmediate: () => {
         try {
@@ -389,7 +298,7 @@ export class PianoSampler {
         } catch {
           // Already stopped.
         }
-        disconnectNodes()
+        disconnect()
       }
     }
   }

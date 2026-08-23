@@ -9,7 +9,7 @@ interface FirstRunWelcomeProps {
 const STEPS = [
   { title: '欢迎', body: '欢迎使用钢琴基本功训练器。本向导只需一次。' },
   { title: 'MIDI 设备', body: '连接 Roland FP-30X 等 MIDI 键盘后，在侧栏选择设备开始识别。' },
-  { title: '钢琴发声', body: '默认使用内置钢琴发声；可在设置中切换静音或外部软音源。' },
+  { title: '钢琴发声', body: '默认使用内置钢琴采样发声；也可关闭软件内发声，MIDI 识别与训练仍会正常工作。' },
   { title: '练习目标', body: '从识谱、节奏、和弦或自由练习开始，建立每日稳定练习。' }
 ]
 

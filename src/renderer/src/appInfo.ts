@@ -5,5 +5,5 @@ export const APP_LICENSES = [
   { name: 'Bravura (VexFlow fonts)', version: '1.0.2', license: 'SIL OFL 1.1', usage: '音乐字体' },
   { name: 'React', version: '18.x', license: 'MIT', usage: '界面' },
   { name: 'Electron', version: '31.x', license: 'MIT', usage: '桌面壳' },
-  { name: 'Salamander Grand Piano V2', version: '—', license: 'CC BY 3.0', usage: '钢琴采样（Alexander Holm，本地导入时启用）' }
+  { name: 'Salamander Grand Piano V2 / Yamaha C5', version: 'V2', license: 'CC BY 3.0', usage: '内置钢琴采样（Alexander Holm）' }
 ]

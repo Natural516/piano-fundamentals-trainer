@@ -3,9 +3,10 @@ import type { PianoAudioMode } from './pianoAudioTypes'
 export const PIANO_AUDIO_MODE_STORAGE_KEY = 'piano-audio-mode.v1'
 export const PIANO_VOLUME_STORAGE_KEY = 'piano-volume.v1'
 
-const VALID_MODES: PianoAudioMode[] = ['builtin', 'silent', 'external']
+const VALID_MODES: PianoAudioMode[] = ['builtin', 'silent']
 
 export function sanitizeAudioMode(value: unknown): PianoAudioMode {
+  if (value === 'external') return 'silent'
   return VALID_MODES.includes(value as PianoAudioMode) ? (value as PianoAudioMode) : 'builtin'
 }
 

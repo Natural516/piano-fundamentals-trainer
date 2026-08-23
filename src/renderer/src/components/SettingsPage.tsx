@@ -13,7 +13,10 @@ interface SettingsPageProps {
   pianoAudio: UsePianoAudioResult
 }
 
-const audioModeOptions: PianoAudioMode[] = ['builtin', 'silent', 'external']
+const audioModeOptions: Array<{ mode: PianoAudioMode; description: string }> = [
+  { mode: 'builtin', description: '训练器自身使用真实钢琴采样发声。' },
+  { mode: 'silent', description: '只进行 MIDI 识别与训练，不在软件内发声。' }
+]
 
 export function SettingsPage({ onOpenMidiTest, pianoAudio }: SettingsPageProps): JSX.Element {
   const ai = useAiCoach()
@@ -62,21 +65,22 @@ export function SettingsPage({ onOpenMidiTest, pianoAudio }: SettingsPageProps):
           <div className="settings-audio">
             <div className="settings-audio__row">
               <span>钢琴发声</span>
-              <div className="segmented-control">
+              <div className="settings-audio__mode-options">
                 {audioModeOptions.map((option) => (
                   <button
-                    key={option}
-                    className={pianoAudio.mode === option ? 'is-active' : ''}
+                    key={option.mode}
+                    className={pianoAudio.mode === option.mode ? 'is-active' : ''}
                     type="button"
-                    onClick={() => pianoAudio.setMode(option)}
+                    onClick={() => pianoAudio.setMode(option.mode)}
                   >
-                    {PIANO_AUDIO_MODE_LABELS[option]}
+                    <strong>{PIANO_AUDIO_MODE_LABELS[option.mode]}</strong>
+                    <span>{option.description}</span>
                   </button>
                 ))}
               </div>
             </div>
             <div className="settings-audio__row">
-              <span>钢琴音量</span>
+              <span>音量</span>
               <div className="settings-audio__slider">
                 <input
                   aria-label="钢琴音量"
@@ -91,12 +95,15 @@ export function SettingsPage({ onOpenMidiTest, pianoAudio }: SettingsPageProps):
             </div>
             <p className="settings-audio__status">
               当前状态：{pianoAudio.samplerStatus.message}
-              {pianoAudio.samplerStatus.sampleCount > 0
-                ? `（已加载 ${pianoAudio.samplerStatus.sampleCount} 个采样）`
-                : '。没有安装采样音色时仍可正常练习与判定。'}
             </p>
             <div className="settings-audio__actions">
-              <AppButton variant="secondary" onClick={() => void pianoAudio.testPlayChord()}>测试发声</AppButton>
+              <AppButton
+                variant="secondary"
+                disabled={pianoAudio.mode !== 'builtin'}
+                onClick={() => void pianoAudio.testPlayChord()}
+              >
+                试听
+              </AppButton>
               <AppButton variant="ghost" onClick={onOpenMidiTest}>MIDI 输入与测试</AppButton>
             </div>
           </div>

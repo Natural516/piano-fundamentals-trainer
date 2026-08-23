@@ -1,6 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { inflateRawSync } from 'node:zlib'
+import {
+  getPianoSampleRoot,
+  PIANO_SAMPLE_READ_CHANNEL,
+  readPianoSampleResource
+} from './pianoSampleResources'
 import { deleteAiApiKey, getAiApiKey, hasAiApiKey, setAiApiKey } from './secureSecrets'
 
 const APP_ID = 'com.piano.fundamentals.trainer'
@@ -23,6 +28,13 @@ ipcMain.handle(SECRET_SET_CHANNEL, (_event, value: unknown) => (
 ))
 ipcMain.handle(SECRET_DELETE_CHANNEL, () => deleteAiApiKey())
 ipcMain.handle(SECRET_HAS_CHANNEL, () => hasAiApiKey())
+ipcMain.handle(PIANO_SAMPLE_READ_CHANNEL, (_event, requestedPath: unknown) => (
+  readPianoSampleResource(getPianoSampleRoot({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath()
+  }), requestedPath)
+))
 
 app.commandLine.appendSwitch('enable-features', 'WebMIDI')
 

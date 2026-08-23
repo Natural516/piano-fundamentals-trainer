@@ -840,6 +840,35 @@ body::before {
   font-weight: 700;
 }
 
+.settings-audio__mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-audio__mode-options button {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-soft);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-audio__mode-options button.is-active {
+  border-color: var(--accent-primary);
+  background: var(--accent-soft);
+}
+
+.settings-audio__mode-options button span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .settings-audio__slider {
   display: flex;
   align-items: center;
@@ -1368,6 +1397,10 @@ body::before {
 }
 
 @media (max-width: 860px) {
+  .settings-audio__mode-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .coach-report,
   .analytics-report {
     grid-template-columns: minmax(0, 1fr);

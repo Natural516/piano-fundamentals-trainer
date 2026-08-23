@@ -98,7 +98,7 @@ export function FreePracticePage({
 
           <div className="free-practice__meta">
             <div><span>音频状态</span><strong>{pianoAudio.samplerStatus.message}</strong></div>
-            <div><span>发声模式</span><strong>{pianoAudio.mode === 'builtin' ? '内置钢琴' : pianoAudio.mode === 'silent' ? '静音' : '外部软音源'}</strong></div>
+            <div><span>发声模式</span><strong>{pianoAudio.mode === 'builtin' ? '内置钢琴' : '关闭'}</strong></div>
           </div>
 
           <div className="practice-primary-actions">

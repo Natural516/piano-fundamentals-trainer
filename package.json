@@ -48,6 +48,15 @@
       "out/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "resources/piano-samples",
+        "to": "piano-samples",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
     "win": {
       "icon": "build/icon.ico",
       "signAndEditExecutable": false,

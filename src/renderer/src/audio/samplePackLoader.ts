@@ -128,8 +128,9 @@ export function selectSampleAndRate(anchors: SampleAnchor[], midiNumber: number)
 }
 
 export function getVelocityGain(velocity: number): number {
-  const normalized = Math.min(1, Math.max(0, velocity / 127))
-  return 0.28 + normalized * 0.72
+  if (!Number.isFinite(velocity) || velocity <= 0) return 0
+  const normalized = Math.min(1, velocity / 127)
+  return Math.max(0.05, normalized)
 }
 
 export function clampPianoVolume(volume: number): number {

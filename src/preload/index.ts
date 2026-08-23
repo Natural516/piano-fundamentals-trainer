@@ -3,6 +3,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('pianoApp', {
   platform: process.platform,
   inflateRaw: (bytes: Uint8Array): Promise<Uint8Array> => ipcRenderer.invoke('piano:inflate-raw', bytes),
+  pianoSamples: {
+    readFile: (relativePath: string) => ipcRenderer.invoke('piano:samples:read', relativePath)
+  },
   secrets: {
     getAiApiKey: () => ipcRenderer.invoke('piano:secret:get-ai-api-key'),
     setAiApiKey: (value: string) => ipcRenderer.invoke('piano:secret:set-ai-api-key', value),
