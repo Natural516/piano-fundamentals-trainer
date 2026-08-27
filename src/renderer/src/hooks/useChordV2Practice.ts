@@ -4,7 +4,8 @@ import { CHORD_V2_DIFFICULTY_QUALITIES, type ChordV2Result } from '../chordV2/ch
 import { getChordV2Identity, formatChordSymbol } from '../chordV2/chordIdentity'
 import { createArpeggioSequence, judgeVoicing, normalizeNotes, ArpeggioStateMachine, createDefaultVoicing } from '../chordV2/voicing'
 import { pickBassConstraint, validateVoicing } from '../chordV2/chordValidator'
-import { useMidiEventSubscription } from './useMidiEvents'
+import { getLastMidiEventId } from '../midi/midiEventBus'
+import { useMidiEventSubscription, useMidiPanicSubscription } from './useMidiEvents'
 
 type ChordV2Status = 'idle' | 'running' | 'paused' | 'finished'
 type ChordV2FeedbackType = 'correct' | 'wrong' | 'missing' | 'extra' | 'wrong_bass' | null
@@ -353,6 +354,20 @@ export function useChordV2Practice(): UseChordV2PracticeResult {
     blockNotesRef.current = [...blockNotesRef.current, event.midiNumber]
     if (blockTimerRef.current === null) {
       blockTimerRef.current = window.setTimeout(() => evaluateBlockRef.current(), BLOCK_WINDOW_MS)
+    }
+  })
+
+  useMidiPanicSubscription(() => {
+    if (blockTimerRef.current !== null) {
+      window.clearTimeout(blockTimerRef.current)
+      blockTimerRef.current = null
+    }
+    blockNotesRef.current = []
+    arpeggioMachineRef.current = null
+    lastEventIdRef.current = getLastMidiEventId()
+    if (!pendingAdvanceRef.current) {
+      setInputNotes([])
+      setFeedback(null)
     }
   })
 

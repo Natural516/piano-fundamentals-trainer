@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
 import type { ActiveMidiNote, MidiConnectionState } from '../types'
-import { useDisplayPreferences } from '../hooks/useDisplayPreferences'
 import { useFreePractice } from '../hooks/useFreePractice'
 import { useMidiDisconnectProtection } from '../hooks/useMidiDisconnectProtection'
 import type { UsePianoAudioResult } from '../hooks/usePianoAudio'
 import { AppButton } from './AppButton'
-import { FullKeyboard } from './FullKeyboard'
+import { FreePracticeVisualization } from './FreePracticeVisualization'
 import { PracticePageHeader } from './PracticePageHeader'
 import { PracticeStatBar } from './PracticeStatBar'
 
@@ -31,7 +30,6 @@ export function FreePracticePage({
   pianoAudio,
   onPracticeRunningChange
 }: FreePracticePageProps): JSX.Element {
-  const { showVirtualKeyboard, setShowVirtualKeyboard } = useDisplayPreferences('free-practice')
   const practice = useFreePractice({
     playNote: pianoAudio.playNote,
     stopNote: pianoAudio.stopNote,
@@ -100,6 +98,11 @@ export function FreePracticePage({
             <div><span>音频状态</span><strong>{pianoAudio.samplerStatus.message}</strong></div>
             <div><span>发声模式</span><strong>{pianoAudio.mode === 'builtin' ? '内置钢琴' : '关闭'}</strong></div>
           </div>
+
+          <FreePracticeVisualization
+            key={practice.session?.id ?? 'free-practice-idle'}
+            activeNotes={activeNotes}
+          />
 
           <div className="practice-primary-actions">
             {practice.status === 'idle' || (practice.status === 'finished' && !practice.saveError) ? (
@@ -194,21 +197,6 @@ export function FreePracticePage({
           </section>
         ) : null}
 
-        {showVirtualKeyboard ? (
-          <section className="midi-panel free-practice-keyboard practice-keyboard-panel">
-            <div className="panel-title-row">
-              <div><h3>虚拟钢琴键盘</h3><p>MIDI 输入实时高亮。</p></div>
-              <button className="practice-settings-trigger" type="button" aria-label="隐藏虚拟键盘" title="隐藏虚拟键盘" onClick={() => setShowVirtualKeyboard(false)}>
-                ×
-              </button>
-            </div>
-            <FullKeyboard activeNotes={activeNotes} />
-          </section>
-        ) : (
-          <div className="practice-primary-actions free-practice__keyboard-toggle">
-            <AppButton variant="secondary" onClick={() => setShowVirtualKeyboard(true)}>显示虚拟键盘</AppButton>
-          </div>
-        )}
       </div>
     </section>
   )

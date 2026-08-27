@@ -62,6 +62,13 @@ export class ScalePracticeCore {
     this.lastHandledEventId = baselineEventId
   }
 
+  clearTransientInput(baselineEventId: number): void {
+    this.pendingInput = null
+    this.wrongNotes = []
+    this.lastHandledEventId = Math.max(this.lastHandledEventId ?? 0, baselineEventId)
+    this.onChange?.()
+  }
+
   processMidiEvent(event: MidiEventRecord, practiceStartTimestampMs: number): void {
     if (this.isComplete) {
       return

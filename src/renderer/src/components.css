@@ -925,6 +925,99 @@ body::before {
   font-size: 14px;
 }
 
+.free-practice-visualization {
+  display: grid;
+  grid-template-rows: minmax(270px, 1fr) auto;
+  gap: 12px;
+  min-height: 0;
+  margin-top: 14px;
+}
+
+.free-practice-grand-staff,
+.free-practice-piano {
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--bg-soft);
+}
+
+.free-practice-grand-staff {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  padding: 10px 12px 12px;
+}
+
+.free-practice-piano {
+  padding: 9px 12px 12px;
+}
+
+.free-practice-visualization__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 8px;
+}
+
+.free-practice-visualization__heading strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.free-practice-visualization__heading span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-align: right;
+}
+
+.free-practice-grand-staff__stage {
+  position: relative;
+  min-height: 0;
+}
+
+.free-practice-staff-renderer {
+  --music-staff-ink: #171717;
+  --music-staff-paper: #ffffff;
+
+  width: 100%;
+  height: 100%;
+  min-height: 250px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #ddd7ca;
+  border-radius: 12px;
+  background: var(--music-staff-paper);
+  color: var(--music-staff-ink);
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+
+.free-practice-staff-renderer > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.free-practice-grand-staff__empty {
+  position: absolute;
+  top: 50%;
+  right: 70px;
+  left: 90px;
+  margin: 0;
+  color: #777166;
+  font-size: 12px;
+  text-align: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.free-practice-piano .full-keyboard-shell {
+  margin-top: 0;
+  border-radius: 11px;
+  box-shadow: none;
+}
+
 .free-practice__notes {
   display: grid;
   gap: 8px;
@@ -995,10 +1088,6 @@ body::before {
 .free-practice-playback__seek span {
   color: var(--text-secondary);
   font-size: 12px;
-}
-
-.free-practice__keyboard-toggle {
-  margin-top: 16px;
 }
 
 .chord-v2-target {

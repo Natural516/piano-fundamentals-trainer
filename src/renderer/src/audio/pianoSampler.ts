@@ -1,5 +1,6 @@
 import { getVelocityGain, selectSampleAndRate } from './samplePackLoader'
 import type { PianoSamplerStatus, SampleAnchor, SelectedSample } from './pianoAudioTypes'
+import { pianoLatencyDiagnostics } from './pianoLatencyDiagnostics'
 import {
   pickVoiceToSteal,
   pedalAllNotesOff,
@@ -54,6 +55,7 @@ export class PianoSampler {
   private voices = new Map<number, SamplerVoice>()
   private anchors: SampleAnchor[] = []
   private buffers = new Map<string, AudioBuffer>()
+  private noteMap: Array<SelectedSample | null> = []
   private samplePackLoaded = false
   private loadError: string | null = null
   private nextVoiceId = 1
@@ -76,6 +78,7 @@ export class PianoSampler {
     this.panic()
     this.anchors = []
     this.buffers.clear()
+    this.noteMap = []
     this.samplePackLoaded = false
     this.loadError = null
 
@@ -92,45 +95,53 @@ export class PianoSampler {
       })))
       for (const { sample, buffer } of loadedBuffers) this.buffers.set(sample, buffer)
       this.anchors = [...anchors]
+      this.noteMap = Array.from({ length: 128 }, (_, midiNumber) => (
+        selectSampleAndRate(this.anchors, midiNumber)
+      ))
       this.samplePackLoaded = true
       return loadedBuffers.length
     } catch (error) {
       this.anchors = []
       this.buffers.clear()
+      this.noteMap = []
       this.loadError = getErrorMessage(error)
       throw new Error(this.loadError)
     }
   }
 
-  noteOn(midiNumber: number, velocity: number): boolean {
+  noteOn(midiNumber: number, velocity: number, diagnosticEventId?: number): boolean {
+    pianoLatencyDiagnostics.markSamplerEntry(diagnosticEventId)
     if (!this.samplePackLoaded || velocity <= 0) {
       if (velocity <= 0) this.noteOff(midiNumber)
       return false
     }
 
-    const selected = selectSampleAndRate(this.anchors, midiNumber)
+    const selected = this.noteMap[midiNumber] ?? null
     if (!selected || !this.buffers.has(selected.anchor.sample)) {
       this.loadError = `缺少音符 ${midiNumber} 对应的内置钢琴采样`
       return false
     }
 
-    const stealTarget = pickVoiceToSteal(
-      [...this.voices.values()].map((voice) => voice.descriptor),
-      this.maxPolyphony
-    )
+    const stealTarget = this.voices.size >= this.maxPolyphony
+      ? pickVoiceToSteal(
+        [...this.voices.values()].map((voice) => voice.descriptor),
+        this.maxPolyphony
+      )
+      : null
     if (stealTarget) {
       const voiceToSteal = this.voices.get(stealTarget.id)
       voiceToSteal?.stopImmediate()
       this.voices.delete(stealTarget.id)
     }
 
+    const now = this.audioContext.currentTime
     const descriptor: VoiceDescriptor = {
       id: this.nextVoiceId++,
       midiNumber,
       ...pedalKeyDown({ physicalKeyDown: false, sustainedByPedal: false, released: false }),
-      startedAt: this.audioContext.currentTime
+      startedAt: now
     }
-    const voice = this.createSampleVoice(descriptor, selected, velocity)
+    const voice = this.createSampleVoice(descriptor, selected, velocity, now, diagnosticEventId)
     if (!voice) return false
     this.voices.set(descriptor.id, voice)
     return true
@@ -181,6 +192,10 @@ export class PianoSampler {
     return this.pedalDown
   }
 
+  get isReadyForImmediatePlay(): boolean {
+    return this.samplePackLoaded && !this.loadError && this.audioContext.state === 'running'
+  }
+
   setVolume(volume: number): void {
     this.volume = Math.min(100, Math.max(0, Math.round(volume)))
     this.masterGain.gain.setTargetAtTime(getVolumeGain(this.volume), this.audioContext.currentTime, 0.02)
@@ -226,6 +241,7 @@ export class PianoSampler {
     this.panic()
     this.buffers.clear()
     this.anchors = []
+    this.noteMap = []
     this.samplePackLoaded = false
     this.loadError = null
     try {
@@ -242,12 +258,13 @@ export class PianoSampler {
   private createSampleVoice(
     descriptor: VoiceDescriptor,
     selected: SelectedSample,
-    velocity: number
+    velocity: number,
+    now: number,
+    diagnosticEventId?: number
   ): SamplerVoice | null {
     const buffer = this.buffers.get(selected.anchor.sample)
     if (!buffer) return null
 
-    const now = this.audioContext.currentTime
     const source = this.audioContext.createBufferSource()
     const gain = this.audioContext.createGain()
     const peakGain = getVelocityGain(velocity) * getDecibelGain(selected.anchor.volume)
@@ -275,6 +292,7 @@ export class PianoSampler {
 
     source.onended = disconnect
     source.start(now)
+    pianoLatencyDiagnostics.markSourceStart(diagnosticEventId, this.audioContext)
 
     return {
       descriptor,

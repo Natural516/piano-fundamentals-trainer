@@ -55,6 +55,10 @@ export class WaitScoreCore {
     this.advanceSkippable()
   }
 
+  clearTransientInput(): void {
+    this.pressed.clear()
+  }
+
   processNoteOn(midiNumber: number, sourceEventId?: string): 'none' | 'wrong' | 'complete' {
     this.advanceSkippable()
 

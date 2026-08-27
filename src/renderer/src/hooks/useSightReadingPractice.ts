@@ -27,7 +27,7 @@ import {
   type SightReadingSettings
 } from '../utils/sightReadingSettings'
 import { getMajorKeySignature, type MajorKeyId } from '../utils/musicKeySignatures'
-import { useMidiEventSubscription } from './useMidiEvents'
+import { useMidiEventSubscription, useMidiPanicSubscription } from './useMidiEvents'
 
 export type SightReadingStatus = 'idle' | 'running' | 'finished'
 export type SightReadingResult = 'correct' | 'wrong_note' | 'timeout' | null
@@ -494,6 +494,12 @@ export function useSightReadingPractice(): UseSightReadingPracticeResult {
 
     const outcome = sessionRef.current.processMidiEvent(event)
     if (outcome) applyOutcomeRef.current(outcome)
+  })
+
+  useMidiPanicSubscription(() => {
+    sessionRef.current.clearTransientInput(getLastMidiEventId())
+    setCurrentInput('')
+    setCurrentInputMidiNumber(null)
   })
 
   return {

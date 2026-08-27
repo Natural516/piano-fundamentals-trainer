@@ -1651,11 +1651,31 @@ button {
   background: linear-gradient(180deg, #242422 0%, #151513 100%);
 }
 
+.virtual-piano-keyboard.is-fit-to-width .keyboard-scroll {
+  overflow: hidden;
+  padding: 10px 12px 12px;
+}
+
 .full-keyboard {
   position: relative;
   min-width: 1180px;
   height: 190px;
   filter: drop-shadow(0 14px 24px rgba(0, 0, 0, 0.34));
+}
+
+.virtual-piano-keyboard.is-fit-to-width .full-keyboard {
+  width: 100%;
+  min-width: 0;
+  height: 126px;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.3));
+}
+
+.virtual-piano-keyboard.is-fit-to-width .full-black-key {
+  height: 78px;
+}
+
+.virtual-piano-keyboard.is-disabled {
+  opacity: 0.58;
 }
 
 .full-keyboard__white {

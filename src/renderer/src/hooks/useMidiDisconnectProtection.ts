@@ -6,12 +6,16 @@ export function useMidiDisconnectProtection(
   sessionActive: boolean,
   onDisconnect: () => void
 ): void {
-  const previousStateRef = useRef(connectionState)
+  const handledOutageRef = useRef(false)
 
   useEffect(() => {
-    const previous = previousStateRef.current
-    previousStateRef.current = connectionState
-    if (previous === 'connected' && connectionState !== 'connected' && sessionActive) {
+    if (connectionState !== 'disconnected' && connectionState !== 'pending') {
+      handledOutageRef.current = false
+      return
+    }
+
+    if (sessionActive && !handledOutageRef.current) {
+      handledOutageRef.current = true
       onDisconnect()
     }
   }, [connectionState, onDisconnect, sessionActive])

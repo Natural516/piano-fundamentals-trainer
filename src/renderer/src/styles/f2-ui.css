@@ -178,6 +178,29 @@ body {
   width: min(100%, 1280px);
 }
 
+.midi-recovery-notice {
+  position: fixed;
+  z-index: 90;
+  top: 18px;
+  left: 50%;
+  max-width: min(680px, calc(100vw - 40px));
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 10px;
+  background: rgba(36, 25, 9, 0.96);
+  color: #fff3d6;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.midi-recovery-notice.is-reconnected {
+  border-color: rgba(52, 211, 153, 0.5);
+  background: rgba(8, 38, 30, 0.96);
+  color: #dcfff1;
+}
+
 .app-card,
 .midi-panel,
 .settings-card,
@@ -1350,6 +1373,73 @@ summary:focus-visible {
   padding-top: 12px;
 }
 
+.is-practice-focus .free-practice-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  min-height: 0;
+}
+
+.is-practice-focus .free-practice-panel .panel-title-row {
+  margin-bottom: 0;
+}
+
+.is-practice-focus .free-practice__meta {
+  margin-top: 8px;
+}
+
+.is-practice-focus .free-practice__meta div {
+  padding-block: 7px;
+}
+
+.is-practice-focus .free-practice-visualization {
+  grid-template-rows: minmax(185px, 1fr) auto;
+  gap: 8px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.is-practice-focus .free-practice-grand-staff {
+  padding: 7px 10px 9px;
+}
+
+.is-practice-focus .free-practice-grand-staff__stage .free-practice-staff-renderer {
+  min-height: 180px;
+}
+
+.is-practice-focus .free-practice-piano {
+  padding: 6px 10px 8px;
+}
+
+.is-practice-focus .free-practice-piano .virtual-piano-keyboard.is-fit-to-width .keyboard-scroll {
+  padding: 6px 9px 8px;
+}
+
+.is-practice-focus .free-practice-piano .virtual-piano-keyboard.is-fit-to-width .full-keyboard {
+  height: 96px;
+}
+
+.is-practice-focus .free-practice-piano .virtual-piano-keyboard.is-fit-to-width .full-black-key {
+  height: 60px;
+}
+
+.is-practice-focus .free-practice-panel .practice-primary-actions {
+  position: static;
+  margin-top: 0;
+  padding: 8px 0 0;
+  background: none;
+}
+
+.is-practice-focus .free-practice__notes {
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.is-practice-focus .free-practice__notes textarea {
+  min-height: 44px;
+  max-height: 58px;
+  resize: none;
+}
+
 .is-practice-focus .sight-main-panel {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
@@ -1546,5 +1636,39 @@ summary:focus-visible {
   .is-practice-focus .scale-sequence-panel,
   .is-practice-focus .coordination-pattern-panel {
     max-height: 160px;
+  }
+}
+
+@media (max-height: 720px) {
+  .is-practice-focus .free-practice-visualization {
+    grid-template-rows: minmax(145px, 1fr) auto;
+  }
+
+  .is-practice-focus .free-practice-grand-staff__stage .free-practice-staff-renderer {
+    min-height: 145px;
+  }
+
+  .is-practice-focus .free-practice-visualization__heading {
+    padding-bottom: 4px;
+  }
+
+  .is-practice-focus .free-practice-piano .virtual-piano-keyboard.is-fit-to-width .full-keyboard {
+    height: 76px;
+  }
+
+  .is-practice-focus .free-practice-piano .virtual-piano-keyboard.is-fit-to-width .full-black-key {
+    height: 48px;
+  }
+
+  .is-practice-focus .free-practice__notes textarea {
+    min-height: 38px;
+    max-height: 38px;
+    padding-block: 7px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .free-practice-visualization__heading span {
+    display: none;
   }
 }

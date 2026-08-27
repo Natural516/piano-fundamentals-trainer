@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ActiveMidiNote, MidiConnectionState } from '../types'
 import { useScorePractice, type ScorePracticeMode } from '../hooks/useScorePractice'
 import type { UsePianoAudioResult } from '../hooks/usePianoAudio'
+import { useMidiDisconnectProtection } from '../hooks/useMidiDisconnectProtection'
 import { loadTrainingSafeMusicXmlDocument, UnsupportedMusicXmlProfileError } from '../score/musicXmlProfile'
 import { importMxlFile } from '../score/mxlImportService'
 import { parseMidiFile } from '../midiFile/midiFileParser'
@@ -174,7 +175,6 @@ export function ScorePracticePage({
   const recordSaveAttemptedRef = useRef('')
   const sessionRecordIdRef = useRef('')
   const pausedForExitRef = useRef(false)
-  const previousMidiConnectionRef = useRef(midiConnectionState)
   const sessionStartedAtRef = useRef('')
   const followVisible = isExperimentalFeatureVisible('FEATURE_SCORE_FOLLOWING')
   const effectiveMode: ScorePracticeMode = mode === 'follow' && !followVisible ? 'wait' : mode
@@ -384,14 +384,11 @@ export function ScorePracticePage({
     onPracticeRunningChange(practice.sessionActive)
   }, [onPracticeRunningChange, practice.sessionActive])
 
-  useEffect(() => {
-    const previous = previousMidiConnectionRef.current
-    previousMidiConnectionRef.current = midiConnectionState
-    if (previous === 'connected' && midiConnectionState !== 'connected' && practice.sessionActive) {
-      practice.interruptDevice()
-      setSavedMessage('MIDI 设备已断开，本次练习已暂停并保存恢复检查点')
-    }
-  }, [midiConnectionState, practice.interruptDevice, practice.sessionActive])
+  const protectDisconnectedSession = useCallback(() => {
+    practice.interruptDevice()
+    setSavedMessage('MIDI 设备已断开，本次练习已暂停并保存恢复检查点')
+  }, [practice.interruptDevice])
+  useMidiDisconnectProtection(midiConnectionState, practice.sessionActive, protectDisconnectedSession)
 
   useEffect(() => {
     if (exitPromptOpen) {

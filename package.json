@@ -7,6 +7,9 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
+    "diagnose:piano-latency": "electron scripts/measure-piano-latency.cjs",
+    "poc:native-audio:build": "cmake -S native-audio-poc -B native-audio-poc/build -A x64 && cmake --build native-audio-poc/build --config Release",
+    "poc:native-audio:auto": "electron scripts/native-audio-poc.cjs",
     "test:regression": "node scripts/regression-check.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "build": "npm run typecheck && electron-vite build",

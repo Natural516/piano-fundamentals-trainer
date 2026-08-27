@@ -22,7 +22,7 @@ import { getToleranceMs } from '../utils/judgement'
 import type { ToleranceLevel } from '../utils/practiceTypes'
 import { useMetronome } from './useMetronome'
 import { useMetronomeSound } from './useMetronomeSound'
-import { useMidiEventSubscription } from './useMidiEvents'
+import { useMidiEventSubscription, useMidiPanicSubscription } from './useMidiEvents'
 
 interface GroupedInputEvent {
   midiNumber: number
@@ -472,6 +472,11 @@ export function useCoordinationPractice(): UseCoordinationPracticeResult {
   }, [])
 
   useMidiEventSubscription(handleMidiEvent)
+
+  useMidiPanicSubscription(() => {
+    pendingInputsRef.current = new Map()
+    lastMidiEventIdRef.current = getLastMidiEventId()
+  })
 
   const currentStepIndex = useMemo(() => {
     if (metronome.status === 'idle' || metronome.isCountingIn || isComplete || timeline.length === 0) return -1

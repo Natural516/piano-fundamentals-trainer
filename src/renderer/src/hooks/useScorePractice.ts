@@ -7,7 +7,8 @@ import { buildPracticeSegment } from '../score/practiceSegmentBuilder'
 import { WaitScoreCore } from '../score/waitScoreCore'
 import { RealtimeScoreCore } from '../score/realtimeScoreCore'
 import { FollowScoreCore } from '../score/followScoreCore'
-import { useMidiEventSubscription } from './useMidiEvents'
+import { getLastMidiEventId } from '../midi/midiEventBus'
+import { useMidiEventSubscription, useMidiPanicSubscription } from './useMidiEvents'
 import { buildPracticeSummaryMetrics } from '../records/practiceMetrics'
 import type { PerMeasurePracticeMetrics } from '../records/practiceRecordV2'
 import { practiceSessionRepository } from '../records/practiceSessionRepository'
@@ -559,6 +560,14 @@ export function useScorePractice(
     setFeedback(outcome === 'wrong' ? 'wrong' : outcome === 'complete' ? 'correct' : 'correct')
     sync()
     if (core.isComplete) completeLoop()
+  })
+
+  useMidiPanicSubscription(() => {
+    waitCoreRef.current?.clearTransientInput()
+    realtimeCoreRef.current?.clearTransientInput()
+    followCoreRef.current?.clearTransientInput()
+    lastEventIdRef.current = getLastMidiEventId()
+    setFeedback(null)
   })
 
   useEffect(() => () => {

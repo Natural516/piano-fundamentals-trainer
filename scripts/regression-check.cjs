@@ -35,10 +35,12 @@ function test(name, callback) {
 
 const midiNotes = require('../src/renderer/src/utils/midiNotes.ts')
 const midiEventBus = require('../src/renderer/src/midi/midiEventBus.ts')
+const midiDeviceLifecycle = require('../src/renderer/src/midi/midiDeviceLifecycle.ts')
 const midiMessages = require('../src/renderer/src/midi/midiMessages.ts')
 const samplePackLoader = require('../src/renderer/src/audio/samplePackLoader.ts')
 const audioModeSettings = require('../src/renderer/src/audio/audioModeSettings.ts')
 const bundledPianoSamplePack = require('../src/renderer/src/audio/bundledPianoSamplePack.ts')
+const pianoHotPath = require('../src/renderer/src/audio/pianoHotPath.ts')
 const pianoMidiRouter = require('../src/renderer/src/audio/pianoMidiRouter.ts')
 const pianoSampler = require('../src/renderer/src/audio/pianoSampler.ts')
 const salamanderSamplePack = require('../src/renderer/src/audio/salamanderSamplePack.ts')
@@ -98,6 +100,8 @@ const scoreSheetTimeAxis = require('../src/renderer/src/score/scoreSheetTimeAxis
 const musicXmlProfile = require('../src/renderer/src/score/musicXmlProfile.ts')
 const {
   Element: VexElement,
+  Formatter: VexFormatter,
+  GhostNote: VexGhostNote,
   Stave: VexStave,
   StaveNote: VexStaveNote,
   Voice: VexVoice
@@ -157,6 +161,10 @@ const sightReadingSettings = require('../src/renderer/src/utils/sightReadingSett
 const musicKeySignatures = require('../src/renderer/src/utils/musicKeySignatures.ts')
 const musicPitchSpelling = require('../src/renderer/src/utils/musicPitchSpelling.ts')
 const musicStaffModel = require('../src/renderer/src/utils/musicStaffModel.ts')
+const freePracticeVisualization = require('../src/renderer/src/utils/freePracticeVisualization.ts')
+const freePracticeStaffGeometry = require('../src/renderer/src/utils/freePracticeStaffGeometry.ts')
+const freePracticeVisualizationDiagnostics = require('../src/renderer/src/utils/freePracticeVisualizationDiagnostics.ts')
+const virtualPianoLayout = require('../src/renderer/src/utils/virtualPianoLayout.ts')
 const themeTypes = require('../src/renderer/src/utils/themeTypes.ts')
 const themeStorage = require('../src/renderer/src/utils/themeStorage.ts')
 const displayPreferences = require('../src/renderer/src/utils/displayPreferences.ts')
@@ -1057,6 +1065,7 @@ test('VexFlow SVG、本地 Bravura 与协调 BPM 步进器接入', () => {
   const stepperSource = fs.readFileSync(require.resolve('../src/renderer/src/components/NumericStepper.tsx'), 'utf8')
   const coordinationPage = fs.readFileSync(require.resolve('../src/renderer/src/components/CoordinationPracticePage.tsx'), 'utf8')
   const fullKeyboardSource = fs.readFileSync(require.resolve('../src/renderer/src/components/FullKeyboard.tsx'), 'utf8')
+  const sharedKeyboardSource = fs.readFileSync(require.resolve('../src/renderer/src/components/VirtualPianoKeyboard.tsx'), 'utf8')
   const virtualKeyboardSource = fs.readFileSync(require.resolve('../src/renderer/src/components/VirtualKeyboard.tsx'), 'utf8')
   const componentCss = fs.readFileSync(require.resolve('../src/renderer/src/components.css'), 'utf8')
   const practiceCss = fs.readFileSync(require.resolve('../src/renderer/src/styles/practice-usability.css'), 'utf8')
@@ -1107,7 +1116,10 @@ test('VexFlow SVG、本地 Bravura 与协调 BPM 步进器接入', () => {
   assert.match(sightPageSource, /MAJOR_KEY_DISPLAY_SIGNATURES\.map/)
   assert.match(chordPageSource, /MAJOR_KEY_DISPLAY_SIGNATURES\.map/)
   assert.doesNotMatch(`${sightPageSource}\n${chordPageSource}`, /MAJOR_KEY_SIGNATURES\.map/)
-  assert.match(fullKeyboardSource, /isActive[\s\S]+isTarget[\s\S]+isCorrect[\s\S]+isWrong/)
+  assert.match(fullKeyboardSource, /VirtualPianoKeyboard/)
+  for (const stateName of ['isPressed', 'isTarget', 'isCorrect', 'isWrong']) {
+    assert.match(sharedKeyboardSource, new RegExp(stateName))
+  }
   assert.match(virtualKeyboardSource, /white-key/)
   assert.match(virtualKeyboardSource, /black-key/)
   assert.match(keyboardCss, /\.full-white-key\.is-active/)
@@ -1138,6 +1150,328 @@ test('VexFlow SVG、本地 Bravura 与协调 BPM 步进器接入', () => {
   assert.match(timeBarSource, /aria-valuenow=\{Math\.round\(remainingTimeMs\)\}/)
   assert.doesNotMatch(timeBarSource, /setTimeout|recordTimeout/)
   assert.match(practiceCss, /transform-origin: left center/)
+})
+
+test('F3.1a Free Practice Virtual Piano 保持 88 键几何与物理按键反馈', async () => {
+  const React = require('react')
+  const TestRenderer = require('react-test-renderer')
+  const { act } = TestRenderer
+  const { VirtualPianoKeyboard } = require('../src/renderer/src/components/VirtualPianoKeyboard.tsx')
+  const keyboardSource = fs.readFileSync(require.resolve('../src/renderer/src/components/VirtualPianoKeyboard.tsx'), 'utf8')
+  const baseCss = fs.readFileSync(require.resolve('../src/renderer/src/styles.css'), 'utf8')
+
+  const layout = virtualPianoLayout.createVirtualPianoLayout([21, 108])
+  assert.equal(layout.keys.length, 88)
+  assert.equal(layout.whiteKeys.length, 52)
+  assert.equal(layout.blackKeys.length, 36)
+  assert.equal(layout.keys[0].noteName, 'A0')
+  assert.equal(layout.keys.at(-1).noteName, 'C8')
+  assert.deepEqual(
+    layout.keys.filter((key) => key.midiNumber >= 60 && key.midiNumber <= 71 && key.isBlack).map((key) => key.pitchClass),
+    ['C#', 'D#', 'F#', 'G#', 'A#'],
+    '黑键必须保持每八度 2 + 3 分组'
+  )
+  assert.ok(layout.blackKeys.every((key) => key.leftPercent > 0 && key.leftPercent < 100))
+  assert.match(keyboardSource, /pressedNotes/)
+  assert.match(keyboardSource, /targetNotes/)
+  assert.match(keyboardSource, /disabled/)
+  assert.match(keyboardSource, /range/)
+  assert.match(keyboardSource, /labels/)
+  assert.match(baseCss, /\.virtual-piano-keyboard\.is-fit-to-width \.full-keyboard\s*\{[\s\S]*?min-width:\s*0/)
+
+  let renderer
+  const keyNode = (midiNumber) => renderer.root.findAll(
+    (node) => node.props['data-midi-number'] === midiNumber
+  )[0]
+  try {
+    await act(async () => {
+      renderer = TestRenderer.create(React.createElement(VirtualPianoKeyboard, {
+        pressedNotes: [60], range: [21, 108], fitToWidth: true
+      }))
+    })
+    assert.match(keyNode(60).props.className, /is-active/, 'noteOn C4 必须显示 pressed')
+
+    await act(async () => renderer.update(React.createElement(VirtualPianoKeyboard, {
+      pressedNotes: [], range: [21, 108], fitToWidth: true
+    })))
+    assert.doesNotMatch(keyNode(60).props.className, /is-active/, 'noteOff C4 必须清除 pressed；CC64 不参与物理键状态')
+
+    await act(async () => renderer.update(React.createElement(VirtualPianoKeyboard, {
+      pressedNotes: [60, 64, 67], range: [21, 108], fitToWidth: true
+    })))
+    assert.deepEqual([60, 64, 67].map((midiNumber) => /is-active/.test(keyNode(midiNumber).props.className)), [true, true, true])
+
+    await act(async () => renderer.update(React.createElement(VirtualPianoKeyboard, {
+      pressedNotes: [], range: [21, 108], fitToWidth: true
+    })))
+    assert.equal(renderer.root.findAll((node) => /is-active/.test(node.props.className ?? '')).length, 0, 'disconnect 清空输入态后不得残留 pressed')
+
+    await act(async () => renderer.update(React.createElement(VirtualPianoKeyboard, {
+      pressedNotes: [62], range: [21, 108], fitToWidth: true
+    })))
+    assert.match(keyNode(62).props.className, /is-active/, 'reconnect 后新 noteOn 必须重新显示')
+  } finally {
+    if (renderer) await act(async () => renderer.unmount())
+  }
+})
+
+test('F3.1a Staff event semantics：normalized noteOn 立即且仅一次进入 bounded attack history', () => {
+  const event = (id, type, midiNumber, timestamp, velocity = 100) => ({
+    id, type, midiNumber, velocity, timestamp, deviceName: 'Regression MIDI'
+  })
+  const reduce = freePracticeVisualization.reduceFreePracticeVisualizationEvent
+  let state = freePracticeVisualization.createFreePracticeVisualizationState()
+
+  const c4 = event(1, 'noteOn', 60, 1_000)
+  state = reduce(state, c4)
+  assert.equal(state.history.length, 1, '首个 C4 noteOn 必须同步创建 attack column')
+  assert.deepEqual(state.history[0].midiNumbers, [60])
+  assert.equal(state.lastNoteOnEventId, 1)
+
+  const afterDuplicate = reduce(state, c4)
+  assert.equal(afterDuplicate, state, '同一 normalized event id 不得二次进入 visualization')
+  state = reduce(state, event(2, 'noteOff', 60, 1_010, 0))
+  assert.equal(state.history.length, 1, 'noteOff 不得生成 attack')
+  state = reduce(state, { id: 3, type: 'controlChange', controllerNumber: 64, value: 127, sustainPedalDown: true, timestamp: 1_020, deviceName: 'Regression MIDI' })
+  state = reduce(state, { id: 4, type: 'controlChange', controllerNumber: 64, value: 0, sustainPedalDown: false, timestamp: 1_030, deviceName: 'Regression MIDI' })
+  assert.equal(state.history.length, 1, 'CC64 down/up 不得生成 attack')
+  assert.equal(midiMessages.parseMidiMessage([0x90, 60, 0], 'Regression MIDI', 5, 1_040).type, 'noteOff')
+
+  state = reduce(state, event(6, 'noteOn', 64, 1_045))
+  state = reduce(state, event(7, 'noteOn', 67, 1_055))
+  assert.equal(state.history.length, 1)
+  assert.deepEqual(state.history[0].midiNumbers, [60, 64, 67], 'grouping window 内必须先显示再 merge 为一个唯一 pitch chord column')
+
+  const chainedArpeggio = freePracticeVisualization.appendFreePracticeAttacks([], [
+    { id: 'chain-c', midiNumber: 60, timestamp: 2_000 },
+    { id: 'chain-e', midiNumber: 64, timestamp: 2_050 },
+    { id: 'chain-g', midiNumber: 67, timestamp: 2_100 }
+  ])
+  assert.equal(chainedArpeggio.length, 2, 'grouping window 必须从首个 attack 计算，不能链式无限延长')
+
+  let repeated = freePracticeVisualization.createFreePracticeVisualizationState()
+  repeated = reduce(repeated, event(10, 'noteOn', 60, 2_000))
+  repeated = reduce(repeated, event(11, 'noteOff', 60, 2_010, 0))
+  repeated = reduce(repeated, event(12, 'noteOn', 60, 2_020))
+  repeated = reduce(repeated, event(13, 'noteOff', 60, 2_030, 0))
+  repeated = reduce(repeated, event(14, 'noteOn', 60, 2_040))
+  assert.deepEqual(repeated.history.map((column) => column.midiNumbers), [[60], [60], [60]])
+
+  let overflow = freePracticeVisualization.createFreePracticeVisualizationState()
+  for (let index = 0; index < 11; index += 1) {
+    overflow = reduce(overflow, event(100 + index, 'noteOn', 60, 10_000 + index * 100))
+  }
+  assert.equal(overflow.history.length, freePracticeVisualization.FREE_PRACTICE_HISTORY_CAPACITY)
+  assert.equal(overflow.history[0].id, 'midi-attack-101', '容量溢出必须删除最旧 attack')
+  assert.equal(overflow.history.at(-1).id, 'midi-attack-110')
+
+  const unchangedByReconnectOrPanic = overflow
+  assert.equal(overflow, unchangedByReconnectOrPanic, 'disconnect/reconnect/Panic 没有 normalized noteOn，不得制造 phantom attack')
+})
+
+test('F3.1a Staff app path：一个 event-bus noteOn 只产生一个 visualization event 且不重放旧事件', async () => {
+  const React = require('react')
+  const TestRenderer = require('react-test-renderer')
+  const { act } = TestRenderer
+  const notationFontPath = require.resolve('../src/renderer/src/utils/musicNotationFont.ts')
+  const staffPath = require.resolve('../src/renderer/src/components/FreePracticeStaffRenderer.tsx')
+  const visualizationPath = require.resolve('../src/renderer/src/components/FreePracticeVisualization.tsx')
+  const previousNotationFontModule = require.cache[notationFontPath]
+  require.cache[notationFontPath] = {
+    id: notationFontPath, filename: notationFontPath, loaded: true,
+    exports: { ensureMusicNotationFont: () => Promise.resolve() }, children: [], paths: []
+  }
+  delete require.cache[staffPath]
+  delete require.cache[visualizationPath]
+  const { FreePracticeStaffRenderer } = require(staffPath)
+  const { FreePracticeVisualization } = require(visualizationPath)
+  const visualizationSource = fs.readFileSync(visualizationPath, 'utf8')
+  const eventSource = fs.readFileSync(require.resolve('../src/renderer/src/utils/freePracticeVisualization.ts'), 'utf8')
+  let renderer
+  const staffProps = () => renderer.root.findByType(FreePracticeStaffRenderer).props
+
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  midiEventBus.resetMidiEventBusForTests()
+  try {
+    await act(async () => { renderer = TestRenderer.create(React.createElement(FreePracticeVisualization, { activeNotes: [] })) })
+    await act(async () => midiEventBus.publishMidiEvent({ id: 1, type: 'noteOn', midiNumber: 60, velocity: 100, timestamp: 1_000, deviceName: 'Regression MIDI' }))
+    assert.equal(staffProps().columns.length, 1)
+    assert.deepEqual(staffProps().columns[0].pitches.map((pitch) => pitch.midiNumber), [60])
+
+    await act(async () => midiEventBus.publishMidiEvent({ id: 1, type: 'noteOn', midiNumber: 60, velocity: 100, timestamp: 1_000, deviceName: 'Regression MIDI' }))
+    assert.equal(staffProps().columns.length, 1, '重复 event id 不得重复 append')
+    await act(async () => midiEventBus.publishMidiEvent({ id: 2, type: 'noteOff', midiNumber: 60, velocity: 0, timestamp: 1_010, deviceName: 'Regression MIDI' }))
+    await act(async () => midiEventBus.publishMidiEvent({ id: 3, type: 'controlChange', controllerNumber: 64, value: 127, sustainPedalDown: true, timestamp: 1_020, deviceName: 'Regression MIDI' }))
+    await act(async () => midiEventBus.publishMidiPanic('manual'))
+    assert.equal(staffProps().columns.length, 1)
+
+    await act(async () => renderer.unmount())
+    renderer = null
+    midiEventBus.publishMidiEvent({ id: 4, type: 'noteOn', midiNumber: 64, velocity: 100, timestamp: 1_100, deviceName: 'Regression MIDI' })
+    await act(async () => { renderer = TestRenderer.create(React.createElement(FreePracticeVisualization, { activeNotes: [] })) })
+    assert.equal(staffProps().columns.length, 0, 'reconnect/remount 后不得重放订阅前旧 attack')
+    await act(async () => midiEventBus.publishMidiEvent({ id: 5, type: 'noteOn', midiNumber: 67, velocity: 100, timestamp: 1_200, deviceName: 'Regression MIDI' }))
+    assert.deepEqual(staffProps().columns[0].pitches.map((pitch) => pitch.midiNumber), [67])
+
+    assert.match(visualizationSource, /useMidiEventSubscription/)
+    assert.match(visualizationSource, /reduceFreePracticeVisualizationEvent/)
+    assert.doesNotMatch(visualizationSource, /requestMIDIAccess|previousAttackTimestampsRef/)
+    assert.doesNotMatch(eventSource, /setTimeout|debounce|Promise|requestAnimationFrame/)
+  } finally {
+    if (renderer) await act(async () => renderer.unmount())
+    midiEventBus.resetMidiEventBusForTests()
+    delete require.cache[staffPath]
+    delete require.cache[visualizationPath]
+    if (previousNotationFontModule) require.cache[notationFontPath] = previousNotationFontModule
+    else delete require.cache[notationFontPath]
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT
+  }
+})
+
+test('F3.1a Staff layout invariants：固定 viewBox、固定 slots、固定 glyph 与极端音域', () => {
+  const rendererSource = fs.readFileSync(require.resolve('../src/renderer/src/components/FreePracticeStaffRenderer.tsx'), 'utf8')
+  const visualizationSource = fs.readFileSync(require.resolve('../src/renderer/src/components/FreePracticeVisualization.tsx'), 'utf8')
+  const pageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/FreePracticePage.tsx'), 'utf8')
+  const componentCss = fs.readFileSync(require.resolve('../src/renderer/src/components.css'), 'utf8')
+  const focusCss = fs.readFileSync(require.resolve('../src/renderer/src/styles/f2-ui.css'), 'utf8')
+  const geometry = freePracticeStaffGeometry.getFreePracticeStaffGeometrySnapshot()
+  const emptyGeometry = freePracticeStaffGeometry.getFreePracticeStaffGeometrySnapshot()
+  const oneAttackGeometry = freePracticeStaffGeometry.getFreePracticeStaffGeometrySnapshot()
+  const fiveAttackGeometry = freePracticeStaffGeometry.getFreePracticeStaffGeometrySnapshot()
+  const maxAttackGeometry = freePracticeStaffGeometry.getFreePracticeStaffGeometrySnapshot()
+  assert.deepEqual(emptyGeometry, oneAttackGeometry)
+  assert.deepEqual(oneAttackGeometry, fiveAttackGeometry)
+  assert.deepEqual(fiveAttackGeometry, maxAttackGeometry)
+  assert.equal(geometry.viewBox, '0 0 1200 340')
+  assert.equal(geometry.slotCount, freePracticeVisualization.FREE_PRACTICE_HISTORY_CAPACITY)
+  assert.equal(geometry.staffLineSpacing, 10)
+  assert.equal(geometry.noteheadScale, 1)
+  assert.equal(geometry.clefScale, 1)
+  assert.equal(geometry.slotSpacing, geometry.formatWidth / geometry.slotCount)
+  const fixedSlotPositions = freePracticeStaffGeometry.getFreePracticeStaffSlotPositions()
+  assert.ok(fixedSlotPositions[0] > freePracticeStaffGeometry.FREE_PRACTICE_STAFF_GEOMETRY.staveX + 80, '首个 slot 必须位于谱号与调号之后')
+  assert.ok(fixedSlotPositions.at(-1) < freePracticeStaffGeometry.FREE_PRACTICE_STAFF_GEOMETRY.staveX + freePracticeStaffGeometry.FREE_PRACTICE_STAFF_GEOMETRY.staveWidth - 80, '最后 slot 必须保留谱表右侧安全边距')
+  VexElement.setTextMeasurementCanvas({
+    getContext: () => ({
+      font: '',
+      measureText: (text) => ({
+        width: String(text).length * 10,
+        fontBoundingBoxAscent: 10,
+        fontBoundingBoxDescent: 3,
+        actualBoundingBoxAscent: 10,
+        actualBoundingBoxDescent: 3,
+        actualBoundingBoxLeft: 0,
+        actualBoundingBoxRight: 10
+      })
+    })
+  })
+
+  const renderSlotPositions = (noteKeys) => {
+    const stave = new VexStave(42, geometry.trebleStaveY, 1116).addClef('treble').addKeySignature('C')
+    const tickables = Array.from({ length: geometry.slotCount }, (_, index) => (
+      noteKeys[index]
+        ? new VexStaveNote({ keys: noteKeys[index], duration: 'q', clef: 'treble' })
+        : new VexGhostNote('q')
+    ))
+    const voice = new VexVoice({ numBeats: geometry.slotCount, beatValue: 4 })
+      .setMode(VexVoice.Mode.SOFT)
+      .setStave(stave)
+      .addTickables(tickables)
+    const formatter = new VexFormatter().joinVoices([voice]).format([voice], geometry.formatWidth)
+    fixedSlotPositions.forEach((slotX, index) => tickables[index].getTickContext().setX(slotX))
+    formatter.postFormat()
+    return tickables.map((note) => note.getTickContext().getX())
+  }
+  const oneAttackSlots = renderSlotPositions([['c/4']])
+  const fiveAttackSlots = renderSlotPositions([['c/4'], ['d/4'], ['e/4'], ['f#/4'], ['g/4']])
+  const maxAttackSlots = renderSlotPositions(Array.from({ length: geometry.slotCount }, () => ['c/4']))
+  assert.deepEqual(oneAttackSlots, fiveAttackSlots, '1/5 attacks 不得改变固定 slot X')
+  assert.deepEqual(fiveAttackSlots, maxAttackSlots, '5/MAX attacks 不得改变固定 slot X')
+  assert.deepEqual(maxAttackSlots, fixedSlotPositions, 'renderer 必须采用固定 slot X')
+  const slotSpacing = oneAttackSlots.slice(1).map((x, index) => Number((x - oneAttackSlots[index]).toFixed(6)))
+  assert.equal(new Set(slotSpacing).size, 1, '固定 slot spacing 必须完全一致')
+
+  const vexFlowTrebleC8CenterY = geometry.trebleStaveY - 50
+  const vexFlowBassA0CenterY = geometry.bassStaveY + 145
+  assert.ok(vexFlowTrebleC8CenterY >= 18, 'C8 音头与上加线必须保留顶部安全边距')
+  assert.ok(vexFlowBassA0CenterY <= freePracticeStaffGeometry.FREE_PRACTICE_STAFF_GEOMETRY.height - 18, 'A0 音头与下加线必须保留底部安全边距')
+  const extremes = freePracticeVisualization.createFreePracticeNotationColumns([
+    { id: 'extremes', firstAttackAt: 1_000, lastAttackAt: 1_000, midiNumbers: [21, 108] }
+  ])[0].pitches
+  assert.equal(extremes.find((pitch) => pitch.midiNumber === 21).clef, 'bass')
+  assert.equal(extremes.find((pitch) => pitch.midiNumber === 108).clef, 'treble')
+
+  const secondStave = new VexStave(42, geometry.trebleStaveY, 1116).addClef('treble')
+  const secondChord = new VexStaveNote({ keys: ['c/4', 'd/4'], duration: 'q', clef: 'treble' })
+  const secondVoice = new VexVoice({ numBeats: 1, beatValue: 4 }).setMode(VexVoice.Mode.SOFT).setStave(secondStave).addTickables([secondChord])
+  new VexFormatter().joinVoices([secondVoice]).format([secondVoice], 100)
+  assert.ok(secondChord.getKeyProps().every((key) => key.displaced), '相邻二度和弦必须由 VexFlow displacement 错开音头')
+
+  let stressState = freePracticeVisualization.createFreePracticeVisualizationState()
+  for (let index = 0; index < 1000; index += 1) {
+    stressState = freePracticeVisualization.reduceFreePracticeVisualizationEvent(stressState, {
+      id: index + 1,
+      type: 'noteOn',
+      midiNumber: 21 + (index % 88),
+      velocity: 100,
+      timestamp: 10_000 + index * 100,
+      deviceName: 'Synthetic MIDI'
+    })
+    assert.deepEqual(freePracticeStaffGeometry.getFreePracticeStaffGeometrySnapshot(), geometry)
+  }
+  assert.equal(stressState.history.length, geometry.slotCount)
+
+  assert.match(rendererSource, /duration:\s*'q'/)
+  assert.match(rendererSource, /TRANSPARENT_STEM_STYLE/)
+  assert.doesNotMatch(rendererSource, /duration:\s*'w'/)
+  assert.match(rendererSource, /Array\.from\(\{ length: geometry\.slotCount \}/)
+  assert.match(rendererSource, /geometry\.formatWidth/)
+  assert.match(rendererSource, /getFreePracticeStaffSlotPositions/)
+  assert.match(rendererSource, /getTickContext\(\)\.setX\(slotX\)/)
+  assert.match(rendererSource, /useLayoutEffect/)
+  assert.match(rendererSource, /preserveAspectRatio/)
+  assert.match(rendererSource, /setLedgerLineStyle/)
+  assert.match(rendererSource, /GhostNote/)
+  assert.doesNotMatch(rendererSource, /ResizeObserver|requestAnimationFrame|clientHeight|getBoundingClientRect|scale\(|translate\(/)
+  assert.match(visualizationSource, /仅显示攻击顺序，不表示节奏或时值/)
+  assert.match(visualizationSource, /FreePracticeStaffRenderer/)
+  assert.match(visualizationSource, /VirtualPianoKeyboard/)
+  assert.doesNotMatch(visualizationSource, /requestMIDIAccess|PracticeSessionRepository/)
+  assert.match(pageSource, /FreePracticeVisualization/)
+  assert.doesNotMatch(pageSource, /显示虚拟键盘|useDisplayPreferences\('free-practice'\)/)
+  assert.match(componentCss, /\.free-practice-grand-staff/)
+  assert.match(componentCss, /\.free-practice-staff-renderer/)
+  assert.match(focusCss, /\.is-practice-focus \.free-practice-visualization/)
+})
+
+test('F3.1a Staff latency diagnostics：1000 noteOn 提供 p50/p95/p99/max 且不引入等待', () => {
+  const Diagnostics = freePracticeVisualizationDiagnostics.FreePracticeVisualizationDiagnostics
+  const diagnostics = new Diagnostics(true, 1000)
+  const originalInfo = console.info
+  console.info = () => undefined
+  try {
+    for (let index = 0; index < 1000; index += 1) {
+      const event = { id: index + 1, type: 'noteOn', midiNumber: 60, velocity: 100, timestamp: 100_000 + index, deviceName: 'Synthetic MIDI' }
+      const handlerAt = index * 2
+      diagnostics.markHandler(event, handlerAt, event.timestamp + 0.2)
+      diagnostics.markStateUpdate(event.id, handlerAt + 0.05)
+      diagnostics.markCommit(event.id, handlerAt + 0.45)
+    }
+  } finally {
+    console.info = originalInfo
+  }
+  const report = diagnostics.getReport()
+  assert.equal(report.sampleCount, 1000)
+  for (const metric of [report.midiToHandlerMs, report.handlerToStateUpdateMs, report.stateUpdateToCommitMs, report.totalSoftwareMs]) {
+    assert.notEqual(metric.p50, null)
+    assert.notEqual(metric.p95, null)
+    assert.notEqual(metric.p99, null)
+    assert.notEqual(metric.max, null)
+  }
+  assert.ok(Math.abs(report.midiToHandlerMs.p99 - 0.2) < 1e-6)
+  assert.ok(Math.abs(report.handlerToStateUpdateMs.p99 - 0.05) < 1e-6)
+  assert.ok(Math.abs(report.stateUpdateToCommitMs.p99 - 0.4) < 1e-6)
+  assert.ok(Math.abs(report.totalSoftwareMs.p99 - 0.65) < 1e-6)
 })
 
 test('单谱表与大谱表极限音保留安全边距', () => {
@@ -1857,6 +2191,7 @@ test('结果报告完成与再练行为统一且识谱报告精简', () => {
 function createFakeAudioContext() {
   const sources = []
   const gains = []
+  const metrics = { decodeCalls: 0, resumeCalls: 0 }
 
   const createAudioParam = (initialValue = 1) => ({
     value: initialValue,
@@ -1913,14 +2248,16 @@ function createFakeAudioContext() {
       return node
     },
     async decodeAudioData() {
+      metrics.decodeCalls += 1
       return { duration: 8, sampleRate: 48000 }
     },
     async resume() {
+      metrics.resumeCalls += 1
       this.state = 'running'
     }
   }
 
-  return { context, gains, sources }
+  return { context, gains, metrics, sources }
 }
 
 async function createLoadedFakeSampler(options = {}) {
@@ -2038,6 +2375,7 @@ test('采样器复音策略：重复音、抢声部与延音集合', () => {
 
 test('钢琴音频层接入逐事件总线且不使用 latestEvent', () => {
   const audioHook = fs.readFileSync(require.resolve('../src/renderer/src/hooks/usePianoAudio.ts'), 'utf8')
+  const hotPathSource = fs.readFileSync(require.resolve('../src/renderer/src/audio/pianoHotPath.ts'), 'utf8')
   const samplerSource = fs.readFileSync(require.resolve('../src/renderer/src/audio/pianoSampler.ts'), 'utf8')
   const legacyAudioSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useAudioEngine.ts'), 'utf8')
 
@@ -2053,6 +2391,236 @@ test('钢琴音频层接入逐事件总线且不使用 latestEvent', () => {
   assert.match(audioHook, /writePianoVolume/)
   assert.match(audioHook, /loadBundledPianoSamplePack/)
   assert.match(audioHook, /getInternalPianoMidiAction/)
+  assert.match(audioHook, /latencyHint:\s*'interactive'/)
+  assert.match(audioHook, /triggerReadyPianoVoice/)
+  assert.doesNotMatch(hotPathSource, /Promise|async|await|setTimeout|requestAnimationFrame|setState|React/)
+  assert.doesNotMatch(hotPathSource, /readFile|decodeAudioData|loadSamplePack|resume\(/)
+  assert.doesNotMatch(samplerSource, /new AudioContext/)
+})
+
+function midiDevice(id, name, manufacturer = '') {
+  return { id, name, manufacturer, state: 'connected', connection: 'open' }
+}
+
+function memoryStorage() {
+  const values = new Map()
+  return {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) },
+    removeItem(key) { values.delete(key) }
+  }
+}
+
+test('F3.1 A：启动时已连接 Roland 自动绑定为 CONNECTED', () => {
+  const roland = midiDevice('roland-1', 'Roland Digital Piano', 'Roland')
+  const resolution = midiDeviceLifecycle.resolveMidiInput([roland], null)
+  assert.equal(resolution.device.id, 'roland-1')
+  assert.equal(resolution.match, 'single-device')
+  assert.equal(midiDeviceLifecycle.getBoundMidiLifecycleState(resolution.device.id, 'roland-1'), 'CONNECTED')
+
+  const storage = memoryStorage()
+  assert.equal(midiDeviceLifecycle.writeMidiDevicePreference(storage, midiDeviceLifecycle.createMidiDeviceIdentity(roland)), true)
+  assert.deepEqual(midiDeviceLifecycle.readMidiDevicePreference(storage), {
+    id: 'roland-1', name: 'Roland Digital Piano', manufacturer: 'Roland'
+  })
+})
+
+test('F3.1 B：无设备启动后热插 Roland 无需重启即可解析并连接', () => {
+  assert.equal(midiDeviceLifecycle.resolveMidiInput([], null).state, 'NO_DEVICE')
+  const plugged = midiDeviceLifecycle.resolveMidiInput([
+    midiDevice('roland-hotplug', 'Roland Digital Piano', 'Roland')
+  ], null)
+  assert.equal(plugged.device.id, 'roland-hotplug')
+  assert.equal(midiDeviceLifecycle.getBoundMidiLifecycleState(plugged.device.id, 'roland-hotplug'), 'CONNECTED')
+})
+
+test('F3.1 C：ACTIVE 断连写 INTERRUPTED 且 checkpoint facts 保留', () => {
+  const repo = practiceSessionRepositoryModule.createPracticeSessionRepository(memoryStorage())
+  const facts = [{ unitId: 'scale-c4', outcome: 'correct' }]
+  assert.equal(repo.start({ practiceType: 'scale' }, 'f31-active').success, true)
+  assert.equal(repo.interruptDevice('f31-active', facts).success, true)
+  const draft = repo.get('f31-active')
+  assert.equal(draft.state, 'INTERRUPTED')
+  assert.equal(draft.completionState, 'interrupted_device')
+  assert.deepEqual(draft.currentFacts, facts)
+})
+
+test('F3.1 D：CC64 踩下时断连 Panic 同步清 sustain、held 与声音状态', () => {
+  midiEventBus.resetMidiEventBusForTests()
+  const transient = { sustain: true, held: new Set([60, 64]), voices: 2 }
+  midiEventBus.subscribeMidiPanic(() => {
+    transient.sustain = false
+    transient.held.clear()
+    transient.voices = 0
+  })
+  midiEventBus.publishMidiPanic('device-disconnected')
+  assert.equal(transient.sustain, false)
+  assert.equal(transient.held.size, 0)
+  assert.equal(transient.voices, 0)
+  const audioHook = fs.readFileSync(require.resolve('../src/renderer/src/hooks/usePianoAudio.ts'), 'utf8')
+  assert.match(audioHook, /useMidiPanicSubscription\(\(\) => stopAllNotes\(\)\)/)
+})
+
+test('F3.1 E：同一设备重连后仍可恢复同一 session', () => {
+  const storage = memoryStorage()
+  const repo = practiceSessionRepositoryModule.createPracticeSessionRepository(storage)
+  assert.equal(repo.start({ practiceType: 'rhythm' }, 'f31-reconnect').success, true)
+  assert.equal(repo.interruptDevice('f31-reconnect', [{ targetId: 'beat-1', outcome: 'correct' }]).success, true)
+  const preferred = { id: 'old-id', name: 'Roland Digital Piano', manufacturer: 'Roland' }
+  const resolution = midiDeviceLifecycle.resolveMidiInput([
+    midiDevice('old-id', 'Roland Digital Piano', 'Roland')
+  ], preferred)
+  assert.equal(resolution.match, 'exact-id')
+  assert.equal(repo.getRecoverable()[0].sessionId, 'f31-reconnect')
+  assert.equal(repo.checkpoint('f31-reconnect', { state: 'ACTIVE', completionState: null, interruptionReason: null }).success, true)
+  assert.equal(repo.get('f31-reconnect').state, 'ACTIVE')
+})
+
+test('F3.1 F：opaque ID 改变时按 manufacturer+name 恢复正确身份', () => {
+  const resolution = midiDeviceLifecycle.resolveMidiInput([
+    midiDevice('new-opaque-id', 'Roland Digital Piano', 'Roland')
+  ], { id: 'old-opaque-id', name: 'Roland Digital Piano', manufacturer: 'Roland' })
+  assert.equal(resolution.device.id, 'new-opaque-id')
+  assert.equal(resolution.match, 'manufacturer-name')
+})
+
+test('F3.1 G：两台 MIDI 设备仅选中设备可进入事件热路径', () => {
+  assert.equal(midiDeviceLifecycle.shouldAcceptMidiInputEvent('roland', 'roland', 4, 4, false), true)
+  assert.equal(midiDeviceLifecycle.shouldAcceptMidiInputEvent('roland', 'other', 4, 4, false), false)
+})
+
+test('F3.1 H：选中设备断连不静默切换无关设备', () => {
+  const resolution = midiDeviceLifecycle.resolveMidiInput([
+    midiDevice('other', 'USB MIDI Keyboard', 'Other')
+  ], { id: 'roland', name: 'Roland Digital Piano', manufacturer: 'Roland' })
+  assert.equal(resolution.device, null)
+  assert.equal(resolution.state, 'DISCONNECTED')
+
+  const ambiguous = midiDeviceLifecycle.resolveMidiInput([
+    midiDevice('a', 'Roland Digital Piano', 'Roland'),
+    midiDevice('b', 'Roland Digital Piano', 'Roland')
+  ], { id: 'old', name: 'Roland Digital Piano', manufacturer: 'Roland' })
+  assert.equal(ambiguous.state, 'NEEDS_SELECTION')
+})
+
+test('F3.1 I：挂起端口失效后旧 listener 被拒绝并按新端口重校验', () => {
+  assert.equal(midiDeviceLifecycle.shouldAcceptMidiInputEvent('roland-old', 'roland-old', 2, 2, true), false)
+  assert.equal(midiDeviceLifecycle.shouldAcceptMidiInputEvent('roland-old', 'roland-old', 1, 2, false), false)
+  const resumed = midiDeviceLifecycle.resolveMidiInput([
+    midiDevice('roland-after-resume', 'Roland Digital Piano', 'Roland')
+  ], { id: 'roland-old', name: 'Roland Digital Piano', manufacturer: 'Roland' })
+  assert.equal(resumed.device.id, 'roland-after-resume')
+  const mainSource = fs.readFileSync(require.resolve('../src/main/index.ts'), 'utf8')
+  const preloadSource = fs.readFileSync(require.resolve('../src/preload/index.ts'), 'utf8')
+  assert.match(mainSource, /powerMonitor\.on\('resume'/)
+  assert.match(preloadSource, /piano:midi:power-event/)
+})
+
+test('F3.1 J：Panic 只清瞬态输入，不改已提交事实', () => {
+  midiEventBus.resetMidiEventBusForTests()
+  const repo = practiceSessionRepositoryModule.createPracticeSessionRepository(memoryStorage())
+  const facts = [{ unitId: 'kept', outcome: 'correct' }]
+  assert.equal(repo.start({ practiceType: 'score' }, 'f31-panic').success, true)
+  assert.equal(repo.checkpoint('f31-panic', { facts }).success, true)
+  let partialInput = [60, 64]
+  midiEventBus.subscribeMidiPanic(() => { partialInput = [] })
+  midiEventBus.publishMidiPanic('manual')
+  assert.deepEqual(partialInput, [])
+  assert.deepEqual(repo.get('f31-panic').currentFacts, facts)
+})
+
+test('F3.1 K：Free Practice 断连保留可恢复录制事实', () => {
+  const repo = practiceSessionRepositoryModule.createPracticeSessionRepository(memoryStorage())
+  const snapshot = { factType: 'free_practice_snapshot', noteOnCount: 3, midiEvents: [{ type: 'noteOn', midiNumber: 60 }] }
+  assert.equal(repo.start({ practiceType: 'free-practice' }, 'f31-free').success, true)
+  assert.equal(repo.interruptDevice('f31-free', [snapshot]).success, true)
+  const recoverable = repo.getRecoverable()[0]
+  assert.equal(recoverable.sessionId, 'f31-free')
+  assert.deepEqual(recoverable.currentFacts, [snapshot])
+})
+
+test('F3.1 L：Score Wait 断连清 partial chord、保留目标且无 phantom noteOn', () => {
+  const timeline = {
+    units: [{
+      id: 'wait-chord', expectedMidi: [60, 64], rest: false, notes: [], measure: 1,
+      originalMeasure: 1, originalBeat: 1, practiceTick: 0, hand: 'both', staff: null, sourceEventIds: []
+    }]
+  }
+  const core = new waitScoreCore.WaitScoreCore(timeline)
+  assert.equal(core.processNoteOn(60, 'before-disconnect'), 'none')
+  assert.equal(core.currentIndex, 0)
+  core.clearTransientInput()
+  assert.equal(core.currentIndex, 0)
+  assert.equal(core.processNoteOn(64, 'after-reconnect'), 'none', '旧 C4 不得成为重连后的幽灵输入')
+  assert.equal(core.currentIndex, 0)
+  assert.equal(core.processNoteOn(60, 'fresh-c4'), 'complete')
+  assert.equal(core.isComplete, true)
+})
+
+test('MIDI 音频订阅优先分发且不改变判定事件事实与顺序', () => {
+  midiEventBus.resetMidiEventBusForTests()
+  const calls = []
+  const normalEvents = []
+  const stopNormal = midiEventBus.subscribeMidiEvents((event) => {
+    calls.push(`normal:${event.id}`)
+    normalEvents.push(event)
+  })
+  const stopAudio = midiEventBus.subscribeMidiEvents((event) => {
+    calls.push(`audio:${event.id}`)
+  }, 'audio')
+  const events = [
+    { id: 801, type: 'noteOn', midiNumber: 60, velocity: 90, timestamp: 1, deviceName: 'QA' },
+    { id: 802, type: 'noteOff', midiNumber: 60, velocity: 0, timestamp: 2, deviceName: 'QA' }
+  ]
+  for (const event of events) midiEventBus.publishMidiEvent(event)
+  stopAudio()
+  stopNormal()
+  assert.deepEqual(calls, ['audio:801', 'normal:801', 'audio:802', 'normal:802'])
+  assert.deepEqual(normalEvents, events, '判定订阅仍必须收到完全相同的事件对象和顺序')
+  midiEventBus.resetMidiEventBusForTests()
+})
+
+test('钢琴 noteOn 热路径：缓存 AudioBuffer 同步发声且不依赖 resume、decode、文件或 React commit', async () => {
+  const direct = await createLoadedFakeSampler()
+  const decodeCallsBefore = direct.metrics.decodeCalls
+  const resumeCallsBefore = direct.metrics.resumeCalls
+  let promiseSettled = false
+  Promise.resolve().then(() => { promiseSettled = true })
+
+  assert.equal(pianoHotPath.triggerReadyPianoVoice(direct.sampler, 60, 100, 7001), true)
+  assert.equal(direct.sources.length, 1, 'source.start 必须在当前同步调用栈内发生')
+  assert.equal(promiseSettled, false, '热路径不得等待 Promise microtask')
+  assert.equal(direct.metrics.decodeCalls, decodeCallsBefore, 'noteOn 不得 decodeAudioData')
+  assert.equal(direct.metrics.resumeCalls, resumeCallsBefore, 'running context 不得按音符 resume')
+
+  const samplerSource = fs.readFileSync(require.resolve('../src/renderer/src/audio/pianoSampler.ts'), 'utf8')
+  const noteOnSource = samplerSource.match(/noteOn\([\s\S]*?\n  noteOff\(/)?.[0] ?? ''
+  assert.doesNotMatch(noteOnSource, /selectSampleAndRate|decodeAudioData|loadSamplePack|readFile/)
+  assert.match(samplerSource, /noteMap = Array\.from\(\{ length: 128 \}/)
+})
+
+test('钢琴低延迟稳定性：64 声部、快速重复、连续压力与 Panic 保持有界', async () => {
+  const stress = await createLoadedFakeSampler({ maxPolyphony: 64 })
+  for (let index = 0; index < 64; index += 1) {
+    assert.equal(stress.sampler.noteOn(36 + (index % 48), 40 + (index % 88)), true)
+  }
+  assert.equal(stress.sampler.status.activeVoices, 64)
+  assert.equal(stress.sources.length, 64)
+
+  assert.equal(stress.sampler.noteOn(60, 110), true)
+  assert.equal(stress.sampler.status.activeVoices, 64, '第 65 个声部必须抢占且总数有界')
+  assert.ok(stress.sources[0].stopCalls.length >= 1, '满复音时必须释放最旧声部')
+
+  stress.sampler.panic()
+  for (let index = 0; index < 3_000; index += 1) {
+    const midiNumber = 36 + (index % 48)
+    stress.sampler.noteOn(midiNumber, 48 + (index % 72))
+    stress.sampler.noteOff(midiNumber)
+    assert.ok(stress.sampler.status.activeVoices <= 64)
+  }
+  stress.sampler.panic()
+  assert.equal(stress.sampler.status.activeVoices, 0)
+  assert.ok(stress.sources.every((source) => source.stopCalls.length >= 1))
 })
 
 test('Salamander 参考资产：30 个 OGG 原字节、锚点与 CC BY attribution 完整', () => {
@@ -2302,6 +2870,16 @@ test('F0 Free Practice integrity：统一 Session、真实 checkpoint、断线�
   }
   midiEventBus.resetMidiEventBusForTests()
 
+  const notationFontPath = require.resolve('../src/renderer/src/utils/musicNotationFont.ts')
+  const previousNotationFontModule = require.cache[notationFontPath]
+  require.cache[notationFontPath] = {
+    id: notationFontPath,
+    filename: notationFontPath,
+    loaded: true,
+    exports: { ensureMusicNotationFont: () => Promise.resolve() },
+    children: [],
+    paths: []
+  }
   const pagePath = require.resolve('../src/renderer/src/components/FreePracticePage.tsx')
   delete require.cache[pagePath]
   const { FreePracticePage } = require(pagePath)
@@ -2408,6 +2986,8 @@ test('F0 Free Practice integrity：统一 Session、真实 checkpoint、断线�
     if (renderer) await act(async () => renderer.unmount())
     practiceRecordRepositoryModule.practiceRecordRepository.clear()
     delete require.cache[pagePath]
+    if (previousNotationFontModule) require.cache[notationFontPath] = previousNotationFontModule
+    else delete require.cache[notationFontPath]
     midiEventBus.resetMidiEventBusForTests()
     global.window = previousWindow
     global.CustomEvent = previousCustomEvent
@@ -6072,7 +6652,19 @@ let failed = 0
 let blockedCount = 0
 
 async function runTests() {
-  for (const { name, callback } of tests) {
+  const filterIndex = process.argv.indexOf('--filter')
+  const filterText = filterIndex >= 0 ? String(process.argv[filterIndex + 1] ?? '').toLowerCase() : ''
+  const selectedTests = filterText
+    ? tests.filter(({ name }) => name.toLowerCase().includes(filterText))
+    : tests
+
+  if (selectedTests.length === 0) {
+    process.stderr.write(`没有匹配回归过滤条件的检查：${filterText}\n`)
+    process.exitCode = 1
+    return
+  }
+
+  for (const { name, callback } of selectedTests) {
     try {
       await callback()
       process.stdout.write(`PASS ${name}\n`)
@@ -6091,7 +6683,7 @@ async function runTests() {
     process.stderr.write(`\n${failed} 项回归检查失败；${blockedCount} 项被外部 Golden 文件阻塞。\n`)
     process.exitCode = 1
   } else {
-    process.stdout.write(`\n${tests.length - blockedCount} 项回归检查通过；${blockedCount} 项被外部 Golden 文件阻塞。\n`)
+    process.stdout.write(`\n${selectedTests.length - blockedCount} 项回归检查通过；${blockedCount} 项被外部 Golden 文件阻塞。\n`)
   }
 }
 

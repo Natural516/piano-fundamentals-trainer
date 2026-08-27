@@ -21,7 +21,7 @@ import type {
   ToleranceLevel
 } from '../utils/practiceTypes'
 import type { UseMetronomeResult } from './useMetronome'
-import { useMidiEventSubscription } from './useMidiEvents'
+import { useMidiEventSubscription, useMidiPanicSubscription } from './useMidiEvents'
 
 interface PendingChordInput {
   targetId: string
@@ -257,6 +257,11 @@ export function usePracticeEngine({
   }, [addResult, finalizePendingChord])
 
   useMidiEventSubscription(handleMidiEvent)
+
+  useMidiPanicSubscription(() => {
+    pendingChordRef.current = null
+    lastMidiEventIdRef.current = getLastMidiEventId()
+  })
 
   useEffect(() => {
     if (metronome.status !== 'running' || metronome.isCountingIn) {

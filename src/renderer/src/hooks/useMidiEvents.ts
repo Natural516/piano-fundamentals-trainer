@@ -1,6 +1,12 @@
 import { useEffect, useRef } from 'react'
 import type { MidiEventRecord } from '../types'
-import { getLastMidiEventId, subscribeMidiEvents } from '../midi/midiEventBus'
+import {
+  getLastMidiEventId,
+  subscribeMidiPanic,
+  subscribeMidiEvents,
+  type MidiPanicEvent,
+  type MidiEventPriority
+} from '../midi/midiEventBus'
 
 /**
  * Subscribes a stable handler to the per-event MIDI dispatch layer.
@@ -10,7 +16,10 @@ import { getLastMidiEventId, subscribeMidiEvents } from '../midi/midiEventBus'
  * - The handler is always the latest closure via a ref, so the hook never
  *   re-subscribes across renders.
  */
-export function useMidiEventSubscription(handler: (event: MidiEventRecord) => void): void {
+export function useMidiEventSubscription(
+  handler: (event: MidiEventRecord) => void,
+  priority: MidiEventPriority = 'normal'
+): void {
   const handlerRef = useRef(handler)
   handlerRef.current = handler
 
@@ -24,6 +33,13 @@ export function useMidiEventSubscription(handler: (event: MidiEventRecord) => vo
       handlerRef.current(event)
     }
 
-    return subscribeMidiEvents(listener)
-  }, [])
+    return subscribeMidiEvents(listener, priority)
+  }, [priority])
+}
+
+export function useMidiPanicSubscription(handler: (event: MidiPanicEvent) => void): void {
+  const handlerRef = useRef(handler)
+  handlerRef.current = handler
+
+  useEffect(() => subscribeMidiPanic((event) => handlerRef.current(event)), [])
 }

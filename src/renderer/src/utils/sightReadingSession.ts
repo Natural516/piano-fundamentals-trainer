@@ -211,6 +211,10 @@ export class SightReadingSessionCore {
     }
   }
 
+  clearTransientInput(latestEventId: number | null): void {
+    this.lastHandledEventId = newerEventId(this.lastHandledEventId, latestEventId)
+  }
+
   completeFeedback(questionCount: number): SightReadingFeedbackAction {
     if (this.phase !== 'feedback') return 'none'
     if (this.counters.completed >= questionCount) {

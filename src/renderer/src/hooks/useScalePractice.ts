@@ -21,7 +21,7 @@ import type {
 } from '../utils/scaleTypes'
 import { useMetronome } from './useMetronome'
 import { useMetronomeSound } from './useMetronomeSound'
-import { useMidiEventSubscription } from './useMidiEvents'
+import { useMidiEventSubscription, useMidiPanicSubscription } from './useMidiEvents'
 
 interface UseScalePracticeResult {
   scales: MajorScalePattern[]
@@ -314,6 +314,8 @@ export function useScalePractice(): UseScalePracticeResult {
 
     activeCore.processMidiEvent(event, metronomeState.practiceStartTimestampMs)
   })
+
+  useMidiPanicSubscription(() => coreRef.current.clearTransientInput(getLastMidiEventId()))
 
   useEffect(() => {
     resetProgress()

@@ -77,6 +77,10 @@ export class FollowScoreCore {
     this.complete = false
   }
 
+  clearTransientInput(): void {
+    this.candidates = this.candidates.map((candidate) => ({ ...candidate, pressed: [] }))
+  }
+
   observeNoteOn(midiNumber: number, elapsedMs: number): 'correct' | 'wrong' | 'complete' {
     if (this.complete) return 'complete'
 

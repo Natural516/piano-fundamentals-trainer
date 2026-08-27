@@ -175,6 +175,9 @@ export function MidiTestPage({ midi }: MidiTestPageProps): JSX.Element {
             <AppButton className="ghost-button" variant="secondary" onClick={() => void midi.refreshDevices()}>
               刷新设备
             </AppButton>
+            <AppButton className="ghost-button" variant="secondary" onClick={midi.panic}>
+              Panic
+            </AppButton>
           </div>
 
           <div className="midi-status-grid">
@@ -185,6 +188,7 @@ export function MidiTestPage({ midi }: MidiTestPageProps): JSX.Element {
             <div className={`permission-badge status-${midi.sidebarStatus.connectionState}`}>
               <span>连接状态</span>
               <strong>{midi.sidebarStatus.statusLabel}</strong>
+              <small>{midi.lifecycleState}</small>
             </div>
           </div>
 

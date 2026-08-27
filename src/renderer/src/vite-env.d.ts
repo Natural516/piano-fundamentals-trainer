@@ -7,6 +7,20 @@ interface Window {
     pianoSamples: {
       readFile: (relativePath: string) => Promise<PianoSampleBridgeResult>
     }
+    nativeAudioPoc: {
+      enabled: boolean
+      noteOn: (
+        eventId: number,
+        midiNumber: number,
+        velocity: number,
+        webMidiReceivedAtMs: number
+      ) => void
+      requestReport: () => void
+      status: () => NativeAudioPocBridgeStatus
+    }
+    midiLifecycle: {
+      onPowerEvent: (callback: (event: 'suspend' | 'resume') => void) => () => void
+    }
     secrets: {
       getAiApiKey: () => Promise<SecureSecretBridgeResult<string>>
       setAiApiKey: (value: string) => Promise<SecureSecretBridgeResult>
@@ -14,6 +28,15 @@ interface Window {
       hasAiApiKey: () => Promise<SecureSecretBridgeResult>
     }
   }
+}
+
+interface NativeAudioPocBridgeStatus {
+  enabled: boolean
+  connected: boolean
+  sentEvents: number
+  droppedEvents: number
+  queueBackpressure: number
+  reconnects: number
 }
 
 interface PianoSampleBridgeResult {

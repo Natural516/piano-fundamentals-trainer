@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, powerMonitor, shell } from 'electron'
 import { join } from 'node:path'
 import { inflateRawSync } from 'node:zlib'
 import {
@@ -6,6 +6,10 @@ import {
   PIANO_SAMPLE_READ_CHANNEL,
   readPianoSampleResource
 } from './pianoSampleResources'
+import {
+  startNativeAudioPocSupervisor,
+  type NativeAudioPocSupervisor
+} from './nativeAudioPocProcess'
 import { deleteAiApiKey, getAiApiKey, hasAiApiKey, setAiApiKey } from './secureSecrets'
 
 const APP_ID = 'com.piano.fundamentals.trainer'
@@ -14,6 +18,7 @@ const SECRET_GET_CHANNEL = 'piano:secret:get-ai-api-key'
 const SECRET_SET_CHANNEL = 'piano:secret:set-ai-api-key'
 const SECRET_DELETE_CHANNEL = 'piano:secret:delete-ai-api-key'
 const SECRET_HAS_CHANNEL = 'piano:secret:has-ai-api-key'
+const MIDI_POWER_EVENT_CHANNEL = 'piano:midi:power-event'
 
 ipcMain.handle(INFLATE_RAW_CHANNEL, (_event, input: Uint8Array) => {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input)
@@ -39,6 +44,7 @@ ipcMain.handle(PIANO_SAMPLE_READ_CHANNEL, (_event, requestedPath: unknown) => (
 app.commandLine.appendSwitch('enable-features', 'WebMIDI')
 
 let mainWindow: BrowserWindow | null = null
+let nativeAudioPocSupervisor: NativeAudioPocSupervisor | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -90,6 +96,13 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   app.setAppUserModelId(APP_ID)
+  powerMonitor.on('suspend', () => mainWindow?.webContents.send(MIDI_POWER_EVENT_CHANNEL, 'suspend'))
+  powerMonitor.on('resume', () => mainWindow?.webContents.send(MIDI_POWER_EVENT_CHANNEL, 'resume'))
+  nativeAudioPocSupervisor = startNativeAudioPocSupervisor({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath()
+  })
   createWindow()
 
   app.on('activate', () => {
@@ -108,6 +121,8 @@ process.on('unhandledRejection', (reason) => {
 })
 
 app.on('window-all-closed', () => {
+  nativeAudioPocSupervisor?.stop()
+  nativeAudioPocSupervisor = null
   if (process.platform !== 'darwin') {
     app.quit()
   }

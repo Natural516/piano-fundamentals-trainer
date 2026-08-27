@@ -23,6 +23,7 @@ import { useMidi } from './hooks/useMidi'
 import { usePianoAudio } from './hooks/usePianoAudio'
 import { usePracticeHistory } from './hooks/usePracticeHistory'
 import type { ScorePracticePreset } from './plan/planner'
+import { midiRecoveryDiagnostics } from './midi/midiRecoveryDiagnostics'
 import type { PageId } from './types'
 import {
   createPageHistoryState,
@@ -62,6 +63,7 @@ function App(): JSX.Element {
   const [currentPage, setCurrentPage] = useState<PageId>(getInitialPage)
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null)
   const [practiceRunning, setPracticeRunning] = useState(false)
+  const [midiRecoveryNotice, setMidiRecoveryNotice] = useState<'disconnected' | 'reconnected' | null>(null)
   const [showFirstRun, setShowFirstRun] = useState(() => isFirstRun())
   const [scoreSegmentRequest, setScoreSegmentRequest] = useState<(ScorePracticePreset & { requestId: number }) | null>(null)
   const currentPageRef = useRef(currentPage)
@@ -72,6 +74,10 @@ function App(): JSX.Element {
   const confirmedHistoryNavigationRef = useRef<PendingHistoryNavigation | null>(null)
   const bypassNextHistoryGuardRef = useRef(false)
   const midi = useMidi()
+  const previousMidiLifecycleRef = useRef(midi.lifecycleState)
+  const reconnectNoticeBaselineEventIdRef = useRef(0)
+  const midiLifecycleStateRef = useRef(midi.lifecycleState)
+  midiLifecycleStateRef.current = midi.lifecycleState
   const pianoAudio = usePianoAudio()
   const practiceHistory = usePracticeHistory()
 
@@ -110,11 +116,46 @@ function App(): JSX.Element {
   const handlePracticeRunningChange = useCallback((running: boolean) => {
     practiceRunningRef.current = running
     setPracticeRunning(running)
+    if (running) {
+      setMidiRecoveryNotice(midiLifecycleStateRef.current === 'CONNECTED' ? null : 'disconnected')
+    }
   }, [])
 
   useEffect(() => {
     currentPageRef.current = currentPage
-  }, [currentPage])
+    if (!isPracticePage) setMidiRecoveryNotice(null)
+  }, [currentPage, isPracticePage])
+
+  useEffect(() => {
+    const previous = previousMidiLifecycleRef.current
+    previousMidiLifecycleRef.current = midi.lifecycleState
+    if (previous === 'CONNECTED' && midi.lifecycleState !== 'CONNECTED' && practiceRunningRef.current) {
+      setMidiRecoveryNotice('disconnected')
+      return
+    }
+    if (midiRecoveryNotice === 'disconnected' && midi.lifecycleState === 'CONNECTED') {
+      reconnectNoticeBaselineEventIdRef.current = midi.latestEvent?.id ?? 0
+      setMidiRecoveryNotice('reconnected')
+    }
+  }, [midi.latestEvent?.id, midi.lifecycleState, midiRecoveryNotice])
+
+  useEffect(() => {
+    midiRecoveryDiagnostics.updateSession(
+      currentPage,
+      midiRecoveryNotice === 'disconnected'
+        ? 'INTERRUPTED'
+        : practiceRunning
+          ? 'ACTIVE'
+          : 'INACTIVE'
+    )
+  }, [currentPage, midiRecoveryNotice, practiceRunning])
+
+  useEffect(() => {
+    if (
+      midiRecoveryNotice === 'reconnected'
+      && (midi.latestEvent?.id ?? 0) > reconnectNoticeBaselineEventIdRef.current
+    ) setMidiRecoveryNotice(null)
+  }, [midi.latestEvent?.id, midiRecoveryNotice])
 
   useEffect(() => {
     const initialPage = getPageFromHash(window.location.hash)
@@ -239,6 +280,13 @@ function App(): JSX.Element {
       <div className={`app-shell ${isHomePage ? 'is-home' : 'is-page'} ${isPracticeFocus ? 'is-practice-focus' : ''}`}>
         {!isPracticeFocus ? <Sidebar currentPage={currentPage} midiStatus={midi.sidebarStatus} onNavigate={handleNavigate} /> : null}
         <main className={`workspace ${isHomePage ? 'workspace-home' : 'workspace-page'} ${isPracticeFocus ? 'workspace-focus' : ''}`}>
+          {midiRecoveryNotice ? (
+            <div className={`midi-recovery-notice is-${midiRecoveryNotice}`} role="status" aria-live="assertive">
+              {midiRecoveryNotice === 'disconnected'
+                ? 'MIDI 设备已断开，练习已暂停并保存恢复点。重新连接原设备后可继续。'
+                : '原 MIDI 设备已重新连接。请使用当前练习的“继续”按钮恢复。'}
+            </div>
+          ) : null}
           {isHomePage ? (
           <HomePage
             onNavigate={handleNavigate}

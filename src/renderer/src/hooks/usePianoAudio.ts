@@ -7,9 +7,10 @@ import {
   writePianoVolume
 } from '../audio/audioModeSettings'
 import { loadBundledPianoSamplePack } from '../audio/bundledPianoSamplePack'
+import { triggerReadyPianoVoice } from '../audio/pianoHotPath'
 import { getInternalPianoMidiAction } from '../audio/pianoMidiRouter'
 import { PianoSampler } from '../audio/pianoSampler'
-import { useMidiEventSubscription } from './useMidiEvents'
+import { useMidiEventSubscription, useMidiPanicSubscription } from './useMidiEvents'
 
 export interface UsePianoAudioResult {
   mode: PianoAudioMode
@@ -59,8 +60,11 @@ export function usePianoAudio(): UsePianoAudioResult {
   const heldNotesRef = useRef(new Set<number>())
   const sustainDownRef = useRef(false)
 
-  const ensureSampler = useCallback(async (): Promise<PianoSampler | null> => {
-    if (samplerRef.current) return samplerRef.current
+  const ensureSampler = useCallback(async (resumeImmediately = false): Promise<PianoSampler | null> => {
+    if (samplerRef.current) {
+      if (resumeImmediately) await samplerRef.current.resume()
+      return samplerRef.current
+    }
     if (samplerPromiseRef.current) return samplerPromiseRef.current
 
     const task = (async (): Promise<PianoSampler | null> => {
@@ -76,12 +80,16 @@ export function usePianoAudio(): UsePianoAudioResult {
         return null
       }
 
-      const audioContext = new AudioContextConstructor()
+      const audioContext = new AudioContextConstructor({ latencyHint: 'interactive' })
       const sampler = new PianoSampler(audioContext, { volume: volumeRef.current })
       audioContextRef.current = audioContext
 
       try {
-        await loadBundledPianoSamplePack(sampler, window.pianoApp?.pianoSamples)
+        const resumeTask = resumeImmediately ? sampler.resume() : Promise.resolve(false)
+        await Promise.all([
+          loadBundledPianoSamplePack(sampler, window.pianoApp?.pianoSamples),
+          resumeTask
+        ])
         sampler.setSustain(sustainDownRef.current)
         samplerRef.current = sampler
         setSamplerStatus(sampler.status)
@@ -109,9 +117,8 @@ export function usePianoAudio(): UsePianoAudioResult {
 
   const enableAudio = useCallback(async (): Promise<void> => {
     if (modeRef.current !== 'builtin') return
-    const sampler = await ensureSampler()
+    const sampler = await ensureSampler(true)
     if (!sampler) return
-    await sampler.resume()
     setSamplerStatus(sampler.status)
   }, [ensureSampler])
 
@@ -169,7 +176,7 @@ export function usePianoAudio(): UsePianoAudioResult {
         state: 'idle',
         message: '正在准备内置钢琴'
       })
-      void ensureSampler()
+      void ensureSampler(true)
       return
     }
 
@@ -198,18 +205,23 @@ export function usePianoAudio(): UsePianoAudioResult {
       const generation = (noteGenerationRef.current.get(action.midiNumber) ?? 0) + 1
       noteGenerationRef.current.set(action.midiNumber, generation)
       heldNotesRef.current.add(action.midiNumber)
-      void ensureSampler().then(async (sampler) => {
-        if (!sampler) return
-        const resumed = await sampler.resume()
+
+      if (triggerReadyPianoVoice(
+        samplerRef.current,
+        action.midiNumber,
+        action.velocity,
+        event.id
+      )) return
+
+      void ensureSampler(true).then((sampler) => {
         if (
-          !resumed
+          !sampler?.isReadyForImmediatePlay
           || modeRef.current !== 'builtin'
           || noteGenerationRef.current.get(action.midiNumber) !== generation
           || !heldNotesRef.current.has(action.midiNumber)
         ) return
         sampler.setSustain(sustainDownRef.current)
-        sampler.noteOn(action.midiNumber, action.velocity)
-        setSamplerStatus(sampler.status)
+        sampler.noteOn(action.midiNumber, action.velocity, event.id)
       })
       return
     }
@@ -231,11 +243,9 @@ export function usePianoAudio(): UsePianoAudioResult {
     }
 
     stopAllNotes()
-  })
+  }, 'audio')
 
-  useEffect(() => {
-    if (mode === 'builtin') void ensureSampler()
-  }, [ensureSampler, mode])
+  useMidiPanicSubscription(() => stopAllNotes())
 
   useEffect(() => {
     const resumeOnGesture = (): void => {

@@ -74,6 +74,10 @@ export class RealtimeScoreCore {
     this.stepResults.length = 0
   }
 
+  clearTransientInput(): void {
+    this.pressed.clear()
+  }
+
   advanceTo(elapsedMs: number): void {
     while (!this.isComplete) {
       const unit = this.units[this.index]

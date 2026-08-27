@@ -3,6 +3,7 @@ out/
 dist/
 release/
 artifacts/
+native-audio-poc/build/
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
