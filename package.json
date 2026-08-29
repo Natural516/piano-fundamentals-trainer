@@ -7,6 +7,8 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
+    "prototype:android": "vite --config vite.android-prototype.config.ts --host 0.0.0.0",
+    "build:prototype:android": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && vite build --config vite.android-prototype.config.ts",
     "diagnose:piano-latency": "electron scripts/measure-piano-latency.cjs",
     "poc:native-audio:build": "cmake -S native-audio-poc -B native-audio-poc/build -A x64 && cmake --build native-audio-poc/build --config Release",
     "poc:native-audio:auto": "electron scripts/native-audio-poc.cjs",
