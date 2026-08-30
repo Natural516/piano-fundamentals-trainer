@@ -13,6 +13,7 @@
     "poc:native-audio:build": "cmake -S native-audio-poc -B native-audio-poc/build -A x64 && cmake --build native-audio-poc/build --config Release",
     "poc:native-audio:auto": "electron scripts/native-audio-poc.cjs",
     "test:regression": "node scripts/regression-check.cjs",
+    "test:sight-reading": "tsc --noEmit -p tsconfig.sight-reading.json && node scripts/sight-reading-contracts.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",

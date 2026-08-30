@@ -1059,7 +1059,8 @@ test('VexFlow SVG、本地 Bravura 与协调 BPM 步进器接入', () => {
   const sightPageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/SightReadingPage.tsx'), 'utf8')
   const sightHookSource = fs.readFileSync(require.resolve('../src/renderer/src/hooks/useSightReadingPractice.ts'), 'utf8')
   const timeBarSource = fs.readFileSync(require.resolve('../src/renderer/src/components/SightReadingTimeBar.tsx'), 'utf8')
-  const sightSettingsSource = fs.readFileSync(require.resolve('../src/renderer/src/utils/sightReadingSettings.ts'), 'utf8')
+  // A2.1: inspect the authoritative settings module, not its desktop compatibility re-export.
+  const sightSettingsSource = fs.readFileSync(require.resolve('../src/sightReading/sightReadingSettings.ts'), 'utf8')
   const historyPageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/PracticeHistoryPage.tsx'), 'utf8')
   const chordPageSource = fs.readFileSync(require.resolve('../src/renderer/src/components/ChordPracticePage.tsx'), 'utf8')
   const stepperSource = fs.readFileSync(require.resolve('../src/renderer/src/components/NumericStepper.tsx'), 'utf8')

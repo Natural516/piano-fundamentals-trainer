@@ -1,4 +1,4 @@
-import type { SightReadingReport } from '../hooks/useSightReadingPractice'
+import type { SightReadingReport } from '../../../sightReading/report'
 import { STAFF_MODE_LABELS } from './sightReadingNotes'
 import type {
   ChordContentCategory,
