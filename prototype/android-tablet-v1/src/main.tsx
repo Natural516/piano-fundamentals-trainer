@@ -11,6 +11,8 @@ type ScreenId =
   | 'sight-active'
   | 'sight-correct'
   | 'sight-wrong'
+  | 'sight-timeout'
+  | 'sight-early-end'
   | 'sight-result'
   | 'history'
   | 'settings'
@@ -62,6 +64,8 @@ const screens: ScreenOption[] = [
   { id: 'sight-active', label: '识谱 · 进行中', shortLabel: 'ACTIVE' },
   { id: 'sight-correct', label: '识谱 · 正确反馈', shortLabel: 'CORRECT' },
   { id: 'sight-wrong', label: '识谱 · 错误反馈', shortLabel: 'WRONG' },
+  { id: 'sight-timeout', label: '识谱 · 超时反馈', shortLabel: 'TIMEOUT' },
+  { id: 'sight-early-end', label: '识谱 · 提前结束确认', shortLabel: 'EARLY END' },
   { id: 'sight-result', label: '识谱 · 结果', shortLabel: 'RESULT' },
   { id: 'history', label: '练习记录', shortLabel: '记录' },
   { id: 'settings', label: '设置', shortLabel: '设置' },
@@ -356,7 +360,7 @@ function SightReadyScreen(): JSX.Element {
             <div><small>题数</small><strong>20</strong></div>
             <div><small>每题时限</small><strong>固定 5 秒</strong></div>
           </div>
-          <div className="ready-device"><span><Icon name="bluetooth" /></span><div><strong>Roland FP-30X 已连接</strong><small>弹一个键确认后即可开始</small></div><i /></div>
+          <div className="ready-device"><span><Icon name="bluetooth" /></span><div><strong>Roland FP-30X 已连接</strong><small>设备已就绪，可以开始</small></div><i /></div>
           <button className="primary-action is-wide" type="button" onClick={() => navigate('sight-active')}>
             <Icon name="play" />开始练习
           </button>
@@ -369,7 +373,7 @@ function SightReadyScreen(): JSX.Element {
 function PracticeFocusHeader({ screen }: { screen: ScreenId }): JSX.Element {
   return (
     <header className="focus-header">
-      <button className="focus-back" type="button" onClick={() => navigate('sight-ready')}>
+      <button className="focus-back" type="button" onClick={() => navigate('sight-early-end')}>
         <Icon name="arrow-left" /><span>结束本轮</span>
       </button>
       <div className="focus-progress">
@@ -380,29 +384,52 @@ function PracticeFocusHeader({ screen }: { screen: ScreenId }): JSX.Element {
         <MidiStatusButton compact />
         <button className="outline-action" type="button"><Icon name="pause" /><span>暂停</span></button>
       </div>
-      <div className="focus-time-track" aria-label="本题剩余时间"><span className={screen === 'sight-wrong' ? 'is-warning' : ''} /></div>
+      <div className="focus-time-track" aria-label="本题剩余时间"><span className={screen === 'sight-wrong' || screen === 'sight-timeout' ? 'is-warning' : ''} /></div>
     </header>
   )
 }
 
-function PracticeMetric({ label, value, tone }: { label: string; value: string; tone?: 'success' | 'danger' }): JSX.Element {
+function PracticeMetric({ label, value, tone }: { label: string; value: string; tone?: 'success' | 'danger' | 'warning' }): JSX.Element {
   return <div className={`focus-metric ${tone ? `is-${tone}` : ''}`}><span>{label}</span><strong>{value}</strong></div>
 }
 
-function SightFocusScreen({ state }: { state: 'active' | 'correct' | 'wrong' }): JSX.Element {
+function SightFocusScreen({
+  showEarlyEndConfirm = false,
+  state
+}: {
+  showEarlyEndConfirm?: boolean
+  state: 'active' | 'correct' | 'wrong' | 'timeout'
+}): JSX.Element {
   const isCorrect = state === 'correct'
   const isWrong = state === 'wrong'
-  const screen: ScreenId = isCorrect ? 'sight-correct' : isWrong ? 'sight-wrong' : 'sight-active'
+  const isTimeout = state === 'timeout'
+  const screen: ScreenId = showEarlyEndConfirm
+    ? 'sight-early-end'
+    : isCorrect
+      ? 'sight-correct'
+      : isWrong
+        ? 'sight-wrong'
+        : isTimeout
+          ? 'sight-timeout'
+          : 'sight-active'
   const feedback: MusicNotationFeedback = isCorrect ? 'correct' : isWrong ? 'wrong_note' : null
+  const metrics = isCorrect
+    ? { completed: '7', correct: '6', wrong: '1', timeout: '0', streak: '4', accuracy: '86%' }
+    : isWrong
+      ? { completed: '7', correct: '5', wrong: '2', timeout: '0', streak: '0', accuracy: '71%' }
+      : isTimeout
+        ? { completed: '7', correct: '5', wrong: '1', timeout: '1', streak: '0', accuracy: '71%' }
+        : { completed: '6', correct: '5', wrong: '1', timeout: '0', streak: '3', accuracy: '83%' }
 
   return (
-    <div className={`focus-frame ${isCorrect ? 'is-correct' : ''} ${isWrong ? 'is-wrong' : ''}`}>
+    <div className={`focus-frame ${isCorrect ? 'is-correct' : ''} ${isWrong ? 'is-wrong' : ''} ${isTimeout ? 'is-timeout' : ''}`}>
       <PracticeFocusHeader screen={screen} />
       <main className="focus-content">
         <div className="focus-prompt">
-          <span>{isCorrect ? '回答正确' : isWrong ? '这次弹错了' : '请弹出这个音'}</span>
+          <span>{isCorrect ? '回答正确' : isWrong ? '这次弹错了' : isTimeout ? '本题超时' : '请弹出这个音'}</span>
           {isCorrect ? <strong><Icon name="check" /> B4</strong> : null}
           {isWrong ? <strong><Icon name="close" /> 目标 B4 · 弹成 C5</strong> : null}
+          {isTimeout ? <strong><Icon name="clock" /> 本题超时 · B4</strong> : null}
         </div>
         <section className="focus-stage">
           <NotationPaper
@@ -413,13 +440,31 @@ function SightFocusScreen({ state }: { state: 'active' | 'correct' | 'wrong' }):
           />
         </section>
         <div className="focus-footer">
-          <PracticeMetric label="已完成" value="6" />
-          <PracticeMetric label="正确" value={isCorrect ? '6' : '5'} tone="success" />
-          <PracticeMetric label="错误" value={isWrong ? '2' : '1'} tone={isWrong ? 'danger' : undefined} />
-          <PracticeMetric label="当前连对" value={isCorrect ? '4' : isWrong ? '0' : '3'} />
-          <PracticeMetric label="正确率" value={isWrong ? '71%' : '86%'} />
+          <PracticeMetric label="完成" value={metrics.completed} />
+          <PracticeMetric label="正确" value={metrics.correct} tone="success" />
+          <PracticeMetric label="错误" value={metrics.wrong} tone={isWrong ? 'danger' : undefined} />
+          <PracticeMetric label="超时" value={metrics.timeout} tone={isTimeout ? 'warning' : undefined} />
+          <PracticeMetric label="当前连对" value={metrics.streak} />
+          <PracticeMetric label="正确率" value={metrics.accuracy} />
         </div>
       </main>
+      {showEarlyEndConfirm ? (
+        <div className="early-end-backdrop">
+          <section aria-labelledby="early-end-title" aria-modal="true" className="early-end-dialog" role="dialog">
+            <span className="early-end-dialog__icon"><Icon name="stop" /></span>
+            <div>
+              <span className="eyebrow">识谱练习</span>
+              <h1 id="early-end-title">结束本轮？</h1>
+              <p>已完成 6 / 20。<br />结束后，已完成部分仍会保存到练习记录。</p>
+            </div>
+            <div className="early-end-dialog__actions">
+              <button className="secondary-action" type="button" onClick={() => navigate('sight-active')}>继续练习</button>
+              <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>结束并保存</button>
+            </div>
+            <small>UI 合同预览：当前阶段不执行真实保存。</small>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -431,7 +476,7 @@ function SightResultScreen(): JSX.Element {
         <div className="result-score">
           <span className="eyebrow">识谱练习结果</span>
           <div className="score-ring"><strong>85</strong><span>%</span><small>正确率</small></div>
-          <h1>本轮正确率 85%，<br />再留意两个易错音。</h1>
+          <h1>本轮正确率 85%，<br />再留意这个易错音。</h1>
           <p>大谱表 · C 大调 · 20 题 · 固定 5 秒</p>
         </div>
         <div className="result-details">
@@ -445,7 +490,7 @@ function SightResultScreen(): JSX.Element {
           </div>
           <div className="result-note">
             <span className="result-note__icon"><Icon name="info" /></span>
-            <div><small>本轮最需要留意</small><strong>B3 与 F4</strong><p>这两个音各出现了一次错误或超时。</p></div>
+            <div><small>本轮最需留意</small><strong>B3</strong><p>这个音在本轮出现了一次错误。</p></div>
           </div>
           <div className="result-actions">
             <button className="secondary-action" type="button" onClick={() => navigate('sight-ready')}>再练一轮</button>
@@ -528,11 +573,19 @@ function SettingsScreen({ theme, onThemeChange }: { theme: 'light' | 'dark'; onT
               action={<span className="connected-label"><i />已连接</span>}
             />
           </div>
-          <div className="settings-group">
+          <div className="settings-group settings-group--sight">
             <div className="group-title"><span>识谱练习</span><small>稳定基线设置</small></div>
-            <SettingRow description="高音谱表、低音谱表或大谱表" icon="book" title="默认谱表" action={<strong>大谱表</strong>} />
-            <SettingRow description="每轮出现的题目数量" icon="chart" title="默认题数" action={<strong>20</strong>} />
+            <SettingRow description="高音谱表、低音谱表或大谱表" icon="book" title="默认谱表" action={<span className="setting-selection"><strong>大谱表</strong><Icon name="chevron" size={18} /></span>} />
+            <SettingRow description="支持现有 15 个大调" icon="book" title="调性" action={<span className="setting-selection"><strong>C 大调</strong><Icon name="chevron" size={18} /></span>} />
+            <SettingRow description="调内音或包含临时变音" icon="chart" title="音符内容" action={<span className="setting-selection"><strong>调内音</strong><Icon name="chevron" size={18} /></span>} />
+            <SettingRow description="10、20、50 或 100 题" icon="chart" title="默认题数" action={<span className="setting-selection"><strong>20</strong><Icon name="chevron" size={18} /></span>} />
             <SettingRow description="当前稳定版本固定为 5 秒" icon="clock" title="每题时限" action={<strong>5 秒</strong>} />
+            <SettingRow
+              description="答题前不显示目标音名"
+              icon="info"
+              title="显示音名"
+              action={<span aria-label="显示音名已关闭" className="mock-switch"><small>Off</small><i /></span>}
+            />
           </div>
         </div>
         <div className="settings-column">
@@ -613,7 +666,7 @@ function ReviewDock({ active }: { active: ScreenId }): JSX.Element {
   return (
     <div className={`review-dock ${open ? 'is-open' : ''}`}>
       <button className="review-dock__trigger" type="button" onClick={() => setOpen((value) => !value)}>
-        <span>A1 · MOCK</span><strong>{activeLabel}</strong><Icon name="chevron" size={16} />
+        <span>A2 · MOCK</span><strong>{activeLabel}</strong><Icon name="chevron" size={16} />
       </button>
       {open ? (
         <div className="review-dock__menu">
@@ -671,6 +724,8 @@ function App(): JSX.Element {
       case 'sight-active': return <SightFocusScreen state="active" />
       case 'sight-correct': return <SightFocusScreen state="correct" />
       case 'sight-wrong': return <SightFocusScreen state="wrong" />
+      case 'sight-timeout': return <SightFocusScreen state="timeout" />
+      case 'sight-early-end': return <SightFocusScreen showEarlyEndConfirm state="active" />
       case 'sight-result': return <SightResultScreen />
       case 'history': return <HistoryScreen />
       case 'settings': return <SettingsScreen theme={theme} onThemeChange={setTheme} />
