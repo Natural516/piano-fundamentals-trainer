@@ -39,6 +39,15 @@
 
 ## Open backlog
 
+### SIGN-001 — Permanent Android Release Signing
+
+- Discovered: A3.0
+- Priority: P1
+- Status: OPEN / REQUIRED BEFORE RELEASE DISTRIBUTION
+- The current A3.0 APK is signed with the Android DEBUG key and is suitable only for development and Human QA.
+- Establish permanent release signing before persistent real-user data becomes important or updater-compatible release distribution begins.
+- Do not create or commit a release keystore during A3.0 finalization.
+
 ### UI-003 — Final Virtual Piano & Free Practice Visualization Polish
 
 - Discovered: F3.1a

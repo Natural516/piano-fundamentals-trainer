@@ -1,5 +1,7 @@
 import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { App as CapacitorApp } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
 import { MusicStaffRenderer } from '../../../src/renderer/src/components/MusicStaffRenderer'
 import { getMajorKeySignature, MAJOR_KEY_DISPLAY_SIGNATURES, type MajorKeyId } from '../../../src/sightReading/musicKeySignatures'
 import { spellMidiPitch } from '../../../src/sightReading/musicPitchSpelling'
@@ -89,6 +91,8 @@ const productNavigation = [
   { id: 'history' as const, label: '记录', icon: 'history' as const },
   { id: 'settings' as const, label: '设置', icon: 'settings' as const }
 ]
+
+const SHOW_DEVELOPMENT_TOOLS = import.meta.env.DEV || import.meta.env.MODE === 'android-debug'
 
 type SightRuntimeSnapshot = AndroidSightReadingRuntime['snapshot']
 
@@ -890,6 +894,7 @@ function ReviewDock({
   const canAnswer = snapshot.status === 'running' && snapshot.phase === 'answering' && !snapshot.isPaused
   const reports = runtime.reports.list()
   const latestReport = runtime.reports.latest()
+  const nativeDebug = Capacitor.isNativePlatform()
 
   const selectScreen = (target: ScreenId): void => {
     if (target === 'sight-active' && snapshot.status !== 'running') runtime.start()
@@ -900,7 +905,7 @@ function ReviewDock({
   return (
     <div className={`review-dock ${open ? 'is-open' : ''}`}>
       <button className="review-dock__trigger" type="button" onClick={() => setOpen((value) => !value)}>
-        <span>A2.2 · DEV</span><strong>{activeLabel}</strong><Icon name="chevron" size={16} />
+        <span>{nativeDebug ? 'A3.0 · DEBUG' : 'A2.2 · DEV'}</span><strong>{activeLabel}</strong><Icon name="chevron" size={16} />
       </button>
       {open ? (
         <div className="review-dock__menu">
@@ -915,7 +920,7 @@ function ReviewDock({
               <span>{screen.label}</span>{screen.id === active ? <Icon name="check" size={18} /> : null}
             </button>
           ))}
-          {import.meta.env.DEV ? (
+          {SHOW_DEVELOPMENT_TOOLS ? (
             <section className="developer-midi" aria-label="开发模拟 MIDI 控制">
               <div className="developer-midi__heading">
                 <span>DEVELOPMENT ONLY</span>
@@ -949,9 +954,9 @@ function ReviewDock({
               <small>内存报告 {reports.length} 份{latestReport ? ` · 最近：${latestReport.completionState} / ${latestReport.completedQuestions} 题` : ''}</small>
             </section>
           ) : null}
-          {import.meta.env.DEV && metrics ? (
+          {SHOW_DEVELOPMENT_TOOLS && metrics ? (
             <div className="viewport-diagnostic">
-              <strong>DEVICE-001 viewport</strong>
+              <strong>{nativeDebug ? 'DEVICE-001-APP viewport' : 'DEVICE-001 viewport'}</strong>
               <span><b>inner</b>{Math.round(metrics.innerWidth)} × {Math.round(metrics.innerHeight)}</span>
               <span><b>usable</b>{Math.round(metrics.usableWidth)} × {Math.round(metrics.usableHeight)}</span>
               <span><b>visual</b>{Math.round(metrics.visualWidth)} × {Math.round(metrics.visualHeight)}</span>
@@ -977,6 +982,7 @@ function App(): JSX.Element {
   const snapshot = useSightReadingRuntime(runtime)
   const settings = runtime.settings
   const [screen, setScreen] = useState<ScreenId>(() => readScreen())
+  const screenRef = useRef<ScreenId>(screen)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
   useEffect(() => {
@@ -985,6 +991,69 @@ function App(): JSX.Element {
     if (!window.location.hash) navigate('home')
     return () => window.removeEventListener('hashchange', updateScreen)
   }, [])
+
+  useEffect(() => {
+    screenRef.current = screen
+  }, [screen])
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    let disposed = false
+    let removeListener: (() => Promise<void>) | null = null
+
+    void CapacitorApp.addListener('backButton', () => {
+      const currentScreen = screenRef.current
+      const currentSnapshot = runtime.snapshot
+      const practiceScreens: ScreenId[] = [
+        'sight-active', 'sight-correct', 'sight-wrong', 'sight-timeout'
+      ]
+
+      if (currentScreen === 'sight-early-end' && currentSnapshot.status === 'running') {
+        runtime.resume()
+        navigate(getPracticeScreen(runtime))
+        return
+      }
+
+      if (practiceScreens.includes(currentScreen) && currentSnapshot.status === 'running') {
+        runtime.pause()
+        navigate('sight-early-end')
+        return
+      }
+
+      if (currentSnapshot.status === 'running') {
+        navigate(getPracticeScreen(runtime))
+        return
+      }
+
+      const parentScreen: Partial<Record<ScreenId, ScreenId>> = {
+        'sight-ready': 'home',
+        'sight-result': 'home',
+        history: 'home',
+        settings: 'home',
+        midi: 'settings',
+        update: 'settings'
+      }
+      const parent = parentScreen[currentScreen]
+      if (parent) {
+        navigate(parent)
+        return
+      }
+
+      void CapacitorApp.minimizeApp()
+    }).then((handle) => {
+      if (disposed) {
+        void handle.remove()
+        return
+      }
+      removeListener = () => handle.remove()
+    })
+
+    return () => {
+      disposed = true
+      if (removeListener) void removeListener()
+    }
+  }, [runtime])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme

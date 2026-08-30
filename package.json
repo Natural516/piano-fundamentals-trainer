@@ -9,12 +9,16 @@
     "dev": "electron-vite dev",
     "prototype:android": "vite --config vite.android-prototype.config.ts --host 0.0.0.0",
     "build:prototype:android": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && vite build --config vite.android-prototype.config.ts",
+    "build:android:debug": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && vite build --mode android-debug --config vite.android-prototype.config.ts",
+    "android:sync": "npm run build:android:debug && cap sync android",
+    "android:apk:debug": "npm run android:sync && cd android && gradlew.bat assembleDebug",
     "diagnose:piano-latency": "electron scripts/measure-piano-latency.cjs",
     "poc:native-audio:build": "cmake -S native-audio-poc -B native-audio-poc/build -A x64 && cmake --build native-audio-poc/build --config Release",
     "poc:native-audio:auto": "electron scripts/native-audio-poc.cjs",
     "test:regression": "node scripts/regression-check.cjs",
     "test:sight-reading": "tsc --noEmit -p tsconfig.sight-reading.json && node scripts/sight-reading-contracts.cjs",
     "test:android-integration": "node scripts/android-sight-reading-integration.cjs",
+    "test:android-shell": "node scripts/android-shell-check.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
@@ -22,12 +26,16 @@
     "dist": "electron-builder --win --x64"
   },
   "dependencies": {
+    "@capacitor/android": "8.5.0",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/core": "8.5.0",
     "@vexflow-fonts/bravura": "1.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vexflow": "5.0.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.5.0",
     "@types/node": "^20.14.10",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
