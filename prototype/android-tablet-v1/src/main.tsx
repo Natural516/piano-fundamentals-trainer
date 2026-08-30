@@ -1,8 +1,18 @@
-import { StrictMode, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MusicStaffRenderer } from '../../../src/renderer/src/components/MusicStaffRenderer'
-import { spellMidiPitch } from '../../../src/renderer/src/utils/musicPitchSpelling'
-import type { MusicNotationFeedback } from '../../../src/renderer/src/utils/musicNotationTypes'
+import { getMajorKeySignature, MAJOR_KEY_DISPLAY_SIGNATURES, type MajorKeyId } from '../../../src/sightReading/musicKeySignatures'
+import { spellMidiPitch } from '../../../src/sightReading/musicPitchSpelling'
+import type { MusicNotationFeedback, MusicNotationPitch } from '../../../src/sightReading/musicNotationTypes'
+import { STAFF_MODE_LABELS, type SightReadingStaffMode } from '../../../src/sightReading/sightReadingNotes'
+import type { SightReadingSessionReport } from '../../../src/sightReading/report'
+import type { SightReadingNotePoolMode, SightReadingQuestionCount, SightReadingSettings } from '../../../src/sightReading/sightReadingSettings'
+import {
+  AndroidSightReadingRuntime,
+  createBrowserAndroidSightReadingRuntime,
+  formatReactionTime,
+  getPrimaryErrorNote
+} from './sightReadingIntegration'
 import './styles.css'
 
 type ScreenId =
@@ -79,6 +89,30 @@ const productNavigation = [
   { id: 'history' as const, label: '记录', icon: 'history' as const },
   { id: 'settings' as const, label: '设置', icon: 'settings' as const }
 ]
+
+type SightRuntimeSnapshot = AndroidSightReadingRuntime['snapshot']
+
+const NOTE_POOL_LABELS: Record<SightReadingNotePoolMode, string> = {
+  diatonic: '调内音',
+  chromatic: '含临时变音'
+}
+
+function useSightReadingRuntime(runtime: AndroidSightReadingRuntime): SightRuntimeSnapshot {
+  const [, render] = useState(0)
+  useEffect(() => runtime.subscribe(() => render((version) => version + 1)), [runtime])
+  return runtime.snapshot
+}
+
+function getPracticeScreen(runtime: AndroidSightReadingRuntime): ScreenId {
+  switch (runtime.uiState) {
+    case 'correct': return 'sight-correct'
+    case 'wrong': return 'sight-wrong'
+    case 'timeout': return 'sight-timeout'
+    case 'result': return 'sight-result'
+    case 'ready': return 'sight-ready'
+    default: return 'sight-active'
+  }
+}
 
 function Icon({ name, size = 24 }: { name: IconName; size?: number }): JSX.Element {
   const common = {
@@ -203,8 +237,8 @@ function MidiStatusButton({ compact = false }: { compact?: boolean }): JSX.Eleme
   return (
     <button className={`midi-status ${compact ? 'is-compact' : ''}`} type="button" onClick={() => navigate('midi')}>
       <span className="midi-status__signal"><Icon name="bluetooth" size={18} /></span>
-      {!compact ? <span><strong>FP-30X</strong><small>已连接</small></span> : null}
-      <i aria-label="已连接" />
+      {!compact ? <span><strong>MIDI Mock</strong><small>尚未接入蓝牙</small></span> : null}
+      <i aria-label="MIDI 状态为原型占位" />
     </button>
   )
 }
@@ -266,20 +300,24 @@ function ProductFrame({
 
 function NotationPaper({
   feedback = null,
+  note = null,
   noteFeedback = feedback,
-  midiNumber = 71,
   empty = false,
-  label = '大谱表识谱题目'
+  keySignature,
+  staffMode,
+  label = '识谱题目'
 }: {
   feedback?: MusicNotationFeedback
+  note?: MusicNotationPitch | null
   noteFeedback?: MusicNotationFeedback
-  midiNumber?: number
   empty?: boolean
+  keySignature: MajorKeyId
+  staffMode: SightReadingStaffMode
   label?: string
 }): JSX.Element {
   const notes = useMemo(
-    () => empty ? [] : [spellMidiPitch(midiNumber, 'C', 'grand')],
-    [empty, midiNumber]
+    () => empty ? [] : [note ?? spellMidiPitch(71, keySignature, staffMode)],
+    [empty, keySignature, note, staffMode]
   )
 
   return (
@@ -287,22 +325,22 @@ function NotationPaper({
       <MusicStaffRenderer
         ariaLabel={label}
         feedback={noteFeedback}
-        keySignature="C"
+        keySignature={keySignature}
         notes={notes}
-        staffMode="grand"
+        staffMode={staffMode}
       />
     </div>
   )
 }
 
-function HomeScreen(): JSX.Element {
+function HomeScreen({ settings }: { settings: SightReadingSettings }): JSX.Element {
   return (
     <ProductFrame active="home" title="今天，读几页新音符">
       <section className="home-hero">
         <div className="home-hero__copy">
           <span className="eyebrow">今日练习</span>
           <h1>让眼睛先认出，<br />再让手指弹出来。</h1>
-          <p>大谱表 · 20 题 · 每题固定 5 秒</p>
+          <p>{STAFF_MODE_LABELS[settings.staffMode]} · {settings.questionCount} 题 · 每题固定 5 秒</p>
           <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>
             <Icon name="play" />
             开始识谱练习
@@ -311,7 +349,12 @@ function HomeScreen(): JSX.Element {
         <div className="home-hero__notation" aria-hidden="true">
           <span className="floating-note note-one">♪</span>
           <span className="floating-note note-two">♩</span>
-          <NotationPaper midiNumber={67} label="识谱练习预览" />
+          <NotationPaper
+            keySignature={settings.keySignature}
+            label="识谱练习预览"
+            note={spellMidiPitch(67, settings.keySignature, settings.staffMode)}
+            staffMode={settings.staffMode}
+          />
         </div>
       </section>
 
@@ -323,7 +366,7 @@ function HomeScreen(): JSX.Element {
         </button>
         <button className="glance-item" type="button" onClick={() => navigate('midi')}>
           <span className="glance-icon is-blue"><Icon name="bluetooth" /></span>
-          <span><small>MIDI 输入</small><strong>Roland FP-30X</strong><em>连接稳定，可以开始</em></span>
+          <span><small>MIDI 输入</small><strong>Roland FP-30X</strong><em>连接状态为原型占位</em></span>
           <span className="status-dot" />
         </button>
         <button className="glance-item" type="button" onClick={() => navigate('update')}>
@@ -336,32 +379,43 @@ function HomeScreen(): JSX.Element {
   )
 }
 
-function SightReadyScreen(): JSX.Element {
+function SightReadyScreen({
+  onStart,
+  settings
+}: {
+  onStart: () => void
+  settings: SightReadingSettings
+}): JSX.Element {
   return (
     <ProductFrame active="sight" title="识谱练习">
       <section className="ready-layout">
         <div className="ready-stage">
           <div className="section-heading">
-            <div><span className="eyebrow">练习预览</span><h1>大谱表识谱</h1></div>
+            <div><span className="eyebrow">练习预览</span><h1>{STAFF_MODE_LABELS[settings.staffMode]}识谱</h1></div>
             <span className="ready-badge">准备就绪</span>
           </div>
-          <NotationPaper empty label="大谱表练习预览" />
+          <NotationPaper
+            empty
+            keySignature={settings.keySignature}
+            label={`${STAFF_MODE_LABELS[settings.staffMode]}练习预览`}
+            staffMode={settings.staffMode}
+          />
         </div>
 
         <aside className="ready-controls">
           <div>
             <span className="eyebrow">本轮设置</span>
-            <h2>20 个音符</h2>
-            <p>看到音符后，在 FP-30X 上弹出对应琴键。</p>
+            <h2>{settings.questionCount} 个音符</h2>
+            <p>使用右下角开发控制发送模拟 MIDI；MIDI 页面连接状态仍为 Mock。</p>
           </div>
           <div className="setting-summary">
-            <div><small>谱表</small><strong>大谱表</strong></div>
-            <div><small>调性</small><strong>C 大调</strong></div>
-            <div><small>题数</small><strong>20</strong></div>
+            <div><small>谱表</small><strong>{STAFF_MODE_LABELS[settings.staffMode]}</strong></div>
+            <div><small>调性</small><strong>{getMajorKeySignature(settings.keySignature).displayName}</strong></div>
+            <div><small>题数</small><strong>{settings.questionCount}</strong></div>
             <div><small>每题时限</small><strong>固定 5 秒</strong></div>
           </div>
-          <div className="ready-device"><span><Icon name="bluetooth" /></span><div><strong>Roland FP-30X 已连接</strong><small>设备已就绪，可以开始</small></div><i /></div>
-          <button className="primary-action is-wide" type="button" onClick={() => navigate('sight-active')}>
+          <div className="ready-device"><span><Icon name="bluetooth" /></span><div><strong>开发模拟 MIDI</strong><small>仅用于 A2.2 UI 集成测试</small></div><i /></div>
+          <button className="primary-action is-wide" type="button" onClick={onStart}>
             <Icon name="play" />开始练习
           </button>
         </aside>
@@ -370,21 +424,62 @@ function SightReadyScreen(): JSX.Element {
   )
 }
 
-function PracticeFocusHeader({ screen }: { screen: ScreenId }): JSX.Element {
+function useRemainingTime(
+  runtime: AndroidSightReadingRuntime,
+  snapshot: SightRuntimeSnapshot
+): number {
+  const [remaining, setRemaining] = useState(() => runtime.getRemainingTimeMs())
+  useEffect(() => {
+    setRemaining(runtime.getRemainingTimeMs())
+    if (snapshot.status !== 'running' || snapshot.phase !== 'answering' || snapshot.isPaused) return
+    const timer = window.setInterval(() => setRemaining(runtime.getRemainingTimeMs()), 100)
+    return () => window.clearInterval(timer)
+  }, [runtime, snapshot.currentNote?.midiNumber, snapshot.isPaused, snapshot.phase, snapshot.status])
+  return remaining
+}
+
+function PracticeFocusHeader({
+  onPauseToggle,
+  onRequestEnd,
+  remainingTimeMs,
+  screen,
+  settings,
+  snapshot
+}: {
+  onPauseToggle: () => void
+  onRequestEnd: () => void
+  remainingTimeMs: number
+  screen: ScreenId
+  settings: SightReadingSettings
+  snapshot: SightRuntimeSnapshot
+}): JSX.Element {
+  const questionIndex = snapshot.phase === 'feedback'
+    ? snapshot.completedQuestions
+    : Math.min(settings.questionCount, snapshot.completedQuestions + 1)
+  const progress = Math.max(0, Math.min(100, remainingTimeMs / 5000 * 100))
+
   return (
     <header className="focus-header">
-      <button className="focus-back" type="button" onClick={() => navigate('sight-early-end')}>
+      <button className="focus-back" type="button" onClick={onRequestEnd}>
         <Icon name="arrow-left" /><span>结束本轮</span>
       </button>
       <div className="focus-progress">
         <span>识谱练习</span>
-        <strong>第 7 题 <em>/ 20</em></strong>
+        <strong>第 {questionIndex} 题 <em>/ {settings.questionCount}</em></strong>
       </div>
       <div className="focus-actions">
         <MidiStatusButton compact />
-        <button className="outline-action" type="button"><Icon name="pause" /><span>暂停</span></button>
+        <button className="outline-action" type="button" onClick={onPauseToggle}>
+          <Icon name={snapshot.isPaused ? 'play' : 'pause'} />
+          <span>{snapshot.isPaused ? '继续' : '暂停'}</span>
+        </button>
       </div>
-      <div className="focus-time-track" aria-label="本题剩余时间"><span className={screen === 'sight-wrong' || screen === 'sight-timeout' ? 'is-warning' : ''} /></div>
+      <div className="focus-time-track" aria-label="本题剩余时间">
+        <span
+          className={screen === 'sight-wrong' || screen === 'sight-timeout' ? 'is-warning' : ''}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
     </header>
   )
 }
@@ -394,58 +489,74 @@ function PracticeMetric({ label, value, tone }: { label: string; value: string; 
 }
 
 function SightFocusScreen({
-  showEarlyEndConfirm = false,
-  state
+  runtime,
+  screen,
+  settings,
+  snapshot
 }: {
-  showEarlyEndConfirm?: boolean
-  state: 'active' | 'correct' | 'wrong' | 'timeout'
+  runtime: AndroidSightReadingRuntime
+  screen: ScreenId
+  settings: SightReadingSettings
+  snapshot: SightRuntimeSnapshot
 }): JSX.Element {
-  const isCorrect = state === 'correct'
-  const isWrong = state === 'wrong'
-  const isTimeout = state === 'timeout'
-  const screen: ScreenId = showEarlyEndConfirm
-    ? 'sight-early-end'
-    : isCorrect
-      ? 'sight-correct'
-      : isWrong
-        ? 'sight-wrong'
-        : isTimeout
-          ? 'sight-timeout'
-          : 'sight-active'
-  const feedback: MusicNotationFeedback = isCorrect ? 'correct' : isWrong ? 'wrong_note' : null
-  const metrics = isCorrect
-    ? { completed: '7', correct: '6', wrong: '1', timeout: '0', streak: '4', accuracy: '86%' }
-    : isWrong
-      ? { completed: '7', correct: '5', wrong: '2', timeout: '0', streak: '0', accuracy: '71%' }
-      : isTimeout
-        ? { completed: '7', correct: '5', wrong: '1', timeout: '1', streak: '0', accuracy: '71%' }
-        : { completed: '6', correct: '5', wrong: '1', timeout: '0', streak: '3', accuracy: '83%' }
+  const showEarlyEndConfirm = screen === 'sight-early-end'
+  const isCorrect = snapshot.phase === 'feedback' && snapshot.result === 'correct'
+  const isWrong = snapshot.phase === 'feedback' && snapshot.result === 'wrong_note'
+  const isTimeout = snapshot.phase === 'feedback' && snapshot.result === 'timeout'
+  const feedback: MusicNotationFeedback = isCorrect ? 'correct' : isWrong ? 'wrong_note' : isTimeout ? 'timeout' : null
+  const targetName = snapshot.currentNote?.noteName ?? '—'
+  const remainingTimeMs = useRemainingTime(runtime, snapshot)
+  const requestEnd = (): void => {
+    runtime.pause()
+    navigate('sight-early-end')
+  }
+  const continuePractice = (): void => {
+    runtime.resume()
+    navigate(getPracticeScreen(runtime))
+  }
+  const stopAndSave = (): void => {
+    runtime.stop()
+    navigate('sight-ready')
+  }
 
   return (
-    <div className={`focus-frame ${isCorrect ? 'is-correct' : ''} ${isWrong ? 'is-wrong' : ''} ${isTimeout ? 'is-timeout' : ''}`}>
-      <PracticeFocusHeader screen={screen} />
+    <div className={`focus-frame ${isCorrect ? 'is-correct' : ''} ${isWrong ? 'is-wrong' : ''} ${isTimeout ? 'is-timeout' : ''} ${snapshot.isPaused ? 'is-paused' : ''}`}>
+      <PracticeFocusHeader
+        onPauseToggle={() => snapshot.isPaused ? runtime.resume() : runtime.pause()}
+        onRequestEnd={requestEnd}
+        remainingTimeMs={remainingTimeMs}
+        screen={screen}
+        settings={settings}
+        snapshot={snapshot}
+      />
       <main className="focus-content">
         <div className="focus-prompt">
-          <span>{isCorrect ? '回答正确' : isWrong ? '这次弹错了' : isTimeout ? '本题超时' : '请弹出这个音'}</span>
-          {isCorrect ? <strong><Icon name="check" /> B4</strong> : null}
-          {isWrong ? <strong><Icon name="close" /> 目标 B4 · 弹成 C5</strong> : null}
-          {isTimeout ? <strong><Icon name="clock" /> 本题超时 · B4</strong> : null}
+          <span>{snapshot.isPaused ? '练习已暂停' : isCorrect ? '回答正确' : isWrong ? '这次弹错了' : isTimeout ? '本题超时' : '请弹出这个音'}</span>
+          {!snapshot.isPaused && !isCorrect && !isWrong && !isTimeout && settings.noteNameVisible
+            ? <strong>{targetName}</strong>
+            : null}
+          {!snapshot.isPaused && isCorrect ? <strong><Icon name="check" /> {targetName}</strong> : null}
+          {!snapshot.isPaused && isWrong ? <strong><Icon name="close" /> 目标 {targetName} · 弹成 {snapshot.currentInput || '—'}</strong> : null}
+          {!snapshot.isPaused && isTimeout ? <strong><Icon name="clock" /> 本题超时 · {targetName}</strong> : null}
         </div>
         <section className="focus-stage">
           <NotationPaper
             feedback={feedback}
+            keySignature={settings.keySignature}
+            label={settings.noteNameVisible || isCorrect || isWrong || isTimeout ? `当前题目 ${targetName}` : '当前识谱题目'}
+            note={snapshot.currentNote?.notation}
             noteFeedback={isWrong ? null : feedback}
-            midiNumber={71}
-            label="当前题目 B4"
+            staffMode={settings.staffMode}
           />
+          {snapshot.isPaused ? <div className="focus-paused-state"><Icon name="pause" size={32} /><strong>已暂停</strong></div> : null}
         </section>
         <div className="focus-footer">
-          <PracticeMetric label="完成" value={metrics.completed} />
-          <PracticeMetric label="正确" value={metrics.correct} tone="success" />
-          <PracticeMetric label="错误" value={metrics.wrong} tone={isWrong ? 'danger' : undefined} />
-          <PracticeMetric label="超时" value={metrics.timeout} tone={isTimeout ? 'warning' : undefined} />
-          <PracticeMetric label="当前连对" value={metrics.streak} />
-          <PracticeMetric label="正确率" value={metrics.accuracy} />
+          <PracticeMetric label="完成" value={String(snapshot.completedQuestions)} />
+          <PracticeMetric label="正确" value={String(snapshot.correctCount)} tone="success" />
+          <PracticeMetric label="错误" value={String(snapshot.wrongCount)} tone={isWrong ? 'danger' : undefined} />
+          <PracticeMetric label="超时" value={String(snapshot.timeoutCount)} tone={isTimeout ? 'warning' : undefined} />
+          <PracticeMetric label="当前连对" value={String(snapshot.currentStreak)} />
+          <PracticeMetric label="正确率" value={`${snapshot.accuracy}%`} />
         </div>
       </main>
       {showEarlyEndConfirm ? (
@@ -455,13 +566,13 @@ function SightFocusScreen({
             <div>
               <span className="eyebrow">识谱练习</span>
               <h1 id="early-end-title">结束本轮？</h1>
-              <p>已完成 6 / 20。<br />结束后，已完成部分仍会保存到练习记录。</p>
+              <p>已完成 {snapshot.completedQuestions} / {settings.questionCount}。<br />结束后，已完成部分会保存到当前开发运行内存。</p>
             </div>
             <div className="early-end-dialog__actions">
-              <button className="secondary-action" type="button" onClick={() => navigate('sight-active')}>继续练习</button>
-              <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>结束并保存</button>
+              <button className="secondary-action" type="button" onClick={continuePractice}>继续练习</button>
+              <button className="primary-action" type="button" onClick={stopAndSave}>结束并保存</button>
             </div>
-            <small>UI 合同预览：当前阶段不执行真实保存。</small>
+            <small>completionState = stopped · partialEvidence = true</small>
           </section>
         </div>
       ) : null}
@@ -469,28 +580,44 @@ function SightFocusScreen({
   )
 }
 
-function SightResultScreen(): JSX.Element {
+function SightResultScreen({
+  report
+}: {
+  report: SightReadingSessionReport
+}): JSX.Element {
+  const primaryError = getPrimaryErrorNote(report)
+  const primaryErrorCount = primaryError
+    ? (report.wrongNoteCounts.find((entry) => entry.noteName === primaryError)?.count ?? 0)
+      + (report.timeoutNoteCounts.find((entry) => entry.noteName === primaryError)?.count ?? 0)
+    : 0
+
   return (
     <ProductFrame active="sight" title="本轮完成">
       <section className="result-layout">
         <div className="result-score">
           <span className="eyebrow">识谱练习结果</span>
-          <div className="score-ring"><strong>85</strong><span>%</span><small>正确率</small></div>
-          <h1>本轮正确率 85%，<br />再留意这个易错音。</h1>
-          <p>大谱表 · C 大调 · 20 题 · 固定 5 秒</p>
+          <div className="score-ring"><strong>{report.accuracy}</strong><span>%</span><small>正确率</small></div>
+          <h1>{primaryError
+            ? <>本轮正确率 {report.accuracy}%，<br />再留意这个易错音。</>
+            : <>本轮练习已完成，<br />没有需要优先处理的音符错误。</>}</h1>
+          <p>{STAFF_MODE_LABELS[report.staffMode]} · {report.keyName} · {report.totalQuestions} 题 · 固定 5 秒</p>
         </div>
         <div className="result-details">
           <div className="result-metrics">
-            <div><span>完成</span><strong>20</strong></div>
-            <div><span>正确</span><strong className="success-text">17</strong></div>
-            <div><span>错误</span><strong className="danger-text">2</strong></div>
-            <div><span>超时</span><strong>1</strong></div>
-            <div><span>平均反应</span><strong>1.24<small> 秒</small></strong></div>
-            <div><span>最高连对</span><strong>9</strong></div>
+            <div><span>完成</span><strong>{report.completedQuestions}</strong></div>
+            <div><span>正确</span><strong className="success-text">{report.correct}</strong></div>
+            <div><span>错误</span><strong className="danger-text">{report.wrong}</strong></div>
+            <div><span>超时</span><strong>{report.timeout}</strong></div>
+            <div><span>平均反应</span><strong>{formatReactionTime(report.averageReactionMs)}</strong></div>
+            <div><span>最高连对</span><strong>{report.bestStreak}</strong></div>
           </div>
           <div className="result-note">
             <span className="result-note__icon"><Icon name="info" /></span>
-            <div><small>本轮最需留意</small><strong>B3</strong><p>这个音在本轮出现了一次错误。</p></div>
+            <div>{primaryError ? (
+              <><small>本轮最需留意</small><strong>{primaryError}</strong><p>这个目标音在本轮出现了 {primaryErrorCount} 次错误或超时。</p></>
+            ) : (
+              <><small>本轮最需留意</small><strong>暂无</strong><p>本轮没有发现需要优先处理的目标音。</p></>
+            )}</div>
           </div>
           <div className="result-actions">
             <button className="secondary-action" type="button" onClick={() => navigate('sight-ready')}>再练一轮</button>
@@ -558,33 +685,122 @@ function SettingRow({
   )
 }
 
-function SettingsScreen({ theme, onThemeChange }: { theme: 'light' | 'dark'; onThemeChange: (theme: 'light' | 'dark') => void }): JSX.Element {
+function SettingSelect<Value extends string | number>({
+  ariaLabel,
+  onChange,
+  options,
+  value
+}: {
+  ariaLabel: string
+  onChange: (value: Value) => void
+  options: readonly { label: string; value: Value }[]
+  value: Value
+}): JSX.Element {
+  return (
+    <select
+      aria-label={ariaLabel}
+      className="setting-select"
+      value={value}
+      onChange={(event) => onChange(event.target.value as Value)}
+    >
+      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  )
+}
+
+function SettingsScreen({
+  onSettingsChange,
+  settings,
+  theme,
+  onThemeChange
+}: {
+  onSettingsChange: (changes: Partial<SightReadingSettings>) => void
+  settings: SightReadingSettings
+  theme: 'light' | 'dark'
+  onThemeChange: (theme: 'light' | 'dark') => void
+}): JSX.Element {
   return (
     <ProductFrame active="settings" title="设置">
       <section className="settings-layout">
         <div className="settings-column">
           <div className="settings-group">
-            <div className="group-title"><span>设备</span><small>用于识谱输入</small></div>
+            <div className="group-title"><span>设备</span><small>A2.2 保留 Mock</small></div>
             <SettingRow
-              description="蓝牙 MIDI · 连接稳定"
+              description="蓝牙 MIDI · 当前阶段未接入"
               icon="bluetooth"
               onClick={() => navigate('midi')}
               title="Roland FP-30X"
-              action={<span className="connected-label"><i />已连接</span>}
+              action={<span className="connected-label"><i />Mock</span>}
             />
           </div>
           <div className="settings-group settings-group--sight">
-            <div className="group-title"><span>识谱练习</span><small>稳定基线设置</small></div>
-            <SettingRow description="高音谱表、低音谱表或大谱表" icon="book" title="默认谱表" action={<span className="setting-selection"><strong>大谱表</strong><Icon name="chevron" size={18} /></span>} />
-            <SettingRow description="支持现有 15 个大调" icon="book" title="调性" action={<span className="setting-selection"><strong>C 大调</strong><Icon name="chevron" size={18} /></span>} />
-            <SettingRow description="调内音或包含临时变音" icon="chart" title="音符内容" action={<span className="setting-selection"><strong>调内音</strong><Icon name="chevron" size={18} /></span>} />
-            <SettingRow description="10、20、50 或 100 题" icon="chart" title="默认题数" action={<span className="setting-selection"><strong>20</strong><Icon name="chevron" size={18} /></span>} />
+            <div className="group-title"><span>识谱练习</span><small>下一轮生效 · 内存设置</small></div>
+            <SettingRow
+              description="高音谱表、低音谱表或大谱表"
+              icon="book"
+              title="默认谱表"
+              action={<SettingSelect
+                ariaLabel="默认谱表"
+                value={settings.staffMode}
+                onChange={(staffMode: SightReadingStaffMode) => onSettingsChange({ staffMode })}
+                options={[
+                  { value: 'treble', label: '高音谱表' },
+                  { value: 'bass', label: '低音谱表' },
+                  { value: 'grand', label: '大谱表' }
+                ]}
+              />}
+            />
+            <SettingRow
+              description="支持现有 15 个大调"
+              icon="book"
+              title="调性"
+              action={<SettingSelect
+                ariaLabel="调性"
+                value={settings.keySignature}
+                onChange={(keySignature: MajorKeyId) => onSettingsChange({ keySignature })}
+                options={MAJOR_KEY_DISPLAY_SIGNATURES.map((key) => ({ value: key.id, label: key.displayName }))}
+              />}
+            />
+            <SettingRow
+              description="调内音或包含临时变音"
+              icon="chart"
+              title="音符内容"
+              action={<SettingSelect
+                ariaLabel="音符内容"
+                value={settings.notePoolMode}
+                onChange={(notePoolMode: SightReadingNotePoolMode) => onSettingsChange({ notePoolMode })}
+                options={[
+                  { value: 'diatonic', label: '调内音' },
+                  { value: 'chromatic', label: '含临时变音' }
+                ]}
+              />}
+            />
+            <SettingRow
+              description="10、20、50 或 100 题"
+              icon="chart"
+              title="默认题数"
+              action={<SettingSelect
+                ariaLabel="默认题数"
+                value={String(settings.questionCount)}
+                onChange={(value: string) => onSettingsChange({ questionCount: Number(value) as SightReadingQuestionCount })}
+                options={[10, 20, 50, 100].map((value) => ({ value: String(value), label: String(value) }))}
+              />}
+            />
             <SettingRow description="当前稳定版本固定为 5 秒" icon="clock" title="每题时限" action={<strong>5 秒</strong>} />
             <SettingRow
-              description="答题前不显示目标音名"
+              description={settings.noteNameVisible ? '答题前显示目标音名' : '答题前不显示目标音名'}
               icon="info"
               title="显示音名"
-              action={<span aria-label="显示音名已关闭" className="mock-switch"><small>Off</small><i /></span>}
+              action={(
+                <button
+                  aria-label={`显示音名已${settings.noteNameVisible ? '开启' : '关闭'}`}
+                  className={`mock-switch ${settings.noteNameVisible ? 'is-on' : ''}`}
+                  type="button"
+                  onClick={() => onSettingsChange({ noteNameVisible: !settings.noteNameVisible })}
+                >
+                  <small>{settings.noteNameVisible ? 'On' : 'Off'}</small><i />
+                </button>
+              )}
             />
           </div>
         </div>
@@ -618,14 +834,14 @@ function MidiScreen(): JSX.Element {
       <main className="standalone-content">
         <section className="device-hero">
           <div className="device-orbit"><span><Icon name="bluetooth" size={42} /></span><i /><i /><i /></div>
-          <span className="connected-label large"><i />连接正常</span>
+          <span className="connected-label large"><i />Mock 状态</span>
           <h1>Roland FP-30X</h1>
-          <p>蓝牙 MIDI 输入已经准备好。钢琴本身负责发声，应用只读取演奏信息。</p>
+          <p>此页仍是已批准的连接状态 Mock；A2.2 只在开发控制区发送模拟 MIDI，不代表蓝牙已经连接。</p>
         </section>
         <section className="device-details">
-          <div><small>设备类型</small><strong>Bluetooth MIDI</strong></div>
-          <div><small>输入状态</small><strong>正在监听</strong></div>
-          <div><small>最近活动</small><strong>刚刚</strong></div>
+          <div><small>设备类型</small><strong>Mock Bluetooth MIDI</strong></div>
+          <div><small>输入状态</small><strong>尚未接入</strong></div>
+          <div><small>最近活动</small><strong>无真实输入</strong></div>
           <div><small>应用发声</small><strong>关闭</strong></div>
         </section>
         <section className="device-help">
@@ -651,22 +867,40 @@ function UpdateScreen(): JSX.Element {
           <div className="version-line"><span>当前版本</span><strong>V1 Prototype</strong></div>
           <div className="version-line"><span>上次检查</span><strong>今天 10:24</strong></div>
           <button className="primary-action is-wide" type="button"><Icon name="refresh" />再次检查</button>
-          <small className="mock-disclaimer">A1 原型仅展示入口与视觉状态，不执行网络请求或 APK 更新。</small>
+          <small className="mock-disclaimer">A2.2 原型仅展示入口与视觉状态，不执行网络请求或 APK 更新。</small>
         </section>
       </main>
     </div>
   )
 }
 
-function ReviewDock({ active }: { active: ScreenId }): JSX.Element {
+function ReviewDock({
+  active,
+  runtime,
+  snapshot
+}: {
+  active: ScreenId
+  runtime: AndroidSightReadingRuntime
+  snapshot: SightRuntimeSnapshot
+}): JSX.Element {
   const [open, setOpen] = useState(false)
+  const [midiNumber, setMidiNumber] = useState('60')
   const metrics = useViewportMetrics()
   const activeLabel = screens.find((screen) => screen.id === active)?.shortLabel ?? '首页'
+  const canAnswer = snapshot.status === 'running' && snapshot.phase === 'answering' && !snapshot.isPaused
+  const reports = runtime.reports.list()
+  const latestReport = runtime.reports.latest()
+
+  const selectScreen = (target: ScreenId): void => {
+    if (target === 'sight-active' && snapshot.status !== 'running') runtime.start()
+    navigate(target)
+    setOpen(false)
+  }
 
   return (
     <div className={`review-dock ${open ? 'is-open' : ''}`}>
       <button className="review-dock__trigger" type="button" onClick={() => setOpen((value) => !value)}>
-        <span>A2 · MOCK</span><strong>{activeLabel}</strong><Icon name="chevron" size={16} />
+        <span>A2.2 · DEV</span><strong>{activeLabel}</strong><Icon name="chevron" size={16} />
       </button>
       {open ? (
         <div className="review-dock__menu">
@@ -676,11 +910,45 @@ function ReviewDock({ active }: { active: ScreenId }): JSX.Element {
               className={screen.id === active ? 'is-active' : ''}
               key={screen.id}
               type="button"
-              onClick={() => { navigate(screen.id); setOpen(false) }}
+              onClick={() => selectScreen(screen.id)}
             >
               <span>{screen.label}</span>{screen.id === active ? <Icon name="check" size={18} /> : null}
             </button>
           ))}
+          {import.meta.env.DEV ? (
+            <section className="developer-midi" aria-label="开发模拟 MIDI 控制">
+              <div className="developer-midi__heading">
+                <span>DEVELOPMENT ONLY</span>
+                <strong>模拟 MIDI 输入</strong>
+              </div>
+              <div className="developer-midi__status">
+                <span>目标 <strong>{snapshot.currentNote?.noteName ?? '—'}</strong></span>
+                <span>阶段 <strong>{snapshot.phase}</strong></span>
+                <span>事件 <strong>{runtime.midi.events().length}</strong></span>
+              </div>
+              <div className="developer-midi__actions">
+                <button disabled={!canAnswer} type="button" onClick={() => runtime.sendCorrect()}>答对</button>
+                <button disabled={!canAnswer} type="button" onClick={() => runtime.sendWrong()}>答错</button>
+              </div>
+              <div className="developer-midi__exact">
+                <input
+                  aria-label="指定 MIDI note number"
+                  inputMode="numeric"
+                  max="127"
+                  min="0"
+                  type="number"
+                  value={midiNumber}
+                  onChange={(event) => setMidiNumber(event.target.value)}
+                />
+                <button disabled={!canAnswer} type="button" onClick={() => runtime.sendMidi(Number(midiNumber))}>发送 NOTE_ON</button>
+              </div>
+              <button className="developer-midi__restart" type="button" onClick={() => { runtime.restart(); navigate('sight-active') }}>
+                重新开始开发会话
+              </button>
+              <small>normalized NOTE_ON → shared controller；真实 5 秒 timeout 没有快捷按钮。</small>
+              <small>内存报告 {reports.length} 份{latestReport ? ` · 最近：${latestReport.completionState} / ${latestReport.completedQuestions} 题` : ''}</small>
+            </section>
+          ) : null}
           {import.meta.env.DEV && metrics ? (
             <div className="viewport-diagnostic">
               <strong>DEVICE-001 viewport</strong>
@@ -703,6 +971,11 @@ function OrientationNotice(): JSX.Element {
 }
 
 function App(): JSX.Element {
+  const runtimeRef = useRef<AndroidSightReadingRuntime | null>(null)
+  if (!runtimeRef.current) runtimeRef.current = createBrowserAndroidSightReadingRuntime()
+  const runtime = runtimeRef.current
+  const snapshot = useSightReadingRuntime(runtime)
+  const settings = runtime.settings
   const [screen, setScreen] = useState<ScreenId>(() => readScreen())
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
@@ -717,18 +990,44 @@ function App(): JSX.Element {
     document.documentElement.dataset.theme = theme
   }, [theme])
 
+  useEffect(() => {
+    const dynamicScreens: ScreenId[] = [
+      'sight-active', 'sight-correct', 'sight-wrong',
+      'sight-timeout', 'sight-early-end', 'sight-result'
+    ]
+    if (!dynamicScreens.includes(screen) || screen === 'sight-early-end') return
+    const expected = getPracticeScreen(runtime)
+    if (screen !== expected) navigate(expected)
+  }, [runtime, screen, snapshot.phase, snapshot.result, snapshot.status])
+
+  const startPractice = (): void => {
+    runtime.start()
+    navigate('sight-active')
+  }
+
   const content = (() => {
     switch (screen) {
-      case 'home': return <HomeScreen />
-      case 'sight-ready': return <SightReadyScreen />
-      case 'sight-active': return <SightFocusScreen state="active" />
-      case 'sight-correct': return <SightFocusScreen state="correct" />
-      case 'sight-wrong': return <SightFocusScreen state="wrong" />
-      case 'sight-timeout': return <SightFocusScreen state="timeout" />
-      case 'sight-early-end': return <SightFocusScreen showEarlyEndConfirm state="active" />
-      case 'sight-result': return <SightResultScreen />
+      case 'home': return <HomeScreen settings={settings} />
+      case 'sight-ready': return <SightReadyScreen onStart={startPractice} settings={settings} />
+      case 'sight-active':
+      case 'sight-correct':
+      case 'sight-wrong':
+      case 'sight-timeout':
+      case 'sight-early-end':
+        return <SightFocusScreen runtime={runtime} screen={screen} settings={settings} snapshot={snapshot} />
+      case 'sight-result':
+        return snapshot.report
+          ? <SightResultScreen report={snapshot.report} />
+          : <SightReadyScreen onStart={startPractice} settings={settings} />
       case 'history': return <HistoryScreen />
-      case 'settings': return <SettingsScreen theme={theme} onThemeChange={setTheme} />
+      case 'settings': return (
+        <SettingsScreen
+          onSettingsChange={(changes) => { runtime.updateSettings(changes) }}
+          onThemeChange={setTheme}
+          settings={settings}
+          theme={theme}
+        />
+      )
       case 'midi': return <MidiScreen />
       case 'update': return <UpdateScreen />
     }
@@ -737,7 +1036,7 @@ function App(): JSX.Element {
   return (
     <>
       <div className="tablet-app">{content}</div>
-      <ReviewDock active={screen} />
+      <ReviewDock active={screen} runtime={runtime} snapshot={snapshot} />
       <OrientationNotice />
     </>
   )

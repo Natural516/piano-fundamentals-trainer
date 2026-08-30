@@ -802,12 +802,32 @@ button:focus-visible {
 }
 
 .focus-stage {
+  position: relative;
   display: grid;
   min-height: 0;
   place-items: center;
   overflow: hidden;
   border-radius: var(--radius-xl);
   background: var(--app-bg);
+}
+
+.focus-paused-state {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: var(--accent);
+  backdrop-filter: blur(3px);
+}
+
+.focus-paused-state strong {
+  font-size: 18px;
 }
 
 .focus-stage .notation-paper {
@@ -1371,6 +1391,19 @@ button.setting-row {
   color: var(--ink-muted);
 }
 
+.setting-select {
+  min-width: 142px;
+  min-height: 42px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 680;
+}
+
 .mock-switch {
   display: inline-flex;
   min-width: 72px;
@@ -1382,6 +1415,14 @@ button.setting-row {
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: var(--surface-soft);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.mock-switch.is-on {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent-ink);
 }
 
 .mock-switch small {
@@ -1762,6 +1803,97 @@ button.setting-row {
 .review-dock__menu > button.is-active {
   background: #2d4639;
   color: #b9ead1;
+}
+
+.developer-midi {
+  display: grid;
+  gap: 9px;
+  margin: 8px 2px;
+  padding: 12px;
+  border: 1px solid rgba(145, 201, 171, .24);
+  border-radius: 13px;
+  background: rgba(45, 70, 57, .4);
+}
+
+.developer-midi__heading {
+  display: grid;
+  gap: 2px;
+}
+
+.developer-midi__heading span {
+  color: #91c9ab;
+  font-size: 8px;
+  font-weight: 780;
+  letter-spacing: .12em;
+}
+
+.developer-midi__heading strong {
+  font-size: 12px;
+}
+
+.developer-midi__status {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.developer-midi__status span {
+  display: grid;
+  gap: 2px;
+  color: #91a097;
+  font-size: 8px;
+}
+
+.developer-midi__status strong {
+  overflow: hidden;
+  color: #e6eee9;
+  font-size: 10px;
+  text-overflow: ellipsis;
+}
+
+.developer-midi__actions,
+.developer-midi__exact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.developer-midi button,
+.developer-midi input {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 10px;
+}
+
+.developer-midi button {
+  background: #395c49;
+  color: #edf3ee;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.developer-midi button:disabled {
+  cursor: not-allowed;
+  opacity: .38;
+}
+
+.developer-midi input {
+  width: 100%;
+  padding: 0 10px;
+  background: #171f1a;
+  color: #edf3ee;
+}
+
+.developer-midi__restart {
+  width: 100%;
+  background: #25382e !important;
+}
+
+.developer-midi small {
+  color: #8fa096;
+  font-size: 8px;
+  line-height: 1.4;
 }
 
 .viewport-diagnostic {
