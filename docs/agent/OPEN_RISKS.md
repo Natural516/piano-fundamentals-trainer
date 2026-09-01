@@ -49,6 +49,19 @@
 
 ## Open backlog
 
+### UPDATE-HOST-001 — Public HTTPS Updater Artifacts
+
+- Discovered: Android A4.3A
+- Priority: P1
+- Status: OPEN / BLOCKS REAL-NETWORK UPDATER HUMAN QA
+- Real end-to-end updater Human QA requires one publicly reachable HTTPS
+  manifest URL and one publicly reachable HTTPS APK URL for a
+  permanent-signed APK.
+- Hosting remains vendor-neutral. The updater contract must not depend on a
+  GitHub-, Cloudflare-, or other provider-specific API, and no artifact is
+  published during A4.3A.
+- Resolution trigger: immediately before updater real-network Human QA.
+
 ### UI-003 — Final Virtual Piano & Free Practice Visualization Polish
 
 - Discovered: F3.1a
