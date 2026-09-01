@@ -24,6 +24,16 @@
 - F3.1 real Roland FP-30X Human Hardware QA passed startup-connected, hot-plug, active-practice disconnect, reconnect, CC64 disconnect, sleep/resume, power off/on, Score Practice recovery, and Free Practice recovery.
 - Confirmed: committed practice facts remain intact, interrupted sessions remain recoverable, reconnect continues correctly, CC64 and internal voices clear, phantom inputs do not remain, judgement stays operational, and Session lifecycle stays correct.
 
+### SIGN-001 — Permanent Android Release Signing
+
+- Discovered: A3.0
+- Priority: P1
+- Status: CLOSED
+- Package identity: `com.pianofundamentals.trainer`; permanent alias: `piano-fundamentals`; versionCode `1`; versionName `1.0`.
+- Authoritative public Release certificate SHA-256: `19:3D:A3:16:AE:F6:A2:2F:9C:15:D1:01:9E:25:87:E7:25:85:8A:70:8B:D0:07:7A:D8:58:98:CD:65:57:96:32`.
+- Evidence: permanent key established, independent backup completed by the user, Release signing verified, first Release APK passed real-device Human QA, and the one-time DEBUG-to-RELEASE migration completed.
+- The keystore and credentials remain external/local-only. Future distributable APKs must keep the same package and signer identity and increment `versionCode`.
+
 ### F3.1a — Free Practice Real-Time Staff Defects
 
 - Status: CLOSED
@@ -38,15 +48,6 @@
 - Do not repeat Shared-mode library experiments unless new endpoint, driver, or hardware evidence appears.
 
 ## Open backlog
-
-### SIGN-001 — Permanent Android Release Signing
-
-- Discovered: A3.0
-- Priority: P1
-- Status: FOUNDATION READY / PERMANENT KEY AND A4.0B QA PENDING
-- A4.0A provides fail-closed Gradle release signing, a gitignored local credential path, an external-keystore policy, explicit Android version metadata, and public APK signature verification.
-- The current A3.1 APK remains Android DEBUG signed and is suitable only for development and Human QA. No permanent keystore has been generated or committed.
-- The user must create and back up the permanent key interactively, then complete the one-time DEBUG uninstall and permanent RELEASE install during A4.0B before persistent real-user data or updater-compatible release distribution.
 
 ### UI-003 — Final Virtual Piano & Free Practice Visualization Polish
 

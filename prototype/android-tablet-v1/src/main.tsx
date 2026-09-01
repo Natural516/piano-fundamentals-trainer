@@ -1280,7 +1280,7 @@ function App(): JSX.Element {
   return (
     <MidiUiContext.Provider value={{ runtime }}>
       <div className="tablet-app">{content}</div>
-      <ReviewDock active={screen} runtime={runtime} snapshot={snapshot} />
+      {SHOW_DEVELOPMENT_TOOLS ? <ReviewDock active={screen} runtime={runtime} snapshot={snapshot} /> : null}
       <OrientationNotice />
     </MidiUiContext.Provider>
   )

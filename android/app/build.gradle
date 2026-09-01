@@ -20,6 +20,7 @@ if (!appVersionName) {
     throw new GradleException("android/version.properties versionName must not be empty")
 }
 def appVersionCode = Integer.parseInt(appVersionCodeText)
+def permanentReleaseKeyAlias = 'piano-fundamentals'
 
 def releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
     taskName.toLowerCase(Locale.ROOT).contains('release')
@@ -100,6 +101,9 @@ if (releaseTaskRequested) {
             "PIANO_ANDROID_KEY_ALIAS and PIANO_ANDROID_KEY_PASSWORD. " +
             "No debug-signing fallback is allowed."
         )
+    }
+    if (releaseSigning.keyAlias != permanentReleaseKeyAlias) {
+        throw new GradleException("Release signing keyAlias must match the permanent application identity")
     }
     if (!releaseStoreFileInput.isAbsolute()) {
         throw new GradleException("Release signing storeFile must be an absolute local path outside the Git repository")

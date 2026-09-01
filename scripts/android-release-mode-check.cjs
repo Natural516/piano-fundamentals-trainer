@@ -1,0 +1,61 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
+const { spawnSync } = require('node:child_process')
+
+const repositoryRoot = path.resolve(__dirname, '..')
+const apkPath = path.join(repositoryRoot, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk')
+const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'piano-release-audit-'))
+
+const readTree = (directory) => {
+  const contents = []
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const absolutePath = path.join(directory, entry.name)
+    if (entry.isDirectory()) contents.push(readTree(absolutePath))
+    else if (/\.(?:html|js|css)$/i.test(entry.name)) contents.push(fs.readFileSync(absolutePath, 'utf8'))
+  }
+  return contents.join('\n')
+}
+
+try {
+  assert.equal(fs.existsSync(apkPath) && fs.statSync(apkPath).isFile(), true, 'Release APK is missing; run npm.cmd run android:apk:release first')
+
+  const jarName = process.platform === 'win32' ? 'jar.exe' : 'jar'
+  const jarPath = process.env.JAVA_HOME
+    ? path.join(process.env.JAVA_HOME, 'bin', jarName)
+    : jarName
+  const extraction = spawnSync(jarPath, ['xf', apkPath], {
+    cwd: tempRoot,
+    encoding: 'utf8',
+    windowsHide: true
+  })
+  assert.equal(extraction.status, 0, `Unable to inspect Release APK assets: ${extraction.stderr || extraction.error || 'jar failed'}`)
+
+  const publicAssets = path.join(tempRoot, 'assets', 'public')
+  assert.equal(fs.existsSync(publicAssets) && fs.statSync(publicAssets).isDirectory(), true, 'Release APK does not contain Capacitor public assets')
+  const bundle = readTree(publicAssets)
+
+  const forbiddenDevelopmentTokens = [
+    'A3.1 · DEBUG',
+    'A3.1 · DEV',
+    'Human UI Review',
+    '开发模拟 MIDI',
+    'DEVICE-001-APP viewport',
+    'DEVICE-001 viewport',
+    '发送 NOTE_ON',
+    '重新开始开发会话'
+  ]
+  for (const token of forbiddenDevelopmentTokens) {
+    assert.equal(bundle.includes(token), false, `Release APK exposes development-only UI: ${token}`)
+  }
+
+  assert.equal(bundle.includes('Android 原生 BLE MIDI'), true, 'Release APK is missing the real Bluetooth MIDI path')
+  assert.equal(bundle.includes('扫描 MIDI 设备'), true, 'Release APK is missing normal MIDI connection UI')
+
+  process.stdout.write('PASS Release APK excludes development-only controls and diagnostics\n')
+  process.stdout.write('PASS Release APK retains real Bluetooth MIDI connection UI\n')
+  process.stdout.write('\n2/2 Android release-mode checks PASS\n')
+} finally {
+  fs.rmSync(tempRoot, { recursive: true, force: true })
+}

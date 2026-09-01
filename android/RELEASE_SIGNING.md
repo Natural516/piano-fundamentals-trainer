@@ -55,6 +55,20 @@ The permanent alias is:
 
 `piano-fundamentals`
 
+## SIGN-001 permanent public identity
+
+Status: **CLOSED / PERMANENT RELEASE IDENTITY APPROVED**
+
+- Package: `com.pianofundamentals.trainer`
+- Alias: `piano-fundamentals`
+- Release certificate SHA-256: `19:3D:A3:16:AE:F6:A2:2F:9C:15:D1:01:9E:25:87:E7:25:85:8A:70:8B:D0:07:7A:D8:58:98:CD:65:57:96:32`
+
+This fingerprint is the authoritative permanent Android signing identity. The
+first Release APK passed real-device Human QA on the Lenovo Xiaoxin Pad Pro
+12.7 with the Roland FP-30X, and the one-time DEBUG-to-RELEASE migration was
+completed. The user confirmed an independent key backup. The key remains
+external to the repository and its passwords remain private.
+
 ## User-run interactive key generation
 
 Run the following commands locally only after Human Review. Do not paste the

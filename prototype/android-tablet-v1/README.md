@@ -396,9 +396,9 @@ page, navigation, and staff scale also remain frozen. These areas require a
 demonstrated bug or a new explicit requirement before further changes. A custom
 BLE GATT MIDI transport is not warranted by the approved hardware path.
 
-`SIGN-001` remains open at priority P1. Permanent release signing is still
-required before persistent real-user data or updater-compatible release
-distribution. A3.1 remains DEBUG signed and does not create a release keystore.
+At the A3.1 checkpoint, `SIGN-001` remained open at priority P1 and the build
+was DEBUG signed. A4.0B has since established and approved the permanent Release
+identity described below.
 
 ## A4.0A release-signing foundation
 
@@ -408,3 +408,19 @@ metadata verification. It does not generate the permanent keystore or produce a
 release-signed APK. The user-run interactive key-generation command, private
 key location, DEBUG-to-RELEASE migration, verification steps, and backup policy
 are maintained in [`android/RELEASE_SIGNING.md`](../../android/RELEASE_SIGNING.md).
+
+## A4.0B permanent Release checkpoint
+
+The permanent key has been established outside the repository and the first
+non-debuggable Release APK has passed public signature verification. The frozen
+identity is package `com.pianofundamentals.trainer`, alias
+`piano-fundamentals`, and certificate SHA-256
+`19:3D:A3:16:AE:F6:A2:2F:9C:15:D1:01:9E:25:87:E7:25:85:8A:70:8B:D0:07:7A:D8:58:98:CD:65:57:96:32`.
+
+Release builds omit the Human UI Review dock, simulated MIDI controls, and
+viewport diagnostics while retaining the real Android Bluetooth MIDI
+connection flow. Real-device R1-R13 Human QA passed on the Lenovo Xiaoxin Pad
+Pro 12.7 with the Roland FP-30X. The one-time DEBUG-to-RELEASE migration and an
+independent permanent-key backup are complete, so `SIGN-001` is closed. Future
+distributable APKs must retain this package/signing identity and increment
+`versionCode`.

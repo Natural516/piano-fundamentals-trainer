@@ -35,6 +35,8 @@ check('release signing is fail-closed and never falls back to debug', () => {
   assert.match(gradle, /signingConfig signingConfigs\.getByName\('release'\)/)
   assert.doesNotMatch(gradle, /signingConfig\s+signingConfigs\.debug/)
   assert.match(gradle, /keystore must not be stored inside the Git repository/)
+  assert.match(gradle, /permanentReleaseKeyAlias = 'piano-fundamentals'/)
+  assert.match(gradle, /Release signing keyAlias must match the permanent application identity/)
 })
 
 check('local secrets and private key extensions are ignored', () => {
