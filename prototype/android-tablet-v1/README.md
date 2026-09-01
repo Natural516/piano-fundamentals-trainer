@@ -399,3 +399,12 @@ BLE GATT MIDI transport is not warranted by the approved hardware path.
 `SIGN-001` remains open at priority P1. Permanent release signing is still
 required before persistent real-user data or updater-compatible release
 distribution. A3.1 remains DEBUG signed and does not create a release keystore.
+
+## A4.0A release-signing foundation
+
+A4.0A adds only fail-closed release-signing infrastructure, the explicit
+Android version source, non-secret configuration templates, and public APK
+metadata verification. It does not generate the permanent keystore or produce a
+release-signed APK. The user-run interactive key-generation command, private
+key location, DEBUG-to-RELEASE migration, verification steps, and backup policy
+are maintained in [`android/RELEASE_SIGNING.md`](../../android/RELEASE_SIGNING.md).

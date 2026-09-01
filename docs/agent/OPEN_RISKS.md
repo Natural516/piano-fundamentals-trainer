@@ -43,10 +43,10 @@
 
 - Discovered: A3.0
 - Priority: P1
-- Status: OPEN / REQUIRED BEFORE RELEASE DISTRIBUTION
-- The current A3.0 APK is signed with the Android DEBUG key and is suitable only for development and Human QA.
-- Establish permanent release signing before persistent real-user data becomes important or updater-compatible release distribution begins.
-- Do not create or commit a release keystore during A3.0 finalization.
+- Status: FOUNDATION READY / PERMANENT KEY AND A4.0B QA PENDING
+- A4.0A provides fail-closed Gradle release signing, a gitignored local credential path, an external-keystore policy, explicit Android version metadata, and public APK signature verification.
+- The current A3.1 APK remains Android DEBUG signed and is suitable only for development and Human QA. No permanent keystore has been generated or committed.
+- The user must create and back up the permanent key interactively, then complete the one-time DEBUG uninstall and permanent RELEASE install during A4.0B before persistent real-user data or updater-compatible release distribution.
 
 ### UI-003 — Final Virtual Piano & Free Practice Visualization Polish
 
