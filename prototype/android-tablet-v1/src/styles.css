@@ -2091,6 +2091,59 @@ button.setting-row {
   display: none;
 }
 
+.persistence-loading {
+  display: grid;
+  width: 100vw;
+  height: 100dvh;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 40px;
+  background: var(--app-bg);
+  color: var(--ink-primary);
+  text-align: center;
+}
+
+.persistence-loading h1,
+.persistence-loading p {
+  margin: 0;
+}
+
+.persistence-error {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  max-width: 460px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.persistence-error span {
+  display: grid;
+  gap: 3px;
+}
+
+.persistence-error small {
+  color: var(--ink-secondary);
+}
+
+.persistence-error button {
+  min-width: 72px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--danger);
+  color: #fff;
+  font-weight: 700;
+}
+
 @media (orientation: portrait) {
   body {
     min-width: 0;

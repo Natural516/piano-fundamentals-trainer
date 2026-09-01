@@ -106,10 +106,11 @@ share that file.
 ## Android version contract
 
 `android/version.properties` is the single Android package-version source.
-The A4.0A values remain:
+The permanent Release chain began at A4.0B with `versionCode=1` and
+`versionName=1.0`. The current A4.1 update values are:
 
-- `versionCode=1`
-- `versionName=1.0`
+- `versionCode=2`
+- `versionName=1.1.0`
 
 For every distributable update:
 

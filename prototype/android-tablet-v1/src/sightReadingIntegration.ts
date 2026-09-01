@@ -10,7 +10,6 @@ import {
 } from '../../../src/sightReading/report'
 import {
   ANDROID_SIGHT_READING_DEFAULTS,
-  createSightReadingSettingsStore,
   migrateSightReadingSettings,
   type SightReadingSettings,
   type SightReadingWriteResult
@@ -26,6 +25,15 @@ import {
   type AndroidMidiInputSource,
   type RoutedMidiPayload
 } from './androidBluetoothMidiCore'
+import { CapacitorPreferencesBackend } from './androidPersistence'
+import {
+  createDurableSightReadingReport,
+  initializeAndroidPersistence,
+  type DurableSightReadingReport,
+  type PersistenceStatus,
+  type SightReadingReportRepository as DurableReportRepository,
+  type SightReadingSettingsRepository as DurableSettingsRepository
+} from './androidPersistenceCore'
 
 export interface AndroidSightReadingRuntimeDependencies {
   clock: Clock
@@ -33,6 +41,14 @@ export interface AndroidSightReadingRuntimeDependencies {
   random: () => number
   bluetoothPlugin?: AndroidBluetoothMidiPlugin | null
   initialMidiSource?: AndroidMidiInputSource
+  initialSettings?: SightReadingSettings
+  initialSettingsPersisted?: boolean
+  settingsRepository?: DurableSettingsRepository | null
+  reportRepository?: DurableReportRepository | null
+  initialSettingsError?: string | null
+  initialReportsError?: string | null
+  wallClock?: { now(): number }
+  idGenerator?: () => string
 }
 
 export type AndroidSightReadingUiState =
@@ -42,18 +58,6 @@ export type AndroidSightReadingUiState =
   | 'wrong'
   | 'timeout'
   | 'result'
-
-class InMemoryKeyValueAdapter {
-  private readonly values = new Map<string, string>()
-
-  getItem(key: string): string | null {
-    return this.values.get(key) ?? null
-  }
-
-  setItem(key: string, value: string): void {
-    this.values.set(key, value)
-  }
-}
 
 export class InMemorySightReadingReportRepository {
   private readonly reports: SightReadingSessionReport[] = []
@@ -102,6 +106,15 @@ export class DevelopmentMidiAdapter {
 
 type ControllerSnapshot = SightReadingController['snapshot']
 
+export interface AndroidPersistenceSnapshot {
+  settingsStatus: PersistenceStatus
+  settingsError: string | null
+  reportStatus: PersistenceStatus
+  reportError: string | null
+  durableReportCount: number
+  pendingReportCount: number
+}
+
 export function getAndroidSightReadingUiState(snapshot: ControllerSnapshot): AndroidSightReadingUiState {
   if (snapshot.status === 'finished') return 'result'
   if (snapshot.status !== 'running') return 'ready'
@@ -126,16 +139,41 @@ export class AndroidSightReadingRuntime {
   readonly bluetooth: AndroidBluetoothMidiAdapter
   readonly controller: SightReadingController
   readonly midiRouter: AndroidMidiInputRouter
-  private readonly settingsStore
+  private readonly settingsRepository: DurableSettingsRepository | null
+  private readonly reportRepository: DurableReportRepository | null
+  private readonly wallClock: { now(): number }
+  private readonly idGenerator: () => string
   private settingsValue: SightReadingSettings
-  private savedReport: SightReadingSessionReport | null = null
+  private observedReport: SightReadingSessionReport | null = null
+  private sessionStartedAt: number | null = null
+  private sessionSettings: SightReadingSettings | null = null
+  private readonly pendingReportRecords = new Map<string, DurableSightReadingReport>()
+  private settingsWriteQueue: Promise<void> = Promise.resolve()
+  private reportWriteQueue: Promise<void> = Promise.resolve()
+  private settingsSaveGeneration = 0
+  private persistenceValue: AndroidPersistenceSnapshot
   private readonly listeners = new Set<() => void>()
   private midiResumeRequiredValue = false
 
   constructor(dependencies: AndroidSightReadingRuntimeDependencies) {
-    const storage = new InMemoryKeyValueAdapter()
-    this.settingsStore = createSightReadingSettingsStore(storage, ANDROID_SIGHT_READING_DEFAULTS)
-    this.settingsValue = this.settingsStore.read().settings
+    this.settingsRepository = dependencies.settingsRepository ?? null
+    this.reportRepository = dependencies.reportRepository ?? null
+    this.wallClock = dependencies.wallClock ?? { now: () => Date.now() }
+    this.idGenerator = dependencies.idGenerator ?? createProductionRecordId
+    this.settingsValue = migrateSightReadingSettings(
+      dependencies.initialSettings ?? ANDROID_SIGHT_READING_DEFAULTS,
+      ANDROID_SIGHT_READING_DEFAULTS
+    )
+    this.persistenceValue = {
+      settingsStatus: dependencies.initialSettingsError
+        ? 'error'
+        : dependencies.initialSettingsPersisted ? 'saved' : 'idle',
+      settingsError: dependencies.initialSettingsError ?? null,
+      reportStatus: dependencies.initialReportsError ? 'error' : this.reportRepository ? 'saved' : 'idle',
+      reportError: dependencies.initialReportsError ?? null,
+      durableReportCount: this.reportRepository?.list().length ?? 0,
+      pendingReportCount: 0
+    }
 
     let controller: SightReadingController
     this.midiRouter = new AndroidMidiInputRouter(
@@ -160,9 +198,12 @@ export class AndroidSightReadingRuntime {
     )
     this.controller.subscribe(() => {
       const report = this.controller.snapshot.report
-      if (report && report !== this.savedReport) {
+      if (report && report !== this.observedReport) {
         const saved = saveSightReadingReport(report, this.reports)
-        if (saved.success) this.savedReport = report
+        if (saved.success) {
+          this.observedReport = report
+          this.queueDurableReport(report)
+        }
       }
       this.notify()
     })
@@ -192,24 +233,75 @@ export class AndroidSightReadingRuntime {
     return this.bluetooth.snapshot
   }
 
+  get persistenceSnapshot(): AndroidPersistenceSnapshot {
+    return { ...this.persistenceValue }
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
   }
 
-  updateSettings(changes: Partial<SightReadingSettings>): SightReadingWriteResult {
+  async updateSettings(changes: Partial<SightReadingSettings>): Promise<SightReadingWriteResult> {
     if (this.snapshot.status === 'running') {
       return { success: false, error: 'Settings are locked during a running session.' }
     }
     const next = migrateSightReadingSettings({ ...this.settingsValue, ...changes }, ANDROID_SIGHT_READING_DEFAULTS)
-    const result = this.settingsStore.write(next)
-    if (!result.success) return result
     this.settingsValue = next
     this.controller.reset(next)
+    this.notify()
+    if (!this.settingsRepository) return { success: true }
+
+    const generation = ++this.settingsSaveGeneration
+    this.persistenceValue.settingsStatus = 'saving'
+    this.persistenceValue.settingsError = null
+    this.notify()
+    let result: SightReadingWriteResult = { success: false, error: 'Settings save did not run' }
+    const operation = this.settingsWriteQueue.then(async () => {
+      result = await this.settingsRepository!.save(next)
+    })
+    this.settingsWriteQueue = operation.catch(() => {})
+    try {
+      await operation
+    } catch (error) {
+      result = { success: false, error: String(error) }
+    }
+    if (generation === this.settingsSaveGeneration) {
+      this.persistenceValue.settingsStatus = result.success ? 'saved' : 'error'
+      this.persistenceValue.settingsError = result.success ? null : result.error
+      this.notify()
+    }
     return result
   }
 
+  retrySettingsPersistence(): Promise<SightReadingWriteResult> {
+    return this.updateSettings({})
+  }
+
+  async retryReportPersistence(): Promise<SightReadingWriteResult> {
+    if (!this.reportRepository) return { success: true }
+    if (this.pendingReportRecords.size === 0) {
+      const result = await this.reportRepository.initialize()
+      this.persistenceValue.reportStatus = result.success ? 'saved' : 'error'
+      this.persistenceValue.reportError = result.success ? null : result.error
+      this.persistenceValue.durableReportCount = result.records.length
+      this.notify()
+      return result.success ? { success: true } : { success: false, error: result.error }
+    }
+    for (const record of [...this.pendingReportRecords.values()]) this.enqueueDurableReportSave(record)
+    await this.reportWriteQueue
+    return this.pendingReportRecords.size === 0
+      ? { success: true }
+      : { success: false, error: this.persistenceValue.reportError ?? 'Unable to save Sight Reading report' }
+  }
+
+  async flushPersistence(): Promise<void> {
+    await Promise.all([this.settingsWriteQueue, this.reportWriteQueue])
+  }
+
   start(): void {
+    this.sessionStartedAt = this.wallClock.now()
+    this.sessionSettings = { ...this.settingsValue }
     this.controller.start(this.settingsValue)
     if (this.midiSource === 'bluetooth' && this.bluetoothSnapshot.connectionState !== 'CONNECTED') {
       this.midiResumeRequiredValue = true
@@ -324,13 +416,68 @@ export class AndroidSightReadingRuntime {
     this.notify()
   }
 
+  private queueDurableReport(report: SightReadingSessionReport): void {
+    if (!this.reportRepository) return
+    try {
+      const endedAt = this.wallClock.now()
+      const record = createDurableSightReadingReport(report, {
+        recordId: this.idGenerator(),
+        startedAt: this.sessionStartedAt ?? endedAt,
+        endedAt,
+        settings: this.sessionSettings ?? this.settingsValue
+      })
+      this.pendingReportRecords.set(record.recordId, record)
+      this.persistenceValue.pendingReportCount = this.pendingReportRecords.size
+      this.enqueueDurableReportSave(record)
+    } catch (error) {
+      this.persistenceValue.reportStatus = 'error'
+      this.persistenceValue.reportError = String(error)
+    }
+  }
+
+  private enqueueDurableReportSave(record: DurableSightReadingReport): void {
+    if (!this.reportRepository) return
+    this.persistenceValue.reportStatus = 'saving'
+    this.persistenceValue.reportError = null
+    this.reportWriteQueue = this.reportWriteQueue.then(async () => {
+      const result = await this.reportRepository!.save(record)
+      if (result.success) {
+        this.pendingReportRecords.delete(record.recordId)
+        this.persistenceValue.reportStatus = this.pendingReportRecords.size === 0 ? 'saved' : 'saving'
+        this.persistenceValue.reportError = null
+        this.persistenceValue.durableReportCount = this.reportRepository!.list().length
+      } else {
+        this.persistenceValue.reportStatus = 'error'
+        this.persistenceValue.reportError = result.error
+      }
+      this.persistenceValue.pendingReportCount = this.pendingReportRecords.size
+      this.notify()
+    }).catch((error) => {
+      this.persistenceValue.reportStatus = 'error'
+      this.persistenceValue.reportError = String(error)
+      this.persistenceValue.pendingReportCount = this.pendingReportRecords.size
+      this.notify()
+    })
+  }
+
   private notify(): void {
     for (const listener of this.listeners) listener()
   }
 }
 
-export function createBrowserAndroidSightReadingRuntime(options?: { nativeBluetooth?: boolean }): AndroidSightReadingRuntime {
+function createProductionRecordId(): string {
+  const cryptoApi = globalThis.crypto
+  if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID()
+  if (typeof cryptoApi?.getRandomValues === 'function') {
+    const bytes = cryptoApi.getRandomValues(new Uint8Array(16))
+    return `sr-${[...bytes].map((value) => value.toString(16).padStart(2, '0')).join('')}`
+  }
+  throw new Error('Secure record ID generation is unavailable')
+}
+
+export async function createBrowserAndroidSightReadingRuntime(options?: { nativeBluetooth?: boolean }): Promise<AndroidSightReadingRuntime> {
   const nativeBluetooth = options?.nativeBluetooth ?? false
+  const persistence = await initializeAndroidPersistence(CapacitorPreferencesBackend)
   return new AndroidSightReadingRuntime({
     clock: { now: () => performance.now() },
     scheduler: {
@@ -339,6 +486,14 @@ export function createBrowserAndroidSightReadingRuntime(options?: { nativeBlueto
     },
     random: () => Math.random(),
     bluetoothPlugin: nativeBluetooth ? NativeAndroidBluetoothMidi : null,
-    initialMidiSource: nativeBluetooth ? 'bluetooth' : 'development'
+    initialMidiSource: nativeBluetooth ? 'bluetooth' : 'development',
+    initialSettings: persistence.settingsLoad.settings,
+    initialSettingsPersisted: persistence.settingsLoad.success && persistence.settingsLoad.source === 'stored',
+    settingsRepository: persistence.settings,
+    reportRepository: persistence.reports,
+    initialSettingsError: persistence.settingsLoad.success ? null : persistence.settingsLoad.error,
+    initialReportsError: persistence.reportLoad.success ? null : persistence.reportLoad.error,
+    wallClock: { now: () => Date.now() },
+    idGenerator: createProductionRecordId
   })
 }

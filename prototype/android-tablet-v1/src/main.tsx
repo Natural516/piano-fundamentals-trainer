@@ -638,7 +638,7 @@ function SightFocusScreen({
             <div>
               <span className="eyebrow">识谱练习</span>
               <h1 id="early-end-title">结束本轮？</h1>
-              <p>已完成 {snapshot.completedQuestions} / {settings.questionCount}。<br />结束后，已完成部分会保存到当前开发运行内存。</p>
+              <p>已完成 {snapshot.completedQuestions} / {settings.questionCount}。<br />结束后，已完成部分会保存到此设备。</p>
             </div>
             <div className="early-end-dialog__actions">
               <button className="secondary-action" type="button" onClick={continuePractice}>继续练习</button>
@@ -793,6 +793,12 @@ function SettingsScreen({
 }): JSX.Element {
   const { runtime } = useMidiUi()
   const midiStatus = presentMidiStatus(runtime)
+  const persistence = runtime.persistenceSnapshot
+  const settingsStatus = persistence.settingsStatus === 'saving'
+    ? '正在保存'
+    : persistence.settingsStatus === 'error'
+      ? '保存失败'
+      : persistence.settingsStatus === 'saved' ? '已保存到此设备' : '使用默认设置'
   return (
     <ProductFrame active="settings" title="设置">
       <section className="settings-layout">
@@ -808,7 +814,7 @@ function SettingsScreen({
             />
           </div>
           <div className="settings-group settings-group--sight">
-            <div className="group-title"><span>识谱练习</span><small>下一轮生效 · 内存设置</small></div>
+            <div className="group-title"><span>识谱练习</span><small>下一轮生效 · {settingsStatus}</small></div>
             <SettingRow
               description="高音谱表、低音谱表或大谱表"
               icon="book"
@@ -1131,14 +1137,22 @@ function OrientationNotice(): JSX.Element {
   return <div className="orientation-notice"><div className="rotate-device">↻</div><h1>请横放平板</h1><p>Android V1 专为钢琴谱架上的横屏使用设计。</p></div>
 }
 
-function App(): JSX.Element {
-  const runtimeRef = useRef<AndroidSightReadingRuntime | null>(null)
-  if (!runtimeRef.current) {
-    runtimeRef.current = createBrowserAndroidSightReadingRuntime({
-      nativeBluetooth: Capacitor.isNativePlatform()
-    })
+function PersistenceErrorNotice({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element | null {
+  const persistence = runtime.persistenceSnapshot
+  if (persistence.settingsStatus !== 'error' && persistence.reportStatus !== 'error') return null
+  const retry = async (): Promise<void> => {
+    if (persistence.settingsStatus === 'error') await runtime.retrySettingsPersistence()
+    if (persistence.reportStatus === 'error') await runtime.retryReportPersistence()
   }
-  const runtime = runtimeRef.current
+  return (
+    <aside className="persistence-error" role="alert">
+      <span><strong>本地保存失败</strong><small>当前练习事实仍保留，可重试写入此设备。</small></span>
+      <button type="button" onClick={() => { void retry() }}>重试</button>
+    </aside>
+  )
+}
+
+function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element {
   const snapshot = useSightReadingRuntime(runtime)
   const settings = runtime.settings
   const [screen, setScreen] = useState<ScreenId>(() => readScreen())
@@ -1266,7 +1280,7 @@ function App(): JSX.Element {
       case 'history': return <HistoryScreen />
       case 'settings': return (
         <SettingsScreen
-          onSettingsChange={(changes) => { runtime.updateSettings(changes) }}
+          onSettingsChange={(changes) => { void runtime.updateSettings(changes) }}
           onThemeChange={setTheme}
           settings={settings}
           theme={theme}
@@ -1280,14 +1294,48 @@ function App(): JSX.Element {
   return (
     <MidiUiContext.Provider value={{ runtime }}>
       <div className="tablet-app">{content}</div>
+      <PersistenceErrorNotice runtime={runtime} />
       {SHOW_DEVELOPMENT_TOOLS ? <ReviewDock active={screen} runtime={runtime} snapshot={snapshot} /> : null}
       <OrientationNotice />
     </MidiUiContext.Provider>
   )
 }
 
+function AndroidAppBootstrap(): JSX.Element {
+  const [runtime, setRuntime] = useState<AndroidSightReadingRuntime | null>(null)
+  const [initializationError, setInitializationError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    void createBrowserAndroidSightReadingRuntime({
+      nativeBluetooth: Capacitor.isNativePlatform()
+    }).then((createdRuntime) => {
+      if (active) setRuntime(createdRuntime)
+      else void createdRuntime.dispose()
+    }).catch((error) => {
+      if (active) setInitializationError(String(error))
+    })
+    return () => { active = false }
+  }, [])
+
+  if (initializationError) {
+    return (
+      <main className="persistence-loading" role="alert">
+        <span className="eyebrow">本地数据</span>
+        <h1>无法初始化应用数据</h1>
+        <p>{initializationError}</p>
+        <button className="primary-action" type="button" onClick={() => window.location.reload()}>重试</button>
+      </main>
+    )
+  }
+  if (!runtime) {
+    return <main className="persistence-loading" aria-live="polite"><span className="eyebrow">本地数据</span><h1>正在载入练习设置…</h1></main>
+  }
+  return <App runtime={runtime} />
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AndroidAppBootstrap />
   </StrictMode>
 )

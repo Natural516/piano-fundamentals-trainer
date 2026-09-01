@@ -424,3 +424,22 @@ Pro 12.7 with the Roland FP-30X. The one-time DEBUG-to-RELEASE migration and an
 independent permanent-key backup are complete, so `SIGN-001` is closed. Future
 distributable APKs must retain this package/signing identity and increment
 `versionCode`.
+
+## A4.1 durable Android persistence
+
+A4.1 raises the distributable Android package to `versionCode=2` and
+`versionName=1.1.0`. It persists only Android Sight Reading settings and
+finalized COMPLETED/STOPPED Sight Reading reports through
+`@capacitor/preferences`. The native Android backend is application-owned
+SharedPreferences data; shared `src/sightReading` remains platform-neutral.
+
+The app waits for its versioned settings document before creating the runtime.
+Report writes are asynchronous and explicit: the complete record is written
+first, then its index, followed by read-back; startup reconciliation recovers
+valid orphan records and removes stale index references. Write failures retain
+the authoritative runtime report and expose retryable application state instead
+of claiming durable success.
+
+The schema-1 namespace is `piano.v1.*`. It contains no live question/timer
+state and no Bluetooth/MIDI device identity. History and Update remain the
+approved Mock surfaces; A4.1 does not add session recovery or updater behavior.

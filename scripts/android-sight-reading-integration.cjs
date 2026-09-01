@@ -89,10 +89,10 @@ test('I01 Android defaults reach the real shared controller', () => {
   assert.equal(runtime.snapshot.report, null)
 })
 
-test('I02 in-memory settings affect the next generated session', () => {
+test('I02 in-memory settings affect the next generated session', async () => {
   for (const staffMode of ['treble', 'bass', 'grand']) {
     const { runtime } = createRuntime(() => 0)
-    assert.deepEqual(runtime.updateSettings({
+    assert.deepEqual(await runtime.updateSettings({
       staffMode,
       keySignature: 'Cb',
       notePoolMode: 'chromatic',
@@ -108,7 +108,7 @@ test('I02 in-memory settings affect the next generated session', () => {
     assert.equal(runtime.settings.questionCount, 10)
     assert.equal(runtime.settings.noteNameVisible, true)
     assert.equal(getMajorKeySignature(runtime.settings.keySignature).displayName, 'C♭ 大调')
-    assert.equal(runtime.updateSettings({ questionCount: 100 }).success, false)
+    assert.equal((await runtime.updateSettings({ questionCount: 100 })).success, false)
   }
 })
 
@@ -190,9 +190,9 @@ test('I08 explicit pause/resume uses real display, answer and feedback timing', 
   feedback.time.advance(1); assert.equal(feedback.runtime.uiState, 'active')
 })
 
-test('I09 completed session saves one real report and projects RESULT facts', () => {
+test('I09 completed session saves one real report and projects RESULT facts', async () => {
   const { runtime, time } = createRuntime()
-  runtime.updateSettings({ questionCount: 10 })
+  await runtime.updateSettings({ questionCount: 10 })
   runtime.start()
   for (let index = 0; index < 10; index++) answerCorrect(runtime, time, 100 + index)
   const report = runtime.reports.latest()
@@ -205,9 +205,9 @@ test('I09 completed session saves one real report and projects RESULT facts', ()
   assert.equal(getPrimaryErrorNote(report), null)
 })
 
-test('I10 early stop saves stopped partial facts and returns READY without normal RESULT', () => {
+test('I10 early stop saves stopped partial facts and returns READY without normal RESULT', async () => {
   const { runtime, time } = createRuntime()
-  runtime.updateSettings({ questionCount: 10 })
+  await runtime.updateSettings({ questionCount: 10 })
   runtime.start(); answerCorrect(runtime, time, 120)
   unlock(runtime, time); time.advance(300); const wrongTarget = runtime.snapshot.currentNote
   runtime.sendWrong(); time.advance(350)
@@ -236,15 +236,19 @@ test('I11 UI integration has no direct answer/timeout shortcut', () => {
   assert.match(sources, /getAndroidSightReadingUiState/)
 })
 
-let failed = 0
-for (const { name, callback } of tests) {
-  try {
-    callback()
-    process.stdout.write(`PASS ${name}\n`)
-  } catch (error) {
-    failed += 1
-    process.stderr.write(`FAIL ${name}\n${error.stack || error}\n`)
+async function run() {
+  let failed = 0
+  for (const { name, callback } of tests) {
+    try {
+      await callback()
+      process.stdout.write(`PASS ${name}\n`)
+    } catch (error) {
+      failed += 1
+      process.stderr.write(`FAIL ${name}\n${error.stack || error}\n`)
+    }
   }
+  process.stdout.write(`\n${tests.length - failed}/${tests.length} Android Sight Reading integration groups PASS\n`)
+  process.exitCode = failed ? 1 : 0
 }
-process.stdout.write(`\n${tests.length - failed}/${tests.length} Android Sight Reading integration groups PASS\n`)
-process.exitCode = failed ? 1 : 0
+
+void run()
