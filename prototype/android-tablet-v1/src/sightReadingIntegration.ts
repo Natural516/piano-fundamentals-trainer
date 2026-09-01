@@ -31,6 +31,7 @@ import {
   initializeAndroidPersistence,
   type DurableSightReadingReport,
   type PersistenceStatus,
+  type ReportLoadResult,
   type SightReadingReportRepository as DurableReportRepository,
   type SightReadingSettingsRepository as DurableSettingsRepository
 } from './androidPersistenceCore'
@@ -47,6 +48,7 @@ export interface AndroidSightReadingRuntimeDependencies {
   reportRepository?: DurableReportRepository | null
   initialSettingsError?: string | null
   initialReportsError?: string | null
+  initialHistoryWarning?: string | null
   wallClock?: { now(): number }
   idGenerator?: () => string
 }
@@ -115,6 +117,19 @@ export interface AndroidPersistenceSnapshot {
   pendingReportCount: number
 }
 
+export interface AndroidHistoryRepositorySnapshot {
+  status: 'loading' | 'ready' | 'error'
+  records: readonly DurableSightReadingReport[]
+  warning: string | null
+  error: string | null
+}
+
+function historyWarning(result: ReportLoadResult): string | null {
+  return result.diagnostics.invalidRecordKeys.length > 0
+    ? '部分练习记录无法读取，其他有效记录仍可正常显示。'
+    : null
+}
+
 export function getAndroidSightReadingUiState(snapshot: ControllerSnapshot): AndroidSightReadingUiState {
   if (snapshot.status === 'finished') return 'result'
   if (snapshot.status !== 'running') return 'ready'
@@ -152,6 +167,9 @@ export class AndroidSightReadingRuntime {
   private reportWriteQueue: Promise<void> = Promise.resolve()
   private settingsSaveGeneration = 0
   private persistenceValue: AndroidPersistenceSnapshot
+  private historyStatusValue: AndroidHistoryRepositorySnapshot['status']
+  private historyWarningValue: string | null
+  private historyErrorValue: string | null
   private readonly listeners = new Set<() => void>()
   private midiResumeRequiredValue = false
 
@@ -174,6 +192,9 @@ export class AndroidSightReadingRuntime {
       durableReportCount: this.reportRepository?.list().length ?? 0,
       pendingReportCount: 0
     }
+    this.historyStatusValue = dependencies.initialReportsError ? 'error' : 'ready'
+    this.historyWarningValue = dependencies.initialHistoryWarning ?? null
+    this.historyErrorValue = dependencies.initialReportsError ?? null
 
     let controller: SightReadingController
     this.midiRouter = new AndroidMidiInputRouter(
@@ -237,6 +258,15 @@ export class AndroidSightReadingRuntime {
     return { ...this.persistenceValue }
   }
 
+  get historySnapshot(): AndroidHistoryRepositorySnapshot {
+    return {
+      status: this.historyStatusValue,
+      records: this.reportRepository?.list() ?? [],
+      warning: this.historyWarningValue,
+      error: this.historyErrorValue
+    }
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
@@ -293,6 +323,21 @@ export class AndroidSightReadingRuntime {
     return this.pendingReportRecords.size === 0
       ? { success: true }
       : { success: false, error: this.persistenceValue.reportError ?? 'Unable to save Sight Reading report' }
+  }
+
+  async refreshHistory(): Promise<ReportLoadResult | null> {
+    if (!this.reportRepository) return null
+    this.historyStatusValue = 'loading'
+    this.historyErrorValue = null
+    this.notify()
+    await this.reportWriteQueue
+    const result = await this.reportRepository.initialize()
+    this.historyStatusValue = result.success ? 'ready' : 'error'
+    this.historyWarningValue = historyWarning(result)
+    this.historyErrorValue = result.success ? null : result.error
+    this.persistenceValue.durableReportCount = result.records.length
+    this.notify()
+    return result
   }
 
   async flushPersistence(): Promise<void> {
@@ -493,6 +538,7 @@ export async function createBrowserAndroidSightReadingRuntime(options?: { native
     reportRepository: persistence.reports,
     initialSettingsError: persistence.settingsLoad.success ? null : persistence.settingsLoad.error,
     initialReportsError: persistence.reportLoad.success ? null : persistence.reportLoad.error,
+    initialHistoryWarning: historyWarning(persistence.reportLoad),
     wallClock: { now: () => Date.now() },
     idGenerator: createProductionRecordId
   })

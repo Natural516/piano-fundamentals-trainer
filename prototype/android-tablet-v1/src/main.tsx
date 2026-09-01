@@ -16,6 +16,12 @@ import {
   getPrimaryErrorNote
 } from './sightReadingIntegration'
 import type { AndroidBluetoothMidiConnectionState } from './androidBluetoothMidi'
+import {
+  formatHistoryDuration,
+  formatHistoryPercentage,
+  formatHistoryTimestamp,
+  projectSightReadingHistory
+} from './historyProjection'
 import './styles.css'
 
 type ScreenId =
@@ -701,32 +707,57 @@ function SightResultScreen({
   )
 }
 
-const historyItems = [
-  { time: '今天 09:42', title: '大谱表 · C 大调', detail: '20 题 · 2 分 18 秒', accuracy: '85%', tone: 'good' },
-  { time: '昨天 20:16', title: '高音谱表 · C 大调', detail: '20 题 · 1 分 52 秒', accuracy: '90%', tone: 'great' },
-  { time: '8 月 26 日 18:30', title: '低音谱表 · C 大调', detail: '50 题 · 5 分 08 秒', accuracy: '78%', tone: 'steady' }
-]
+function HistoryScreen({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element {
+  const history = runtime.historySnapshot
+  const projection = projectSightReadingHistory(history.records)
+  const { summary } = projection
+  useEffect(() => {
+    void runtime.refreshHistory()
+  }, [runtime])
 
-function HistoryScreen(): JSX.Element {
+  const empty = projection.items.length === 0
+  const overallAccuracy = formatHistoryPercentage(summary.overallAccuracy)
+  const averageReaction = summary.averageReactionMs === null ? '—' : (summary.averageReactionMs / 1000).toFixed(2)
+  const listStatus = history.status === 'loading'
+    ? '正在同步本地记录'
+    : history.status === 'error'
+      ? `共 ${summary.totalSessions} 条 · 读取异常`
+      : history.warning
+        ? `共 ${summary.totalSessions} 条 · 部分记录不可用`
+        : `共 ${summary.totalSessions} 条记录`
   return (
     <ProductFrame active="history" title="练习记录">
       <section className="history-layout">
         <div className="history-summary">
-          <div><span className="eyebrow">近 7 天</span><h1>你已经完成 6 次练习</h1><p>共识别 160 个音符，平均正确率 84%。</p></div>
-          <div className="history-summary__stat"><strong>84<small>%</small></strong><span>平均正确率</span></div>
-          <div className="history-summary__stat"><strong>1.31<small>s</small></strong><span>平均反应</span></div>
+          <div>
+            <span className="eyebrow">全部记录</span>
+            <h1>{empty ? '还没有练习记录' : `已有 ${summary.totalSessions} 次练习记录`}</h1>
+            <p>{empty
+              ? '完成或提前结束并保存一轮识谱练习后，会在这里显示。'
+              : `共完成 ${summary.totalCompletedQuestions} 题：正确 ${summary.totalCorrect}，错误 ${summary.totalWrong}，超时 ${summary.totalTimeout}。`}</p>
+          </div>
+          <div className="history-summary__stat"><strong>{overallAccuracy}{summary.overallAccuracy === null ? null : <small>%</small>}</strong><span>总体正确率</span></div>
+          <div className="history-summary__stat"><strong>{averageReaction}{summary.averageReactionMs === null ? null : <small>s</small>}</strong><span>平均反应</span></div>
         </div>
         <div className="history-list">
-          <div className="list-heading"><h2>最近练习</h2><span>共 18 条记录</span></div>
+          <div className="list-heading"><h2>最近练习</h2><span>{listStatus}</span></div>
           <div className="history-list__rows">
-            {historyItems.map((item) => (
-              <button className="history-row" key={item.time} type="button">
+            {projection.items.length > 0 ? projection.items.map((item) => (
+              <article className={`history-row is-${item.completionState}`} key={item.recordId}>
                 <span className="history-row__mark"><Icon name="book" /></span>
-                <span className="history-row__copy"><small>{item.time}</small><strong>{item.title}</strong><em>{item.detail}</em></span>
-                <span className={`history-row__score is-${item.tone}`}><strong>{item.accuracy}</strong><small>正确率</small></span>
-                <Icon name="chevron" size={20} />
-              </button>
-            ))}
+                <span className="history-row__copy">
+                  <small>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small>
+                  <strong>{item.title}</strong>
+                  <em>{item.settingsSummary} · 完成 {item.completed}/{item.plannedQuestionCount} · 正确 {item.correct} / 错误 {item.wrong} / 超时 {item.timeout} · {formatHistoryDuration(item.durationMs)}</em>
+                </span>
+                <span className="history-row__score"><strong>{formatHistoryPercentage(item.accuracy)}%</strong><small>正确率</small></span>
+              </article>
+            )) : (
+              <div className="history-empty" role={history.status === 'error' ? 'alert' : 'status'}>
+                <span className="history-row__mark"><Icon name={history.status === 'error' ? 'info' : 'history'} /></span>
+                <div><strong>{history.status === 'loading' ? '正在读取本地记录…' : history.status === 'error' ? '暂时无法读取练习记录' : '暂无真实练习记录'}</strong><p>{history.status === 'error' ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : '完成一轮识谱练习后，真实结果会显示在这里。'}</p></div>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -1277,7 +1308,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
         return snapshot.report
           ? <SightResultScreen report={snapshot.report} />
           : <SightReadyScreen onStart={startPractice} settings={settings} />
-      case 'history': return <HistoryScreen />
+      case 'history': return <HistoryScreen runtime={runtime} />
       case 'settings': return (
         <SettingsScreen
           onSettingsChange={(changes) => { void runtime.updateSettings(changes) }}

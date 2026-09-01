@@ -1,8 +1,8 @@
 # Android Tablet V1 UI Prototype
 
-Android-first personal-edition UI prototype. A2.2 connects the approved Sight
-Reading surfaces to the real shared headless implementation while retaining
-mock device/update surfaces.
+Android-first personal-edition tablet application. The approved Sight Reading
+surfaces use the shared headless implementation, real Bluetooth MIDI, durable
+Android settings/reports and real local History. Update remains a Mock surface.
 
 ## Target device
 
@@ -443,3 +443,21 @@ of claiming durable success.
 The schema-1 namespace is `piano.v1.*`. It contains no live question/timer
 state and no Bluetooth/MIDI device identity. History and Update remain the
 approved Mock surfaces; A4.1 does not add session recovery or updater behavior.
+
+## A4.2 real History projection
+
+A4.2 raises the permanent Android package to `versionCode=3` and
+`versionName=1.2.0`. The approved History composition now reads the frozen
+A4.1 `SightReadingReportRepository` through an application-owned, read-only
+projection layer. It displays only valid durable Sight Reading COMPLETED and
+STOPPED reports, newest first, and never mixes them with the former Mock rows.
+
+History summary accuracy is computed from total correct divided by total
+settled questions. Aggregate reaction time weights each non-null session mean
+by `correct + wrong`; timeout contributes no reaction sample. A repository
+refresh on History entry exposes newly durable reports while preserving
+startup reconciliation for orphan, stale-index and malformed-record cases.
+The schema-1 keys and existing A4.1 records are not migrated or rewritten.
+
+History remains read-only: there is no delete, edit, export, session recovery,
+or future-module placeholder. Update remains Mock.
