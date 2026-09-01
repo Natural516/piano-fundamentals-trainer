@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { StrictMode, createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
@@ -15,6 +15,7 @@ import {
   formatReactionTime,
   getPrimaryErrorNote
 } from './sightReadingIntegration'
+import type { AndroidBluetoothMidiConnectionState } from './androidBluetoothMidi'
 import './styles.css'
 
 type ScreenId =
@@ -95,6 +96,46 @@ const productNavigation = [
 const SHOW_DEVELOPMENT_TOOLS = import.meta.env.DEV || import.meta.env.MODE === 'android-debug'
 
 type SightRuntimeSnapshot = AndroidSightReadingRuntime['snapshot']
+
+interface MidiUiContextValue {
+  runtime: AndroidSightReadingRuntime
+}
+
+const MidiUiContext = createContext<MidiUiContextValue | null>(null)
+
+function useMidiUi(): MidiUiContextValue {
+  const value = useContext(MidiUiContext)
+  if (!value) throw new Error('MIDI UI must be rendered inside MidiUiContext')
+  return value
+}
+
+interface MidiStatusPresentation {
+  label: string
+  detail: string
+  tone: 'connected' | 'busy' | 'idle' | 'error' | 'development'
+}
+
+function presentMidiStatus(runtime: AndroidSightReadingRuntime): MidiStatusPresentation {
+  if (runtime.midiSource === 'development') {
+    return { label: '开发 MIDI', detail: 'DEBUG 模拟输入', tone: 'development' }
+  }
+  const midi = runtime.bluetoothSnapshot
+  const name = midi.connectedDeviceName ?? 'FP-30X'
+  const states: Record<AndroidBluetoothMidiConnectionState, MidiStatusPresentation> = {
+    UNSUPPORTED: { label: '不支持 MIDI', detail: '设备缺少 BLE MIDI 能力', tone: 'error' },
+    PERMISSION_REQUIRED: { label: '需要权限', detail: '允许附近设备后扫描', tone: 'idle' },
+    PERMISSION_DENIED: { label: '权限被拒绝', detail: '请重新授权附近设备', tone: 'error' },
+    BLUETOOTH_OFF: { label: '蓝牙已关闭', detail: '请先打开系统蓝牙', tone: 'error' },
+    IDLE: { label: 'MIDI 未连接', detail: '打开 MIDI 页面扫描', tone: 'idle' },
+    SCANNING: { label: '正在扫描', detail: '查找 BLE MIDI 钢琴', tone: 'busy' },
+    DEVICE_FOUND: { label: '已发现设备', detail: '请选择钢琴连接', tone: 'busy' },
+    CONNECTING: { label: '正在连接', detail: name, tone: 'busy' },
+    CONNECTED: { label: `${name} 已连接`, detail: 'MIDI 输入端口已打开', tone: 'connected' },
+    DISCONNECTED: { label: 'MIDI 已断开', detail: '可重新扫描并连接', tone: 'error' },
+    ERROR: { label: 'MIDI 连接错误', detail: midi.lastError ?? '请重试', tone: 'error' }
+  }
+  return states[midi.connectionState]
+}
 
 const NOTE_POOL_LABELS: Record<SightReadingNotePoolMode, string> = {
   diatonic: '调内音',
@@ -238,11 +279,13 @@ function useViewportMetrics(): ViewportMetrics | null {
 }
 
 function MidiStatusButton({ compact = false }: { compact?: boolean }): JSX.Element {
+  const { runtime } = useMidiUi()
+  const status = presentMidiStatus(runtime)
   return (
-    <button className={`midi-status ${compact ? 'is-compact' : ''}`} type="button" onClick={() => navigate('midi')}>
+    <button className={`midi-status is-${status.tone} ${compact ? 'is-compact' : ''}`} type="button" onClick={() => navigate('midi')}>
       <span className="midi-status__signal"><Icon name="bluetooth" size={18} /></span>
-      {!compact ? <span><strong>MIDI Mock</strong><small>尚未接入蓝牙</small></span> : null}
-      <i aria-label="MIDI 状态为原型占位" />
+      {!compact ? <span><strong>{status.label}</strong><small>{status.detail}</small></span> : null}
+      <i aria-label={status.label} />
     </button>
   )
 }
@@ -338,6 +381,8 @@ function NotationPaper({
 }
 
 function HomeScreen({ settings }: { settings: SightReadingSettings }): JSX.Element {
+  const { runtime } = useMidiUi()
+  const midiStatus = presentMidiStatus(runtime)
   return (
     <ProductFrame active="home" title="今天，读几页新音符">
       <section className="home-hero">
@@ -370,8 +415,8 @@ function HomeScreen({ settings }: { settings: SightReadingSettings }): JSX.Eleme
         </button>
         <button className="glance-item" type="button" onClick={() => navigate('midi')}>
           <span className="glance-icon is-blue"><Icon name="bluetooth" /></span>
-          <span><small>MIDI 输入</small><strong>Roland FP-30X</strong><em>连接状态为原型占位</em></span>
-          <span className="status-dot" />
+          <span><small>MIDI 输入</small><strong>{midiStatus.label}</strong><em>{midiStatus.detail}</em></span>
+          <span className={`status-dot is-${midiStatus.tone}`} />
         </button>
         <button className="glance-item" type="button" onClick={() => navigate('update')}>
           <span className="glance-icon is-amber"><Icon name="refresh" /></span>
@@ -390,6 +435,8 @@ function SightReadyScreen({
   onStart: () => void
   settings: SightReadingSettings
 }): JSX.Element {
+  const { runtime } = useMidiUi()
+  const midiStatus = presentMidiStatus(runtime)
   return (
     <ProductFrame active="sight" title="识谱练习">
       <section className="ready-layout">
@@ -410,7 +457,11 @@ function SightReadyScreen({
           <div>
             <span className="eyebrow">本轮设置</span>
             <h2>{settings.questionCount} 个音符</h2>
-            <p>使用右下角开发控制发送模拟 MIDI；MIDI 页面连接状态仍为 Mock。</p>
+            <p>{runtime.midiSource === 'development'
+              ? '当前使用 DEBUG 模拟输入；可在开发控制中切换到真实蓝牙 MIDI。'
+              : midiStatus.tone === 'connected'
+                ? '直接在已连接的 FP-30X 上弹奏目标音。'
+                : '开始前请打开 MIDI 页面，扫描并连接 FP-30X。'}</p>
           </div>
           <div className="setting-summary">
             <div><small>谱表</small><strong>{STAFF_MODE_LABELS[settings.staffMode]}</strong></div>
@@ -418,7 +469,9 @@ function SightReadyScreen({
             <div><small>题数</small><strong>{settings.questionCount}</strong></div>
             <div><small>每题时限</small><strong>固定 5 秒</strong></div>
           </div>
-          <div className="ready-device"><span><Icon name="bluetooth" /></span><div><strong>开发模拟 MIDI</strong><small>仅用于 A2.2 UI 集成测试</small></div><i /></div>
+          <button className="ready-device" type="button" onClick={() => navigate('midi')}>
+            <span><Icon name="bluetooth" /></span><div><strong>{midiStatus.label}</strong><small>{midiStatus.detail}</small></div><i className={`is-${midiStatus.tone}`} />
+          </button>
           <button className="primary-action is-wide" type="button" onClick={onStart}>
             <Icon name="play" />开始练习
           </button>
@@ -446,6 +499,7 @@ function PracticeFocusHeader({
   onPauseToggle,
   onRequestEnd,
   remainingTimeMs,
+  resumeBlocked,
   screen,
   settings,
   snapshot
@@ -453,6 +507,7 @@ function PracticeFocusHeader({
   onPauseToggle: () => void
   onRequestEnd: () => void
   remainingTimeMs: number
+  resumeBlocked: boolean
   screen: ScreenId
   settings: SightReadingSettings
   snapshot: SightRuntimeSnapshot
@@ -473,9 +528,9 @@ function PracticeFocusHeader({
       </div>
       <div className="focus-actions">
         <MidiStatusButton compact />
-        <button className="outline-action" type="button" onClick={onPauseToggle}>
+        <button className="outline-action" disabled={resumeBlocked} type="button" onClick={onPauseToggle}>
           <Icon name={snapshot.isPaused ? 'play' : 'pause'} />
-          <span>{snapshot.isPaused ? '继续' : '暂停'}</span>
+          <span>{snapshot.isPaused ? resumeBlocked ? '等待 MIDI' : '继续' : '暂停'}</span>
         </button>
       </div>
       <div className="focus-time-track" aria-label="本题剩余时间">
@@ -509,6 +564,12 @@ function SightFocusScreen({
   const isTimeout = snapshot.phase === 'feedback' && snapshot.result === 'timeout'
   const feedback: MusicNotationFeedback = isCorrect ? 'correct' : isWrong ? 'wrong_note' : isTimeout ? 'timeout' : null
   const targetName = snapshot.currentNote?.noteName ?? '—'
+  const midiStatus = presentMidiStatus(runtime)
+  const transportPause = runtime.midiSource === 'bluetooth' && runtime.midiResumeRequired
+  const resumeBlocked = transportPause && runtime.bluetoothSnapshot.connectionState !== 'CONNECTED'
+  const pausedPrompt = transportPause
+    ? resumeBlocked ? 'MIDI 已断开，练习已安全暂停' : 'MIDI 已恢复，请点击继续'
+    : '练习已暂停'
   const remainingTimeMs = useRemainingTime(runtime, snapshot)
   const requestEnd = (): void => {
     runtime.pause()
@@ -529,13 +590,14 @@ function SightFocusScreen({
         onPauseToggle={() => snapshot.isPaused ? runtime.resume() : runtime.pause()}
         onRequestEnd={requestEnd}
         remainingTimeMs={remainingTimeMs}
+        resumeBlocked={resumeBlocked}
         screen={screen}
         settings={settings}
         snapshot={snapshot}
       />
       <main className="focus-content">
         <div className="focus-prompt">
-          <span>{snapshot.isPaused ? '练习已暂停' : isCorrect ? '回答正确' : isWrong ? '这次弹错了' : isTimeout ? '本题超时' : '请弹出这个音'}</span>
+          <span>{snapshot.isPaused ? pausedPrompt : isCorrect ? '回答正确' : isWrong ? '这次弹错了' : isTimeout ? '本题超时' : '请弹出这个音'}</span>
           {!snapshot.isPaused && !isCorrect && !isWrong && !isTimeout && settings.noteNameVisible
             ? <strong>{targetName}</strong>
             : null}
@@ -552,7 +614,13 @@ function SightFocusScreen({
             noteFeedback={isWrong ? null : feedback}
             staffMode={settings.staffMode}
           />
-          {snapshot.isPaused ? <div className="focus-paused-state"><Icon name="pause" size={32} /><strong>已暂停</strong></div> : null}
+          {snapshot.isPaused ? (
+            <div className="focus-paused-state">
+              <Icon name="pause" size={32} />
+              <strong>{transportPause ? midiStatus.label : '已暂停'}</strong>
+              {transportPause ? <small>{resumeBlocked ? '重新连接后再继续' : '连接已恢复，需明确继续'}</small> : null}
+            </div>
+          ) : null}
         </section>
         <div className="focus-footer">
           <PracticeMetric label="完成" value={String(snapshot.completedQuestions)} />
@@ -723,18 +791,20 @@ function SettingsScreen({
   theme: 'light' | 'dark'
   onThemeChange: (theme: 'light' | 'dark') => void
 }): JSX.Element {
+  const { runtime } = useMidiUi()
+  const midiStatus = presentMidiStatus(runtime)
   return (
     <ProductFrame active="settings" title="设置">
       <section className="settings-layout">
         <div className="settings-column">
           <div className="settings-group">
-            <div className="group-title"><span>设备</span><small>A2.2 保留 Mock</small></div>
+            <div className="group-title"><span>设备</span><small>Android 原生 BLE MIDI</small></div>
             <SettingRow
-              description="蓝牙 MIDI · 当前阶段未接入"
+              description={midiStatus.detail}
               icon="bluetooth"
               onClick={() => navigate('midi')}
-              title="Roland FP-30X"
-              action={<span className="connected-label"><i />Mock</span>}
+              title={runtime.bluetoothSnapshot.connectedDeviceName ?? 'Roland FP-30X'}
+              action={<span className={`connected-label is-${midiStatus.tone}`}><i />{midiStatus.label}</span>}
             />
           </div>
           <div className="settings-group settings-group--sight">
@@ -832,26 +902,81 @@ function SettingsScreen({
 }
 
 function MidiScreen(): JSX.Element {
+  const { runtime } = useMidiUi()
+  const midi = runtime.bluetoothSnapshot
+  const status = presentMidiStatus(runtime)
+  const scanActive = midi.connectionState === 'SCANNING' || midi.connectionState === 'DEVICE_FOUND'
+  const lastEvent = midi.diagnostics.lastNormalizedEvent
+  const action = (() => {
+    if (midi.connectionState === 'UNSUPPORTED') {
+      return { label: '此设备不支持', disabled: true, run: () => {} }
+    }
+    if (midi.connectionState === 'PERMISSION_REQUIRED' || midi.connectionState === 'PERMISSION_DENIED') {
+      return { label: '允许附近设备', disabled: false, run: () => { void runtime.bluetooth.requestPermissions() } }
+    }
+    if (midi.connectionState === 'BLUETOOTH_OFF') {
+      return { label: '请先打开系统蓝牙', disabled: true, run: () => {} }
+    }
+    if (midi.connectionState === 'CONNECTED') {
+      return { label: '断开 MIDI', disabled: false, run: () => { void runtime.bluetooth.disconnect() } }
+    }
+    if (scanActive) {
+      return { label: '停止扫描', disabled: false, run: () => { void runtime.bluetooth.stopScan() } }
+    }
+    return { label: '扫描 MIDI 设备', disabled: false, run: () => { void runtime.bluetooth.scan() } }
+  })()
+
   return (
     <div className="standalone-frame">
       <ProductHeader title="MIDI 连接" onBack={() => navigate('settings')} />
       <main className="standalone-content">
         <section className="device-hero">
           <div className="device-orbit"><span><Icon name="bluetooth" size={42} /></span><i /><i /><i /></div>
-          <span className="connected-label large"><i />Mock 状态</span>
-          <h1>Roland FP-30X</h1>
-          <p>此页仍是已批准的连接状态 Mock；A2.2 只在开发控制区发送模拟 MIDI，不代表蓝牙已经连接。</p>
+          <span className={`connected-label large is-${status.tone}`}><i />{status.label}</span>
+          <h1>{midi.connectedDeviceName ?? 'Roland FP-30X'}</h1>
+          <p>{status.detail}。使用 Android 原生 BLE MIDI / MidiManager 接收钢琴输入，不需要经典蓝牙音频配对。</p>
+          <button className="secondary-action midi-primary-action" disabled={action.disabled} type="button" onClick={action.run}>
+            <Icon name="refresh" />{action.label}
+          </button>
         </section>
         <section className="device-details">
-          <div><small>设备类型</small><strong>Mock Bluetooth MIDI</strong></div>
-          <div><small>输入状态</small><strong>尚未接入</strong></div>
-          <div><small>最近活动</small><strong>无真实输入</strong></div>
+          <div><small>设备类型</small><strong>BLE MIDI · receive only</strong></div>
+          <div><small>输入端口</small><strong>{midi.midiPortState}</strong></div>
+          <div><small>最近活动</small><strong>{lastEvent ? `${lastEvent.type} · ${lastEvent.midiNumber ?? '—'}` : '等待真实输入'}</strong></div>
           <div><small>应用发声</small><strong>关闭</strong></div>
         </section>
+        {midi.discoveredDevices.length > 0 ? (
+          <section className="midi-device-list" aria-label="发现的 Bluetooth MIDI 设备">
+            <div className="list-heading"><h2>发现的 MIDI 设备</h2><span>{midi.discoveredDevices.length} 个候选</span></div>
+            <div>
+              {midi.discoveredDevices.map((device) => {
+                const connected = midi.connectionState === 'CONNECTED' && midi.connectedDeviceId === device.id
+                return (
+                  <button
+                    className={connected ? 'is-connected' : ''}
+                    disabled={midi.connectionState === 'CONNECTING' || connected}
+                    key={device.id}
+                    type="button"
+                    onClick={() => { void runtime.bluetooth.connect(device.id) }}
+                  >
+                    <span><Icon name="bluetooth" /></span>
+                    <span><strong>{device.name}</strong><small>{device.manufacturer ?? device.product ?? '标准 BLE MIDI'}</small></span>
+                    <em>{connected ? '已连接' : '连接'}</em>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        ) : null}
         <section className="device-help">
           <span><Icon name="info" /></span>
-          <div><strong>没有收到琴键输入？</strong><p>确认 FP-30X 已开机并完成系统蓝牙 MIDI 配对，然后重新连接。</p></div>
-          <button className="secondary-action" type="button"><Icon name="refresh" />重新连接</button>
+          <div>
+            <strong>{midi.lastError ? '连接诊断' : '没有发现或收到琴键输入？'}</strong>
+            <p>{midi.lastError ?? '确认 FP-30X 已开机且 Bluetooth MIDI 可用，然后重新扫描。A3.1 不要求反复进行经典蓝牙配对。'}</p>
+          </div>
+          <button className="secondary-action" disabled={midi.bluetoothState !== 'ON' || midi.permissionState !== 'GRANTED'} type="button" onClick={() => { void runtime.bluetooth.scan() }}>
+            <Icon name="refresh" />重新扫描
+          </button>
         </section>
       </main>
     </div>
@@ -871,7 +996,7 @@ function UpdateScreen(): JSX.Element {
           <div className="version-line"><span>当前版本</span><strong>V1 Prototype</strong></div>
           <div className="version-line"><span>上次检查</span><strong>今天 10:24</strong></div>
           <button className="primary-action is-wide" type="button"><Icon name="refresh" />再次检查</button>
-          <small className="mock-disclaimer">A2.2 原型仅展示入口与视觉状态，不执行网络请求或 APK 更新。</small>
+          <small className="mock-disclaimer">A3.1 中更新功能仍为 Mock，仅展示入口与视觉状态，不执行网络请求或 APK 更新。</small>
         </section>
       </main>
     </div>
@@ -895,6 +1020,9 @@ function ReviewDock({
   const reports = runtime.reports.list()
   const latestReport = runtime.reports.latest()
   const nativeDebug = Capacitor.isNativePlatform()
+  const midi = runtime.bluetoothSnapshot
+  const midiStatus = presentMidiStatus(runtime)
+  const developmentInputActive = runtime.midiSource === 'development'
 
   const selectScreen = (target: ScreenId): void => {
     if (target === 'sight-active' && snapshot.status !== 'running') runtime.start()
@@ -905,7 +1033,7 @@ function ReviewDock({
   return (
     <div className={`review-dock ${open ? 'is-open' : ''}`}>
       <button className="review-dock__trigger" type="button" onClick={() => setOpen((value) => !value)}>
-        <span>{nativeDebug ? 'A3.0 · DEBUG' : 'A2.2 · DEV'}</span><strong>{activeLabel}</strong><Icon name="chevron" size={16} />
+        <span>{nativeDebug ? 'A3.1 · DEBUG' : 'A3.1 · DEV'}</span><strong>{activeLabel}</strong><Icon name="chevron" size={16} />
       </button>
       {open ? (
         <div className="review-dock__menu">
@@ -924,16 +1052,20 @@ function ReviewDock({
             <section className="developer-midi" aria-label="开发模拟 MIDI 控制">
               <div className="developer-midi__heading">
                 <span>DEVELOPMENT ONLY</span>
-                <strong>模拟 MIDI 输入</strong>
+                <strong>MIDI 输入源</strong>
+              </div>
+              <div className="developer-midi__source" role="group" aria-label="DEBUG MIDI 输入源">
+                <button className={!developmentInputActive ? 'is-active' : ''} type="button" onClick={() => runtime.setMidiInputSource('bluetooth')}>真实蓝牙 MIDI</button>
+                <button className={developmentInputActive ? 'is-active' : ''} type="button" onClick={() => runtime.setMidiInputSource('development')}>开发模拟 MIDI</button>
               </div>
               <div className="developer-midi__status">
                 <span>目标 <strong>{snapshot.currentNote?.noteName ?? '—'}</strong></span>
                 <span>阶段 <strong>{snapshot.phase}</strong></span>
-                <span>事件 <strong>{runtime.midi.events().length}</strong></span>
+                <span>来源 <strong>{developmentInputActive ? 'DEVELOPMENT' : 'REAL BLUETOOTH'}</strong></span>
               </div>
               <div className="developer-midi__actions">
-                <button disabled={!canAnswer} type="button" onClick={() => runtime.sendCorrect()}>答对</button>
-                <button disabled={!canAnswer} type="button" onClick={() => runtime.sendWrong()}>答错</button>
+                <button disabled={!canAnswer || !developmentInputActive} type="button" onClick={() => runtime.sendCorrect()}>答对</button>
+                <button disabled={!canAnswer || !developmentInputActive} type="button" onClick={() => runtime.sendWrong()}>答错</button>
               </div>
               <div className="developer-midi__exact">
                 <input
@@ -945,13 +1077,37 @@ function ReviewDock({
                   value={midiNumber}
                   onChange={(event) => setMidiNumber(event.target.value)}
                 />
-                <button disabled={!canAnswer} type="button" onClick={() => runtime.sendMidi(Number(midiNumber))}>发送 NOTE_ON</button>
+                <button disabled={!canAnswer || !developmentInputActive} type="button" onClick={() => runtime.sendMidi(Number(midiNumber))}>发送 NOTE_ON</button>
               </div>
               <button className="developer-midi__restart" type="button" onClick={() => { runtime.restart(); navigate('sight-active') }}>
                 重新开始开发会话
               </button>
               <small>normalized NOTE_ON → shared controller；真实 5 秒 timeout 没有快捷按钮。</small>
               <small>内存报告 {reports.length} 份{latestReport ? ` · 最近：${latestReport.completionState} / ${latestReport.completedQuestions} 题` : ''}</small>
+              <div className="bluetooth-midi-diagnostic">
+                <strong>BLUETOOTH MIDI DIAGNOSTICS</strong>
+                <span><b>permission</b>{midi.permissionState}</span>
+                <span><b>Android API</b>{midi.androidApiLevel || 'browser'}</span>
+                <span><b>Bluetooth</b>{midi.bluetoothState}</span>
+                <span><b>connection</b>{midi.connectionState}</span>
+                <span><b>device</b>{midi.connectedDeviceName ?? midi.discoveredDevices[0]?.name ?? '—'}</span>
+                <span><b>identity</b>{midi.connectedDeviceId ?? midi.discoveredDevices[0]?.id ?? '—'}</span>
+                <span><b>source</b>{midi.discoveredDevices[0]?.source ?? '—'}</span>
+                <span><b>service</b>{midi.discoveredDevices[0]?.serviceUuids?.join(', ') ?? midi.scanServiceUuid}</span>
+                <span><b>port</b>{midi.midiPortState}</span>
+                <span><b>messages</b>{midi.diagnostics.receivedMessageCount}</span>
+                <span><b>raw</b>{midi.diagnostics.lastRawMessage}</span>
+                <span><b>normalized</b>{midi.diagnostics.lastNormalizedEvent
+                  ? `${midi.diagnostics.lastNormalizedEvent.type} ${midi.diagnostics.lastNormalizedEvent.midiNumber ?? ''}`
+                  : '—'}</span>
+                <span><b>event id</b>{midi.diagnostics.lastNormalizedEvent?.id ?? '—'}</span>
+                <span><b>timestamp</b>{midi.diagnostics.lastNormalizedEvent?.timestamp.toFixed(3) ?? '—'}</span>
+                <span><b>native ns</b>{midi.diagnostics.lastNativeTimestampNanos ?? '—'}</span>
+                <span><b>channel</b>{midi.diagnostics.lastChannel ?? '—'}</span>
+                <span><b>controller</b>{midi.diagnostics.lastController}</span>
+                <span><b>disconnect/reconnect</b>{midi.disconnectCount}/{midi.reconnectCount}</span>
+                <span><b>status</b>{midiStatus.label}</span>
+              </div>
             </section>
           ) : null}
           {SHOW_DEVELOPMENT_TOOLS && metrics ? (
@@ -977,13 +1133,21 @@ function OrientationNotice(): JSX.Element {
 
 function App(): JSX.Element {
   const runtimeRef = useRef<AndroidSightReadingRuntime | null>(null)
-  if (!runtimeRef.current) runtimeRef.current = createBrowserAndroidSightReadingRuntime()
+  if (!runtimeRef.current) {
+    runtimeRef.current = createBrowserAndroidSightReadingRuntime({
+      nativeBluetooth: Capacitor.isNativePlatform()
+    })
+  }
   const runtime = runtimeRef.current
   const snapshot = useSightReadingRuntime(runtime)
   const settings = runtime.settings
   const [screen, setScreen] = useState<ScreenId>(() => readScreen())
   const screenRef = useRef<ScreenId>(screen)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
+
+  useEffect(() => {
+    void runtime.startMidi()
+  }, [runtime])
 
   useEffect(() => {
     const updateScreen = (): void => setScreen(readScreen())
@@ -1000,7 +1164,7 @@ function App(): JSX.Element {
     if (!Capacitor.isNativePlatform()) return
 
     let disposed = false
-    let removeListener: (() => Promise<void>) | null = null
+    const removeListeners: Array<() => Promise<void>> = []
 
     void CapacitorApp.addListener('backButton', () => {
       const currentScreen = screenRef.current
@@ -1046,12 +1210,23 @@ function App(): JSX.Element {
         void handle.remove()
         return
       }
-      removeListener = () => handle.remove()
+      removeListeners.push(() => handle.remove())
+    })
+
+    void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) void runtime.resumeFromAppLifecycle()
+      else void runtime.suspendForAppLifecycle()
+    }).then((handle) => {
+      if (disposed) {
+        void handle.remove()
+        return
+      }
+      removeListeners.push(() => handle.remove())
     })
 
     return () => {
       disposed = true
-      if (removeListener) void removeListener()
+      for (const remove of removeListeners) void remove()
     }
   }, [runtime])
 
@@ -1103,11 +1278,11 @@ function App(): JSX.Element {
   })()
 
   return (
-    <>
+    <MidiUiContext.Provider value={{ runtime }}>
       <div className="tablet-app">{content}</div>
       <ReviewDock active={screen} runtime={runtime} snapshot={snapshot} />
       <OrientationNotice />
-    </>
+    </MidiUiContext.Provider>
   )
 }
 

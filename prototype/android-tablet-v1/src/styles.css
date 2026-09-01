@@ -274,6 +274,34 @@ button:focus-visible {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 15%, transparent);
 }
 
+.midi-status.is-busy i,
+.status-dot.is-busy,
+.ready-device i.is-busy,
+.connected-label.is-busy i {
+  background: var(--amber);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--amber) 15%, transparent);
+}
+
+.midi-status.is-idle i,
+.midi-status.is-development i,
+.status-dot.is-idle,
+.status-dot.is-development,
+.ready-device i.is-idle,
+.ready-device i.is-development,
+.connected-label.is-idle i,
+.connected-label.is-development i {
+  background: var(--blue);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--blue) 15%, transparent);
+}
+
+.midi-status.is-error i,
+.status-dot.is-error,
+.ready-device i.is-error,
+.connected-label.is-error i {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 15%, transparent);
+}
+
 .midi-status.is-compact {
   min-width: 50px;
   padding-right: 9px;
@@ -315,6 +343,12 @@ button:focus-visible {
   border-radius: 18px;
   cursor: pointer;
   font-weight: 720;
+}
+
+.secondary-action:disabled,
+.outline-action:disabled {
+  cursor: not-allowed;
+  opacity: .5;
 }
 
 .primary-action {
@@ -644,6 +678,11 @@ button:focus-visible {
   padding: 13px;
   border-radius: 16px;
   background: var(--surface-soft);
+  width: 100%;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
 }
 
 .ready-device > span {
@@ -828,6 +867,11 @@ button:focus-visible {
 
 .focus-paused-state strong {
   font-size: 18px;
+}
+
+.focus-paused-state small {
+  color: var(--ink-secondary);
+  font-size: 12px;
 }
 
 .focus-stage .notation-paper {
@@ -1459,6 +1503,16 @@ button.setting-row {
   font-size: 13px;
 }
 
+.connected-label.is-busy { color: var(--amber); }
+.connected-label.is-idle,
+.connected-label.is-development { color: var(--blue); }
+.connected-label.is-error { color: var(--danger); }
+
+.connected-label.large.is-busy { background: var(--amber-soft); }
+.connected-label.large.is-idle,
+.connected-label.large.is-development { background: var(--blue-soft); }
+.connected-label.large.is-error { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); }
+
 .theme-segmented {
   display: flex;
   padding: 4px;
@@ -1492,7 +1546,7 @@ button.setting-row {
   min-height: 0;
   align-content: center;
   grid-template-columns: 1fr minmax(360px, 0.72fr);
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   gap: 20px 28px;
   padding: 34px 7vw;
 }
@@ -1502,7 +1556,7 @@ button.setting-row {
   min-height: 430px;
   align-items: center;
   justify-content: center;
-  grid-row: 1 / 3;
+  grid-row: 1 / 4;
   flex-direction: column;
   padding: 32px;
   border: 1px solid var(--line);
@@ -1561,6 +1615,11 @@ button.setting-row {
   line-height: 1.7;
 }
 
+.midi-primary-action {
+  min-height: 48px;
+  margin-top: 18px;
+}
+
 .device-details {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1584,6 +1643,55 @@ button.setting-row {
 .device-details div:nth-last-child(-n + 2) { border-bottom: 0; }
 .device-details small { color: var(--ink-muted); font-size: 11px; }
 .device-details strong { font-size: 15px; }
+
+.midi-device-list {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.midi-device-list > div:last-child {
+  display: grid;
+  gap: 8px;
+}
+
+.midi-device-list > div:last-child > button {
+  display: grid;
+  min-height: 58px;
+  align-items: center;
+  grid-template-columns: 38px 1fr auto;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.midi-device-list button > span:first-child {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.midi-device-list button > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.midi-device-list button strong { font-size: 13px; }
+.midi-device-list button small { color: var(--ink-muted); font-size: 10px; }
+.midi-device-list button em { color: var(--accent); font-size: 11px; font-style: normal; font-weight: 750; }
+.midi-device-list button:disabled { cursor: default; opacity: .7; }
 
 .device-help {
   display: grid;
@@ -1747,7 +1855,7 @@ button.setting-row {
   position: absolute;
   right: 0;
   bottom: 56px;
-  width: 286px;
+  width: 336px;
   overflow: hidden auto;
   max-height: min(690px, calc(100dvh - 86px));
   padding: 8px;
@@ -1831,6 +1939,24 @@ button.setting-row {
   font-size: 12px;
 }
 
+.developer-midi__source {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.developer-midi__source button {
+  padding: 0 6px;
+  background: #25382e;
+  font-size: 9px;
+}
+
+.developer-midi__source button.is-active {
+  border-color: #91c9ab;
+  background: #416b54;
+  color: white;
+}
+
 .developer-midi__status {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1894,6 +2020,38 @@ button.setting-row {
   color: #8fa096;
   font-size: 8px;
   line-height: 1.4;
+}
+
+.bluetooth-midi-diagnostic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(255, 255, 255, .1);
+}
+
+.bluetooth-midi-diagnostic > strong {
+  grid-column: 1 / -1;
+  color: #91c9ab;
+  font-size: 8px;
+  letter-spacing: .08em;
+}
+
+.bluetooth-midi-diagnostic span {
+  display: grid;
+  overflow: hidden;
+  gap: 1px;
+  color: #e6eee9;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 8px;
+  text-overflow: ellipsis;
+}
+
+.bluetooth-midi-diagnostic b {
+  color: #708078;
+  font-size: 7px;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .viewport-diagnostic {

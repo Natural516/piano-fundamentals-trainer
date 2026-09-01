@@ -18,6 +18,8 @@
     "test:regression": "node scripts/regression-check.cjs",
     "test:sight-reading": "tsc --noEmit -p tsconfig.sight-reading.json && node scripts/sight-reading-contracts.cjs",
     "test:android-integration": "node scripts/android-sight-reading-integration.cjs",
+    "test:android-bluetooth-midi": "node scripts/android-bluetooth-midi-check.cjs",
+    "test:android-bluetooth-midi:native": "cd android && gradlew.bat testDebugUnitTest --tests com.pianofundamentals.trainer.BluetoothMidiStatePolicyTest",
     "test:android-shell": "node scripts/android-shell-check.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "build": "npm run typecheck && electron-vite build",

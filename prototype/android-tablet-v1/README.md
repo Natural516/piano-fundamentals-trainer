@@ -187,9 +187,10 @@ runtime in a thin Capacitor Android shell. The stable Android identity is:
 - Orientation: landscape
 - Signing: Android DEBUG signing only
 
-The shell does not contain Bluetooth/MIDI discovery, pairing, permissions, or
-input code. Settings and reports remain in memory. History, MIDI, and Update
-remain the approved Mock surfaces.
+At the approved A3.0 checkpoint, the shell did not contain Bluetooth/MIDI
+discovery, pairing, permissions, or input code. Settings and reports remain in
+memory. A3.1 replaces only the MIDI Mock surface; History and Update remain the
+approved Mock surfaces.
 
 The Android DEBUG web build uses Vite mode `android-debug`, which keeps the
 simulated normalized MIDI controls and the DEVICE-001-APP viewport diagnostic
@@ -255,3 +256,146 @@ the natural five-second timeout, pause/resume, early end, and a complete
 10-question RESULT. Then test background/foreground, lock/unlock, and a cold
 launch with Wi-Fi disabled. These device checks are Human QA; A3.0 does not
 claim final Android lifecycle recovery semantics.
+
+## A3.1 FP-30X Bluetooth MIDI
+
+A3.1 adds a receive-only Android native MIDI path without changing the shared
+Sight Reading controller or the approved ACTIVE composition:
+
+```text
+FP-30X BLE MIDI advertisement
+  -> Android BluetoothLeScanner (standard MIDI service UUID only)
+  -> MidiManager.openBluetoothDevice / openDevice
+  -> piano MidiDevice output port
+  -> Android MidiReceiver byte-stream chunks
+  -> AndroidBluetoothMidiPlugin (Capacitor Kotlin)
+  -> AndroidBluetoothMidiAdapter
+  -> JS Clock timestamp + process-wide monotonic event ID
+  -> normalized SightReadingMidiEvent
+  -> SightReadingController.handleMidi()
+```
+
+The native `System.nanoTime()` value is retained only in DEBUG diagnostics.
+Judgement timestamps are assigned at bridge receipt using the same
+`performance.now()` clock as the shared controller, so clock epochs are never
+mixed. The TypeScript byte-stream parser handles partial callbacks, multiple
+messages, running status and interleaved real-time bytes. NOTE_ON velocity zero
+is normalized to NOTE_OFF; CC64 reaches the existing control-change contract
+and remains ignored by Sight Reading judgement.
+
+The Android 12+ permission set is limited to `BLUETOOTH_SCAN` and
+`BLUETOOTH_CONNECT`; scan declares `neverForLocation`. API 24-30 uses legacy
+Bluetooth declarations and runtime `ACCESS_FINE_LOCATION`, all capped at API
+30. The app does not request Bluetooth advertise, background location, audio,
+camera, storage or unrelated permissions.
+
+The plugin scans only the standard BLE MIDI service UUID
+`03B80E5A-EDE8-4B33-A751-6CE34EC4C700`, also enumerates Bluetooth MIDI devices
+already visible to MidiManager, and opens only the piano's MIDI output port so
+the app receives input. It does not implement BLE GATT MIDI parsing, system
+audio pairing, MIDI forwarding, MIDI output, or a software synth.
+
+DEBUG builds retain two explicitly exclusive input modes: `REAL BLUETOOTH MIDI`
+and `DEVELOPMENT MIDI`. One process-wide router owns event IDs and accepts only
+the selected source. Native builds default to real Bluetooth MIDI; browser
+development defaults to DevelopmentMidiAdapter. The DEBUG dock reports
+permission/Bluetooth/connection/port state, discovered identity, raw bytes,
+native timestamp, normalized event and timestamp, event ID, channel, CC value,
+message count and disconnect/reconnect counts.
+
+On disconnect, Bluetooth off, app background or screen lock, a running Sight
+Reading session is paused, transient input is cleared, and the watermark is
+advanced without scoring or advancing. Reconnect does not resume timing.
+After connection and lifecycle validation, the user must explicitly continue.
+No last-device identity is persisted in A3.1.
+
+### A3.1 real-hardware Human QA (DEVICE-001 + Roland FP-30X)
+
+Before testing, install the A3.1 DEBUG APK over the A3.0 DEBUG build, launch the
+app, open the `A3.1 · DEBUG` dock, and keep the input source on
+`真实蓝牙 MIDI`. Do not use the simulated answer buttons during H1-H16.
+
+1. **H1 — Piano already on.** Enable Android Bluetooth and power on the FP-30X
+   before launching the app. Open MIDI, grant Nearby devices if requested,
+   scan, identify the actual Roland/FP-30X advertisement, connect, and play
+   several notes. Confirm the port is OPEN and real activity increments.
+2. **H2 — App starts first.** With the piano off, launch the app, then power on
+   the FP-30X. Scan and connect without restarting the app.
+3. **H3 — Correct answer.** Start Sight Reading, wait for the answer window,
+   play the displayed target on the real FP-30X, and confirm CORRECT.
+4. **H4 — Wrong answer.** Play a different note and confirm WRONG reports the
+   actual played note.
+5. **H5 — Timeout.** Play nothing and confirm the real fixed five-second
+   TIMEOUT still occurs.
+6. **H6 — Fast repeat.** Repeatedly press the same key quickly. In DEBUG verify
+   every NOTE_ON receives a distinct increasing event ID.
+7. **H7 — Chord/near-simultaneous input.** Play a simple chord. Verify every
+   attack is visible and equal timestamps never collapse distinct IDs. Sight
+   Reading still judges only the first valid NOTE_ON by its approved contract.
+8. **H8 — Pedal.** Press/release the sustain pedal. Confirm CC64 down/up appears
+   in DEBUG and never becomes an answer.
+9. **H9 — Disconnect during ACTIVE.** While awaiting an answer, power off the
+   piano or otherwise break MIDI. Confirm the session pauses, the timeout
+   freezes, facts do not change, and there is no phantom answer/advance.
+10. **H10 — Reconnect same piano.** Power on/scan/connect the same piano. Before
+    continuing, confirm no stale answer appears. Explicitly press Continue and
+    finish the current question in the same live session.
+11. **H11 — FP-30X power cycle.** From CONNECTED, power the piano off and on,
+    then scan/connect/continue without restarting Android.
+12. **H12 — Android Bluetooth cycle.** From CONNECTED, turn Android Bluetooth
+    off and back on. Confirm clean pause/disconnect, then scan/connect/continue
+    without crash or phantom MIDI.
+13. **H13 — Pedal disconnect boundary.** Hold CC64 down, disconnect, reconnect,
+    release the pedal, and explicitly continue. Confirm no stuck or phantom
+    judgement state.
+14. **H14 — Background/foreground.** During a live session, background the app,
+    play notes and wait more than five seconds, then foreground. Confirm no
+    unseen answer or timeout was recorded; explicitly continue.
+15. **H15 — Screen lock/unlock.** Repeat H14 using screen lock. Confirm the
+    connection state is valid, stale input is rejected and resume is explicit.
+16. **H16 — Complete real round.** Complete a 10-question session entirely on
+    the FP-30X and verify RESULT correct/wrong/timeout/completed/accuracy facts.
+
+Record for the QA report: Android API level, permission result, actual advertised
+name and DEBUG identity, whether the device came from `bleScan` or
+`midiManager`, port state, disconnect/reconnect counts, and any native error.
+If the standard UUID scan or `MidiManager.openBluetoothDevice()` cannot discover
+or open the FP-30X, stop testing and capture scan results, advertised service
+UUIDs, MidiManager visibility, permission state and the exact native error.
+Do not add a custom BLE-MIDI GATT parser without a separate Human Review.
+
+### A3.1 real-hardware approval
+
+Android A3.1 real-hardware Human QA passed on the personal target hardware:
+
+- Android tablet: Lenovo Xiaoxin Pad Pro 12.7, landscape
+- Piano: Roland FP-30X
+
+The real standard BLE MIDI / Android `MidiManager` path was verified for device
+discovery and connection, real note input, fast repeated attacks,
+near-simultaneous chord input, and CC64 down/up without pedal events becoming
+Sight Reading answers. Correct notes, wrong notes with the actual played pitch,
+the fixed five-second timeout, and a complete 10-question session all produced
+the expected controller facts and RESULT report.
+
+The same hardware review also passed disconnect/reconnect safety, explicit
+resume without stale judgement, FP-30X power off/on recovery, Android Bluetooth
+off/on recovery, CC64-down disconnect recovery, app background/foreground, and
+screen lock/unlock. No app restart, phantom answer, timeout drift, stuck
+transient state, or unintended question advance was observed.
+
+This approval proves only the Lenovo Xiaoxin Pad Pro 12.7 and Roland FP-30X
+combination. It does not claim compatibility with other tablets or pianos.
+
+The approved Android BLE MIDI discovery path, `MidiManager` integration,
+Capacitor Kotlin boundary, byte-stream parser, JS clock-domain timestamps,
+process-wide event IDs, source exclusivity, disconnect watermark/reset,
+explicit-resume behavior, and `SightReadingController` MIDI contract are now
+frozen. The approved Home, READY, ACTIVE, CORRECT, WRONG, TIMEOUT, RESULT, MIDI
+page, navigation, and staff scale also remain frozen. These areas require a
+demonstrated bug or a new explicit requirement before further changes. A custom
+BLE GATT MIDI transport is not warranted by the approved hardware path.
+
+`SIGN-001` remains open at priority P1. Permanent release signing is still
+required before persistent real-user data or updater-compatible release
+distribution. A3.1 remains DEBUG signed and does not create a release keystore.
