@@ -107,10 +107,10 @@ share that file.
 
 `android/version.properties` is the single Android package-version source.
 The permanent Release chain began at A4.0B with `versionCode=1` and
-`versionName=1.0`. The current A4.2 update values are:
+`versionName=1.0`. The current A4.3B update values are:
 
-- `versionCode=3`
-- `versionName=1.2.0`
+- `versionCode=4`
+- `versionName=1.3.0`
 
 For every distributable update:
 

@@ -29,6 +29,8 @@
     "test:android-release-mode": "node scripts/android-release-mode-check.cjs",
     "test:android-persistence": "node scripts/android-persistence-check.cjs",
     "test:android-history": "node scripts/android-history-check.cjs",
+    "test:android-updater": "node scripts/android-updater-check.cjs",
+    "test:android-updater:native": "node scripts/android-updater-native-check.cjs",
     "test:android-shell": "node scripts/android-shell-check.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "build": "npm run typecheck && electron-vite build",

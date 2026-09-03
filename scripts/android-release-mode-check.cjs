@@ -59,6 +59,13 @@ try {
   assert.equal(bundle.includes('Android 原生 BLE MIDI'), true, 'Release APK is missing the real Bluetooth MIDI path')
   assert.equal(bundle.includes('扫描 MIDI 设备'), true, 'Release APK is missing normal MIDI connection UI')
 
+  for (const token of ['更新服务尚未配置', '安装始终由 Android 系统确认', '检查更新']) {
+    assert.equal(bundle.includes(token), true, `Release APK is missing real updater UI: ${token}`)
+  }
+  for (const token of ['跳过签名', '跳过哈希', '接受任意 APK', 'Development updater']) {
+    assert.equal(bundle.includes(token), false, `Release APK exposes an updater bypass/control: ${token}`)
+  }
+
   process.stdout.write('PASS Release APK excludes development-only controls and diagnostics\n')
   process.stdout.write('PASS Release APK retains real Bluetooth MIDI connection UI\n')
   process.stdout.write('\n2/2 Android release-mode checks PASS\n')

@@ -460,4 +460,66 @@ startup reconciliation for orphan, stale-index and malformed-record cases.
 The schema-1 keys and existing A4.1 records are not migrated or rewritten.
 
 History remains read-only: there is no delete, edit, export, session recovery,
-or future-module placeholder. Update remains Mock.
+or future-module placeholder.
+
+## A4.3B updater implementation candidate
+
+A4.3B raises the permanent Android package to `versionCode=4` and
+`versionName=1.3.0`. The existing Update card now binds to a real,
+user-initiated updater state machine. No update request is made during app
+startup. The build-time endpoint is `UPDATE_MANIFEST_URL`; an absent or invalid
+endpoint produces only the sanitized updater configuration error.
+
+The platform-neutral TypeScript core in `src/updaterCore.ts` owns strict JSON
+parsing (including duplicate-key rejection), exact schema/semantic validation,
+numeric version decisions, legal state transitions, release-note
+normalization, and sanitized UI outcomes. `src/androidUpdater.ts` provides the
+bounded HTTPS manifest adapter and the narrow Capacitor port binding. It never
+receives an APK path or install URI.
+
+The Android `AndroidUpdaterPlugin` streams a selected HTTPS APK into
+`cache/update/parts`, enforces the manifest size and the 256 MiB application
+limit, hashes the completed bytes, and verifies archive package, version and
+the exact current permanent signer. API 28 and newer use current
+`apkContentsSigners`; API 24–27 use the legacy current `signatures` path. Only
+after every check passes is the closed file atomically moved to the read-only
+`cache/update/verified` scope and represented in JavaScript by a process-local
+opaque token.
+
+`installVerifiedArtifact(token)` is the only installer entry point. It
+re-checks the live token, canonical scope, read-only state, identity, byte
+count, SHA-256, package, version and signer immediately before creating a
+narrow FileProvider `content://` URI. API 26 and newer preflight the official
+per-app install-source capability; API 24–25 do not execute that newer API.
+Launching the normal Android system installer produces only
+`installerLaunched`, never an installed-success claim.
+
+`UPDATE-HOST-001` remains open. A4.3B deliberately contains no public manifest
+or APK host and does not claim real-network updater QA.
+
+### A4.3B DEVICE-001 focused Human QA
+
+Use the permanent-signed Release APK on the Lenovo Xiaoxin Pad Pro 12.7. Keep
+the currently installed Release 1.2.0 (`versionCode=3`) and do not uninstall it.
+
+1. **B1 — In-place upgrade.** Install Release 1.3.0 (`versionCode=4`) over
+   1.2.0. Confirm Android accepts the same package/signer and all existing
+   settings and History records remain.
+2. **B2 — Protected surfaces.** Inspect Home, Sight Reading, History, Settings
+   and MIDI. Confirm the approved composition and behavior remain unchanged.
+3. **B3 — Real Update card.** Open Settings → Update. Confirm the existing card
+   hierarchy remains and no fake version, time, download or success fact is
+   shown.
+4. **B4 — Missing host containment.** With `UPDATE_MANIFEST_URL` intentionally
+   absent for this candidate, tap Check Update. Confirm only a concise
+   updater-specific configuration error appears and all other app areas remain
+   available.
+5. **B5 — Real piano practice.** Return to Sight Reading, connect the real
+   Roland FP-30X and complete a short practice using real Bluetooth MIDI.
+6. **B6 — Durable History.** Open History and confirm every pre-upgrade record
+   plus the B5 report is present and accurate.
+7. **B7 — Offline cold launch.** Fully close the app, disable network access,
+   cold-launch it and confirm normal offline startup, records and practice.
+8. **B8 — Release-only surface.** Confirm no Human Review dock, simulated MIDI,
+   viewport diagnostic, updater bypass, fake APK acceptance, or other Debug
+   controls are visible.

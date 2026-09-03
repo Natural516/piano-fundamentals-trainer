@@ -7,6 +7,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AndroidBluetoothMidiPlugin.class);
+        registerPlugin(AndroidUpdaterPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

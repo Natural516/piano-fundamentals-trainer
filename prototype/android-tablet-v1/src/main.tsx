@@ -22,6 +22,8 @@ import {
   formatHistoryTimestamp,
   projectSightReadingHistory
 } from './historyProjection'
+import { createAndroidUpdaterController } from './androidUpdater'
+import { UpdaterController, type UpdaterSnapshot, type UpdaterStatus } from './updaterCore'
 import './styles.css'
 
 type ScreenId =
@@ -109,10 +111,29 @@ interface MidiUiContextValue {
 
 const MidiUiContext = createContext<MidiUiContextValue | null>(null)
 
+interface UpdaterUiContextValue {
+  controller: UpdaterController
+  snapshot: UpdaterSnapshot
+}
+
+const UpdaterUiContext = createContext<UpdaterUiContextValue | null>(null)
+
 function useMidiUi(): MidiUiContextValue {
   const value = useContext(MidiUiContext)
   if (!value) throw new Error('MIDI UI must be rendered inside MidiUiContext')
   return value
+}
+
+function useUpdaterUi(): UpdaterUiContextValue {
+  const value = useContext(UpdaterUiContext)
+  if (!value) throw new Error('Updater UI must be rendered inside UpdaterUiContext')
+  return value
+}
+
+function useUpdaterSnapshot(controller: UpdaterController): UpdaterSnapshot {
+  const [snapshot, setSnapshot] = useState<UpdaterSnapshot>(() => controller.snapshot)
+  useEffect(() => controller.subscribe(() => setSnapshot(controller.snapshot)), [controller])
+  return snapshot
 }
 
 interface MidiStatusPresentation {
@@ -823,6 +844,7 @@ function SettingsScreen({
   onThemeChange: (theme: 'light' | 'dark') => void
 }): JSX.Element {
   const { runtime } = useMidiUi()
+  const { snapshot: updater } = useUpdaterUi()
   const midiStatus = presentMidiStatus(runtime)
   const persistence = runtime.persistenceSnapshot
   const settingsStatus = persistence.settingsStatus === 'saving'
@@ -830,6 +852,13 @@ function SettingsScreen({
     : persistence.settingsStatus === 'error'
       ? '保存失败'
       : persistence.settingsStatus === 'saved' ? '已保存到此设备' : '使用默认设置'
+  const updaterLabel = updater.status === 'updateAvailable'
+    ? '发现新版本'
+    : updater.status === 'readyToInstall'
+      ? '已验证'
+      : updater.status === 'checking' || updater.status === 'downloading' || updater.status === 'verifying'
+        ? '处理中'
+        : updater.status === 'error' ? '需要检查' : '检查更新'
   return (
     <ProductFrame active="settings" title="设置">
       <section className="settings-layout">
@@ -929,8 +958,8 @@ function SettingsScreen({
           </div>
           <div className="settings-group">
             <div className="group-title"><span>关于</span><small>个人版</small></div>
-            <SettingRow description="查看版本与更新状态" icon="refresh" onClick={() => navigate('update')} title="检查更新" action={<strong>已是最新</strong>} />
-            <SettingRow description="Android Tablet Personal Edition" icon="info" title="当前版本" action={<strong>V1 Prototype</strong>} />
+            <SettingRow description="查看版本与更新状态" icon="refresh" onClick={() => navigate('update')} title="检查更新" action={<strong>{updaterLabel}</strong>} />
+            <SettingRow description="Android Tablet Personal Edition" icon="info" title="当前版本" action={<strong>{updater.installed ? `V${updater.installed.versionName}` : '正在读取'}</strong>} />
           </div>
         </div>
       </section>
@@ -1020,20 +1049,90 @@ function MidiScreen(): JSX.Element {
   )
 }
 
+function updaterStatusCopy(status: UpdaterStatus): { eyebrow: string; title: string; detail: string } {
+  const copy: Record<UpdaterStatus, { eyebrow: string; title: string; detail: string }> = {
+    idle: { eyebrow: '更新状态', title: '检查应用更新', detail: '仅在你点击后连接公开的 HTTPS 更新服务。' },
+    checking: { eyebrow: '正在检查', title: '正在获取更新信息', detail: '练习、记录与 MIDI 功能不会被更新检查阻塞。' },
+    upToDate: { eyebrow: '更新状态', title: '当前没有可用的新版本', detail: '版本判断只使用 Android versionCode。' },
+    updateAvailable: { eyebrow: '发现更新', title: '有新的应用版本', detail: '下载后还会验证大小、哈希、包名、版本与永久签名。' },
+    downloading: { eyebrow: '正在下载', title: '正在下载更新包', detail: '更新包保存在应用私有缓存中，下载完成前不可安装。' },
+    verifying: { eyebrow: '安全验证', title: '正在验证更新包', detail: '所有验证步骤都必须通过，没有跳过按钮。' },
+    readyToInstall: { eyebrow: '验证完成', title: '更新包可以交给系统安装', detail: '点击后仍需在 Android 系统安装器中明确确认。' },
+    installPermissionRequired: { eyebrow: '需要系统授权', title: '允许此应用安装更新', detail: '打开系统设置并授权后，返回应用重新确认，再次点击安装。' },
+    installerLaunched: { eyebrow: '系统安装器', title: '已打开 Android 系统安装器', detail: '这不代表安装已经成功；完成后重新打开应用确认真实版本。' },
+    error: { eyebrow: '更新未完成', title: '暂时无法完成这次更新操作', detail: '该问题只影响更新功能，练习与本地记录仍可正常使用。' }
+  }
+  return copy[status]
+}
+
 function UpdateScreen(): JSX.Element {
+  const { controller, snapshot } = useUpdaterUi()
+  const copy = updaterStatusCopy(snapshot.status)
+  const currentVersion = snapshot.installed ? `V${snapshot.installed.versionName} · ${snapshot.installed.versionCode}` : '正在读取'
+  const targetVersion = snapshot.manifest ? `V${snapshot.manifest.versionName} · ${snapshot.manifest.versionCode}` : '—'
+  const action: { label: string; disabled: boolean; run: () => void; secondary?: boolean } = (() => {
+    if (snapshot.status === 'checking' || snapshot.status === 'verifying') {
+      return { label: '处理中…', disabled: true, run: () => {} }
+    }
+    if (snapshot.status === 'downloading') {
+      return { label: '取消下载', disabled: false, run: () => { void controller.cancelDownload() }, secondary: true }
+    }
+    if (snapshot.status === 'updateAvailable') {
+      return { label: '下载更新', disabled: false, run: () => { void controller.download() } }
+    }
+    if (snapshot.status === 'readyToInstall') {
+      return { label: '交给系统安装', disabled: false, run: () => { void controller.install() } }
+    }
+    if (snapshot.status === 'installPermissionRequired') {
+      return { label: '打开系统设置', disabled: false, run: () => { void controller.openInstallSettings() } }
+    }
+    if (snapshot.status === 'installerLaunched') {
+      return { label: '等待系统安装确认', disabled: true, run: () => {} }
+    }
+    if (snapshot.status === 'error') {
+      if (!snapshot.retryAction) return { label: '无法继续', disabled: true, run: () => {} }
+      return { label: snapshot.retryAction === 'download' ? '重新下载' : snapshot.retryAction === 'install' ? '重试安装' : '重新检查', disabled: false, run: () => { void controller.retry() } }
+    }
+    return { label: snapshot.status === 'upToDate' ? '再次检查' : '检查更新', disabled: false, run: () => { void controller.check() } }
+  })()
+  const icon: IconName = snapshot.status === 'error'
+    ? 'close'
+    : snapshot.status === 'upToDate' || snapshot.status === 'readyToInstall'
+      ? 'check'
+      : 'refresh'
+
   return (
     <div className="standalone-frame">
       <ProductHeader title="检查更新" onBack={() => navigate('settings')} />
       <main className="update-content">
-        <section className="update-card">
-          <div className="update-illustration"><Icon name="check" size={52} /><span /></div>
-          <span className="eyebrow">更新状态</span>
-          <h1>你正在使用最新版本</h1>
-          <p>Android Tablet Personal Edition</p>
-          <div className="version-line"><span>当前版本</span><strong>V1 Prototype</strong></div>
-          <div className="version-line"><span>上次检查</span><strong>今天 10:24</strong></div>
-          <button className="primary-action is-wide" type="button"><Icon name="refresh" />再次检查</button>
-          <small className="mock-disclaimer">A3.1 中更新功能仍为 Mock，仅展示入口与视觉状态，不执行网络请求或 APK 更新。</small>
+        <section className={`update-card is-${snapshot.status}`} aria-live="polite">
+          <div className="update-illustration"><Icon name={icon} size={52} /><span /></div>
+          <span className="eyebrow">{copy.eyebrow}</span>
+          <h1>{copy.title}</h1>
+          <p>{snapshot.errorMessage ?? copy.detail}</p>
+          <div className="version-line"><span>当前版本</span><strong>{currentVersion}</strong></div>
+          <div className="version-line"><span>目标版本</span><strong>{targetVersion}</strong></div>
+          {snapshot.manifest && snapshot.status === 'updateAvailable' ? (
+            <div className="update-release-notes" aria-label="版本说明">
+              <strong>本次更新</strong>
+              {snapshot.manifest.releaseNotes.length > 0
+                ? <ul>{snapshot.manifest.releaseNotes.map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}</ul>
+                : <p>此版本没有附加说明。</p>}
+            </div>
+          ) : null}
+          {snapshot.status === 'downloading' && snapshot.progress ? (
+            <div className="update-progress" aria-label={`下载进度 ${Math.round(snapshot.progress.percent)}%`}>
+              <div><span style={{ width: `${snapshot.progress.percent}%` }} /></div>
+              <small>{Math.round(snapshot.progress.percent)}% · {Math.round(snapshot.progress.receivedBytes / 1024)} / {Math.round(snapshot.progress.totalBytes / 1024)} KiB</small>
+            </div>
+          ) : null}
+          <button className={`${action.secondary ? 'secondary-action' : 'primary-action'} is-wide`} disabled={action.disabled} type="button" onClick={action.run}>
+            <Icon name={snapshot.status === 'readyToInstall' ? 'chevron' : 'refresh'} />{action.label}
+          </button>
+          {snapshot.status === 'installPermissionRequired' ? (
+            <button className="update-inline-action" type="button" onClick={() => { void controller.refreshInstallPermission() }}>我已返回，重新检查授权</button>
+          ) : null}
+          <small className="update-security-note">安装始终由 Android 系统确认。更新失败不会影响离线练习与本地记录。</small>
         </section>
       </main>
     </div>
@@ -1185,6 +1284,8 @@ function PersistenceErrorNotice({ runtime }: { runtime: AndroidSightReadingRunti
 
 function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element {
   const snapshot = useSightReadingRuntime(runtime)
+  const updater = useMemo(() => createAndroidUpdaterController(), [])
+  const updaterSnapshot = useUpdaterSnapshot(updater)
   const settings = runtime.settings
   const [screen, setScreen] = useState<ScreenId>(() => readScreen())
   const screenRef = useRef<ScreenId>(screen)
@@ -1193,6 +1294,11 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   useEffect(() => {
     void runtime.startMidi()
   }, [runtime])
+
+  useEffect(() => {
+    void updater.initialize()
+    return () => { void updater.dispose() }
+  }, [updater])
 
   useEffect(() => {
     const updateScreen = (): void => setScreen(readScreen())
@@ -1259,8 +1365,12 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
     })
 
     void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
-      if (isActive) void runtime.resumeFromAppLifecycle()
-      else void runtime.suspendForAppLifecycle()
+      if (isActive) {
+        void runtime.resumeFromAppLifecycle()
+        void updater.refreshInstallPermission()
+      } else {
+        void runtime.suspendForAppLifecycle()
+      }
     }).then((handle) => {
       if (disposed) {
         void handle.remove()
@@ -1273,7 +1383,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       disposed = true
       for (const remove of removeListeners) void remove()
     }
-  }, [runtime])
+  }, [runtime, updater])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -1323,12 +1433,14 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   })()
 
   return (
-    <MidiUiContext.Provider value={{ runtime }}>
-      <div className="tablet-app">{content}</div>
-      <PersistenceErrorNotice runtime={runtime} />
-      {SHOW_DEVELOPMENT_TOOLS ? <ReviewDock active={screen} runtime={runtime} snapshot={snapshot} /> : null}
-      <OrientationNotice />
-    </MidiUiContext.Provider>
+    <UpdaterUiContext.Provider value={{ controller: updater, snapshot: updaterSnapshot }}>
+      <MidiUiContext.Provider value={{ runtime }}>
+        <div className="tablet-app">{content}</div>
+        <PersistenceErrorNotice runtime={runtime} />
+        {SHOW_DEVELOPMENT_TOOLS ? <ReviewDock active={screen} runtime={runtime} snapshot={snapshot} /> : null}
+        <OrientationNotice />
+      </MidiUiContext.Provider>
+    </UpdaterUiContext.Provider>
   )
 }
 

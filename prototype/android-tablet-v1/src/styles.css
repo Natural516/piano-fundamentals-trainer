@@ -1836,6 +1836,103 @@ button.setting-row {
   margin-top: 18px;
 }
 
+.update-card .secondary-action {
+  margin-top: 18px;
+}
+
+.update-card.is-checking .update-illustration svg,
+.update-card.is-downloading .update-illustration svg,
+.update-card.is-verifying .update-illustration svg {
+  animation: update-spin 1.35s linear infinite;
+}
+
+.update-card.is-error .update-illustration {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger);
+}
+
+.update-card.is-error .update-illustration span {
+  background: var(--danger);
+}
+
+.update-release-notes {
+  width: 100%;
+  max-height: 112px;
+  padding: 12px 14px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  text-align: left;
+}
+
+.update-release-notes > strong {
+  font-size: 12px;
+}
+
+.update-release-notes ul {
+  margin: 7px 0 0;
+  padding-left: 18px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.update-release-notes p {
+  margin: 7px 0 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.update-progress {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.update-progress > div {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--accent-soft);
+}
+
+.update-progress > div > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+.update-progress small {
+  display: block;
+  margin-top: 7px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+.update-inline-action {
+  min-height: 42px;
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.update-security-note {
+  margin-top: 14px;
+  color: var(--ink-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+@keyframes update-spin {
+  to { transform: rotate(360deg); }
+}
+
 .mock-disclaimer {
   margin-top: 16px;
   color: var(--ink-muted);
