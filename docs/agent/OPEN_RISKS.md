@@ -34,6 +34,24 @@
 - Evidence: permanent key established, independent backup completed by the user, Release signing verified, first Release APK passed real-device Human QA, and the one-time DEBUG-to-RELEASE migration completed.
 - The keystore and credentials remain external/local-only. Future distributable APKs must keep the same package and signer identity and increment `versionCode`.
 
+### UPDATE-HOST-001 — Public HTTPS Updater Artifacts
+
+- Discovered: Android A4.3A
+- Priority: P1
+- Status: CLOSED
+- Public release repository: `https://github.com/Natural516/piano-trainer-releases`.
+- Production Manifest endpoint: `https://github.com/Natural516/piano-trainer-releases/releases/latest/download/latest.json`.
+- Closure evidence: the DEVICE-001 real-network Human QA run consumed the public Manifest through the Android app, downloaded the permanent-signed APK, passed the complete size/hash/package/version/current-signer/verified-token/FileProvider verification chain, completed an in-place system-installer update from `versionCode=7` to `versionCode=8`, and preserved durable settings and History data.
+- Hosting remains credential-free in the application. GitHub credentials or tokens are not part of the production updater contract.
+
+### A4.3C-BLOCKER-001 — GitHub Release Manifest WebView CORS Incompatibility
+
+- Priority: P1
+- Status: RESOLVED
+- Demonstrated cause: Android WebView browser fetch could not reliably read the public GitHub Release `latest.json` asset because the asset delivery path was not CORS-readable.
+- Approved resolution: Android Release builds use the narrow native HTTPS `fetchManifest()` transport, which returns bounded raw UTF-8 JSON to the existing TypeScript `parseUpdaterManifest()` authority.
+- Frozen rule: do not restore WebView fetch as the Android Release production Manifest transport. HTTPS-only redirects, the 65,536-byte response bound, fatal UTF-8 handling, sanitized updater-only failures, and all existing TypeScript schema/version decisions remain mandatory.
+
 ### F3.1a — Free Practice Real-Time Staff Defects
 
 - Status: CLOSED
@@ -48,19 +66,6 @@
 - Do not repeat Shared-mode library experiments unless new endpoint, driver, or hardware evidence appears.
 
 ## Open backlog
-
-### UPDATE-HOST-001 — Public HTTPS Updater Artifacts
-
-- Discovered: Android A4.3A
-- Priority: P1
-- Status: OPEN / BLOCKS REAL-NETWORK UPDATER HUMAN QA
-- Real end-to-end updater Human QA requires one publicly reachable HTTPS
-  manifest URL and one publicly reachable HTTPS APK URL for a
-  permanent-signed APK.
-- Hosting remains vendor-neutral. The updater contract must not depend on a
-  GitHub-, Cloudflare-, or other provider-specific API, and no artifact is
-  published during A4.3A.
-- Resolution trigger: immediately before updater real-network Human QA.
 
 ### UI-003 — Final Virtual Piano & Free Practice Visualization Polish
 

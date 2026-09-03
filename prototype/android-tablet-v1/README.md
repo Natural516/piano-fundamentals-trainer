@@ -523,3 +523,49 @@ the currently installed Release 1.2.0 (`versionCode=3`) and do not uninstall it.
 8. **B8 — Release-only surface.** Confirm no Human Review dock, simulated MIDI,
    viewport diagnostic, updater bypass, fake APK acceptance, or other Debug
    controls are visible.
+
+## A4.3C native Manifest transport blocker fix
+
+The public v1.3.2 / `versionCode=6` QA release exposed a real Android WebView
+CORS blocker while reading the GitHub Release `latest.json` asset. That release
+is treated as consumed and superseded; it is not replaced or reissued.
+
+The final reviewable source is `versionCode=8`, `versionName=1.3.4`. A verified
+`versionCode=7`, `versionName=1.3.3` Release APK is preserved only as the
+manually installed QA bootstrap. Neither generated APK is committed.
+
+Normal `android-release` builds bind the production manifest endpoint to:
+
+`https://github.com/Natural516/piano-trainer-releases/releases/latest/download/latest.json`
+
+The endpoint has one committed source in `android/updater.properties`.
+`android-release` always uses this production endpoint and ignores the
+development `UPDATE_MANIFEST_URL` override. Debug and local diagnostic builds
+retain the existing optional override, so deterministic missing/invalid
+configuration tests remain available without affecting a distributable
+Release.
+
+Android production Manifest retrieval no longer uses WebView `fetch` or CORS.
+The existing `AndroidUpdaterPlugin.fetchManifest()` owns HTTPS transport only:
+controlled HTTPS redirects, bounded streaming, fatal UTF-8 decoding, timeouts
+and cleanup. It accepts no arbitrary URL from the UI and returns bounded raw
+JSON plus minimal transport metadata. The existing platform-neutral
+`parseUpdaterManifest()` remains solely responsible for strict JSON/schema,
+package and version decisions; Kotlin does not duplicate those rules.
+
+The local, ignored QA artifact directory is:
+
+`android/app/build/outputs/updater/a4.3c/`
+
+The replacement GitHub Release tag is `v1.3.4`. Its only manually uploaded
+assets are `piano-trainer-1.3.4.apk` and the regenerated `latest.json`; the
+manifest uses the tag-specific APK URL.
+
+DEVICE-001 real-network Human QA passed the complete in-place `versionCode=7`
+to `versionCode=8` path, including public native Manifest retrieval, APK
+download and verification, system-installer handoff, durable data preservation,
+post-update version confirmation, FP-30X practice, cold launch and offline use.
+`UPDATE-HOST-001` is CLOSED and `A4.3C-BLOCKER-001` is RESOLVED. The final
+approved Android V1 Release baseline is `versionCode=8`,
+`versionName=1.3.4`; future distributable builds must use a versionCode greater
+than 8.

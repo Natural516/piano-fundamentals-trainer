@@ -31,6 +31,7 @@
     "test:android-history": "node scripts/android-history-check.cjs",
     "test:android-updater": "node scripts/android-updater-check.cjs",
     "test:android-updater:native": "node scripts/android-updater-native-check.cjs",
+    "test:android-updater:network": "node scripts/android-native-manifest-network-check.cjs",
     "test:android-shell": "node scripts/android-shell-check.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "build": "npm run typecheck && electron-vite build",

@@ -28,6 +28,13 @@ interface NativeInstalledPackageResult extends NativeUpdaterResult {
   versionName?: string
 }
 
+interface NativeManifestResult extends NativeUpdaterResult {
+  manifestText?: string
+  finalUrl?: string
+  redirectCount?: number
+  byteCount?: number
+}
+
 interface NativeVerifiedArtifactResult extends NativeUpdaterResult {
   token?: string
   packageId?: typeof UPDATER_PACKAGE_ID
@@ -48,6 +55,7 @@ interface NativeUpdaterProgressEvent extends NativeVerificationProgress {
 
 interface AndroidUpdaterPlugin {
   getInstalledPackageInfo(): Promise<NativeInstalledPackageResult>
+  fetchManifest(): Promise<NativeManifestResult>
   invalidateSelection(): Promise<NativeUpdaterResult>
   downloadAndVerify(request: NativeVerificationRequest): Promise<NativeVerifiedArtifactResult>
   cancelDownload(): Promise<NativeUpdaterResult>
@@ -153,15 +161,43 @@ export class HttpsManifestFetchAdapter {
   }
 }
 
+export class AndroidNativeManifestFetchAdapter {
+  constructor(private readonly plugin: AndroidUpdaterPlugin) {}
+
+  async fetchManifest(configuredUrl: string): Promise<string> {
+    try {
+      validateUpdaterHttpsUrl(configuredUrl)
+      const result = requireSuccess(await this.plugin.fetchManifest(), 'MANIFEST_NETWORK_ERROR')
+      if (typeof result.manifestText !== 'string' || typeof result.finalUrl !== 'string' ||
+          !Number.isSafeInteger(result.redirectCount) || Number(result.redirectCount) < 0 ||
+          !Number.isSafeInteger(result.byteCount) || Number(result.byteCount) < 0) {
+        throw new UpdaterFailure('MANIFEST_NETWORK_ERROR')
+      }
+      validateUpdaterHttpsUrl(result.finalUrl)
+      const actualBytes = new TextEncoder().encode(result.manifestText).byteLength
+      if (actualBytes > UPDATER_MANIFEST_MAX_BYTES || actualBytes !== result.byteCount) {
+        throw new UpdaterFailure('MANIFEST_INVALID')
+      }
+      return result.manifestText
+    } catch (error) {
+      throw updaterFailureFromUnknown(error, 'MANIFEST_NETWORK_ERROR')
+    }
+  }
+}
+
 export class AndroidNativeUpdaterPorts implements UpdaterPorts {
   private progressListener: PluginListenerHandle | null = null
   private progressCallback: ((progress: NativeVerificationProgress) => void) | null = null
   private progressSelectionId: string | null = null
 
+  private readonly manifestFetcher: { fetchManifest(url: string): Promise<string> }
+
   constructor(
     private readonly plugin: AndroidUpdaterPlugin,
-    private readonly manifestFetcher = new HttpsManifestFetchAdapter()
-  ) {}
+    manifestFetcher?: { fetchManifest(url: string): Promise<string> }
+  ) {
+    this.manifestFetcher = manifestFetcher ?? new AndroidNativeManifestFetchAdapter(plugin)
+  }
 
   async getInstalledPackageInfo(): Promise<InstalledPackageInfo> {
     try {

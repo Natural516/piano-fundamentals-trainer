@@ -51,6 +51,19 @@ class AndroidUpdaterPlugin : Plugin() {
         val signerSet: Set<String>
     )
 
+    private data class ManifestConnection(
+        val connection: HttpsURLConnection,
+        val finalUrl: URL,
+        val redirectCount: Int
+    )
+
+    private data class ManifestResponse(
+        val text: String,
+        val finalUrl: String,
+        val redirectCount: Int,
+        val byteCount: Int
+    )
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
     private val cancellationRequested = AtomicBoolean(false)
@@ -89,6 +102,25 @@ class AndroidUpdaterPlugin : Plugin() {
             })
         } catch (_: Exception) {
             call.resolve(failure("INSTALLED_PACKAGE_INFO_ERROR"))
+        }
+    }
+
+    @PluginMethod
+    fun fetchManifest(call: PluginCall) {
+        worker.execute {
+            try {
+                val response = fetchProductionManifest()
+                resolveOnMain(call, success().apply {
+                    put("manifestText", response.text)
+                    put("finalUrl", response.finalUrl)
+                    put("redirectCount", response.redirectCount)
+                    put("byteCount", response.byteCount)
+                })
+            } catch (failure: NativeFailure) {
+                resolveOnMain(call, failure(failure.code))
+            } catch (_: Exception) {
+                resolveOnMain(call, failure("MANIFEST_NETWORK_ERROR"))
+            }
         }
     }
 
@@ -315,6 +347,86 @@ class AndroidUpdaterPlugin : Plugin() {
                 resolveOnMain(call, failure("INSTALL_LAUNCH_FAILED"))
             }
         }
+    }
+
+    private fun fetchProductionManifest(): ManifestResponse {
+        val initialUrl = try {
+            AndroidManifestTransportPolicy.validatedHttpsUrl(URL(BuildConfig.UPDATE_MANIFEST_URL))
+        } catch (_: Exception) {
+            throw NativeFailure("UPDATER_CONFIGURATION_ERROR")
+        }
+        val opened = openManifestConnection(initialUrl)
+        try {
+            val declaredLength = opened.connection.contentLengthLong
+            if (declaredLength > AndroidManifestTransportPolicy.MAX_MANIFEST_BYTES) {
+                throw NativeFailure("MANIFEST_INVALID")
+            }
+            val bounded = BoundedManifestUtf8Buffer()
+            BufferedInputStream(opened.connection.inputStream).use { input ->
+                val buffer = ByteArray(8 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    if (read > 0) bounded.append(buffer, 0, read)
+                }
+            }
+            return ManifestResponse(
+                text = bounded.decodeUtf8(),
+                finalUrl = opened.finalUrl.toString(),
+                redirectCount = opened.redirectCount,
+                byteCount = bounded.size
+            )
+        } catch (failure: NativeFailure) {
+            throw failure
+        } catch (failure: ManifestTransportFailure) {
+            throw NativeFailure(failure.errorCode)
+        } catch (_: Exception) {
+            throw NativeFailure("MANIFEST_NETWORK_ERROR")
+        } finally {
+            opened.connection.disconnect()
+        }
+    }
+
+    private fun openManifestConnection(initialUrl: URL): ManifestConnection {
+        var current = initialUrl
+        repeat(AndroidManifestTransportPolicy.MAX_REDIRECTS + 1) { redirectCount ->
+            val connection = current.openConnection() as? HttpsURLConnection
+                ?: throw NativeFailure("MANIFEST_NETWORK_ERROR")
+            try {
+                connection.instanceFollowRedirects = false
+                connection.requestMethod = "GET"
+                connection.connectTimeout = CONNECT_TIMEOUT_MS
+                connection.readTimeout = READ_TIMEOUT_MS
+                connection.useCaches = false
+                connection.setRequestProperty("Accept", "application/json")
+                connection.setRequestProperty("Accept-Encoding", "identity")
+                connection.setRequestProperty("Cache-Control", "no-store")
+                val status = connection.responseCode
+                if (status in 200..299) {
+                    return ManifestConnection(connection, current, redirectCount)
+                }
+                if (AndroidManifestTransportPolicy.isRedirect(status) &&
+                    redirectCount < AndroidManifestTransportPolicy.MAX_REDIRECTS) {
+                    val location = connection.getHeaderField("Location")
+                        ?: throw NativeFailure("MANIFEST_NETWORK_ERROR")
+                    current = try {
+                        AndroidManifestTransportPolicy.redirectedHttpsUrl(current, location)
+                    } catch (_: ManifestTransportFailure) {
+                        throw NativeFailure("MANIFEST_NETWORK_ERROR")
+                    }
+                    connection.disconnect()
+                } else {
+                    throw NativeFailure("MANIFEST_NETWORK_ERROR")
+                }
+            } catch (failure: NativeFailure) {
+                connection.disconnect()
+                throw failure
+            } catch (_: Exception) {
+                connection.disconnect()
+                throw NativeFailure("MANIFEST_NETWORK_ERROR")
+            }
+        }
+        throw NativeFailure("MANIFEST_NETWORK_ERROR")
     }
 
     private fun downloadToPart(

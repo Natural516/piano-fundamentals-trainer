@@ -35,6 +35,7 @@ try {
   const publicAssets = path.join(tempRoot, 'assets', 'public')
   assert.equal(fs.existsSync(publicAssets) && fs.statSync(publicAssets).isDirectory(), true, 'Release APK does not contain Capacitor public assets')
   const bundle = readTree(publicAssets)
+  const productionManifestUrl = 'https://github.com/Natural516/piano-trainer-releases/releases/latest/download/latest.json'
 
   const forbiddenDevelopmentTokens = [
     'A3.1 · DEBUG',
@@ -62,12 +63,15 @@ try {
   for (const token of ['更新服务尚未配置', '安装始终由 Android 系统确认', '检查更新']) {
     assert.equal(bundle.includes(token), true, `Release APK is missing real updater UI: ${token}`)
   }
+  assert.equal(bundle.includes(productionManifestUrl), true, 'Release APK is missing the production updater Manifest endpoint')
+  assert.equal(bundle.includes('debug-override.invalid'), false, 'Release APK contains a development updater endpoint override')
   for (const token of ['跳过签名', '跳过哈希', '接受任意 APK', 'Development updater']) {
     assert.equal(bundle.includes(token), false, `Release APK exposes an updater bypass/control: ${token}`)
   }
 
   process.stdout.write('PASS Release APK excludes development-only controls and diagnostics\n')
   process.stdout.write('PASS Release APK retains real Bluetooth MIDI connection UI\n')
+  process.stdout.write(`PASS Release APK binds production updater Manifest endpoint: ${productionManifestUrl}\n`)
   process.stdout.write('\n2/2 Android release-mode checks PASS\n')
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true })

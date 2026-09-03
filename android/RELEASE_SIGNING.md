@@ -107,19 +107,26 @@ share that file.
 
 `android/version.properties` is the single Android package-version source.
 The permanent Release chain began at A4.0B with `versionCode=1` and
-`versionName=1.0`. The current A4.3B update values are:
+`versionName=1.0`. The current A4.3C blocker-fix target values are:
 
-- `versionCode=4`
-- `versionName=1.3.0`
+- `versionCode=8`
+- `versionName=1.3.4`
 
 For every distributable update:
 
-1. Increase `versionCode` monotonically. Android and the future updater use it
+1. Increase `versionCode` monotonically. Android and the updater use it
    as the authoritative ordering value.
 2. Set `versionName` to the human-readable release label.
 3. Never reuse a lower or equal `versionCode` for a newer distributable APK.
 
-This policy does not implement an updater.
+The public production endpoint has one committed source in
+`android/updater.properties`. Gradle embeds it in native `BuildConfig`, while
+`vite.android-prototype.config.ts` embeds the same value for controller
+configuration. Android production Manifest network retrieval is performed by
+the native updater plugin and returns only bounded raw UTF-8 JSON to the
+platform-neutral TypeScript parser. Release builds deliberately ignore the
+development `UPDATE_MANIFEST_URL` override; non-Release builds may continue to
+use that environment variable for isolated diagnostics.
 
 ## Build and verify
 

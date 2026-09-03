@@ -22,6 +22,25 @@ if (!appVersionName) {
 def appVersionCode = Integer.parseInt(appVersionCodeText)
 def permanentReleaseKeyAlias = 'piano-fundamentals'
 
+def updaterConfigurationFile = rootProject.file('updater.properties')
+if (!updaterConfigurationFile.isFile()) {
+    throw new GradleException("Android updater configuration is missing: android/updater.properties")
+}
+def updaterConfiguration = new Properties()
+updaterConfigurationFile.withInputStream { stream -> updaterConfiguration.load(stream) }
+def productionManifestUrl = updaterConfiguration.getProperty('manifestUrl', '').trim()
+def productionManifestUri
+try {
+    productionManifestUri = new URI(productionManifestUrl)
+} catch (Exception ignored) {
+    throw new GradleException("android/updater.properties manifestUrl must be a valid HTTPS URL")
+}
+if (productionManifestUri.scheme?.toLowerCase(Locale.ROOT) != 'https' ||
+    !productionManifestUri.host || productionManifestUri.userInfo || productionManifestUri.fragment) {
+    throw new GradleException("android/updater.properties manifestUrl must be a credential-free HTTPS URL")
+}
+def escapedProductionManifestUrl = productionManifestUrl.replace('\\', '\\\\').replace('"', '\\"')
+
 def releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
     taskName.toLowerCase(Locale.ROOT).contains('release')
 }
@@ -61,6 +80,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode
         versionName appVersionName
+        buildConfigField "String", "UPDATE_MANIFEST_URL", "\"${escapedProductionManifestUrl}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -89,6 +109,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = '21'
+    }
+    buildFeatures {
+        buildConfig true
     }
 }
 
