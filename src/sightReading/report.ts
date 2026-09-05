@@ -1,7 +1,7 @@
 import { getMostMissedNote, type SightReadingStaffMode, type SightReadingNote, type SightReadingClef } from './sightReadingNotes'
 import { getSightReadingReactionSummary, type SightReadingSessionCounters } from './sightReadingSession'
 import { getMajorKeySignature, type MajorKeyId } from './musicKeySignatures'
-import { SIGHT_READING_ANSWER_TIMEOUT_MS, type SightReadingSettings, type SightReadingNoteCount, type SightReadingNotePoolMode, type SightReadingWriteResult } from './sightReadingSettings'
+import { getSightReadingAnswerTimeoutMs, type SightReadingSettings, type SightReadingNoteCount, type SightReadingNotePoolMode, type SightReadingWriteResult } from './sightReadingSettings'
 
 export interface SightReadingClefStats {
   total: number
@@ -94,7 +94,7 @@ export function createSightReadingReport(
     keySignature: settings.keySignature,
     keyName: getMajorKeySignature(settings.keySignature).displayName,
     notePoolMode: settings.notePoolMode,
-    answerTimeLimitSeconds: SIGHT_READING_ANSWER_TIMEOUT_MS / 1000,
+    answerTimeLimitSeconds: getSightReadingAnswerTimeoutMs(settings) / 1000,
     treble: calculateClefStats('treble', counters),
     bass: calculateClefStats('bass', counters)
   }

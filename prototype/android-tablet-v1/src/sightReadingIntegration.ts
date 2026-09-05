@@ -95,6 +95,10 @@ export class DevelopmentMidiAdapter {
     return this.emit({ type: 'noteOff', midiNumber, velocity })
   }
 
+  emitControlChange(controllerNumber: number, value: number): SightReadingMidiEvent | null {
+    return this.emit({ type: 'controlChange', controllerNumber, controllerValue: value })
+  }
+
   private emit(event: Omit<RoutedMidiPayload, 'channel' | 'status'>): SightReadingMidiEvent | null {
     const accepted = this.router.emit('development', {
       ...event,
@@ -381,8 +385,11 @@ export class AndroidSightReadingRuntime {
   }
 
   sendCorrect(): SightReadingMidiEvent | null {
-    const target = this.snapshot.currentNote?.midiNumber
-    return typeof target === 'number' ? this.midi.emitNoteOn(target) : null
+    const targets = this.snapshot.currentTargetNotes.map((note) => note.midiNumber)
+    if (targets.length === 0) return null
+    let event: SightReadingMidiEvent | null = null
+    for (const target of targets) event = this.midi.emitNoteOn(target)
+    return event
   }
 
   sendWrong(): SightReadingMidiEvent | null {

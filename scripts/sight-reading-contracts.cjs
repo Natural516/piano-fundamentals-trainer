@@ -132,7 +132,7 @@ function withDesktop(overrides, callback) {
 
 test('Desktop baseline: defaults/migration retain treble + visible names, single note, fixed timeout', () => {
   assert.deepEqual(desktopSettings.DEFAULT_SIGHT_READING_SETTINGS, {
-    staffMode: 'treble', noteCount: 1, questionCount: 20, keySignature: 'C', notePoolMode: 'diatonic', noteNameVisible: true
+    staffMode: 'treble', noteCount: 1, noteMode: 'single', questionCount: 20, keySignature: 'C', notePoolMode: 'diatonic', noteNameVisible: true
   })
   assert.deepEqual(desktopSettings.migrateSightReadingSettings({ staffMode: 'mixed', noteCount: 3, range: 'common', answerTimeLimitSeconds: 10 }), {
     ...desktopSettings.DEFAULT_SIGHT_READING_SETTINGS, staffMode: 'grand'
@@ -386,7 +386,7 @@ function mixedSession() {
 
 test('C01 settings: explicit Android defaults, legacy migration and injected storage errors', () => {
   const defaults = sharedSettings.ANDROID_SIGHT_READING_DEFAULTS
-  assert.deepEqual(defaults, { staffMode: 'grand', keySignature: 'C', notePoolMode: 'diatonic', questionCount: 20, noteNameVisible: false, noteCount: 1 })
+  assert.deepEqual(defaults, { staffMode: 'grand', keySignature: 'C', notePoolMode: 'diatonic', questionCount: 20, noteNameVisible: false, noteCount: 1, noteMode: 'single' })
   for (const invalid of [undefined, null, [], 'bad', {}]) {
     assert.deepEqual(sharedSettings.migrateSightReadingSettings(invalid, defaults), defaults)
   }

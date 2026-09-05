@@ -376,7 +376,7 @@ test('识谱设置迁移删除旧音域和旧时限并固定 5000ms', () => {
     customTimeLimit: 10, noteCount: 3, questionCount: 50, keySignature: 'bad'
   })
   assert.deepEqual(migrated, {
-    staffMode: 'grand', noteCount: 1, questionCount: 50, keySignature: 'C',
+    staffMode: 'grand', noteCount: 1, noteMode: 'single', questionCount: 50, keySignature: 'C',
     notePoolMode: 'diatonic', noteNameVisible: true
   })
   assert.equal('range' in migrated, false)

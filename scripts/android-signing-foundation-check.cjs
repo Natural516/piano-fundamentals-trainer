@@ -21,8 +21,8 @@ check('permanent Android identity remains frozen', () => {
 check('Android version has one explicit committed source', () => {
   const version = read('android/version.properties')
   const gradle = read('android/app/build.gradle')
-  assert.match(version, /^versionCode=8$/m)
-  assert.match(version, /^versionName=1\.3\.4$/m)
+  assert.match(version, /^versionCode=9$/m)
+  assert.match(version, /^versionName=1\.4\.0$/m)
   assert.match(gradle, /rootProject\.file\('version\.properties'\)/)
   assert.match(gradle, /versionCode appVersionCode/)
   assert.match(gradle, /versionName appVersionName/)

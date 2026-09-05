@@ -1,8 +1,17 @@
 import { midiNumberToNoteName } from './midiNotes'
 import { normalizeSightReadingMidiEvent, type SightReadingMidiEvent } from './midi'
 import { createShuffledSightReadingBag, getSightReadingNotes, type SightReadingNote } from './sightReadingNotes'
+import {
+  createSightReadingDoubleQuestions,
+  type SightReadingDoubleQuestion
+} from './doubleNoteQuestions'
 import { SightReadingSessionCore, type SightReadingOutcomeRecord } from './sightReadingSession'
-import { SIGHT_READING_ANSWER_TIMEOUT_MS, migrateSightReadingSettings, type SightReadingSettings } from './sightReadingSettings'
+import {
+  getSightReadingAnswerTimeoutMs,
+  getEffectiveSightReadingNotePoolMode,
+  migrateSightReadingSettings,
+  type SightReadingSettings
+} from './sightReadingSettings'
 import { calculateSightReadingAccuracy, createSightReadingSessionReport, type SightReadingSessionReport } from './report'
 
 export interface Clock { now(): number }
@@ -19,6 +28,8 @@ export interface SightReadingDependencies {
 
 export const QUESTION_DISPLAY_DELAY_MS = 32
 export const FEEDBACK_DURATION_MS = 350
+export const DOUBLE_NOTE_CORRECT_FEEDBACK_DURATION_MS = 1200
+export const DOUBLE_NOTE_WRONG_FEEDBACK_DURATION_MS = 1600
 
 /** Single-note sequencing only. No React, browser, hardware API or persistence. */
 export class SightReadingController {
@@ -31,6 +42,9 @@ export class SightReadingController {
   private currentInput = ''
   private currentInputMidiNumber: number | null = null
   private bag: SightReadingNote[] = []
+  private doubleQuestions: SightReadingDoubleQuestion[] = []
+  private currentDoubleQuestion: SightReadingDoubleQuestion | null = null
+  private doubleQuestionIndex = 0
   private previousMidiNumber: number | null = null
   private timer: number | null = null
   private timerGeneration = 0
@@ -52,6 +66,8 @@ export class SightReadingController {
       phase: this.core.phase,
       isPaused: this.core.paused,
       currentNote: this.core.currentNote,
+      currentTargetNotes: this.core.currentNotes,
+      currentIntervalLabel: this.currentDoubleQuestion?.interval.label ?? null,
       currentInput: this.currentInput,
       currentInputMidiNumber: this.currentInputMidiNumber,
       result: this.outcome?.outcome ?? null,
@@ -87,8 +103,13 @@ export class SightReadingController {
 
   handleMidi(event: SightReadingMidiEvent): void {
     if (this.status !== 'running' || this.disconnected) return
+    const hadCapture = this.core.hasActiveDoubleCapture()
     const outcome = this.core.processMidiEvent(normalizeSightReadingMidiEvent(event))
     if (outcome) this.applyOutcome(outcome)
+    else if (!hadCapture && this.core.hasActiveDoubleCapture()) {
+      this.scheduleDoubleCapture(this.core.getRemainingCaptureMs(this.dependencies.clock.now()))
+      this.notify()
+    }
   }
 
   pause(): void {
@@ -104,7 +125,10 @@ export class SightReadingController {
     if (this.status !== 'running' || !this.core.paused || this.disconnected) return
     this.core.resume(this.dependencies.clock.now(), this.dependencies.readMidiWatermark())
     if (this.core.phase === 'display') this.schedule(() => this.unlockQuestion(), QUESTION_DISPLAY_DELAY_MS)
-    else if (this.core.phase === 'answering') this.scheduleQuestionTimeout(this.core.remainingQuestionMs)
+    else if (this.core.phase === 'answering') {
+      if (this.core.hasActiveDoubleCapture()) this.scheduleDoubleCapture(this.core.getRemainingCaptureMs(this.dependencies.clock.now()))
+      else this.scheduleQuestionTimeout(this.core.remainingQuestionMs)
+    }
     else if (this.core.phase === 'feedback') this.scheduleAdvance(this.remainingAdvanceMs)
     this.notify()
   }
@@ -113,6 +137,9 @@ export class SightReadingController {
     this.core.clearTransientInput(this.dependencies.readMidiWatermark())
     this.currentInput = ''
     this.currentInputMidiNumber = null
+    if (this.settings.noteMode === 'double' && this.status === 'running' && !this.core.paused && this.core.phase === 'answering') {
+      this.scheduleQuestionTimeout(this.core.getRemainingQuestionMs(this.dependencies.clock.now()))
+    }
     this.notify()
   }
 
@@ -136,8 +163,9 @@ export class SightReadingController {
   }
 
   getRemainingTimeMs(): number {
-    if (this.status !== 'running' || this.core.phase === 'display') return SIGHT_READING_ANSWER_TIMEOUT_MS
-    return Math.min(SIGHT_READING_ANSWER_TIMEOUT_MS, this.core.getRemainingQuestionMs(this.dependencies.clock.now()))
+    const answerTimeoutMs = getSightReadingAnswerTimeoutMs(this.settings)
+    if (this.status !== 'running' || this.core.phase === 'display') return answerTimeoutMs
+    return Math.min(answerTimeoutMs, this.core.getRemainingQuestionMs(this.dependencies.clock.now()))
   }
 
   dispose(): void {
@@ -148,9 +176,22 @@ export class SightReadingController {
   private initialize(settings: SightReadingSettings): void {
     this.clearTimer()
     this.settings = migrateSightReadingSettings(settings)
-    this.notes = getSightReadingNotes(this.settings)
-    this.core = new SightReadingSessionCore(this.notes)
+    this.notes = getSightReadingNotes({
+      ...this.settings,
+      notePoolMode: getEffectiveSightReadingNotePoolMode(this.settings)
+    })
+    this.core = new SightReadingSessionCore(this.notes, this.settings.noteMode)
     this.bag = []
+    this.doubleQuestions = this.settings.noteMode === 'double'
+      ? createSightReadingDoubleQuestions({
+          keySignature: this.settings.keySignature,
+          staffMode: this.settings.staffMode,
+          questionCount: this.settings.questionCount,
+          random: this.dependencies.random
+        })
+      : []
+    this.currentDoubleQuestion = null
+    this.doubleQuestionIndex = 0
     this.previousMidiNumber = null
     this.report = null
     this.outcome = null
@@ -160,6 +201,22 @@ export class SightReadingController {
   }
 
   private displayNextQuestion(): void {
+    if (this.settings.noteMode === 'double') {
+      const next = this.doubleQuestions[this.doubleQuestionIndex]
+      if (!next) {
+        this.finish('completed')
+        return
+      }
+      this.doubleQuestionIndex += 1
+      this.currentDoubleQuestion = next
+      this.core.beginQuestion(next.notes)
+      this.outcome = null
+      this.currentInput = ''
+      this.currentInputMidiNumber = null
+      this.schedule(() => this.unlockQuestion(), QUESTION_DISPLAY_DELAY_MS)
+      this.notify()
+      return
+    }
     if (this.bag.length === 0) {
       this.bag = createShuffledSightReadingBag(this.notes, this.previousMidiNumber, this.dependencies.random)
     }
@@ -175,8 +232,9 @@ export class SightReadingController {
 
   private unlockQuestion(): void {
     if (this.status !== 'running' || this.core.paused || this.core.phase !== 'display') return
-    this.core.unlockQuestion(this.dependencies.clock.now(), this.dependencies.readMidiWatermark(), SIGHT_READING_ANSWER_TIMEOUT_MS)
-    this.scheduleQuestionTimeout(SIGHT_READING_ANSWER_TIMEOUT_MS)
+    const answerTimeoutMs = getSightReadingAnswerTimeoutMs(this.settings)
+    this.core.unlockQuestion(this.dependencies.clock.now(), this.dependencies.readMidiWatermark(), answerTimeoutMs)
+    this.scheduleQuestionTimeout(answerTimeoutMs)
     this.notify()
   }
 
@@ -191,11 +249,25 @@ export class SightReadingController {
     }, delay)
   }
 
+  private scheduleDoubleCapture(delayMs: number): void {
+    const delay = Math.max(0, delayMs)
+    this.schedule(() => {
+      if (this.status !== 'running') return
+      const outcome = this.core.settleDoubleCapture()
+      if (outcome) this.applyOutcome(outcome)
+    }, delay)
+  }
+
   private applyOutcome(outcome: SightReadingOutcomeRecord): void {
     this.outcome = outcome
     this.currentInput = outcome.inputName || (outcome.inputMidiNumber !== null ? midiNumberToNoteName(outcome.inputMidiNumber) : '')
     this.currentInputMidiNumber = outcome.inputMidiNumber
-    this.scheduleAdvance(FEEDBACK_DURATION_MS)
+    const feedbackDurationMs = this.settings.noteMode === 'double'
+      ? outcome.outcome === 'correct'
+        ? DOUBLE_NOTE_CORRECT_FEEDBACK_DURATION_MS
+        : DOUBLE_NOTE_WRONG_FEEDBACK_DURATION_MS
+      : FEEDBACK_DURATION_MS
+    this.scheduleAdvance(feedbackDurationMs)
     this.notify()
   }
 

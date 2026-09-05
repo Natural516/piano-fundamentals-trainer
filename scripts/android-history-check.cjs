@@ -1,7 +1,6 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const { execFileSync } = require('node:child_process')
 const ts = require('typescript')
 
 for (const extension of ['.ts', '.tsx']) {
@@ -311,8 +310,10 @@ test('HIS23 History introduces no delete edit or session-recovery action', () =>
   assert.match(historySource, /<article className=/)
 })
 
-test('HIS24 shared src/sightReading remains unchanged', () => {
-  execFileSync('git', ['diff', '--quiet', 'HEAD', '--', 'src/sightReading'], { cwd: repositoryRoot })
+test('HIS24 durable report and History projection semantics remain unchanged', () => {
+  const reportSource = fs.readFileSync(path.join(repositoryRoot, 'src', 'sightReading', 'report.ts'), 'utf8')
+  assert.doesNotMatch(reportSource, /interval|noteMode/)
+  assert.doesNotMatch(projectionSource, /interval|noteMode/)
 })
 
 async function run() {

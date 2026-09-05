@@ -8,7 +8,7 @@ import { spellMidiPitch } from '../../../src/sightReading/musicPitchSpelling'
 import type { MusicNotationFeedback, MusicNotationPitch } from '../../../src/sightReading/musicNotationTypes'
 import { STAFF_MODE_LABELS, type SightReadingStaffMode } from '../../../src/sightReading/sightReadingNotes'
 import type { SightReadingSessionReport } from '../../../src/sightReading/report'
-import type { SightReadingNotePoolMode, SightReadingQuestionCount, SightReadingSettings } from '../../../src/sightReading/sightReadingSettings'
+import { getSightReadingAnswerTimeoutMs, type SightReadingNoteMode, type SightReadingNotePoolMode, type SightReadingQuestionCount, type SightReadingSettings } from '../../../src/sightReading/sightReadingSettings'
 import {
   AndroidSightReadingRuntime,
   createBrowserAndroidSightReadingRuntime,
@@ -24,6 +24,7 @@ import {
 } from './historyProjection'
 import { createAndroidUpdaterController } from './androidUpdater'
 import { UpdaterController, type UpdaterSnapshot, type UpdaterStatus } from './updaterCore'
+import { getSightReadingPrompt } from './sightReadingPresentation'
 import './styles.css'
 
 type ScreenId =
@@ -375,6 +376,7 @@ function ProductFrame({
 function NotationPaper({
   feedback = null,
   note = null,
+  notes: suppliedNotes = null,
   noteFeedback = feedback,
   empty = false,
   keySignature,
@@ -383,6 +385,7 @@ function NotationPaper({
 }: {
   feedback?: MusicNotationFeedback
   note?: MusicNotationPitch | null
+  notes?: readonly MusicNotationPitch[] | null
   noteFeedback?: MusicNotationFeedback
   empty?: boolean
   keySignature: MajorKeyId
@@ -390,8 +393,8 @@ function NotationPaper({
   label?: string
 }): JSX.Element {
   const notes = useMemo(
-    () => empty ? [] : [note ?? spellMidiPitch(71, keySignature, staffMode)],
-    [empty, keySignature, note, staffMode]
+    () => empty ? [] : suppliedNotes ?? [note ?? spellMidiPitch(71, keySignature, staffMode)],
+    [empty, keySignature, note, staffMode, suppliedNotes]
   )
 
   return (
@@ -410,13 +413,14 @@ function NotationPaper({
 function HomeScreen({ settings }: { settings: SightReadingSettings }): JSX.Element {
   const { runtime } = useMidiUi()
   const midiStatus = presentMidiStatus(runtime)
+  const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
   return (
     <ProductFrame active="home" title="今天，读几页新音符">
       <section className="home-hero">
         <div className="home-hero__copy">
           <span className="eyebrow">今日练习</span>
           <h1>让眼睛先认出，<br />再让手指弹出来。</h1>
-          <p>{STAFF_MODE_LABELS[settings.staffMode]} · {settings.questionCount} 题 · 每题固定 5 秒</p>
+          <p>{STAFF_MODE_LABELS[settings.staffMode]} · {settings.questionCount} 题 · 每题固定 {answerTimeLimitSeconds} 秒</p>
           <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>
             <Icon name="play" />
             开始识谱练习
@@ -464,6 +468,7 @@ function SightReadyScreen({
 }): JSX.Element {
   const { runtime } = useMidiUi()
   const midiStatus = presentMidiStatus(runtime)
+  const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
   return (
     <ProductFrame active="sight" title="识谱练习">
       <section className="ready-layout">
@@ -483,7 +488,7 @@ function SightReadyScreen({
         <aside className="ready-controls">
           <div>
             <span className="eyebrow">本轮设置</span>
-            <h2>{settings.questionCount} 个音符</h2>
+            <h2>{settings.noteMode === 'double' ? `${settings.questionCount} 道双音题` : `${settings.questionCount} 个音符`}</h2>
             <p>{runtime.midiSource === 'development'
               ? '当前使用 DEBUG 模拟输入；可在开发控制中切换到真实蓝牙 MIDI。'
               : midiStatus.tone === 'connected'
@@ -494,7 +499,7 @@ function SightReadyScreen({
             <div><small>谱表</small><strong>{STAFF_MODE_LABELS[settings.staffMode]}</strong></div>
             <div><small>调性</small><strong>{getMajorKeySignature(settings.keySignature).displayName}</strong></div>
             <div><small>题数</small><strong>{settings.questionCount}</strong></div>
-            <div><small>每题时限</small><strong>固定 5 秒</strong></div>
+            <div><small>每题时限</small><strong>固定 {answerTimeLimitSeconds} 秒</strong></div>
           </div>
           <button className="ready-device" type="button" onClick={() => navigate('midi')}>
             <span><Icon name="bluetooth" /></span><div><strong>{midiStatus.label}</strong><small>{midiStatus.detail}</small></div><i className={`is-${midiStatus.tone}`} />
@@ -518,7 +523,7 @@ function useRemainingTime(
     if (snapshot.status !== 'running' || snapshot.phase !== 'answering' || snapshot.isPaused) return
     const timer = window.setInterval(() => setRemaining(runtime.getRemainingTimeMs()), 100)
     return () => window.clearInterval(timer)
-  }, [runtime, snapshot.currentNote?.midiNumber, snapshot.isPaused, snapshot.phase, snapshot.status])
+  }, [runtime, snapshot.currentTargetNotes.map((note) => note.midiNumber).join(':'), snapshot.isPaused, snapshot.phase, snapshot.status])
   return remaining
 }
 
@@ -542,7 +547,8 @@ function PracticeFocusHeader({
   const questionIndex = snapshot.phase === 'feedback'
     ? snapshot.completedQuestions
     : Math.min(settings.questionCount, snapshot.completedQuestions + 1)
-  const progress = Math.max(0, Math.min(100, remainingTimeMs / 5000 * 100))
+  const answerTimeoutMs = getSightReadingAnswerTimeoutMs(settings)
+  const progress = Math.max(0, Math.min(100, remainingTimeMs / answerTimeoutMs * 100))
 
   return (
     <header className="focus-header">
@@ -590,7 +596,8 @@ function SightFocusScreen({
   const isWrong = snapshot.phase === 'feedback' && snapshot.result === 'wrong_note'
   const isTimeout = snapshot.phase === 'feedback' && snapshot.result === 'timeout'
   const feedback: MusicNotationFeedback = isCorrect ? 'correct' : isWrong ? 'wrong_note' : isTimeout ? 'timeout' : null
-  const targetName = snapshot.currentNote?.noteName ?? '—'
+  const targetName = snapshot.currentTargetNotes.map((note) => note.noteName).join(' + ') || '—'
+  const intervalLabel = snapshot.currentIntervalLabel
   const midiStatus = presentMidiStatus(runtime)
   const transportPause = runtime.midiSource === 'bluetooth' && runtime.midiResumeRequired
   const resumeBlocked = transportPause && runtime.bluetoothSnapshot.connectionState !== 'CONNECTED'
@@ -624,7 +631,13 @@ function SightFocusScreen({
       />
       <main className="focus-content">
         <div className="focus-prompt">
-          <span>{snapshot.isPaused ? pausedPrompt : isCorrect ? '回答正确' : isWrong ? '这次弹错了' : isTimeout ? '本题超时' : '请弹出这个音'}</span>
+          <span>{getSightReadingPrompt({
+            intervalLabel,
+            noteMode: settings.noteMode,
+            outcome: snapshot.result,
+            paused: snapshot.isPaused,
+            pausedPrompt
+          })}</span>
           {!snapshot.isPaused && !isCorrect && !isWrong && !isTimeout && settings.noteNameVisible
             ? <strong>{targetName}</strong>
             : null}
@@ -638,6 +651,7 @@ function SightFocusScreen({
             keySignature={settings.keySignature}
             label={settings.noteNameVisible || isCorrect || isWrong || isTimeout ? `当前题目 ${targetName}` : '当前识谱题目'}
             note={snapshot.currentNote?.notation}
+            notes={snapshot.currentTargetNotes.map((note) => note.notation)}
             noteFeedback={isWrong ? null : feedback}
             staffMode={settings.staffMode}
           />
@@ -699,7 +713,7 @@ function SightResultScreen({
           <h1>{primaryError
             ? <>本轮正确率 {report.accuracy}%，<br />再留意这个易错音。</>
             : <>本轮练习已完成，<br />没有需要优先处理的音符错误。</>}</h1>
-          <p>{STAFF_MODE_LABELS[report.staffMode]} · {report.keyName} · {report.totalQuestions} 题 · 固定 5 秒</p>
+          <p>{STAFF_MODE_LABELS[report.staffMode]} · {report.keyName} · {report.totalQuestions} 题 · 固定 {report.answerTimeLimitSeconds} 秒</p>
         </div>
         <div className="result-details">
           <div className="result-metrics">
@@ -843,6 +857,7 @@ function SettingsScreen({
   theme: 'light' | 'dark'
   onThemeChange: (theme: 'light' | 'dark') => void
 }): JSX.Element {
+  const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
   const { runtime } = useMidiUi()
   const { snapshot: updater } = useUpdaterUi()
   const midiStatus = presentMidiStatus(runtime)
@@ -902,18 +917,34 @@ function SettingsScreen({
               />}
             />
             <SettingRow
+              description="单音保持原有首音判定；双音使用 150ms 同时音捕获"
+              icon="book"
+              title="音符数量"
+              action={<SettingSelect
+                ariaLabel="音符数量"
+                value={settings.noteMode}
+                onChange={(noteMode: SightReadingNoteMode) => onSettingsChange({ noteMode })}
+                options={[
+                  { value: 'single', label: '单音' },
+                  { value: 'double', label: '双音' }
+                ]}
+              />}
+            />
+            <SettingRow
               description="调内音或包含临时变音"
               icon="chart"
               title="音符内容"
-              action={<SettingSelect
-                ariaLabel="音符内容"
-                value={settings.notePoolMode}
-                onChange={(notePoolMode: SightReadingNotePoolMode) => onSettingsChange({ notePoolMode })}
-                options={[
-                  { value: 'diatonic', label: '调内音' },
-                  { value: 'chromatic', label: '含临时变音' }
-                ]}
-              />}
+              action={settings.noteMode === 'double'
+                ? <strong>双音固定调内</strong>
+                : <SettingSelect
+                    ariaLabel="音符内容"
+                    value={settings.notePoolMode}
+                    onChange={(notePoolMode: SightReadingNotePoolMode) => onSettingsChange({ notePoolMode })}
+                    options={[
+                      { value: 'diatonic', label: '调内音' },
+                      { value: 'chromatic', label: '含临时变音' }
+                    ]}
+                  />}
             />
             <SettingRow
               description="10、20、50 或 100 题"
@@ -926,7 +957,7 @@ function SettingsScreen({
                 options={[10, 20, 50, 100].map((value) => ({ value: String(value), label: String(value) }))}
               />}
             />
-            <SettingRow description="当前稳定版本固定为 5 秒" icon="clock" title="每题时限" action={<strong>5 秒</strong>} />
+            <SettingRow description={`当前模式固定为 ${answerTimeLimitSeconds} 秒`} icon="clock" title="每题时限" action={<strong>{answerTimeLimitSeconds} 秒</strong>} />
             <SettingRow
               description={settings.noteNameVisible ? '答题前显示目标音名' : '答题前不显示目标音名'}
               icon="info"
@@ -1195,7 +1226,7 @@ function ReviewDock({
                 <button className={developmentInputActive ? 'is-active' : ''} type="button" onClick={() => runtime.setMidiInputSource('development')}>开发模拟 MIDI</button>
               </div>
               <div className="developer-midi__status">
-                <span>目标 <strong>{snapshot.currentNote?.noteName ?? '—'}</strong></span>
+                <span>目标 <strong>{snapshot.currentTargetNotes.map((note) => note.noteName).join(' + ') || '—'}</strong></span>
                 <span>阶段 <strong>{snapshot.phase}</strong></span>
                 <span>来源 <strong>{developmentInputActive ? 'DEVELOPMENT' : 'REAL BLUETOOTH'}</strong></span>
               </div>
@@ -1218,7 +1249,7 @@ function ReviewDock({
               <button className="developer-midi__restart" type="button" onClick={() => { runtime.restart(); navigate('sight-active') }}>
                 重新开始开发会话
               </button>
-              <small>normalized NOTE_ON → shared controller；真实 5 秒 timeout 没有快捷按钮。</small>
+              <small>normalized NOTE_ON → shared controller；真实 {getSightReadingAnswerTimeoutMs(runtime.settings) / 1000} 秒 timeout 没有快捷按钮。</small>
               <small>内存报告 {reports.length} 份{latestReport ? ` · 最近：${latestReport.completionState} / ${latestReport.completedQuestions} 题` : ''}</small>
               <div className="bluetooth-midi-diagnostic">
                 <strong>BLUETOOTH MIDI DIAGNOSTICS</strong>

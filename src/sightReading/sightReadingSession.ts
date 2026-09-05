@@ -1,5 +1,6 @@
 import type { SightReadingMidiEvent } from './midi'
 import type { SightReadingClef, SightReadingNote } from './sightReadingNotes'
+import type { SightReadingNoteMode } from './sightReadingSettings'
 
 export type SightReadingQuestionPhase = 'idle' | 'display' | 'answering' | 'feedback'
 export type SightReadingRecordedOutcome = 'correct' | 'wrong_note' | 'timeout'
@@ -40,6 +41,7 @@ export interface SightReadingReactionSummary {
 }
 
 export type SightReadingFeedbackAction = 'none' | 'next' | 'finish'
+export const DOUBLE_NOTE_CAPTURE_WINDOW_MS = 150
 
 function createClefCounter(): Record<SightReadingClef, number> {
   return { treble: 0, bass: 0 }
@@ -104,9 +106,14 @@ export class SightReadingSessionCore {
   pauseStartedAtMs: number | null = null
   lastHandledEventId: number | null = null
   currentNote: SightReadingNote | null = null
+  currentNotes: readonly SightReadingNote[] = []
+  captureDeadlineMs: number | null = null
+  remainingCaptureMs = 0
   counters: SightReadingSessionCounters
+  private readonly observedTargetPitches = new Set<number>()
+  private targetSetCompletedAtMs: number | null = null
 
-  constructor(notes: SightReadingNote[]) {
+  constructor(notes: SightReadingNote[], readonly noteMode: SightReadingNoteMode = 'single') {
     this.counters = createSightReadingSessionCounters(notes)
   }
 
@@ -121,15 +128,19 @@ export class SightReadingSessionCore {
     this.pauseStartedAtMs = null
     this.lastHandledEventId = latestEventId
     this.currentNote = null
+    this.currentNotes = []
+    this.resetCapture()
   }
 
-  beginQuestion(note: SightReadingNote): void {
+  beginQuestion(note: SightReadingNote | readonly [SightReadingNote, SightReadingNote]): void {
     this.phase = 'display'
     this.inputLocked = true
     this.questionStartedAtMs = null
     this.questionDeadlineMs = null
     this.remainingQuestionMs = 0
-    this.currentNote = note
+    this.currentNotes = 'midiNumber' in note ? [note] : note
+    this.currentNote = this.currentNotes[0] ?? null
+    this.resetCapture()
   }
 
   unlockQuestion(now: number, latestEventId: number | null, timeLimitMs: number): void {
@@ -163,6 +174,29 @@ export class SightReadingSessionCore {
 
     this.lastHandledEventId = event.id
     this.remainingQuestionMs = this.getRemainingQuestionMs(event.timestamp)
+
+    if (this.noteMode === 'double') {
+      if (this.questionDeadlineMs !== null && event.timestamp > this.questionDeadlineMs) return null
+      if (this.captureDeadlineMs !== null && event.timestamp > this.captureDeadlineMs) return null
+      const targetNumbers = new Set(this.currentNotes.map((note) => note.midiNumber))
+      if (!targetNumbers.has(event.midiNumber)) {
+        const reactionTimeMs = Math.max(0, Math.round(event.timestamp - this.questionStartedAtMs))
+        return this.recordOutcome('wrong_note', reactionTimeMs, event.noteName ?? '', event.midiNumber)
+      }
+      if (this.captureDeadlineMs === null) {
+        this.captureDeadlineMs = Math.min(
+          event.timestamp + DOUBLE_NOTE_CAPTURE_WINDOW_MS,
+          this.questionDeadlineMs ?? event.timestamp + DOUBLE_NOTE_CAPTURE_WINDOW_MS
+        )
+        this.remainingCaptureMs = Math.max(0, this.captureDeadlineMs - event.timestamp)
+      }
+      this.observedTargetPitches.add(event.midiNumber)
+      if (this.observedTargetPitches.size === targetNumbers.size && this.targetSetCompletedAtMs === null) {
+        this.targetSetCompletedAtMs = event.timestamp
+      }
+      return null
+    }
+
     const reactionTimeMs = Math.max(0, Math.round(event.timestamp - this.questionStartedAtMs))
     const outcome: SightReadingRecordedOutcome = event.midiNumber === this.currentNote.midiNumber
       ? 'correct'
@@ -173,8 +207,40 @@ export class SightReadingSessionCore {
 
   recordTimeout(): SightReadingOutcomeRecord | null {
     if (this.paused || this.phase !== 'answering' || this.inputLocked || !this.currentNote) return null
+    if (this.noteMode === 'double' && this.captureDeadlineMs !== null) return this.settleDoubleCapture()
     this.remainingQuestionMs = 0
     return this.recordOutcome('timeout', null, '', null)
+  }
+
+  settleDoubleCapture(): SightReadingOutcomeRecord | null {
+    if (
+      this.noteMode !== 'double' || this.paused || this.phase !== 'answering' ||
+      this.inputLocked || !this.currentNote || this.captureDeadlineMs === null
+    ) return null
+    const settlementTime = this.captureDeadlineMs
+    const complete = this.observedTargetPitches.size === this.currentNotes.length
+    const decisiveTime = complete ? this.targetSetCompletedAtMs ?? settlementTime : settlementTime
+    const reactionTimeMs = this.questionStartedAtMs === null
+      ? 0
+      : Math.max(0, Math.round(decisiveTime - this.questionStartedAtMs))
+    const inputNotes = this.currentNotes
+      .filter((note) => this.observedTargetPitches.has(note.midiNumber))
+      .sort((left, right) => left.midiNumber - right.midiNumber)
+    const inputName = inputNotes.map((note) => note.noteName).join(' + ')
+    const inputMidiNumber = inputNotes.length > 0 ? inputNotes[inputNotes.length - 1].midiNumber : null
+    this.remainingCaptureMs = 0
+    return this.recordOutcome(complete ? 'correct' : 'wrong_note', reactionTimeMs, inputName, inputMidiNumber)
+  }
+
+  hasActiveDoubleCapture(): boolean {
+    return this.noteMode === 'double' && this.captureDeadlineMs !== null && this.phase === 'answering'
+  }
+
+  getRemainingCaptureMs(now: number): number {
+    if (!this.paused && this.hasActiveDoubleCapture() && this.captureDeadlineMs !== null) {
+      return Math.max(0, this.captureDeadlineMs - now)
+    }
+    return Math.max(0, this.remainingCaptureMs)
   }
 
   getRemainingQuestionMs(now: number): number {
@@ -193,6 +259,9 @@ export class SightReadingSessionCore {
 
     if (this.phase === 'answering') {
       this.remainingQuestionMs = Math.max(0, (this.questionDeadlineMs ?? now) - now)
+      if (this.captureDeadlineMs !== null) {
+        this.remainingCaptureMs = Math.max(0, this.captureDeadlineMs - now)
+      }
     }
   }
 
@@ -207,12 +276,15 @@ export class SightReadingSessionCore {
     if (this.phase === 'answering') {
       if (this.questionStartedAtMs !== null) this.questionStartedAtMs += pauseDuration
       this.questionDeadlineMs = now + this.remainingQuestionMs
+      if (this.captureDeadlineMs !== null) this.captureDeadlineMs = now + this.remainingCaptureMs
+      if (this.targetSetCompletedAtMs !== null) this.targetSetCompletedAtMs += pauseDuration
       this.inputLocked = false
     }
   }
 
   clearTransientInput(latestEventId: number | null): void {
     this.lastHandledEventId = newerEventId(this.lastHandledEventId, latestEventId)
+    if (this.noteMode === 'double') this.resetCapture()
   }
 
   completeFeedback(questionCount: number): SightReadingFeedbackAction {
@@ -237,6 +309,15 @@ export class SightReadingSessionCore {
     this.remainingQuestionMs = 0
     this.pauseStartedAtMs = null
     this.currentNote = null
+    this.currentNotes = []
+    this.resetCapture()
+  }
+
+  private resetCapture(): void {
+    this.captureDeadlineMs = null
+    this.remainingCaptureMs = 0
+    this.observedTargetPitches.clear()
+    this.targetSetCompletedAtMs = null
   }
 
   private recordOutcome(

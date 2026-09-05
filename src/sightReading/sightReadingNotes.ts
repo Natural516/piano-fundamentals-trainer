@@ -55,7 +55,7 @@ function createNumberRange(start: number, end: number): number[] {
   return Array.from({ length: end - start + 1 }, (_, index) => start + index)
 }
 
-function isDiatonicMidiNumber(midiNumber: number, keySignature: MajorKeyId): boolean {
+export function isDiatonicMidiNumber(midiNumber: number, keySignature: MajorKeyId): boolean {
   const pitchClass = ((midiNumber % 12) + 12) % 12
   return getMajorKeySignature(keySignature).scaleDegrees.some((degree) => degree.pitchClass === pitchClass)
 }
@@ -68,10 +68,10 @@ function createNotePool(
   const [start, end] = SIGHT_READING_MIDI_RANGES[staffMode]
   return createNumberRange(start, end)
     .filter((midiNumber) => notePoolMode === 'chromatic' || isDiatonicMidiNumber(midiNumber, keySignature))
-    .map((midiNumber) => createNote(staffMode, midiNumber, keySignature))
+    .map((midiNumber) => createSightReadingNote(staffMode, midiNumber, keySignature))
 }
 
-function createNote(
+export function createSightReadingNote(
   staffMode: SightReadingStaffMode,
   midiNumber: number,
   keySignature: MajorKeyId
@@ -124,7 +124,7 @@ export function getSightReadingNoteByMidi(
   return midiNumber >= start && midiNumber <= end && (
     notePoolMode === 'chromatic' || isDiatonicMidiNumber(midiNumber, keySignature)
   )
-    ? createNote(staffMode, midiNumber, keySignature)
+    ? createSightReadingNote(staffMode, midiNumber, keySignature)
     : null
 }
 

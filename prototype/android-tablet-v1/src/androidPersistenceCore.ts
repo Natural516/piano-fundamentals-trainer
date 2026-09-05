@@ -4,6 +4,7 @@ import {
   ANDROID_SIGHT_READING_DEFAULTS,
   SIGHT_READING_ANSWER_TIMEOUT_MS,
   type SightReadingQuestionCount,
+  type SightReadingNoteMode,
   type SightReadingSettings,
   type SightReadingWriteResult
 } from '../../../src/sightReading/sightReadingSettings'
@@ -33,6 +34,8 @@ export interface AndroidSightReadingSettingsDocument {
   questionCount: SightReadingQuestionCount
   answerTimeLimitMs: typeof SIGHT_READING_ANSWER_TIMEOUT_MS
   noteNameVisible: boolean
+  /** Optional in schema v1 so code-8 documents remain valid and load as single-note. */
+  noteMode?: SightReadingNoteMode
 }
 
 export interface DurableSightReadingReport {
@@ -111,9 +114,11 @@ function parseJson(value: string): unknown {
 }
 
 function settingsDocumentToRuntime(document: AndroidSightReadingSettingsDocument): SightReadingSettings {
+  const noteMode = document.noteMode === 'double' ? 'double' : 'single'
   return {
     staffMode: document.staffMode,
-    noteCount: 1,
+    noteCount: noteMode === 'double' ? 2 : 1,
+    noteMode,
     questionCount: document.questionCount,
     keySignature: document.keySignature,
     notePoolMode: document.notePoolMode,
@@ -121,9 +126,12 @@ function settingsDocumentToRuntime(document: AndroidSightReadingSettingsDocument
   }
 }
 
-export function createSettingsDocument(settings: SightReadingSettings): AndroidSightReadingSettingsDocument {
+export function createSettingsDocument(
+  settings: SightReadingSettings,
+  includeNoteMode = true
+): AndroidSightReadingSettingsDocument {
   if (!isSettingsValueValid(settings)) throw new Error('Android Sight Reading settings are invalid')
-  return {
+  const document: AndroidSightReadingSettingsDocument = {
     schemaVersion: ANDROID_PERSISTENCE_SCHEMA_VERSION,
     staffMode: settings.staffMode,
     keySignature: settings.keySignature,
@@ -132,6 +140,8 @@ export function createSettingsDocument(settings: SightReadingSettings): AndroidS
     answerTimeLimitMs: SIGHT_READING_ANSWER_TIMEOUT_MS,
     noteNameVisible: settings.noteNameVisible
   }
+  if (includeNoteMode) document.noteMode = settings.noteMode
+  return document
 }
 
 function isSettingsValueValid(settings: SightReadingSettings): boolean {
@@ -139,7 +149,8 @@ function isSettingsValueValid(settings: SightReadingSettings): boolean {
     isMajorKeyId(settings.keySignature) &&
     (settings.notePoolMode === 'diatonic' || settings.notePoolMode === 'chromatic') &&
     isQuestionCount(settings.questionCount) &&
-    settings.noteCount === 1 &&
+    (settings.noteMode === 'single' || settings.noteMode === 'double') &&
+    settings.noteCount === (settings.noteMode === 'double' ? 2 : 1) &&
     typeof settings.noteNameVisible === 'boolean'
 }
 
@@ -151,7 +162,8 @@ function isSettingsDocument(value: unknown): value is AndroidSightReadingSetting
     (value.notePoolMode === 'diatonic' || value.notePoolMode === 'chromatic') &&
     isQuestionCount(value.questionCount) &&
     value.answerTimeLimitMs === SIGHT_READING_ANSWER_TIMEOUT_MS &&
-    typeof value.noteNameVisible === 'boolean'
+    typeof value.noteNameVisible === 'boolean' &&
+    (value.noteMode === undefined || value.noteMode === 'single' || value.noteMode === 'double')
 }
 
 function isNoteCountEntry(value: unknown): value is { noteName: string; count: number } {
@@ -211,7 +223,9 @@ export function createDurableSightReadingReport(
     startedAt: options.startedAt,
     endedAt: options.endedAt,
     durationMs: Math.max(0, options.endedAt - options.startedAt),
-    settings: createSettingsDocument(options.settings),
+    // Durable report shape remains code-8-compatible: note mode and interval analytics
+    // are intentionally not added to historical records in this phase.
+    settings: createSettingsDocument(options.settings, false),
     plannedQuestionCount: report.totalQuestions,
     completed: report.completedQuestions,
     correct: report.correct,
