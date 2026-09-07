@@ -86,7 +86,23 @@ npm.cmd run android:verify:debug
 
 ## 截图
 
-隐私审查后的公开截图尚未加入本仓库。内部 Human QA 截图不会直接用作公开宣传素材。
+以下画面来自真实 Android 平板上的正式应用界面。系统状态栏仅包含常规时间、电量与导航信息。
+
+### 首页
+
+![首页](docs/screenshots/home.png)
+
+### 识谱练习
+
+![识谱练习设置](docs/screenshots/sight-reading-settings.png)
+
+![单音识谱练习](docs/screenshots/sight-reading-single.png)
+
+![双音识谱练习](docs/screenshots/sight-reading-double.png)
+
+### 练习记录
+
+![练习记录](docs/screenshots/history.png)
 
 ## 许可证
 

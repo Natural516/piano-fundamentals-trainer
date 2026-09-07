@@ -2,16 +2,16 @@ PIANO FUNDAMENTALS TRAINER — PUBLIC FILE MANIFEST
 
 Source checkpoint: 352e02a3c78b0f0b1a5ffbf5a270ba8e97c1cf27
 Snapshot scope: Android application plus required shared build/test dependencies
-Generated before the independent initial public commit. Paths are repository-relative.
+Maintained with each reviewed public commit. Paths are repository-relative.
 
 ANDROID_BUILD: 30
 ANDROID_RUNTIME: 53
 ANDROID_SHARED_CORE: 18
 ANDROID_TEST: 18
 LICENSE_ATTRIBUTION: 9
-PUBLIC_ASSET: 1
+PUBLIC_ASSET: 6
 PUBLIC_DOCUMENTATION: 12
-TOTAL: 141
+TOTAL: 146
 
 CATEGORY	PATH
 ANDROID_BUILD	.gitattributes
@@ -97,6 +97,11 @@ PUBLIC_DOCUMENTATION	docs/BRANDING.md
 PUBLIC_DOCUMENTATION	docs/BUILDING_ANDROID.md
 PUBLIC_DOCUMENTATION	docs/DEPENDENCY_LICENSES.md
 PUBLIC_DOCUMENTATION	docs/FORKS_AND_OFFICIAL_BUILDS.md
+PUBLIC_ASSET	docs/screenshots/history.png
+PUBLIC_ASSET	docs/screenshots/home.png
+PUBLIC_ASSET	docs/screenshots/sight-reading-double.png
+PUBLIC_ASSET	docs/screenshots/sight-reading-settings.png
+PUBLIC_ASSET	docs/screenshots/sight-reading-single.png
 ANDROID_BUILD	package-lock.json
 ANDROID_BUILD	package.json
 ANDROID_BUILD	prototype/android-tablet-v1/index.html

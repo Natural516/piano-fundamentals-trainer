@@ -68,6 +68,8 @@ keystore.properties
 JKS/keystore/private keys/signing passwords
 .env files
 internal screenshots and local audit/QA reports
+  This exclusion remains in force. Only the five privacy-reviewed real-device
+  images explicitly listed under docs/screenshots/ are intentional public assets.
 
 CONFIRMED ABSENT FROM REVIEWED PUBLIC CONTENT
 
