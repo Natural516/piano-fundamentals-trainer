@@ -1,0 +1,47 @@
+node_modules/
+out/
+dist/
+release/
+artifacts/
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.cer
+android/google-services.json
+
+# Android release signing secrets. The permanent keystore must stay outside
+# this repository; only android/keystore.properties.example is committed.
+android/keystore.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+
+# Coverage, diagnostics, crashes
+coverage/
+*.dmp
+hs_err_pid*
+replay_pid*
+*.hprof
+
+# Editors and local workspaces
+.idea/
+.vscode/
+*.code-workspace
+
+# Local audit and QA output
+OPEN_SOURCE_*_REPORT.txt
+*_LOCAL_QA_REPORT.txt
+screenshots/local-qa/

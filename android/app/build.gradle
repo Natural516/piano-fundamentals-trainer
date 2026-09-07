@@ -1,0 +1,169 @@
+import java.util.Locale
+import java.util.Properties
+
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+def androidVersionFile = rootProject.file('version.properties')
+if (!androidVersionFile.isFile()) {
+    throw new GradleException("Android version metadata is missing: android/version.properties")
+}
+
+def androidVersion = new Properties()
+androidVersionFile.withInputStream { stream -> androidVersion.load(stream) }
+def appVersionCodeText = androidVersion.getProperty('versionCode', '').trim()
+def appVersionName = androidVersion.getProperty('versionName', '').trim()
+if (!(appVersionCodeText ==~ /[1-9][0-9]*/)) {
+    throw new GradleException("android/version.properties versionCode must be a positive integer")
+}
+if (!appVersionName) {
+    throw new GradleException("android/version.properties versionName must not be empty")
+}
+def appVersionCode = Integer.parseInt(appVersionCodeText)
+def permanentReleaseKeyAlias = 'piano-fundamentals'
+
+def updaterConfigurationFile = rootProject.file('updater.properties')
+if (!updaterConfigurationFile.isFile()) {
+    throw new GradleException("Android updater configuration is missing: android/updater.properties")
+}
+def updaterConfiguration = new Properties()
+updaterConfigurationFile.withInputStream { stream -> updaterConfiguration.load(stream) }
+def productionManifestUrl = updaterConfiguration.getProperty('manifestUrl', '').trim()
+def productionManifestUri
+try {
+    productionManifestUri = new URI(productionManifestUrl)
+} catch (Exception ignored) {
+    throw new GradleException("android/updater.properties manifestUrl must be a valid HTTPS URL")
+}
+if (productionManifestUri.scheme?.toLowerCase(Locale.ROOT) != 'https' ||
+    !productionManifestUri.host || productionManifestUri.userInfo || productionManifestUri.fragment) {
+    throw new GradleException("android/updater.properties manifestUrl must be a credential-free HTTPS URL")
+}
+def escapedProductionManifestUrl = productionManifestUrl.replace('\\', '\\\\').replace('"', '\\"')
+
+def releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.toLowerCase(Locale.ROOT).contains('release')
+}
+def releaseSigningFile = rootProject.file('keystore.properties')
+def releaseSigningProperties = new Properties()
+if (releaseSigningFile.isFile()) {
+    releaseSigningFile.withInputStream { stream -> releaseSigningProperties.load(stream) }
+}
+def signingValue = { String propertyName, String environmentName ->
+    def environmentValue = System.getenv(environmentName)?.trim()
+    environmentValue ?: releaseSigningProperties.getProperty(propertyName, '').trim()
+}
+def releaseSigning = [
+    storeFile: signingValue('storeFile', 'PIANO_ANDROID_STORE_FILE'),
+    storePassword: signingValue('storePassword', 'PIANO_ANDROID_STORE_PASSWORD'),
+    keyAlias: signingValue('keyAlias', 'PIANO_ANDROID_KEY_ALIAS'),
+    keyPassword: signingValue('keyPassword', 'PIANO_ANDROID_KEY_PASSWORD')
+]
+def missingReleaseSigningFields = releaseSigning.findAll { _, value -> !value }.keySet().toList()
+def releaseStoreFileInput = releaseSigning.storeFile ? new File(releaseSigning.storeFile) : null
+def releaseStoreFile = releaseStoreFileInput?.canonicalFile
+def repositoryRoot = rootProject.projectDir.parentFile.canonicalFile
+def releaseStoreIsInsideRepository = releaseStoreFile != null &&
+    releaseStoreFile.toPath().startsWith(repositoryRoot.toPath())
+
+def releaseSigningReady = missingReleaseSigningFields.isEmpty() &&
+    releaseStoreFileInput?.isAbsolute() &&
+    !releaseStoreIsInsideRepository &&
+    releaseStoreFile.isFile()
+
+android {
+    namespace = "com.pianofundamentals.trainer"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.pianofundamentals.trainer"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode appVersionCode
+        versionName appVersionName
+        buildConfigField "String", "UPDATE_MANIFEST_URL", "\"${escapedProductionManifestUrl}\""
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (releaseSigningReady) {
+            release {
+                storeFile releaseStoreFile
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.getByName('release')
+            }
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    kotlinOptions {
+        jvmTarget = '21'
+    }
+    buildFeatures {
+        buildConfig true
+    }
+}
+
+if (releaseTaskRequested) {
+    if (!missingReleaseSigningFields.isEmpty()) {
+        throw new GradleException(
+            "Release signing credentials are missing: ${missingReleaseSigningFields.join(', ')}. " +
+            "Copy android/keystore.properties.example to the gitignored android/keystore.properties " +
+            "or set PIANO_ANDROID_STORE_FILE, PIANO_ANDROID_STORE_PASSWORD, " +
+            "PIANO_ANDROID_KEY_ALIAS and PIANO_ANDROID_KEY_PASSWORD. " +
+            "No debug-signing fallback is allowed."
+        )
+    }
+    if (releaseSigning.keyAlias != permanentReleaseKeyAlias) {
+        throw new GradleException("Release signing keyAlias must match the permanent application identity")
+    }
+    if (!releaseStoreFileInput.isAbsolute()) {
+        throw new GradleException("Release signing storeFile must be an absolute local path outside the Git repository")
+    }
+    if (releaseStoreIsInsideRepository) {
+        throw new GradleException("Release signing keystore must not be stored inside the Git repository")
+    }
+    if (!releaseStoreFile.isFile()) {
+        throw new GradleException("Release signing keystore does not exist at the configured storeFile path")
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

@@ -1,0 +1,878 @@
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-app: #070b16;
+  --bg-sidebar: #0a0f1d;
+  --bg-panel: #0b1020;
+  --bg-card: rgba(17, 24, 39, 0.92);
+  --bg-card-hover: rgba(24, 34, 52, 0.96);
+  --bg-elevated: #111a30;
+  --bg-input: #10182a;
+  --bg-soft: rgba(17, 24, 39, 0.72);
+  --bg-selected: rgba(79, 70, 229, 0.18);
+  --bg-overlay: rgba(3, 7, 18, 0.72);
+  --bg-app-pattern:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.025) 0 1px, transparent 1px 100%),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.02) 0 1px, transparent 1px 100%),
+    linear-gradient(135deg, #070b16 0%, #0b1020 100%);
+  --bg-sidebar-surface: linear-gradient(180deg, rgba(12, 18, 32, 0.96), rgba(7, 11, 21, 0.98));
+  --bg-button: rgba(30, 41, 59, 0.78);
+  --bg-button-hover: rgba(42, 55, 78, 0.92);
+
+  --border-soft: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(129, 140, 248, 0.34);
+  --border-subtle: rgba(148, 163, 184, 0.1);
+
+  --text-primary: #f4f7ff;
+  --text-secondary: #a7b0cc;
+  --text-muted: #6f7a99;
+  --text-disabled: #525d78;
+  --text-on-accent: #ffffff;
+
+  --accent-primary: #7964f2;
+  --accent-primary-hover: #8875fa;
+  --accent-blue: #4385ee;
+  --accent-cyan: #2ccfc3;
+  --accent-soft: rgba(79, 70, 229, 0.18);
+  --accent-cyan-soft: rgba(37, 214, 200, 0.12);
+
+  --success: #34c78a;
+  --success-soft: rgba(52, 199, 138, 0.15);
+  --warning: #e0ac46;
+  --warning-soft: rgba(224, 172, 70, 0.16);
+  --danger: #ec6a70;
+  --danger-soft: rgba(236, 106, 112, 0.15);
+
+  --module-sight-reading: #7c5cff;
+  --module-rhythm: #3b82f6;
+  --module-scale: #25d6c8;
+  --module-chord: #d6a93a;
+  --module-coordination: #e75ca8;
+  --module-free-practice: #6978ff;
+
+  --scrollbar-track: rgba(7, 11, 22, 0.58);
+  --scrollbar-thumb: rgba(129, 140, 248, 0.42);
+  --shadow-card: 0 12px 30px rgba(0, 0, 0, 0.24);
+  --shadow-elevated: 0 20px 50px rgba(0, 0, 0, 0.34);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-app: #f6f8fc;
+  --bg-sidebar: #eef2f8;
+  --bg-panel: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8f9ff;
+  --bg-elevated: #ffffff;
+  --bg-input: #f1f4f9;
+  --bg-soft: #f4f6fb;
+  --bg-selected: #eceafd;
+  --bg-overlay: rgba(24, 32, 51, 0.34);
+  --bg-app-pattern:
+    linear-gradient(90deg, rgba(102, 89, 217, 0.025) 0 1px, transparent 1px 100%),
+    linear-gradient(180deg, rgba(52, 120, 229, 0.02) 0 1px, transparent 1px 100%),
+    linear-gradient(135deg, #f6f8fc 0%, #f1f4fa 100%);
+  --bg-sidebar-surface: linear-gradient(180deg, #f3f6fb, #eaf0f7);
+  --bg-button: #f1f4f9;
+  --bg-button-hover: #e8ecf5;
+
+  --border-soft: #dde3ef;
+  --border-strong: #c6d0e1;
+  --border-subtle: #e8ecf3;
+
+  --text-primary: #182033;
+  --text-secondary: #606b82;
+  --text-muted: #8a94a8;
+  --text-disabled: #aeb6c5;
+  --text-on-accent: #ffffff;
+
+  --accent-primary: #6759d9;
+  --accent-primary-hover: #584bc7;
+  --accent-blue: #3478e5;
+  --accent-cyan: #159f98;
+  --accent-soft: #eceafd;
+  --accent-cyan-soft: #e2f5f2;
+
+  --success: #16875f;
+  --success-soft: #e5f4ee;
+  --warning: #ad7010;
+  --warning-soft: #fff4dc;
+  --danger: #c94558;
+  --danger-soft: #fdecef;
+
+  --module-sight-reading: #654fc7;
+  --module-rhythm: #286fc4;
+  --module-scale: #12877f;
+  --module-chord: #9b690b;
+  --module-coordination: #b53e79;
+  --module-free-practice: #5356c8;
+
+  --scrollbar-track: #e8ecf3;
+  --scrollbar-thumb: #aeb8cb;
+  --shadow-card: 0 8px 24px rgba(52, 66, 99, 0.08);
+  --shadow-elevated: 0 16px 40px rgba(52, 66, 99, 0.14);
+}
+
+body {
+  color: var(--text-primary);
+  background: var(--bg-app-pattern);
+}
+
+.sidebar {
+  border-color: var(--border-soft);
+  background: var(--bg-sidebar-surface);
+}
+
+.app-card,
+.practice-card,
+.info-card,
+.midi-panel,
+.midi-card,
+.judgement-panel,
+.rhythm-panel,
+.scale-panel,
+.chord-panel,
+.coordination-panel,
+.practice-report-panel,
+.midi-log-modal,
+.placeholder-panel,
+.settings-card,
+.history-record,
+.history-empty-state,
+.nav-list,
+.sidebar-audio-monitor,
+.audio-control-row,
+.volume-control,
+.latest-event-box,
+.permission-badge,
+.active-note-card,
+.current-target-card,
+.latest-judgement,
+.report-grid > div,
+.judgement-result-item,
+.metronome-sound-control,
+.metronome-display > div,
+.midi-event-summary-grid div,
+.sight-staff-card,
+.sight-feedback-card,
+.sight-stat-grid div,
+.sight-report-grid div,
+.sight-error-table__grid span,
+.chord-target-view,
+.chord-feedback-box,
+.coordination-status-grid > div,
+.coordination-grid-view,
+.practice-stat-grid > div,
+.history-detail-grid > div {
+  border-color: var(--border-soft);
+  color: var(--text-primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.app-card.is-interactive:hover,
+.practice-card:hover,
+.quick-action:hover,
+.quick-tool:hover,
+.device-list-item:hover,
+.history-record-summary:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-card-hover);
+}
+
+.brand-mark,
+.nav-glyph,
+.quick-action__glyph,
+.record-icon,
+.history-module-icon {
+  border-color: var(--border-soft);
+  color: var(--accent-primary);
+  background: var(--bg-elevated);
+  box-shadow: none;
+}
+
+.brand h1,
+.home-header h2,
+.section-heading h3,
+.quick-actions h3,
+.info-card h3,
+.panel-title-row h3,
+.practice-card h3,
+.stat-list dd,
+.record-item strong,
+.midi-panel strong,
+.settings-card h3,
+.history-record-summary strong,
+.practice-report-heading h4,
+.practice-stat-grid strong,
+.history-detail-grid h5,
+.history-detail-grid p strong {
+  color: var(--text-primary);
+}
+
+.brand p,
+.home-header p,
+.panel-title-row p,
+.midi-page-header p,
+.placeholder-panel p,
+.practice-card p,
+.quick-action small,
+.quick-tool small,
+.stat-list dt,
+.record-item p,
+.record-item time,
+.judgement-help,
+.audio-monitor-note,
+.external-audio-note-panel p,
+.history-record-summary p,
+.history-record-summary time,
+.practice-stat-grid span,
+.history-detail-grid p,
+.theme-current-state {
+  color: var(--text-secondary);
+}
+
+.nav-item.app-button,
+.nav-item.app-button:hover {
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.nav-item.is-active,
+.nav-item.is-active:hover,
+.device-list-item.is-selected,
+.segmented-control button.is-active,
+.sight-segmented button.is-active,
+.history-filter-group button.is-active {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  background: var(--bg-selected);
+}
+
+.app-button,
+.primary-button,
+.primary-log-button,
+.secondary-button,
+.secondary-inline-button,
+.ghost-button,
+.monitor-toggle,
+.mini-monitor-toggle,
+.modal-close-button,
+.segmented-control button,
+.sight-segmented button,
+.history-filter-group button,
+.theme-option {
+  border-color: var(--border-soft);
+  color: var(--text-primary);
+  background: var(--bg-button);
+}
+
+.app-button:hover,
+.primary-button:hover,
+.primary-log-button:hover,
+.secondary-button:hover,
+.secondary-inline-button:hover,
+.ghost-button:hover,
+.monitor-toggle:hover,
+.mini-monitor-toggle:hover,
+.modal-close-button:hover,
+.segmented-control button:hover,
+.sight-segmented button:hover,
+.history-filter-group button:hover,
+.theme-option:hover {
+  border-color: var(--border-strong);
+  background-color: var(--bg-button-hover);
+}
+
+.app-button-primary,
+.primary-button,
+.primary-log-button,
+.accent-violet .primary-button,
+.accent-blue .primary-button,
+.accent-cyan .primary-button,
+.accent-amber .primary-button,
+.accent-rose .primary-button,
+.accent-indigo .primary-button {
+  border-color: var(--accent-primary);
+  color: var(--text-on-accent);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-blue));
+}
+
+.app-button-primary:hover,
+.primary-button:hover,
+.primary-log-button:hover {
+  background: linear-gradient(135deg, var(--accent-primary-hover), var(--accent-blue));
+}
+
+button:disabled,
+input:disabled,
+select:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.midi-select,
+.device-list-item,
+.bpm-control input,
+.metronome-volume-control input,
+.volume-control,
+.chord-setting-group select,
+.coordination-setting-group select {
+  border-color: var(--border-soft);
+  color: var(--text-primary);
+  background: var(--bg-input);
+}
+
+.midi-select:focus,
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  border-color: var(--accent-primary);
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+
+select option {
+  color: var(--text-primary);
+  background: var(--bg-input);
+}
+
+.stat-list div,
+.record-item,
+.midi-log-row,
+.history-record-summary {
+  border-color: var(--border-subtle);
+}
+
+.progress-ring {
+  background: conic-gradient(
+    from -30deg,
+    var(--accent-primary) 0 36%,
+    var(--accent-blue) 36% 57%,
+    var(--accent-cyan) 57% 75%,
+    var(--border-soft) 75% 100%
+  );
+}
+
+.progress-ring::before,
+.midi-log-head,
+.current-note-display {
+  background: var(--bg-elevated);
+}
+
+.midi-log-modal-backdrop {
+  background: var(--bg-overlay);
+}
+
+.midi-log-head {
+  color: var(--text-secondary);
+}
+
+.status-connected,
+.tone-cyan,
+.result-correct,
+.event-noteOn .event-type {
+  color: var(--success);
+}
+
+.status-pending,
+.tone-amber,
+.result-missing_note,
+.result-early,
+.result-late,
+.result-sync_warning {
+  color: var(--warning);
+}
+
+.status-disconnected,
+.result-wrong_note,
+.result-extra_note,
+.result-rest_error {
+  color: var(--danger);
+}
+
+.keyboard-preview {
+  border-color: #11110f;
+  background: linear-gradient(180deg, #343432 0%, #20201e 22%, #11110f 100%);
+}
+
+.full-keyboard-shell {
+  border-color: #10100f;
+  background: linear-gradient(180deg, #363634 0%, #242422 12%, #11110f 100%);
+}
+
+.keyboard-scroll {
+  background: linear-gradient(180deg, #242422 0%, #151513 100%);
+}
+
+.keyboard-preview .white-key,
+.full-white-key {
+  border-color: #a9a294;
+  background: linear-gradient(180deg, #fffefa 0%, #f8f4e9 70%, #e5dece 91%, #c9c0ad 100%);
+}
+
+.keyboard-preview .black-key,
+.full-black-key {
+  border-color: #050505;
+  background: linear-gradient(105deg, #30302e 0%, #171715 38%, #050505 100%);
+}
+
+.rhythm-grid-row span,
+.scale-sequence-grid span,
+.coordination-grid-cell {
+  border-color: var(--border-soft);
+  color: var(--text-secondary);
+  background: var(--bg-input);
+}
+
+.rhythm-grid-row span.is-active,
+.scale-sequence-grid span.is-active,
+.coordination-grid-cell.is-current {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  background: var(--accent-soft);
+}
+
+.coordination-grid-cell.is-rest {
+  color: var(--text-muted);
+  background: var(--bg-soft);
+}
+
+.coordination-grid-cell.result-correct {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+
+.coordination-grid-cell.result-rest_error,
+.coordination-grid-cell.result-late {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.practice-save-error,
+.history-clear-confirm {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.settings-page {
+  height: calc(100vh - 30px);
+  min-height: 0;
+  overflow: auto;
+  padding: 0 0 22px;
+}
+
+.settings-content {
+  max-width: 920px;
+  margin-top: 24px;
+}
+
+.settings-card {
+  padding: 24px;
+}
+
+.theme-switcher {
+  margin-top: 22px;
+}
+
+.theme-option-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.theme-option {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 4px 12px;
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.theme-option.is-active {
+  border-color: var(--accent-primary);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+.theme-option-preview {
+  grid-row: 1 / span 2;
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  width: 46px;
+  height: 38px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.theme-option-preview i:first-child {
+  background: #dfe5ef;
+}
+
+.theme-option-preview i:last-child {
+  margin: 7px 6px;
+  border-radius: 4px;
+  background: #f2f4f8;
+}
+
+.theme-option-preview-dark {
+  background: #0b1020;
+}
+
+.theme-option-preview-dark i:first-child {
+  background: #121a2e;
+}
+
+.theme-option-preview-dark i:last-child {
+  background: #1a2440;
+}
+
+.theme-option-preview-system {
+  background: linear-gradient(90deg, #0b1020 0 50%, #ffffff 50% 100%);
+}
+
+.theme-option-preview-system i:first-child {
+  background: linear-gradient(90deg, #121a2e 0 50%, #dfe5ef 50% 100%);
+}
+
+.theme-option-preview-system i:last-child {
+  background: linear-gradient(90deg, #1a2440 0 50%, #f2f4f8 50% 100%);
+}
+
+.theme-option strong {
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.theme-option small {
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.theme-current-state {
+  margin: 14px 0 0;
+  font-size: 13px;
+}
+
+[data-theme] .session-chip,
+[data-theme] .quick-action,
+[data-theme] .quick-tool,
+[data-theme] .bpm-control,
+[data-theme] .rhythm-pattern-grid,
+[data-theme] .chord-target-main,
+[data-theme] .chord-sound-row,
+[data-theme] .coordination-sound-row,
+[data-theme] .practice-report-panel,
+[data-theme] .empty-midi-state,
+[data-theme] .audio-status-badge,
+[data-theme] .log-count-badge,
+[data-theme] .sight-result-badge,
+[data-theme] .beat-dots span,
+[data-theme] .coordination-grid-row > span,
+[data-theme] .coordination-row-heading {
+  border-color: var(--border-soft);
+  color: var(--text-primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+[data-theme] .session-chip span,
+[data-theme] .session-chip small,
+[data-theme] .quick-action small,
+[data-theme] .quick-tool small,
+[data-theme] .bpm-control span,
+[data-theme] .metronome-display span,
+[data-theme] .current-target-card span,
+[data-theme] .latest-judgement span,
+[data-theme] .report-grid span,
+[data-theme] .chord-target-main span,
+[data-theme] .coordination-status-grid span,
+[data-theme] .coordination-label-row > span,
+[data-theme] .coordination-label-row .coordination-row-heading {
+  color: var(--text-secondary);
+}
+
+[data-theme] .session-chip strong,
+[data-theme] .quick-action strong,
+[data-theme] .quick-tool strong,
+[data-theme] .midi-device,
+[data-theme] .sidebar-audio-row,
+[data-theme] .sidebar-audio-row strong,
+[data-theme] .permission-badge strong,
+[data-theme] .current-note-display strong,
+[data-theme] .active-note-card strong,
+[data-theme] .latest-event-box strong,
+[data-theme] .audio-control-row strong,
+[data-theme] .volume-control strong,
+[data-theme] .midi-event-summary-grid strong,
+[data-theme] .bpm-control strong,
+[data-theme] .metronome-sound-header strong,
+[data-theme] .metronome-volume-control strong,
+[data-theme] .metronome-display strong,
+[data-theme] .current-target-card strong,
+[data-theme] .latest-judgement strong,
+[data-theme] .judgement-result-item strong,
+[data-theme] .report-grid strong,
+[data-theme] .chord-target-main strong,
+[data-theme] .chord-target-main p,
+[data-theme] .chord-feedback-box strong,
+[data-theme] .coordination-status-grid strong,
+[data-theme] .history-record-summary div > strong,
+[data-theme] .history-record-summary > span strong,
+[data-theme] .practice-report-heading h4,
+[data-theme] .practice-stat-grid strong,
+[data-theme] .history-detail-grid h5,
+[data-theme] .history-detail-grid p strong {
+  color: var(--text-primary);
+}
+
+[data-theme] .midi-card .secondary-button,
+[data-theme] .secondary-inline-button,
+[data-theme] .ghost-button,
+[data-theme] .monitor-toggle,
+[data-theme] .mini-monitor-toggle {
+  border-color: var(--border-soft);
+  color: var(--text-primary);
+  background: var(--bg-button);
+}
+
+[data-theme] .midi-card .secondary-button:hover,
+[data-theme] .midi-card .secondary-button.is-active,
+[data-theme] .secondary-inline-button:hover,
+[data-theme] .ghost-button:hover,
+[data-theme] .monitor-toggle:hover,
+[data-theme] .mini-monitor-toggle:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-button-hover);
+}
+
+[data-theme] .quick-action:hover,
+[data-theme] .quick-tool:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+[data-theme] .current-note-display {
+  border-color: var(--accent-cyan);
+  background: var(--accent-cyan-soft);
+}
+
+[data-theme] .active-note-card {
+  border-color: var(--accent-cyan);
+  background: var(--accent-cyan-soft);
+}
+
+[data-theme] .empty-midi-state {
+  color: var(--text-secondary);
+  background: var(--bg-soft);
+  box-shadow: none;
+}
+
+[data-theme] .midi-warning {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+[data-theme] .audio-status-badge,
+[data-theme] .log-count-badge,
+[data-theme] .sight-result-badge {
+  color: var(--text-secondary);
+  background: var(--bg-button);
+  box-shadow: none;
+}
+
+[data-theme] .audio-status-badge.status-ready,
+[data-theme] .sight-result-badge.result-correct {
+  border-color: var(--success);
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+[data-theme] .audio-status-badge.status-error,
+[data-theme] .audio-status-badge.status-unsupported,
+[data-theme] .sight-result-badge.result-wrong_note {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+[data-theme] .bpm-control,
+[data-theme] .metronome-sound-control,
+[data-theme] .metronome-display > div,
+[data-theme] .current-target-card,
+[data-theme] .latest-judgement,
+[data-theme] .report-grid > div,
+[data-theme] .judgement-result-item,
+[data-theme] .rhythm-pattern-grid,
+[data-theme] .chord-target-main,
+[data-theme] .chord-feedback-box,
+[data-theme] .chord-sound-row,
+[data-theme] .coordination-status-grid > div,
+[data-theme] .coordination-sound-row,
+[data-theme] .coordination-grid-view,
+[data-theme] .practice-stat-grid > div,
+[data-theme] .history-detail-grid > div {
+  border-color: var(--border-soft);
+  background: var(--bg-card);
+  box-shadow: none;
+}
+
+[data-theme] .segmented-control button.is-active,
+[data-theme] .sight-segmented button.is-active,
+[data-theme] .beat-dots span.is-active,
+[data-theme] .rhythm-grid-row span.is-active,
+[data-theme] .scale-sequence-grid span.is-active,
+[data-theme] .coordination-grid-cell.is-current {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  background: var(--accent-soft);
+  box-shadow: none;
+}
+
+[data-theme] .beat-dots span.is-count-in.is-active {
+  border-color: var(--warning);
+  color: var(--text-primary);
+  background: var(--warning-soft);
+}
+
+[data-theme] .rhythm-pattern-grid,
+[data-theme] .coordination-grid-view {
+  background: var(--bg-soft);
+}
+
+[data-theme] .rhythm-grid-row span,
+[data-theme] .scale-sequence-grid span,
+[data-theme] .coordination-grid-row > span,
+[data-theme] .coordination-row-heading {
+  border-color: var(--border-soft);
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  box-shadow: none;
+}
+
+[data-theme] .rhythm-symbol-row span.is-note,
+[data-theme] .scale-sequence-grid strong {
+  color: var(--text-primary);
+}
+
+[data-theme] .rhythm-symbol-row span.is-rest,
+[data-theme] .coordination-grid-cell.is-rest {
+  color: var(--text-muted);
+  background: var(--bg-soft);
+}
+
+[data-theme] .judgement-result-item span {
+  color: var(--text-secondary);
+  background: var(--bg-soft);
+}
+
+[data-theme] .judgement-result-item.result-correct span,
+[data-theme] .practice-report-heading > strong {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+[data-theme] .judgement-result-item.result-wrong_note span,
+[data-theme] .judgement-result-item.result-missing_note span,
+[data-theme] .judgement-result-item.result-rest_error span {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+[data-theme] .judgement-result-item.result-early span,
+[data-theme] .judgement-result-item.result-late span,
+[data-theme] .judgement-result-item.result-extra_note span {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+[data-theme] .practice-report-panel {
+  border-color: var(--border-soft);
+  background: var(--bg-soft);
+  box-shadow: none;
+}
+
+[data-theme] .eyebrow {
+  color: var(--text-muted);
+}
+
+[data-theme] .midi-select-label {
+  color: var(--text-secondary);
+}
+
+* {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid var(--scrollbar-track);
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+}
+
+body,
+.sidebar,
+.app-card,
+.practice-card,
+.info-card,
+.midi-panel,
+.judgement-panel,
+.rhythm-panel,
+.scale-panel,
+.chord-panel,
+.coordination-panel,
+.history-record,
+.app-button,
+.theme-option,
+input,
+select {
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .sidebar,
+  .app-card,
+  .practice-card,
+  .info-card,
+  .midi-panel,
+  .judgement-panel,
+  .rhythm-panel,
+  .scale-panel,
+  .chord-panel,
+  .coordination-panel,
+  .history-record,
+  .app-button,
+  .theme-option,
+  input,
+  select {
+    transition: none;
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "name": "piano-fundamentals-trainer",
+  "version": "1.0.0-rc.1",
+  "private": true,
+  "description": "Android tablet piano sight-reading trainer with native Bluetooth MIDI input.",
+  "productName": "钢琴基本功训练器",
+  "author": "Natural516",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Natural516/piano-fundamentals-trainer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Natural516/piano-fundamentals-trainer.git"
+  },
+  "scripts": {
+    "dev": "vite --config vite.android-prototype.config.ts --host 0.0.0.0",
+    "build:android:debug": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && vite build --mode android-debug --config vite.android-prototype.config.ts",
+    "build:android:release": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && vite build --mode android-release --config vite.android-prototype.config.ts",
+    "android:sync": "npm run build:android:debug && cap sync android",
+    "android:sync:release": "npm run build:android:release && cap sync android",
+    "android:apk:debug": "npm run android:sync && cd android && gradlew.bat assembleDebug",
+    "android:apk:release": "npm run android:sync:release && cd android && gradlew.bat assembleRelease",
+    "android:verify:debug": "node scripts/android-apk-signing-report.cjs android/app/build/outputs/apk/debug/app-debug.apk --expect-debug",
+    "android:verify:release": "node scripts/android-apk-signing-report.cjs android/app/build/outputs/apk/release/app-release.apk --expect-release",
+    "test:sight-reading": "tsc --noEmit -p tsconfig.sight-reading.json && node scripts/public-sight-reading-contracts.cjs",
+    "test:android-integration": "node scripts/android-sight-reading-integration.cjs",
+    "test:android-bluetooth-midi": "node scripts/android-bluetooth-midi-check.cjs",
+    "test:android-bluetooth-midi:native": "cd android && gradlew.bat testDebugUnitTest --tests com.pianofundamentals.trainer.BluetoothMidiStatePolicyTest",
+    "test:android-signing": "node scripts/android-signing-foundation-check.cjs",
+    "test:android-persistence": "node scripts/android-persistence-check.cjs",
+    "test:android-history": "node scripts/android-history-check.cjs",
+    "test:android-updater": "node scripts/android-updater-check.cjs",
+    "test:android-updater:native": "node scripts/android-updater-native-check.cjs",
+    "test:android-updater:network": "node scripts/android-native-manifest-network-check.cjs",
+    "test:android-double-note": "node scripts/android-double-note-check.cjs",
+    "test:android-icon": "node scripts/android-icon-check.cjs",
+    "test:android-shell": "node scripts/android-shell-check.cjs",
+    "typecheck": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && tsc --noEmit -p tsconfig.sight-reading.json",
+    "test:public": "npm run android:sync && npm run test:android-double-note && npm run test:android-icon && npm run test:android-updater && npm run test:android-updater:native && npm run test:android-updater:network && npm run test:android-history && npm run test:android-persistence && npm run test:android-signing && npm run test:android-bluetooth-midi && npm run test:android-bluetooth-midi:native && npm run test:android-integration && npm run test:sight-reading && npm run typecheck"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.0",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/core": "8.5.0",
+    "@capacitor/preferences": "8.0.1",
+    "@vexflow-fonts/bravura": "1.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vexflow": "5.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.0",
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}

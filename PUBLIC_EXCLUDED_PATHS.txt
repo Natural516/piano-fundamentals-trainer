@@ -1,0 +1,82 @@
+PIANO FUNDAMENTALS TRAINER — PUBLIC SNAPSHOT EXCLUSIONS
+
+Source checkpoint: 352e02a3c78b0f0b1a5ffbf5a270ba8e97c1cf27
+Snapshot scope: Android application plus required shared build/test dependencies
+
+EXCLUDED FROM THE PUBLIC SNAPSHOT
+
+fixtures/golden/
+  Private Golden MusicXML and MIDI fixtures are outside the approved public scope.
+
+native-audio-poc/
+  Windows-only feasibility experiment; not part of Android runtime or build.
+
+resources/piano-samples/salamander/
+  Legacy desktop audio samples; Android 1.4.0 has no internal piano sound.
+
+src/main/
+src/preload/
+  Electron main/preload runtime; not used by the Android build.
+
+src/renderer/** except the explicit retained shared notation closure
+  Old desktop UI, sampler, exercises, storage, AI and Windows-oriented runtime.
+  Retained exceptions are listed in PUBLIC_FILE_MANIFEST.txt.
+
+electron.vite.config.ts
+build/
+scripts/after-pack.cjs
+scripts/generate-app-icon.py
+scripts/measure-piano-latency.cjs
+scripts/native-audio-poc.cjs
+scripts/capture-f2-production.cjs
+  Electron/Windows packaging, diagnostics, capture and icon tooling.
+
+scripts/regression-check.cjs
+scripts/sight-reading-contracts.cjs
+  Private legacy/Golden regression and desktop compatibility contract surface.
+  The public tree supplies Android-focused deterministic equivalents and does
+  not expose a command that depends on excluded Golden files.
+
+docs/agent/
+docs/F1-human-practice-flow/
+private full reports, stage logs, checkpoint narration and QA evidence
+  Internal development material was not copied wholesale. Stable public
+  documentation was rewritten under docs/.
+
+README.md and other root public documents from the private snapshot
+  Replaced in staging because the originals described obsolete Windows scope.
+
+IGNORED / GENERATED LOCALLY, NOT PART OF THE INITIAL COMMIT
+
+.git from the private repository, old refs/objects/reflogs/worktrees
+node_modules/
+dist/
+out/
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/src/main/res/xml/config.xml
+*.tsbuildinfo
+APK/AAB/AAR products
+latest.json and updater QA artifacts
+local.properties
+keystore.properties
+JKS/keystore/private keys/signing passwords
+.env files
+internal screenshots and local audit/QA reports
+
+CONFIRMED ABSENT FROM REVIEWED PUBLIC CONTENT
+
+fixtures/golden/
+native-audio-poc/
+private .git history
+official private signing configuration/material
+release APK/AAB files
+latest.json
+local.properties
+keystore.properties
+old Codex full execution reports
