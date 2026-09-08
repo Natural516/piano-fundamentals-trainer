@@ -27,6 +27,10 @@ const RENDER_HEIGHT = 344
 const DRAWING_SCALE = 1.33
 const STAFF_INK = '#171717'
 const SECONDARY_INK = '#747b77'
+const GROUP_CENTER_BOUNDARY_RATIO = 0.5
+const GROUP_SEPARATION_RATIO = 0.13
+const ARPEGGIO_LEFT_PADDING_RATIO = 0.12
+const BLOCK_RIGHT_PADDING_RATIO = 0.08
 
 function readThemeColor(element: HTMLElement, variable: string, fallback: string): string {
   return getComputedStyle(element).getPropertyValue(variable).trim() || fallback
@@ -135,12 +139,13 @@ function drawGrandStaff(
 
   const blockColor = colorForState(container, blockState)
   const arpeggioColor = colorForState(container, arpeggioState)
-  const blockX = staveX + staveWidth * 0.30
-  const arpeggioStart = staveX + staveWidth * 0.61
-  const arpeggioEnd = staveX + staveWidth * 0.90
-
-  drawAt(context, trebleStave, pitches.filter((pitch) => pitch.clef === 'treble'), 'treble', blockX, blockColor)
-  drawAt(context, bassStave, pitches.filter((pitch) => pitch.clef === 'bass'), 'bass', blockX, blockColor)
+  const centerOwnershipBoundary = staveX + staveWidth * GROUP_CENTER_BOUNDARY_RATIO
+  const groupSeparation = staveWidth * GROUP_SEPARATION_RATIO
+  const arpeggioStart = staveX + staveWidth * ARPEGGIO_LEFT_PADDING_RATIO
+  const arpeggioEnd = centerOwnershipBoundary - groupSeparation
+  const blockRegionStart = centerOwnershipBoundary + groupSeparation
+  const blockRegionEnd = staveX + staveWidth * (1 - BLOCK_RIGHT_PADDING_RATIO)
+  const blockX = (blockRegionStart + blockRegionEnd) / 2
 
   pitches.forEach((pitch, index) => {
     const denominator = Math.max(1, pitches.length - 1)
@@ -148,6 +153,9 @@ function drawGrandStaff(
     const stave = pitch.clef === 'treble' ? trebleStave : bassStave
     drawAt(context, stave, [pitch], pitch.clef, x, arpeggioColor)
   })
+
+  drawAt(context, trebleStave, pitches.filter((pitch) => pitch.clef === 'treble'), 'treble', blockX, blockColor)
+  drawAt(context, bassStave, pitches.filter((pitch) => pitch.clef === 'bass'), 'bass', blockX, blockColor)
 }
 
 export function ChordGrandStaff({
@@ -212,7 +220,7 @@ export function ChordGrandStaff({
     <div
       ref={containerRef}
       aria-busy={!fontReady && !fontError}
-      aria-label={`${symbol}：左侧柱式和弦，右侧分解和弦`}
+      aria-label={`${symbol}：左侧分解和弦，右侧柱式和弦`}
       className="chord-grand-staff"
       role="img"
     >

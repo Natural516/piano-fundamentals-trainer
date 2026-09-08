@@ -176,7 +176,7 @@ test('CT09', 'written pitch to MIDI follows SPN C4=60 across enharmonic octave b
 })
 
 test('CT10', 'register enumeration returns only deterministic strict close-position placements', () => {
-  assert.deepEqual(core.CHORD_PRACTICE_DEFAULT_REGISTER_WINDOW, { minMidi: 48, maxMidi: 84 })
+  assert.deepEqual(core.CHORD_PRACTICE_DEFAULT_REGISTER_WINDOW, { minMidi: 48, maxMidi: 96 })
   const cases = [
     [pc('C'), 'major', 0, 3],
     [pc('D', -1), 'dominant7', 3, 4],
@@ -190,7 +190,7 @@ test('CT10', 'register enumeration returns only deterministic strict close-posit
     for (const placement of placements) {
       assert.equal(placement.writtenPitches.length, count)
       assert.equal(new Set(placement.soundingMidiNumbers).size, count)
-      assert.ok(placement.lowestMidi >= 48 && placement.highestMidi <= 84)
+      assert.ok(placement.lowestMidi >= 48 && placement.highestMidi <= 96)
       assert.ok(placement.highestMidi - placement.lowestMidi < 12)
       assert.ok(placement.soundingMidiNumbers.every((midi, index, notes) => index === 0 || midi > notes[index - 1]))
       placement.writtenPitches.forEach((pitch, index) => assert.equal(core.writtenPitchToMidi(pitch), placement.soundingMidiNumbers[index]))
@@ -202,40 +202,59 @@ test('CT10', 'register enumeration returns only deterministic strict close-posit
   const cFlat = core.createClosePositionPlacement(pc('C', -1), 'major', 0, 4)
   assert.equal(core.formatWrittenPitch(cFlat.writtenPitches[0]), 'C♭4')
   assert.equal(cFlat.soundingMidiNumbers[0], 59)
+
+  const cMajorPlacements = core.enumerateClosePositionPlacements(
+    pc('C'),
+    'major',
+    0,
+    core.CHORD_PRACTICE_DEFAULT_REGISTER_WINDOW
+  )
+  assert.ok(cMajorPlacements.some((placement) =>
+    placement.soundingMidiNumbers.join(',') === '84,88,91'
+  ), 'C6 E6 G6 must be available in the expanded register')
+  assert.ok(cMajorPlacements.every((placement) => placement.highestMidi <= 96))
+
+  const gMajorPlacements = core.enumerateClosePositionPlacements(
+    pc('G'),
+    'major',
+    0,
+    core.CHORD_PRACTICE_DEFAULT_REGISTER_WINDOW
+  )
+  assert.ok(gMajorPlacements.every((placement) => placement.soundingMidiNumbers.join(',') !== '91,95,98'))
 })
 
 test('CT11', 'weighted generator honors family and quality boundaries in the frozen selection order', () => {
-  const firstTriad = core.generateChordPracticeQuestion({ rng: scriptedRng(0, 0, 0, 0, 0) })
+  const firstTriad = core.generateChordPracticeQuestion({ rng: scriptedRng(0, 0, 0, 0) })
   assert.equal(firstTriad.family, 'triad')
   assert.equal(firstTriad.qualityId, 'major')
-  const upperTriad = core.generateChordPracticeQuestion({ rng: scriptedRng(0.499999, 0.999999, 0.999999, 0.999999, 0.999999) })
+  const upperTriad = core.generateChordPracticeQuestion({ rng: scriptedRng(0.499999, 0.999999, 0.999999, 0.999999) })
   assert.equal(upperTriad.qualityId, 'augmented')
-  const firstSeventh = core.generateChordPracticeQuestion({ rng: scriptedRng(0.5, 0, 0, 0, 0) })
+  const firstSeventh = core.generateChordPracticeQuestion({ rng: scriptedRng(0.5, 0, 0, 0) })
   assert.equal(firstSeventh.family, 'seventh')
   assert.equal(firstSeventh.qualityId, 'major7')
-  const lastSeventh = core.generateChordPracticeQuestion({ rng: scriptedRng(0.999999, 0.999999, 0, 0, 0) })
+  const lastSeventh = core.generateChordPracticeQuestion({ rng: scriptedRng(0.999999, 0.999999, 0, 0) })
   assert.equal(lastSeventh.qualityId, 'diminished7')
 
   core.TRIAD_QUALITY_IDS.forEach((qualityId, index) => {
-    const question = core.generateChordPracticeQuestion({ rng: scriptedRng(0, (index + 0.5) / 4, 0, 0, 0) })
+    const question = core.generateChordPracticeQuestion({ rng: scriptedRng(0, (index + 0.5) / 4, 0, 0) })
     assert.equal(question.qualityId, qualityId)
     assert.ok(question.inversionIndex >= 0 && question.inversionIndex <= 2)
   })
   core.SEVENTH_QUALITY_IDS.forEach((qualityId, index) => {
-    const question = core.generateChordPracticeQuestion({ rng: scriptedRng(0.5, (index + 0.5) / 5, 0, 0, 0) })
+    const question = core.generateChordPracticeQuestion({ rng: scriptedRng(0.5, (index + 0.5) / 5, 0, 0) })
     assert.equal(question.qualityId, qualityId)
     assert.ok(question.inversionIndex >= 0 && question.inversionIndex <= 3)
   })
 })
 
 test('CT12', 'generated question contract contains one legal exact voicing for block and ascending arpeggio', () => {
-  const question = core.generateChordPracticeQuestion({ rng: scriptedRng(0.8, 0.42, 0.73, 0.67, 0.25) })
+  const question = core.generateChordPracticeQuestion({ rng: scriptedRng(0.8, 0.42, 0.73, 0.25) })
   assert.ok(core.isChordPracticeLegal(question.root, question.qualityId))
   assert.strictEqual(question.blockNotes, question.voicing.writtenPitches)
   assert.strictEqual(question.arpeggioNotes, question.voicing.writtenPitches)
   assert.strictEqual(question.soundingMidiNumbers, question.voicing.soundingMidiNumbers)
   assert.ok(question.soundingMidiNumbers.every((midi, index, notes) => index === 0 || midi > notes[index - 1]))
-  assert.ok(question.register.lowestMidi >= 48 && question.register.highestMidi <= 84)
+  assert.ok(question.register.lowestMidi >= 48 && question.register.highestMidi <= 96)
   for (const forbidden of ['judgement', 'midiState', 'timer', 'streak', 'historyRecord', 'persistenceId', 'uiState']) {
     assert.equal(Object.hasOwn(question, forbidden), false)
   }
@@ -252,7 +271,7 @@ test('CT13', 'invalid RNG values and invalid weights fail fast without hidden ra
       family: { triad: 0.6, seventh: 0.5 }
     }
   }), /sum to 1/)
-  assert.doesNotMatch(generatorSource, /Math\.random|Date\.now|randomUUID|reroll|antiRepeat/)
+  assert.doesNotMatch(generatorSource, /Math\.random|Date\.now|randomUUID|\bwhile\s*\(|\bdo\s*\{/)
 })
 
 test('CT14', 'catalog-wide Practice invariants hold for every legal root quality inversion and register', () => {
@@ -274,7 +293,7 @@ test('CT14', 'catalog-wide Practice invariants hold for every legal root quality
         for (const placement of placements) {
           assert.equal(placement.writtenPitches.length, quality.semitones.length)
           assert.equal(new Set(placement.soundingMidiNumbers).size, quality.semitones.length)
-          assert.ok(placement.lowestMidi >= 48 && placement.highestMidi <= 84)
+          assert.ok(placement.lowestMidi >= 48 && placement.highestMidi <= 96)
           assert.ok(placement.highestMidi - placement.lowestMidi < 12)
           placement.soundingMidiNumbers.forEach((midi, index, notes) => {
             if (index > 0) assert.ok(midi > notes[index - 1])
@@ -284,6 +303,87 @@ test('CT14', 'catalog-wide Practice invariants hold for every legal root quality
       }
     }
   }
+})
+
+test('CT15', 'anti-repeat identity excludes written Root plus Quality plus Inversion regardless of register', () => {
+  const previous = Object.freeze({ root: pc('C', -1), qualityId: 'major', inversionIndex: 0 })
+  const availableIdentityCount = core.CHORD_PRACTICE_LEGAL_ROOTS.major.length * 3 - 1
+  for (let index = 0; index < availableIdentityCount; index += 1) {
+    const next = core.generateChordPracticeQuestion({
+      rng: scriptedRng(0, 0, (index + 0.5) / availableIdentityCount, index % 2 === 0 ? 0 : 0.999999),
+      previousQuestionIdentity: previous
+    })
+    assert.equal(core.isSameChordPracticeQuestionIdentity(previous, core.getChordPracticeQuestionIdentity(next)), false)
+  }
+
+  const differentInversion = core.generateChordPracticeQuestion({
+    rng: scriptedRng(0, 0, 0, 0),
+    previousQuestionIdentity: previous
+  })
+  assert.deepEqual(differentInversion.root, previous.root)
+  assert.equal(differentInversion.qualityId, previous.qualityId)
+  assert.equal(differentInversion.inversionIndex, 1)
+})
+
+test('CT16', 'anti-repeat keeps frozen family and quality weights and consumes no reroll RNG', () => {
+  assert.deepEqual(core.CHORD_PRACTICE_DEFAULT_WEIGHTS.family, { triad: 0.5, seventh: 0.5 })
+  assert.deepEqual(core.CHORD_PRACTICE_DEFAULT_WEIGHTS.qualityWithinFamily.triad, {
+    major: 0.25, minor: 0.25, diminished: 0.25, augmented: 0.25
+  })
+  assert.deepEqual(core.CHORD_PRACTICE_DEFAULT_WEIGHTS.qualityWithinFamily.seventh, {
+    major7: 0.2, dominant7: 0.2, minor7: 0.2, halfDiminished7: 0.2, diminished7: 0.2
+  })
+
+  let calls = 0
+  const rng = () => {
+    calls += 1
+    return 0
+  }
+  const previousQuestionIdentity = { root: pc('C', -1), qualityId: 'major', inversionIndex: 0 }
+  const first = core.generateChordPracticeQuestion({ rng, previousQuestionIdentity })
+  assert.equal(calls, 4, 'family, quality, Root×Inversion and register are selected exactly once')
+  const second = core.generateChordPracticeQuestion({
+    rng: scriptedRng(0, 0, 0, 0),
+    previousQuestionIdentity
+  })
+  assert.deepEqual(first, second)
+})
+
+test('CT17', 'Chord product contract freezes Arpeggio-first flow, provisional block capture and module-specific reporting', () => {
+  assert.deepEqual(core.CHORD_PRACTICE_PHASE_ORDER, ['arpeggio', 'block'])
+  assert.equal(core.CHORD_PRACTICE_FLOW_CONTRACT.arpeggioFailureAfterRelease, 'restart-same-question-at-arpeggio-first-note')
+  assert.equal(core.CHORD_PRACTICE_FLOW_CONTRACT.blockFailureAfterRelease, 'restart-same-question-at-arpeggio-first-note')
+  assert.deepEqual(core.CHORD_BLOCK_CAPTURE_CONTRACT, {
+    captureWindowMs: 150,
+    calibrationStatus: 'PROVISIONAL_FP30X_CALIBRATION_REQUIRED',
+    startsOn: 'first-note-on',
+    closesEarlyWhenAllExpectedNotesAppear: false,
+    ignoresCc64ForJudgement: true,
+    requiresPhysicalReleaseGate: true
+  })
+  assert.deepEqual(core.CHORD_QUESTION_COUNT_OPTIONS, [10, 20, 50, 100, 'endless'])
+  assert.equal(core.CHORD_REPORT_PRODUCT_CONTRACT.module, 'chord')
+  assert.equal(core.CHORD_REPORT_PRODUCT_CONTRACT.completionRateLabel, '完成率')
+  assert.equal(core.CHORD_REPORT_PRODUCT_CONTRACT.completionRateFormula, 'firstPassCompleteQuestions / completedQuestions')
+  assert.equal(core.CHORD_REPORT_PRODUCT_CONTRACT.hasQuestionTimeout, false)
+  assert.equal(core.CHORD_REPORT_PRODUCT_CONTRACT.reuseSightReadingAccuracy, false)
+  assert.equal(core.CHORD_REPORT_PRODUCT_CONTRACT.earlySaveScope, 'fully-settled-completed-questions-only')
+  assert.equal(core.CHORD_HISTORY_CARD_PRODUCT_CONTRACT.rightPrimaryMetricLabel, '完成率')
+  assert.equal(core.CHORD_HISTORY_CARD_PRODUCT_CONTRACT.infiniteCompletedDisplay, 'completed-without-denominator')
+  assert.equal(core.CHORD_HISTORY_CARD_PRODUCT_CONTRACT.sightReadingRecordsRemainNonInteractive, true)
+  assert.equal(core.CHORD_REPORT_DETAIL_PRODUCT_CONTRACT.productionNavigationImplemented, false)
+  assert.equal(core.CHORD_REPORT_DETAIL_PRODUCT_CONTRACT.durableStorageImplemented, false)
+  assert.equal(core.CHORD_TIMING_METRIC_CONTRACTS.questionStartLatency.label, '开始弹奏用时')
+  assert.equal(core.CHORD_TIMING_METRIC_CONTRACTS.arpeggioDuration.label, '分解弹奏用时')
+  assert.equal(core.CHORD_TIMING_METRIC_CONTRACTS.switchToBlockLatency.label, '切换柱式用时')
+  assert.equal(core.CHORD_TIMING_METRIC_CONTRACTS.blockLandingSpread.label, '同时落键差')
+  assert.equal(core.CHORD_TIMING_PRIMARY_AGGREGATE, 'median')
+  assert.equal(core.CHORD_TIMING_EXCLUDES_PAUSED_TIME, true)
+  assert.deepEqual(core.CHORD_FAILURE_TIMING_CONTRACT, {
+    questionStartLatencyRestartsAfterFailure: false,
+    successfulCycleMetricsUseFinalSuccessfulCycle: true,
+    failedAttemptTimingsExcludedFromPrimarySummary: true
+  })
 })
 
 let passed = 0

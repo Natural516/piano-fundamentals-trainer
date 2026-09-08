@@ -21,11 +21,11 @@ export interface ChordMockCase {
 }
 
 export type ChordMockStateId =
-  | 'block-ready'
-  | 'wait-release'
   | 'arpeggio-ready'
-  | 'block-wrong'
   | 'arpeggio-wrong'
+  | 'wait-release-to-block'
+  | 'block-ready'
+  | 'block-wrong-restart'
   | 'question-correct'
 
 export type ChordGroupVisualState = 'active' | 'completed' | 'wrong' | 'secondary'
@@ -175,39 +175,39 @@ export const CHORD_MOCK_CASES: readonly ChordMockCase[] = [
 
 export const CHORD_MOCK_STATES: readonly ChordMockState[] = [
   {
-    id: 'block-ready',
-    label: 'A · BLOCK READY',
-    block: 'active',
-    arpeggio: 'secondary',
-    prompt: '请弹奏柱式和弦'
-  },
-  {
-    id: 'wait-release',
-    label: 'B · WAIT RELEASE',
-    block: 'completed',
-    arpeggio: 'secondary',
-    prompt: '请松开琴键'
-  },
-  {
     id: 'arpeggio-ready',
-    label: 'C · ARPEGGIO READY',
-    block: 'completed',
+    label: 'A · ARPEGGIO READY',
+    block: 'secondary',
     arpeggio: 'active',
     prompt: '请按谱面顺序弹奏分解和弦'
   },
   {
-    id: 'block-wrong',
-    label: 'D · BLOCK WRONG',
-    block: 'wrong',
-    arpeggio: 'secondary',
-    prompt: '柱式错误 · 松开琴键后重试'
+    id: 'arpeggio-wrong',
+    label: 'B · ARPEGGIO WRONG',
+    block: 'secondary',
+    arpeggio: 'wrong',
+    prompt: '分解顺序错误 · 松开琴键后从头重试'
   },
   {
-    id: 'arpeggio-wrong',
-    label: 'E · ARPEGGIO WRONG',
-    block: 'completed',
-    arpeggio: 'wrong',
-    prompt: '分解顺序错误 · 松开琴键后重试'
+    id: 'wait-release-to-block',
+    label: 'C · WAIT RELEASE TO BLOCK',
+    block: 'secondary',
+    arpeggio: 'completed',
+    prompt: '分解完成 · 请松开琴键'
+  },
+  {
+    id: 'block-ready',
+    label: 'D · BLOCK READY',
+    block: 'active',
+    arpeggio: 'completed',
+    prompt: '请弹奏柱式和弦'
+  },
+  {
+    id: 'block-wrong-restart',
+    label: 'E · BLOCK WRONG / RESTART',
+    block: 'wrong',
+    arpeggio: 'completed',
+    prompt: '柱式错误 · 松开琴键后从分解重新开始'
   },
   {
     id: 'question-correct',
@@ -219,7 +219,7 @@ export const CHORD_MOCK_STATES: readonly ChordMockState[] = [
 ]
 
 export const DEFAULT_CHORD_MOCK_CASE_ID = 'c-sharp-major-seven-first'
-export const DEFAULT_CHORD_MOCK_STATE_ID: ChordMockStateId = 'block-ready'
+export const DEFAULT_CHORD_MOCK_STATE_ID: ChordMockStateId = 'arpeggio-ready'
 
 export function getChordMockCase(id: string): ChordMockCase {
   return CHORD_MOCK_CASES.find((item) => item.id === id) ?? CHORD_MOCK_CASES[0]

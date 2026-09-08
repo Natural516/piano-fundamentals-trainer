@@ -91,3 +91,9 @@ export interface ChordPracticeQuestion {
     readonly highestMidi: number
   }
 }
+
+export interface ChordPracticeQuestionIdentity {
+  readonly root: WrittenPitchClass
+  readonly qualityId: ChordQualityId
+  readonly inversionIndex: number
+}

@@ -4,9 +4,11 @@ import { formatChordSymbol, getChineseInversionLabel, spellChord } from './spell
 import type {
   ChordFamily,
   ChordPracticeQuestion,
+  ChordPracticeQuestionIdentity,
   ChordPracticeWeights,
   ChordQualityId,
-  RegisterWindow
+  RegisterWindow,
+  WrittenPitchClass
 } from './types'
 import { enumerateClosePositionPlacements } from './voicing'
 
@@ -16,6 +18,12 @@ export interface GenerateChordPracticeQuestionOptions {
   readonly rng: ChordPracticeRng
   readonly registerWindow?: RegisterWindow
   readonly weights?: ChordPracticeWeights
+  readonly previousQuestionIdentity?: ChordPracticeQuestionIdentity
+}
+
+interface RootInversionCandidate {
+  readonly root: WrittenPitchClass
+  readonly inversionIndex: number
 }
 
 function nextUnit(rng: ChordPracticeRng): number {
@@ -47,6 +55,29 @@ function chooseIndex<T>(items: readonly T[], rng: ChordPracticeRng): T {
   return items[Math.floor(nextUnit(rng) * items.length)]
 }
 
+function rootsMatch(left: WrittenPitchClass, right: WrittenPitchClass): boolean {
+  return left.letter === right.letter && left.accidental === right.accidental
+}
+
+export function getChordPracticeQuestionIdentity(
+  question: ChordPracticeQuestion
+): ChordPracticeQuestionIdentity {
+  return Object.freeze({
+    root: Object.freeze({ ...question.root }),
+    qualityId: question.qualityId,
+    inversionIndex: question.inversionIndex
+  })
+}
+
+export function isSameChordPracticeQuestionIdentity(
+  left: ChordPracticeQuestionIdentity,
+  right: ChordPracticeQuestionIdentity
+): boolean {
+  return left.qualityId === right.qualityId
+    && left.inversionIndex === right.inversionIndex
+    && rootsMatch(left.root, right.root)
+}
+
 export function generateChordPracticeQuestion(options: GenerateChordPracticeQuestionOptions): ChordPracticeQuestion {
   const weights = options.weights ?? CHORD_PRACTICE_DEFAULT_WEIGHTS
   const registerWindow = options.registerWindow
@@ -56,23 +87,35 @@ export function generateChordPracticeQuestion(options: GenerateChordPracticeQues
   const qualityId: ChordQualityId = family === 'triad'
     ? chooseWeighted(TRIAD_QUALITY_IDS, weights.qualityWithinFamily.triad, options.rng)
     : chooseWeighted(SEVENTH_QUALITY_IDS, weights.qualityWithinFamily.seventh, options.rng)
-  const root = chooseIndex(CHORD_PRACTICE_LEGAL_ROOTS[qualityId], options.rng)
-  const inversion = chooseIndex(
-    Array.from({ length: getInversionCount(qualityId) }, (_, index) => index),
-    options.rng
+
+  const previousIdentity = options.previousQuestionIdentity
+  const candidates: readonly RootInversionCandidate[] = CHORD_PRACTICE_LEGAL_ROOTS[qualityId]
+    .flatMap((root) => Array.from(
+      { length: getInversionCount(qualityId) },
+      (_, inversionIndex) => ({ root, inversionIndex })
+    ))
+    .filter((candidate) => !previousIdentity
+      || qualityId !== previousIdentity.qualityId
+      || candidate.inversionIndex !== previousIdentity.inversionIndex
+      || !rootsMatch(candidate.root, previousIdentity.root))
+  const candidate = chooseIndex(candidates, options.rng)
+  const placements = enumerateClosePositionPlacements(
+    candidate.root,
+    qualityId,
+    candidate.inversionIndex,
+    registerWindow
   )
-  const placements = enumerateClosePositionPlacements(root, qualityId, inversion, registerWindow)
   const voicing = chooseIndex(placements, options.rng)
-  const chord = spellChord(root, qualityId)
+  const chord = spellChord(candidate.root, qualityId)
   const quality = getChordQuality(qualityId)
   return Object.freeze({
     family,
     qualityId,
-    root,
-    chordSymbol: formatChordSymbol(root, qualityId),
+    root: candidate.root,
+    chordSymbol: formatChordSymbol(candidate.root, qualityId),
     chineseQualityLabel: quality.chineseLabel,
-    inversionIndex: inversion,
-    chineseInversionLabel: getChineseInversionLabel(inversion, quality.semitones.length),
+    inversionIndex: candidate.inversionIndex,
+    chineseInversionLabel: getChineseInversionLabel(candidate.inversionIndex, quality.semitones.length),
     chordTones: chord.tones,
     voicing,
     soundingMidiNumbers: voicing.soundingMidiNumbers,

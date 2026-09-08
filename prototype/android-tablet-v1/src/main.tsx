@@ -649,7 +649,7 @@ function ChordSettingsDrawer({
           <div><Icon name="check" size={18} /><span>三和弦 + 七和弦</span></div>
           <div><Icon name="check" size={18} /><span>全部转位</span></div>
           <div><Icon name="check" size={18} /><span>随机音区</span></div>
-          <div><Icon name="check" size={18} /><span>柱式 + 分解</span></div>
+          <div><Icon name="check" size={18} /><span>分解 + 柱式</span></div>
         </section>
         <small className="chord-settings-note">新的题数设置将在下一轮练习开始时生效。</small>
       </aside>
@@ -796,12 +796,12 @@ function ChordPracticeScreen({
   const progressLabel = questionCount === 'endless' ? '已完成 26' : `06 / ${questionCount}`
   const promptTone = mockStateId === 'question-correct'
     ? 'success'
-    : mockStateId.includes('wrong') ? 'danger' : mockStateId === 'wait-release' ? 'warning' : 'active'
-  const stageLabel = mockStateId.startsWith('block')
-    ? '柱式'
-    : mockStateId === 'wait-release'
+    : mockStateId.includes('wrong') ? 'danger' : mockStateId.startsWith('wait-release') ? 'warning' : 'active'
+  const stageLabel = mockStateId.startsWith('arpeggio')
+    ? '分解'
+    : mockStateId.startsWith('wait-release')
       ? '过渡'
-      : mockStateId === 'question-correct' ? '完成' : '分解'
+      : mockStateId === 'question-correct' ? '完成' : '柱式'
 
   return (
     <div className={`chord-focus-frame ${paused ? 'is-paused' : ''}`}>
@@ -831,8 +831,8 @@ function ChordPracticeScreen({
 
         <section className="chord-notation-card" aria-label={`${chord.symbol} ${chord.inversion}`}>
           <div className="chord-group-labels" aria-hidden="true">
-            <ChordGroupBadge label="柱式" state={mockState.block} />
             <ChordGroupBadge label="分解" state={mockState.arpeggio} />
+            <ChordGroupBadge label="柱式" state={mockState.block} />
           </div>
           <span className="chord-group-divider" aria-hidden="true" />
           <ChordGrandStaff

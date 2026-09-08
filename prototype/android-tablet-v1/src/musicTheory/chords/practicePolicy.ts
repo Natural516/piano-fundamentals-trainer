@@ -9,7 +9,7 @@ export const CHORD_PRACTICE_ROOTS: readonly WrittenPitchClass[] = Object.freeze(
 
 export const CHORD_PRACTICE_DEFAULT_REGISTER_WINDOW: RegisterWindow = Object.freeze({
   minMidi: 48,
-  maxMidi: 84
+  maxMidi: 96
 })
 
 export const CHORD_PRACTICE_DEFAULT_WEIGHTS: ChordPracticeWeights = Object.freeze({
