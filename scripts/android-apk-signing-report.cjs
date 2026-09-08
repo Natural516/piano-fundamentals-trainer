@@ -39,21 +39,34 @@ function quotedField(line, field) {
   return line.match(new RegExp(`${field}='([^']*)'`))?.[1] ?? null
 }
 
+function resolveAndroidSdkRoot(repositoryRoot) {
+  const environmentRoot = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT
+  if (environmentRoot) return path.resolve(environmentRoot)
+
+  const localPropertiesPath = path.join(repositoryRoot, 'android', 'local.properties')
+  if (!fs.existsSync(localPropertiesPath)) return null
+  const value = fs.readFileSync(localPropertiesPath, 'utf8').match(/^sdk\.dir=(.+)$/m)?.[1]?.trim()
+  if (!value) return null
+  return path.resolve(value.replace(/\\:/g, ':').replace(/\\\\/g, '\\'))
+}
+
 const argumentsList = process.argv.slice(2)
 const apkArgument = argumentsList.find((argument) => !argument.startsWith('--'))
+const expectedApplicationIdArgument = argumentsList.find((argument) => argument.startsWith('--expected-application-id='))
+const expectedApplicationId = expectedApplicationIdArgument?.slice('--expected-application-id='.length) || EXPECTED_ANDROID_APPLICATION_ID
 const expectDebug = argumentsList.includes('--expect-debug')
 const expectRelease = argumentsList.includes('--expect-release')
 if (!apkArgument || expectDebug === expectRelease) {
-  fail('usage: node scripts/android-apk-signing-report.cjs <apk> (--expect-debug | --expect-release)')
+  fail('usage: node scripts/android-apk-signing-report.cjs <apk> (--expect-debug | --expect-release) [--expected-application-id=<id>]')
 }
 
 const repositoryRoot = path.resolve(__dirname, '..')
 const apkPath = path.resolve(repositoryRoot, apkArgument)
 if (!fs.existsSync(apkPath)) fail(`APK not found: ${apkPath}`)
 
-const sdkRoot = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT
-if (!sdkRoot) fail('ANDROID_HOME or ANDROID_SDK_ROOT must point to the Android SDK')
-const buildToolsDirectory = newestBuildToolsDirectory(path.resolve(sdkRoot))
+const sdkRoot = resolveAndroidSdkRoot(repositoryRoot)
+if (!sdkRoot) fail('Android SDK path is unavailable; set ANDROID_HOME/ANDROID_SDK_ROOT or android/local.properties sdk.dir')
+const buildToolsDirectory = newestBuildToolsDirectory(sdkRoot)
 const aapt2 = path.join(buildToolsDirectory, process.platform === 'win32' ? 'aapt2.exe' : 'aapt2')
 const apksigner = path.join(buildToolsDirectory, process.platform === 'win32' ? 'apksigner.bat' : 'apksigner')
 if (!fs.existsSync(aapt2)) fail(`aapt2 not found: ${aapt2}`)
@@ -71,7 +84,7 @@ const versionProperties = fs.readFileSync(path.join(repositoryRoot, 'android', '
 const expectedVersionCode = versionProperties.match(/^versionCode=(.+)$/m)?.[1]?.trim()
 const expectedVersionName = versionProperties.match(/^versionName=(.+)$/m)?.[1]?.trim()
 
-assert.equal(applicationId, EXPECTED_ANDROID_APPLICATION_ID, 'permanent Android application ID changed')
+assert.equal(applicationId, expectedApplicationId, 'APK application ID differs from the expected build-channel identity')
 assert.equal(versionCode, expectedVersionCode, 'APK versionCode differs from android/version.properties')
 assert.equal(versionName, expectedVersionName, 'APK versionName differs from android/version.properties')
 if (expectDebug) assert.equal(debuggable, true, 'expected a debuggable APK')

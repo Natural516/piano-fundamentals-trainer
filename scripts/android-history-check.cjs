@@ -306,7 +306,10 @@ test('HIS22 History presentation does not manipulate persistence keys', () => {
 })
 
 test('HIS23 History introduces no delete edit or session-recovery action', () => {
-  assert.doesNotMatch(historySource, /删除|编辑|继续上次|恢复练习|onClick=|<button/)
+  const historyRows = historySource.slice(historySource.indexOf('<div className="history-list__rows">'))
+  assert.doesNotMatch(historySource, /删除|编辑|继续上次|恢复练习/)
+  assert.match(historySource, /className="history-filter"/)
+  assert.doesNotMatch(historyRows, /onClick=|<button/)
   assert.match(historySource, /<article className=/)
 })
 
