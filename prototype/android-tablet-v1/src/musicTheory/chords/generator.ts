@@ -26,7 +26,7 @@ interface RootInversionCandidate {
   readonly inversionIndex: number
 }
 
-function nextUnit(rng: ChordPracticeRng): number {
+export function nextChordPracticeUnit(rng: ChordPracticeRng): number {
   const value = rng()
   if (!Number.isFinite(value) || value < 0 || value >= 1) {
     throw new RangeError(`RNG must return a finite value in [0, 1); received ${value}`)
@@ -41,7 +41,7 @@ function chooseWeighted<T extends string>(entries: readonly T[], weights: Readon
     return sum + weight
   }, 0)
   if (Math.abs(total - 1) > 1e-9) throw new RangeError(`Weights must sum to 1; received ${total}`)
-  const target = nextUnit(rng)
+  const target = nextChordPracticeUnit(rng)
   let cumulative = 0
   for (const entry of entries) {
     cumulative += weights[entry]
@@ -52,7 +52,7 @@ function chooseWeighted<T extends string>(entries: readonly T[], weights: Readon
 
 function chooseIndex<T>(items: readonly T[], rng: ChordPracticeRng): T {
   if (items.length === 0) throw new RangeError('Cannot choose from an empty list')
-  return items[Math.floor(nextUnit(rng) * items.length)]
+  return items[Math.floor(nextChordPracticeUnit(rng) * items.length)]
 }
 
 function rootsMatch(left: WrittenPitchClass, right: WrittenPitchClass): boolean {
@@ -99,23 +99,51 @@ export function generateChordPracticeQuestion(options: GenerateChordPracticeQues
       || candidate.inversionIndex !== previousIdentity.inversionIndex
       || !rootsMatch(candidate.root, previousIdentity.root))
   const candidate = chooseIndex(candidates, options.rng)
+  return createChordPracticeQuestionFromIdentity({
+    identity: Object.freeze({
+      root: Object.freeze({ ...candidate.root }),
+      qualityId,
+      inversionIndex: candidate.inversionIndex
+    }),
+    registerWindow,
+    rng: options.rng
+  })
+}
+
+export interface CreateChordPracticeQuestionFromIdentityOptions {
+  readonly identity: ChordPracticeQuestionIdentity
+  readonly rng: ChordPracticeRng
+  readonly registerWindow?: RegisterWindow
+}
+
+export function createChordPracticeQuestionFromIdentity(
+  options: CreateChordPracticeQuestionFromIdentityOptions
+): ChordPracticeQuestion {
+  const { identity } = options
+  const qualityId = identity.qualityId
+  const quality = getChordQuality(qualityId)
+  if (!Number.isInteger(identity.inversionIndex) || identity.inversionIndex < 0 || identity.inversionIndex >= quality.semitones.length) {
+    throw new RangeError(`Invalid inversion ${identity.inversionIndex} for ${qualityId}`)
+  }
+  const registerWindow = options.registerWindow
+    ? Object.freeze({ ...options.registerWindow })
+    : CHORD_PRACTICE_DEFAULT_REGISTER_WINDOW
   const placements = enumerateClosePositionPlacements(
-    candidate.root,
+    identity.root,
     qualityId,
-    candidate.inversionIndex,
+    identity.inversionIndex,
     registerWindow
   )
   const voicing = chooseIndex(placements, options.rng)
-  const chord = spellChord(candidate.root, qualityId)
-  const quality = getChordQuality(qualityId)
+  const chord = spellChord(identity.root, qualityId)
   return Object.freeze({
-    family,
+    family: quality.family,
     qualityId,
-    root: candidate.root,
-    chordSymbol: formatChordSymbol(candidate.root, qualityId),
+    root: Object.freeze({ ...identity.root }),
+    chordSymbol: formatChordSymbol(identity.root, qualityId),
     chineseQualityLabel: quality.chineseLabel,
-    inversionIndex: candidate.inversionIndex,
-    chineseInversionLabel: getChineseInversionLabel(candidate.inversionIndex, quality.semitones.length),
+    inversionIndex: identity.inversionIndex,
+    chineseInversionLabel: getChineseInversionLabel(identity.inversionIndex, quality.semitones.length),
     chordTones: chord.tones,
     voicing,
     soundingMidiNumbers: voicing.soundingMidiNumbers,

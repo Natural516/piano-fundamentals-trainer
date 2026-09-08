@@ -108,19 +108,23 @@ test('CUI06', 'Chord renderer is one Grand Staff with left arpeggio and right bl
 test('CUI07', 'Chord page exposes only approved settings and compact practice facts', () => {
   for (const label of ['三和弦 + 七和弦', '全部转位', '随机音区', '分解 + 柱式']) assert.match(mainSource, new RegExp(label.replace('+', '\\+')))
   assert.match(mainSource, /\{ label: '无限', value: 'endless' \}/)
-  assert.match(mainSource, /已完成 26/)
-  assert.match(mainSource, /连续正确 4/)
+  assert.match(mainSource, /snapshot\.counters\.completedQuestions/)
+  assert.match(mainSource, /snapshot\.counters\.currentFirstPassStreak/)
   assert.doesNotMatch(mainSource.slice(mainSource.indexOf('function ChordSettingsDrawer'), mainSource.indexOf('function SightReadyScreen')), /Reaction Time|Best Streak|Most Missed|倒计时/)
 })
 
-test('CUI08', 'Chord static surface does not implement MIDI judgement generation persistence or theory logic', () => {
+test('CUI08', 'Chord notation and QA fixtures stay presentation-only while the live page delegates to Runtime', () => {
   assert.doesNotMatch(rendererSource + mockSource, /MidiManager|Bluetooth|handleMidi|PracticeSessionRepository|localStorage|Preferences|Math\.random|setTimeout|setInterval/)
   const chordUi = mainSource.slice(mainSource.indexOf('function ChordGroupBadge'), mainSource.indexOf('function SightReadyScreen'))
-  assert.doesNotMatch(chordUi, /runtime\.(start|stop|handleMidi|sendMidi|updateSettings)|markCorrect|markWrong|advanceQuestion/)
+  assert.match(chordUi, /useChordPracticeRuntime\(runtime\)/)
+  assert.match(chordUi, /runtime\.(start|stop|pause|resume)/)
+  assert.doesNotMatch(chordUi, /new ChordJudgementCore|generateChordPracticeQuestion|markCorrect|markWrong|advanceQuestion/)
+  assert.doesNotMatch(chordUi, /PracticeSessionRepository|localStorage|Preferences/)
 })
 
 test('CUI09', 'development-only selectors expose every state and QA case without entering product controls', () => {
   assert.match(mainSource, /active === 'chord-practice'/)
+  assert.match(mainSource, /LIVE · REAL RUNTIME/)
   assert.match(mainSource, /CHORD_MOCK_STATES\.map/)
   assert.match(mainSource, /CHORD_MOCK_CASES\.map/)
   assert.match(mainSource, /SHOW_DEVELOPMENT_TOOLS \? \(/)
@@ -148,6 +152,7 @@ test('CUI11', 'Grand Staff polish enlarges and raises notation while strengtheni
 test('CUI12', 'provisional block capture is frozen outside UI and static failures restart the same question from Arpeggio', () => {
   assert.match(contractSource, /captureWindowMs: 150/)
   assert.match(contractSource, /PROVISIONAL_FP30X_CALIBRATION_REQUIRED/)
+  assert.match(contractSource, /CHORD_QUESTION_SUCCESS_FEEDBACK_MS = 800/)
   assert.doesNotMatch(mainSource + rendererSource + mockSource, /captureWindowMs|PROVISIONAL_FP30X_CALIBRATION_REQUIRED/)
   const arpeggioWrong = mocks.getChordMockState('arpeggio-wrong')
   assert.deepEqual([arpeggioWrong.arpeggio, arpeggioWrong.block], ['wrong', 'secondary'])
@@ -157,6 +162,42 @@ test('CUI12', 'provisional block capture is frozen outside UI and static failure
   assert.deepEqual([blockReady.arpeggio, blockReady.block], ['completed', 'active'])
   const blockWrong = mocks.getChordMockState('block-wrong-restart')
   assert.deepEqual([blockWrong.arpeggio, blockWrong.block], ['completed', 'wrong'])
+})
+
+test('CUI13', 'Mode Select and accessible help modal preserve Chord-internal navigation', () => {
+  assert.match(mainSource, /function ChordModeSelectScreen/)
+  assert.match(mainSource, /选择和弦练习方式/)
+  assert.match(mainSource, /根据你的目标，选择更适合的练习模式。/)
+  assert.match(mainSource, /aria-label="查看和弦练习方式说明"/)
+  assert.match(mainSource, /aria-modal="true"/)
+  assert.match(mainSource, /onSelectMode\('sequential'\)/)
+  assert.match(mainSource, /onSelectMode\('comprehensive'\)/)
+  assert.match(mainSource, /'chord-practice': 'chord-mode-select'/)
+})
+
+test('CUI14', 'current-inversion Chord tones are optional without an empty separator', () => {
+  const chordUi = mainSource.slice(mainSource.indexOf('function ChordGroupBadge'), mainSource.indexOf('function SightReadyScreen'))
+  assert.match(chordUi, /mockChord\.writtenPitches\.map/)
+  assert.match(chordUi, /liveQuestion\?\.blockNotes\.map\(formatWrittenPitchClass\)\.join\(' · '\)/)
+  assert.match(chordUi, /chordSettings\.showChordTones && chordToneText/)
+  assert.match(chordUi, /<span> · 构成音：\{chordToneText\}<\/span>/)
+  assert.doesNotMatch(chordUi, /spellChord\(mockChord\.root/)
+})
+
+test('CUI16', 'normal Comprehensive help removes internal Chord V1 wording', () => {
+  const modeSelect = mainSource.slice(mainSource.indexOf('function ChordModeSelectScreen'), mainSource.indexOf('const THEORY_TOOL_PLACEHOLDERS'))
+  assert.match(modeSelect, /从完整和弦范围中综合随机出题/)
+  assert.doesNotMatch(modeSelect, /Chord V1/)
+})
+
+test('CUI15', 'Sequential and Comprehensive drawers share count and tones while key is Sequential-only', () => {
+  const drawer = mainSource.slice(mainSource.indexOf('function ChordSettingsDrawer'), mainSource.indexOf('function SightSettingsRows'))
+  assert.match(drawer, /mode === 'sequential'/)
+  assert.match(drawer, /选择循序练习当前调/)
+  assert.match(drawer, /CHORD_SEQUENTIAL_MAJOR_KEY_IDS\.map/)
+  assert.match(drawer, /显示构成音/)
+  assert.match(drawer, /和弦练习题数/)
+  assert.doesNotMatch(drawer, /和弦类型筛选|转位筛选|掌握度/)
 })
 
 let failed = 0

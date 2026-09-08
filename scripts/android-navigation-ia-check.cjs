@@ -32,11 +32,12 @@ const tests = [
     assert.deepEqual(labels, ['首页', '练习', '工具', '记录', '设置'])
     assert.doesNotMatch(navigation, /label: '识谱'/)
   }],
-  ['NAV02', 'Practice Hub routes to the existing Sight Reading and Chord screens', () => {
+  ['NAV02', 'Practice Hub routes to Sight Reading and the Chord-internal Mode Select', () => {
     assert.match(practice, /识谱练习/)
     assert.match(practice, /navigate\('sight-ready'\)/)
     assert.match(practice, /和弦练习/)
-    assert.match(practice, /navigate\('chord-practice'\)/)
+    assert.match(practice, /navigate\('chord-mode-select'\)/)
+    assert.match(practice, /function ChordModeSelectScreen/)
   }],
   ['NAV03', 'Tool Hub exposes exactly four explicit placeholders without navigation', () => {
     for (const label of ['和弦查询', '音阶查询', '音程查询', '调号参考']) assert.match(tools, new RegExp(label))
@@ -70,10 +71,11 @@ const tests = [
     assert.match(history, /history-module-badge">识谱/)
     assert.doesNotMatch(history, /piano\.v1\.|Preferences\.|localStorage/)
   }],
-  ['NAV08', 'submodule and Android Back paths return to Practice Hub', () => {
+  ['NAV08', 'submodule and Android Back paths follow the frozen Chord-internal hierarchy', () => {
     assert.match(ui, /'sight-ready': 'practice'/)
     assert.match(ui, /'sight-result': 'practice'/)
-    assert.match(ui, /'chord-practice': 'practice'/)
+    assert.match(ui, /'chord-mode-select': 'practice'/)
+    assert.match(ui, /'chord-practice': 'chord-mode-select'/)
     assert.match(ui, /aria-label="返回练习"/)
   }],
   ['NAV09', 'QA channel and production version identities remain frozen', () => {
@@ -104,6 +106,17 @@ const tests = [
     assert.match(mainActivity, /WindowInsetsControllerCompat\.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE/)
     assert.match(mainActivity, /controller\.hide\(WindowInsetsCompat\.Type\.systemBars\(\)\)/)
     assert.doesNotMatch(mainActivity, /setOnApplyWindowInsetsListener|setPadding\(|SYSTEM_UI_FLAG_/)
+  }],
+  ['NAV14', 'MIDI page status is display-only and auxiliary self-reentry is guarded before context mutation', () => {
+    const midiStatus = between('function MidiStatusButton', 'function ProductHeader')
+    const midiScreen = between('function MidiScreen', 'function updaterStatusCopy')
+    const openAuxiliary = ui.slice(ui.indexOf('const openAuxiliary'), ui.indexOf('const returnFromAuxiliary'))
+    assert.match(midiStatus, /if \(!interactive\)/)
+    assert.match(midiStatus, /role="status"/)
+    assert.match(midiScreen, /midiStatusInteractive=\{false\}/)
+    assert.match(openAuxiliary, /if \(origin === destination\) return/)
+    assert.ok(openAuxiliary.indexOf('if (origin === destination) return') < openAuxiliary.indexOf('rememberAuxiliaryReturn'))
+    assert.match(css, /\.midi-status\.is-display-only \{[\s\S]*?cursor: default;[\s\S]*?user-select: none;/)
   }]
 ]
 

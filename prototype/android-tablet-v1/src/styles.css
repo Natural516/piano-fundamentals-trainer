@@ -236,6 +236,11 @@ button:focus-visible {
   box-shadow: var(--shadow-soft);
 }
 
+.midi-status.is-display-only {
+  cursor: default;
+  user-select: none;
+}
+
 .midi-status__signal {
   display: grid;
   width: 34px;
@@ -632,6 +637,136 @@ button:focus-visible {
   color: var(--ink-secondary);
   font-size: 13px;
   font-style: normal;
+}
+
+.chord-mode-heading {
+  display: flex;
+  max-width: none;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.chord-help-button {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 23px;
+  font-weight: 780;
+}
+
+.chord-mode-card .module-card__copy i,
+.chord-mode-card .module-card__copy span {
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.chord-mode-card .module-card__copy span {
+  margin-top: 3px;
+  color: var(--ink-secondary);
+  font-weight: 680;
+}
+
+.chord-mode-card .module-card__copy small b {
+  margin-right: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 10px;
+}
+
+.chord-mode-help-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(9, 15, 12, .5);
+  backdrop-filter: blur(4px);
+}
+
+.chord-mode-help {
+  display: grid;
+  width: min(920px, 84vw);
+  max-height: min(760px, 86vh);
+  gap: 20px;
+  overflow: auto;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.chord-mode-help > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chord-mode-help h2,
+.chord-mode-help h3,
+.chord-mode-help p,
+.chord-mode-help dl {
+  margin: 0;
+}
+
+.chord-mode-help__content {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 18px;
+}
+
+.chord-mode-help article {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-raised);
+}
+
+.chord-mode-help article p,
+.chord-mode-help dd {
+  color: var(--ink-secondary);
+  font-size: 13px;
+  line-height: 1.58;
+}
+
+.chord-mode-help dl,
+.chord-mode-help dl > div {
+  display: grid;
+  gap: 6px;
+}
+
+.chord-mode-help dl > div {
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.chord-mode-help dt {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.chord-mode-help dd {
+  margin: 0;
+}
+
+.chord-mode-help > .primary-action {
+  min-width: 128px;
+  justify-self: end;
 }
 
 .tool-card-grid {
@@ -1210,6 +1345,11 @@ button:focus-visible {
   font-weight: 680;
 }
 
+.chord-identity strong span {
+  color: var(--ink-muted);
+  font-weight: 580;
+}
+
 .chord-notation-card {
   position: relative;
   display: grid;
@@ -1436,6 +1576,43 @@ button:focus-visible {
   border-left: 1px solid var(--line-strong);
   background: var(--surface);
   box-shadow: -18px 0 48px rgba(8, 14, 11, .22);
+  overflow-y: auto;
+}
+
+.chord-key-stepper {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.chord-key-stepper button,
+.chord-key-stepper select {
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--ink-secondary);
+  font: inherit;
+  font-weight: 680;
+}
+
+.chord-key-stepper button {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-size: 25px;
+}
+
+.chord-key-stepper select {
+  padding: 0 12px;
+  text-align: center;
+}
+
+.chord-tone-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .chord-settings-drawer__header {

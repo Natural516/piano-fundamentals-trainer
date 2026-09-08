@@ -1,6 +1,24 @@
 export type ChordPracticePhase = 'arpeggio' | 'block'
 export type ChordQuestionCount = 10 | 20 | 50 | 100 | 'endless'
 
+export const CHORD_PRACTICE_MODE_OPTIONS = Object.freeze(['sequential', 'comprehensive'] as const)
+
+export const CHORD_SEQUENTIAL_SCOPE_CONTRACT = Object.freeze({
+  10: Object.freeze({ bagSize: 7, triadInversions: Object.freeze([0]), seventhInversions: Object.freeze([]) }),
+  20: Object.freeze({ bagSize: 7, triadInversions: Object.freeze([0]), seventhInversions: Object.freeze([]) }),
+  50: Object.freeze({ bagSize: 14, triadInversions: Object.freeze([0]), seventhInversions: Object.freeze([0]) }),
+  100: Object.freeze({ bagSize: 28, triadInversions: Object.freeze([0, 1, 2]), seventhInversions: Object.freeze([0]) }),
+  endless: Object.freeze({ bagSize: 49, triadInversions: Object.freeze([0, 1, 2]), seventhInversions: Object.freeze([0, 1, 2, 3]) })
+} as const)
+
+export const CHORD_SEQUENTIAL_LEARNING_CONTRACT = Object.freeze({
+  currentKeyChangesAutomatically: false,
+  bagPositionPersistsAcrossSessions: false,
+  wrongConsumesAnotherBagItem: false,
+  delayedErrorReview: false,
+  masteryAlgorithm: false
+} as const)
+
 export const CHORD_PRACTICE_PHASE_ORDER: readonly ChordPracticePhase[] = Object.freeze([
   'arpeggio',
   'block'
@@ -22,6 +40,8 @@ export const CHORD_BLOCK_CAPTURE_CONTRACT = Object.freeze({
   ignoresCc64ForJudgement: true,
   requiresPhysicalReleaseGate: true
 } as const)
+
+export const CHORD_QUESTION_SUCCESS_FEEDBACK_MS = 800 as const
 
 export const CHORD_QUESTION_COUNT_OPTIONS: readonly ChordQuestionCount[] = Object.freeze([
   10,

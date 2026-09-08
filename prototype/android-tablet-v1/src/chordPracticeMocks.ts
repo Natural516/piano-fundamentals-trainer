@@ -17,6 +17,8 @@ export interface ChordMockCase {
   qaLabel: string
   register: 'low' | 'middle' | 'high'
   symbol: string
+  root: WrittenPitchClass
+  qualityId: ChordQualityId
   writtenPitches: readonly ChordWrittenPitch[]
 }
 
@@ -62,6 +64,8 @@ export const CHORD_MOCK_CASES: readonly ChordMockCase[] = [
     id: 'c-sharp-major-seven-first',
     qaLabel: 'C♯maj7 · 第一转位',
     symbol: 'C♯maj7',
+    root: { letter: 'C', accidental: 1 },
+    qualityId: 'major7',
     inversion: '第一转位',
     register: 'middle',
     writtenPitches: [
@@ -75,6 +79,8 @@ export const CHORD_MOCK_CASES: readonly ChordMockCase[] = [
     id: 'c-major-root',
     qaLabel: 'Case 1 · C Major',
     symbol: 'C',
+    root: { letter: 'C', accidental: 0 },
+    qualityId: 'major',
     inversion: '原位',
     register: 'middle',
     writtenPitches: [
@@ -87,6 +93,8 @@ export const CHORD_MOCK_CASES: readonly ChordMockCase[] = [
     id: 'b-flat-half-diminished-third',
     qaLabel: 'Case 2 · B♭m7♭5',
     symbol: 'B♭m7♭5',
+    root: { letter: 'B', accidental: -1 },
+    qualityId: 'halfDiminished7',
     inversion: '第三转位',
     register: 'middle',
     writtenPitches: [
@@ -100,6 +108,8 @@ export const CHORD_MOCK_CASES: readonly ChordMockCase[] = [
     id: 'c-sharp-major-root',
     qaLabel: 'Case 3 · C♯ Major',
     symbol: 'C♯',
+    root: { letter: 'C', accidental: 1 },
+    qualityId: 'major',
     inversion: '原位',
     register: 'middle',
     writtenPitches: [
@@ -112,6 +122,8 @@ export const CHORD_MOCK_CASES: readonly ChordMockCase[] = [
     id: 'c-flat-major-first',
     qaLabel: 'Case 4 · C♭ Major',
     symbol: 'C♭',
+    root: { letter: 'C', accidental: -1 },
+    qualityId: 'major',
     inversion: '第一转位',
     register: 'middle',
     writtenPitches: [
@@ -124,6 +136,8 @@ export const CHORD_MOCK_CASES: readonly ChordMockCase[] = [
     id: 'd-flat-seven-low',
     qaLabel: 'Case 5 · 低音区 D♭7',
     symbol: 'D♭7',
+    root: { letter: 'D', accidental: -1 },
+    qualityId: 'dominant7',
     inversion: '原位',
     register: 'low',
     writtenPitches: [
@@ -137,6 +151,8 @@ export const CHORD_MOCK_CASES: readonly ChordMockCase[] = [
     id: 'a-augmented-high-second',
     qaLabel: 'Case 6 · 高音区 Aaug',
     symbol: 'Aaug',
+    root: { letter: 'A', accidental: 0 },
+    qualityId: 'augmented',
     inversion: '第二转位',
     register: 'high',
     writtenPitches: [
@@ -149,6 +165,8 @@ export const CHORD_MOCK_CASES: readonly ChordMockCase[] = [
     id: 'b-flat-diminished-seven-double-flat',
     qaLabel: '附加 · B♭dim7 双降号',
     symbol: 'B♭dim7',
+    root: { letter: 'B', accidental: -1 },
+    qualityId: 'diminished7',
     inversion: '原位',
     register: 'middle',
     writtenPitches: [
@@ -162,6 +180,8 @@ export const CHORD_MOCK_CASES: readonly ChordMockCase[] = [
     id: 'b-diminished-seven-natural',
     qaLabel: '附加 · Bdim7 自然号',
     symbol: 'Bdim7',
+    root: { letter: 'B', accidental: 0 },
+    qualityId: 'diminished7',
     inversion: '原位',
     register: 'middle',
     writtenPitches: [
@@ -228,3 +248,4 @@ export function getChordMockCase(id: string): ChordMockCase {
 export function getChordMockState(id: ChordMockStateId): ChordMockState {
   return CHORD_MOCK_STATES.find((item) => item.id === id) ?? CHORD_MOCK_STATES[0]
 }
+import type { ChordQualityId, WrittenPitchClass } from './musicTheory/chords'

@@ -349,7 +349,7 @@ test('CT16', 'anti-repeat keeps frozen family and quality weights and consumes n
   assert.deepEqual(first, second)
 })
 
-test('CT17', 'Chord product contract freezes Arpeggio-first flow, provisional block capture and module-specific reporting', () => {
+test('CT17', 'Chord product contract freezes Arpeggio-first flow, capture, feedback and module-specific reporting', () => {
   assert.deepEqual(core.CHORD_PRACTICE_PHASE_ORDER, ['arpeggio', 'block'])
   assert.equal(core.CHORD_PRACTICE_FLOW_CONTRACT.arpeggioFailureAfterRelease, 'restart-same-question-at-arpeggio-first-note')
   assert.equal(core.CHORD_PRACTICE_FLOW_CONTRACT.blockFailureAfterRelease, 'restart-same-question-at-arpeggio-first-note')
@@ -362,6 +362,7 @@ test('CT17', 'Chord product contract freezes Arpeggio-first flow, provisional bl
     requiresPhysicalReleaseGate: true
   })
   assert.deepEqual(core.CHORD_QUESTION_COUNT_OPTIONS, [10, 20, 50, 100, 'endless'])
+  assert.equal(core.CHORD_QUESTION_SUCCESS_FEEDBACK_MS, 800)
   assert.equal(core.CHORD_REPORT_PRODUCT_CONTRACT.module, 'chord')
   assert.equal(core.CHORD_REPORT_PRODUCT_CONTRACT.completionRateLabel, '完成率')
   assert.equal(core.CHORD_REPORT_PRODUCT_CONTRACT.completionRateFormula, 'firstPassCompleteQuestions / completedQuestions')
@@ -390,6 +391,60 @@ test('CT17', 'Chord product contract freezes Arpeggio-first flow, provisional bl
     questionStartLatencyRestartsAfterFailure: false,
     successfulCycleMetricsUseFinalSuccessfulCycle: true,
     failedAttemptTimingsExcludedFromPrimarySummary: true
+  })
+})
+
+test('CT18', 'all 15 Sequential Major Keys retain exact written scale spelling and sounding pattern', () => {
+  const expected = {
+    C: 'C D E F G A B', G: 'G A B C D E F♯', F: 'F G A B♭ C D E',
+    D: 'D E F♯ G A B C♯', Bb: 'B♭ C D E♭ F G A', A: 'A B C♯ D E F♯ G♯',
+    Eb: 'E♭ F G A♭ B♭ C D', E: 'E F♯ G♯ A B C♯ D♯', Ab: 'A♭ B♭ C D♭ E♭ F G',
+    B: 'B C♯ D♯ E F♯ G♯ A♯', Db: 'D♭ E♭ F G♭ A♭ B♭ C', Fs: 'F♯ G♯ A♯ B C♯ D♯ E♯',
+    Gb: 'G♭ A♭ B♭ C♭ D♭ E♭ F', Cs: 'C♯ D♯ E♯ F♯ G♯ A♯ B♯', Cb: 'C♭ D♭ E♭ F♭ G♭ A♭ B♭'
+  }
+  assert.deepEqual(core.CHORD_SEQUENTIAL_MAJOR_KEY_IDS, ['C', 'G', 'F', 'D', 'Bb', 'A', 'Eb', 'E', 'Ab', 'B', 'Db', 'Fs', 'Gb', 'Cs', 'Cb'])
+  for (const keyId of core.CHORD_SEQUENTIAL_MAJOR_KEY_IDS) {
+    const scale = core.getChordSequentialMajorScale(keyId)
+    assert.equal(scale.map(core.formatWrittenPitchClass).join(' '), expected[keyId])
+    assert.equal(new Set(scale.map((pitch) => pitch.letter)).size, 7)
+    const tonicMidi = core.writtenPitchToMidi({ ...scale[0], octave: 4 })
+    assert.deepEqual(scale.map((pitch, index) => {
+      const octave = 4 + (core.NOTE_LETTERS.indexOf(pitch.letter) < core.NOTE_LETTERS.indexOf(scale[0].letter) ? 1 : 0)
+      return core.writtenPitchToMidi({ ...pitch, octave }) - tonicMidi
+    }), [0, 2, 4, 5, 7, 9, 11])
+  }
+})
+
+test('CT19', 'all 15 keys expose exact diatonic triad and seventh quality contracts with written tones', () => {
+  const triadQualities = ['major', 'minor', 'minor', 'major', 'major', 'minor', 'diminished']
+  const seventhQualities = ['major7', 'minor7', 'minor7', 'major7', 'dominant7', 'minor7', 'halfDiminished7']
+  for (const keyId of core.CHORD_SEQUENTIAL_MAJOR_KEY_IDS) {
+    const scale = core.getChordSequentialMajorScale(keyId)
+    const triads = core.getDiatonicTriadIdentities(keyId)
+    const sevenths = core.getDiatonicSeventhIdentities(keyId)
+    assert.deepEqual(triads.map((item) => item.qualityId), triadQualities)
+    assert.deepEqual(sevenths.map((item) => item.qualityId), seventhQualities)
+    for (const [index, identity] of triads.entries()) {
+      assert.deepEqual(identity.root, scale[index])
+      const expectedTones = [0, 2, 4].map((offset) => scale[(index + offset) % 7])
+      assert.deepEqual(core.spellChord(identity.root, identity.qualityId).tones.map(({ letter, accidental }) => ({ letter, accidental })), expectedTones)
+    }
+    for (const [index, identity] of sevenths.entries()) {
+      assert.deepEqual(identity.root, scale[index])
+      const expectedTones = [0, 2, 4, 6].map((offset) => scale[(index + offset) % 7])
+      assert.deepEqual(core.spellChord(identity.root, identity.qualityId).tones.map(({ letter, accidental }) => ({ letter, accidental })), expectedTones)
+    }
+  }
+})
+
+test('CT20', 'Sequential learning contract has no mastery, delayed review or automatic key switching', () => {
+  assert.deepEqual(core.CHORD_PRACTICE_MODE_OPTIONS, ['sequential', 'comprehensive'])
+  assert.equal(core.CHORD_SEQUENTIAL_LEARNING_CONTRACT.currentKeyChangesAutomatically, false)
+  assert.equal(core.CHORD_SEQUENTIAL_LEARNING_CONTRACT.wrongConsumesAnotherBagItem, false)
+  assert.equal(core.CHORD_SEQUENTIAL_LEARNING_CONTRACT.delayedErrorReview, false)
+  assert.equal(core.CHORD_SEQUENTIAL_LEARNING_CONTRACT.masteryAlgorithm, false)
+  assert.deepEqual(Object.fromEntries(Object.entries(core.CHORD_SEQUENTIAL_SCOPE_CONTRACT).map(([key, value]) => [key, value.bagSize])), {
+    10: 7, 20: 7, 50: 14, 100: 28, endless: 49
   })
 })
 
