@@ -39,6 +39,7 @@
     "test:android-double-note": "node scripts/android-double-note-check.cjs",
     "test:android-icon": "node scripts/android-icon-check.cjs",
     "test:android-chord-ui": "node scripts/android-chord-static-ui-check.cjs",
+    "test:android-chord-theory": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && node scripts/android-chord-theory-check.cjs",
     "test:android-navigation-ia": "node scripts/android-navigation-ia-check.cjs",
     "test:android-qa-channel": "node scripts/android-qa-channel-check.cjs",
     "test:android-shell": "node scripts/android-shell-check.cjs",
