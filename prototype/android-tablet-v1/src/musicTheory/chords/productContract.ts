@@ -97,7 +97,10 @@ export const CHORD_REPORT_DETAIL_PRODUCT_CONTRACT = Object.freeze({
 export const CHORD_TIMING_METRIC_CONTRACTS = Object.freeze({
   questionStartLatency: Object.freeze({
     label: '开始弹奏用时',
-    semantics: 'question-ready-to-first-correct-arpeggio-note-on-on-first-attempt'
+    semantics: 'question-ready-to-first-arpeggio-stage-note-on-on-first-attempt',
+    requiresCorrectness: false,
+    retryReplacesSample: false,
+    stopBeforeFirstArpeggioNoteOn: 'null'
   }),
   arpeggioDuration: Object.freeze({
     label: '分解弹奏用时',

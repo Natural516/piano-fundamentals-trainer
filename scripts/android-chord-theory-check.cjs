@@ -374,6 +374,13 @@ test('CT17', 'Chord product contract freezes Arpeggio-first flow, provisional bl
   assert.equal(core.CHORD_REPORT_DETAIL_PRODUCT_CONTRACT.productionNavigationImplemented, false)
   assert.equal(core.CHORD_REPORT_DETAIL_PRODUCT_CONTRACT.durableStorageImplemented, false)
   assert.equal(core.CHORD_TIMING_METRIC_CONTRACTS.questionStartLatency.label, '开始弹奏用时')
+  assert.deepEqual(core.CHORD_TIMING_METRIC_CONTRACTS.questionStartLatency, {
+    label: '开始弹奏用时',
+    semantics: 'question-ready-to-first-arpeggio-stage-note-on-on-first-attempt',
+    requiresCorrectness: false,
+    retryReplacesSample: false,
+    stopBeforeFirstArpeggioNoteOn: 'null'
+  })
   assert.equal(core.CHORD_TIMING_METRIC_CONTRACTS.arpeggioDuration.label, '分解弹奏用时')
   assert.equal(core.CHORD_TIMING_METRIC_CONTRACTS.switchToBlockLatency.label, '切换柱式用时')
   assert.equal(core.CHORD_TIMING_METRIC_CONTRACTS.blockLandingSpread.label, '同时落键差')
