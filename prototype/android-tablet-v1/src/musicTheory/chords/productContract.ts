@@ -34,7 +34,7 @@ export const CHORD_PRACTICE_FLOW_CONTRACT = Object.freeze({
 
 export const CHORD_BLOCK_CAPTURE_CONTRACT = Object.freeze({
   captureWindowMs: 150,
-  calibrationStatus: 'PROVISIONAL_FP30X_CALIBRATION_REQUIRED',
+  calibrationStatus: 'FROZEN_FOR_CHORD_V1',
   startsOn: 'first-note-on',
   closesEarlyWhenAllExpectedNotesAppear: false,
   ignoresCc64ForJudgement: true,

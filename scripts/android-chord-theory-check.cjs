@@ -355,7 +355,7 @@ test('CT17', 'Chord product contract freezes Arpeggio-first flow, capture, feedb
   assert.equal(core.CHORD_PRACTICE_FLOW_CONTRACT.blockFailureAfterRelease, 'restart-same-question-at-arpeggio-first-note')
   assert.deepEqual(core.CHORD_BLOCK_CAPTURE_CONTRACT, {
     captureWindowMs: 150,
-    calibrationStatus: 'PROVISIONAL_FP30X_CALIBRATION_REQUIRED',
+    calibrationStatus: 'FROZEN_FOR_CHORD_V1',
     startsOn: 'first-note-on',
     closesEarlyWhenAllExpectedNotesAppear: false,
     ignoresCc64ForJudgement: true,

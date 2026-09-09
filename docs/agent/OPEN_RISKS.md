@@ -7,7 +7,6 @@
 - None known after automated validation.
 
 ## P2
-- Chord block window (150ms) relies on system timers; hardware timing should confirm.
 - Practice hooks mirror metronome state via render-time refs; same-frame events may see a ~16ms-stale state (within tolerance).
 
 ## P3
@@ -16,6 +15,14 @@
 - AudioContext autoplay policy may keep the context suspended until the first user gesture; 测试发声 and gesture listeners mitigate.
 
 ## Closed / diagnosed
+
+### CHORD-CAPTURE-001 — Chord V1 Block Capture Window
+
+- Status: CLOSED / FROZEN FOR CHORD V1
+- Frozen contract: `captureWindowMs = 150`.
+- Product decision: real FP-30X use confirmed reliable normal block-chord input; the accepted tolerance may occasionally admit a mildly rolled attack.
+- No FP-30X calibration, adaptive threshold, device-specific threshold, per-user threshold, or calibration setting is required for Chord V1.
+- The Report Detail continues to show measured `blockLandingSpreadMs`; it must never substitute the 150ms capture-window constant.
 
 ### MIDI-001 — MIDI / Device Recovery
 

@@ -149,11 +149,11 @@ test('CUI11', 'Grand Staff polish enlarges and raises notation while strengtheni
   assert.match(rendererSource, /const BLOCK_RIGHT_PADDING_RATIO = 0\.08/)
 })
 
-test('CUI12', 'provisional block capture is frozen outside UI and static failures restart the same question from Arpeggio', () => {
+test('CUI12', 'Chord V1 block capture is frozen outside UI and static failures restart the same question from Arpeggio', () => {
   assert.match(contractSource, /captureWindowMs: 150/)
-  assert.match(contractSource, /PROVISIONAL_FP30X_CALIBRATION_REQUIRED/)
+  assert.match(contractSource, /FROZEN_FOR_CHORD_V1/)
   assert.match(contractSource, /CHORD_QUESTION_SUCCESS_FEEDBACK_MS = 800/)
-  assert.doesNotMatch(mainSource + rendererSource + mockSource, /captureWindowMs|PROVISIONAL_FP30X_CALIBRATION_REQUIRED/)
+  assert.doesNotMatch(mainSource + rendererSource + mockSource, /captureWindowMs|FROZEN_FOR_CHORD_V1/)
   const arpeggioWrong = mocks.getChordMockState('arpeggio-wrong')
   assert.deepEqual([arpeggioWrong.arpeggio, arpeggioWrong.block], ['wrong', 'secondary'])
   const waitToBlock = mocks.getChordMockState('wait-release-to-block')
