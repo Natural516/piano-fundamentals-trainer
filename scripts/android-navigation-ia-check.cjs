@@ -18,8 +18,8 @@ function between(start, end) {
 
 const navigation = between('const productNavigation = [', 'const SHOW_DEVELOPMENT_TOOLS')
 const home = between('function HomeScreen', 'function PracticeHubScreen')
-const practice = between('function PracticeHubScreen', 'const THEORY_TOOL_PLACEHOLDERS')
-const tools = between('const THEORY_TOOL_PLACEHOLDERS', 'function ChordGroupBadge')
+const practice = between('function PracticeHubScreen', 'const THEORY_TOOLS')
+const tools = between('const THEORY_TOOLS', 'function ChordGroupBadge')
 const sightReady = between('function SightReadyScreen', 'function useRemainingTime')
 const history = between('function HistoryScreen', 'function SettingRow')
 const historyRecord = between('function HistoryRecord', 'function HistoryScreen')
@@ -41,11 +41,15 @@ const tests = [
     assert.match(practice, /navigate\('chord-mode-select'\)/)
     assert.match(practice, /function ChordModeSelectScreen/)
   }],
-  ['NAV03', 'Tool Hub exposes exactly four explicit placeholders without navigation', () => {
-    for (const label of ['和弦查询', '音阶查询', '音程查询', '调号参考']) assert.match(tools, new RegExp(label))
-    assert.equal((tools.match(/title: '/g) ?? []).length, 4)
+  ['NAV03', 'Tools exposes three cards and opens the merged Scale and Key Signature screen', () => {
+    for (const label of ['和弦查询', '音阶与调号', '音程查询']) assert.match(tools, new RegExp(label))
+    assert.equal((tools.match(/title: '/g) ?? []).length, 3)
+    assert.doesNotMatch(tools, /title: '音阶查询'|title: '调号参考'/)
     assert.match(tools, /开发中/)
-    assert.doesNotMatch(tools, /onClick=|navigate\(/)
+    assert.match(tools, /navigate\(tool\.screen\)/)
+    assert.match(ui, /case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen \/>/)
+    assert.match(ui, /'scale-key-signature-tool': 'tools'/)
+    assert.match(tools, /<ProductFrame active="tools" onBack=\{\(\) => navigate\('tools'\)\}/)
   }],
   ['NAV04', 'Home glance cards are Last Practice MIDI Input and Theory Tools', () => {
     for (const label of ['上次练习', 'MIDI 输入', '乐理工具']) assert.match(home, new RegExp(label))

@@ -65,6 +65,13 @@ import {
   resolveChordReportById
 } from './chordPractice/reportDetailProjection'
 import {
+  AVAILABLE_SCALE_TYPE_OPTIONS,
+  NATURAL_MAJOR_TOOL_ROOT_IDS,
+  formatScaleToolNoteName,
+  getNaturalMajorToolResult,
+  type ScaleTypeId
+} from './scaleKeySignatureTool'
+import {
   createPracticeKeepAwakeController,
   shouldKeepPracticeAwake
 } from './practiceKeepAwake'
@@ -76,6 +83,7 @@ type ScreenId =
   | 'home'
   | 'practice'
   | 'tools'
+  | 'scale-key-signature-tool'
   | 'sight-ready'
   | 'sight-active'
   | 'sight-correct'
@@ -137,6 +145,7 @@ const screens: ScreenOption[] = [
   { id: 'home', label: '首页', shortLabel: '首页' },
   { id: 'practice', label: '练习', shortLabel: '练习' },
   { id: 'tools', label: '乐理工具', shortLabel: '工具' },
+  { id: 'scale-key-signature-tool', label: '音阶与调号', shortLabel: '音阶与调号' },
   { id: 'sight-ready', label: '识谱 · 准备', shortLabel: 'READY' },
   { id: 'sight-active', label: '识谱 · 进行中', shortLabel: 'ACTIVE' },
   { id: 'sight-correct', label: '识谱 · 正确反馈', shortLabel: 'CORRECT' },
@@ -708,11 +717,10 @@ function ChordModeSelectScreen({ onSelectMode, settingsReady }: { onSelectMode: 
   )
 }
 
-const THEORY_TOOL_PLACEHOLDERS = [
-  { title: '和弦查询', detail: '查看常用和弦构成与转位' },
-  { title: '音阶查询', detail: '查看常用音阶与调内音' },
-  { title: '音程查询', detail: '识别两个音之间的音程' },
-  { title: '调号参考', detail: '快速查看常用大小调调号' }
+const THEORY_TOOLS = [
+  { title: '和弦查询', detail: '查看常用和弦构成与转位', screen: null },
+  { title: '音阶与调号', detail: '查看自然大调音阶与五线谱调号', screen: 'scale-key-signature-tool' },
+  { title: '音程查询', detail: '识别两个音之间的音程', screen: null }
 ] as const
 
 function ToolsHubScreen(): JSX.Element {
@@ -725,7 +733,13 @@ function ToolsHubScreen(): JSX.Element {
           <p>快速查询常用和弦、音阶、音程与调号基础信息。</p>
         </div>
         <div className="tool-card-grid">
-          {THEORY_TOOL_PLACEHOLDERS.map((tool) => (
+          {THEORY_TOOLS.map((tool) => tool.screen ? (
+            <button className="tool-card is-interactive" key={tool.title} type="button" onClick={() => navigate(tool.screen)}>
+              <span className="tool-card__icon"><Icon name="tools" size={27} /></span>
+              <span><strong>{tool.title}</strong><small>{tool.detail}</small></span>
+              <em>打开 <Icon name="chevron" size={15} /></em>
+            </button>
+          ) : (
             <div className="tool-card" key={tool.title} aria-disabled="true">
               <span className="tool-card__icon"><Icon name="tools" size={27} /></span>
               <span><strong>{tool.title}</strong><small>{tool.detail}</small></span>
@@ -733,7 +747,99 @@ function ToolsHubScreen(): JSX.Element {
             </div>
           ))}
         </div>
-        <p className="tools-placeholder-note">更多乐理查询能力正在准备中。</p>
+      </section>
+    </ProductFrame>
+  )
+}
+
+function ScaleNoteToken({ value }: { value: string }): JSX.Element {
+  const letter = value.slice(0, 1)
+  const accidental = value.slice(1)
+  return (
+    <span className="scale-note-token">
+      <span>{letter}</span>
+      {accidental ? <span className="scale-note-token__accidental">{accidental}</span> : null}
+    </span>
+  )
+}
+
+function ScaleKeySignatureToolScreen(): JSX.Element {
+  const [root, setRoot] = useState<MajorKeyId>('C')
+  const [scaleType, setScaleType] = useState<ScaleTypeId>('naturalMajor')
+  const result = useMemo(() => getNaturalMajorToolResult(root), [root])
+
+  return (
+    <ProductFrame active="tools" onBack={() => navigate('tools')} title="音阶与调号">
+      <section className="scale-tool-layout" aria-labelledby="scale-tool-title">
+        <header className="scale-tool-query">
+          <div>
+            <span className="eyebrow">SCALE REFERENCE</span>
+            <h1 id="scale-tool-title">音阶与调号</h1>
+            <p>选择主音，查看自然大调的规范音名与五线谱调号。</p>
+          </div>
+          <div className="scale-tool-selectors" aria-label="音阶查询条件">
+            <label>
+              <span>主音</span>
+              <span className="setting-select-wrap">
+                <select className="setting-select" value={root} onChange={(event) => setRoot(event.target.value as MajorKeyId)}>
+                  {NATURAL_MAJOR_TOOL_ROOT_IDS.map((keyId) => (
+                    <option key={keyId} value={keyId}>{formatScaleToolNoteName(keyId)}</option>
+                  ))}
+                </select>
+                <Icon name="chevron-down" size={17} />
+              </span>
+            </label>
+            <label>
+              <span>音阶类型</span>
+              <span className="setting-select-wrap">
+                <select className="setting-select" value={scaleType} onChange={(event) => setScaleType(event.target.value as ScaleTypeId)}>
+                  {AVAILABLE_SCALE_TYPE_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
+                  ))}
+                </select>
+                <Icon name="chevron-down" size={17} />
+              </span>
+            </label>
+          </div>
+        </header>
+
+        <div className="scale-tool-results">
+          <article className="scale-tool-card scale-tool-scale-card">
+            <div className="scale-tool-scale-content">
+              <h2><ScaleNoteToken value={result.tonicLabel} /> <span>自然大调</span></h2>
+              <span className="eyebrow scale-tool-section-label">音阶构成</span>
+              <p className="scale-tool-note-sequence" aria-label={`${result.title}音阶构成`}>
+                {result.notes.ascending.map((note, index) => (
+                  <span className="scale-tool-sequence-item" key={`${note}-${index}`}>
+                    {index > 0 ? <span aria-hidden="true" className="scale-tool-note-separator">·</span> : null}
+                    <ScaleNoteToken value={note} />
+                  </span>
+                ))}
+              </p>
+            </div>
+            <div className="scale-tool-relative-section">
+              <span className="eyebrow scale-tool-section-label">关系调</span>
+              <small>相对小调</small>
+              <strong><ScaleNoteToken value={result.relativeMinorTonicLabel} /> <span>小调</span></strong>
+            </div>
+          </article>
+
+          <article className="scale-tool-card scale-tool-signature-card">
+            <div className="scale-tool-card-heading">
+              <span className="eyebrow">KEY SIGNATURE</span>
+              <h2>调号</h2>
+            </div>
+            <div className="scale-key-signature-paper">
+              <MusicStaffRenderer
+                ariaLabel={`${result.title}调号大谱表`}
+                feedback={null}
+                keySignature={result.keySignatureId}
+                notes={[]}
+                staffMode="grand"
+              />
+            </div>
+          </article>
+        </div>
       </section>
     </ProductFrame>
   )
@@ -2420,6 +2526,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
         'chord-mode-select': 'practice',
         'chord-practice': 'chord-mode-select',
         'chord-report-detail': 'history',
+        'scale-key-signature-tool': 'tools',
         practice: 'home',
         tools: 'home',
         history: 'home',
@@ -2492,6 +2599,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} />
       case 'practice': return <PracticeHubScreen />
       case 'tools': return <ToolsHubScreen />
+      case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen />
       case 'chord-mode-select': return <ChordModeSelectScreen settingsReady={chordSettingsReady} onSelectMode={(mode) => { activeSessionHost.begin('chord', 'chord-practice'); setChordPracticeMode(mode); navigate('chord-practice') }} />
       case 'sight-ready': return <SightReadyScreen onSettingsChange={(changes) => { void runtime.updateSettings(changes) }} onStart={startPractice} settings={settings} />
       case 'sight-active':

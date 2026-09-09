@@ -45,6 +45,7 @@
     "test:android-chord-sequential": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && node scripts/android-chord-sequential-check.cjs",
     "test:android-chord-persistence": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && node scripts/android-chord-persistence-check.cjs",
     "test:android-chord-report-detail": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && node scripts/android-chord-report-detail-check.cjs",
+    "test:android-scale-key-signature-tool": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && node scripts/android-scale-key-signature-tool-check.cjs",
     "test:android-active-practice-session": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && node scripts/android-active-practice-session-check.cjs",
     "test:android-practice-keep-awake": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && node scripts/android-practice-keep-awake-check.cjs",
     "test:android-navigation-ia": "node scripts/android-navigation-ia-check.cjs",

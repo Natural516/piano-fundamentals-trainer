@@ -185,7 +185,7 @@ test('CUI14', 'current-inversion Chord tones are optional without an empty separ
 })
 
 test('CUI16', 'normal Comprehensive help removes internal Chord V1 wording', () => {
-  const modeSelect = mainSource.slice(mainSource.indexOf('function ChordModeSelectScreen'), mainSource.indexOf('const THEORY_TOOL_PLACEHOLDERS'))
+  const modeSelect = mainSource.slice(mainSource.indexOf('function ChordModeSelectScreen'), mainSource.indexOf('const THEORY_TOOLS'))
   assert.match(modeSelect, /从完整和弦范围中综合随机出题/)
   assert.doesNotMatch(modeSelect, /Chord V1/)
 })
