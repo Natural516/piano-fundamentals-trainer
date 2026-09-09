@@ -2138,6 +2138,21 @@ button:focus-visible {
   text-align: left;
 }
 
+.history-row.is-interactive {
+  cursor: pointer;
+  font: inherit;
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.history-row.is-interactive:hover,
+.history-row.is-interactive:focus-visible {
+  background: color-mix(in srgb, var(--accent-soft) 45%, transparent);
+}
+
+.history-row.is-interactive:active {
+  transform: scale(0.995);
+}
+
 .history-row__mark {
   display: grid;
   width: 50px;
@@ -2197,6 +2212,13 @@ button:focus-visible {
   font-size: 22px;
 }
 
+.history-row__score small {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+}
+
 .history-empty {
   display: flex;
   min-height: 180px;
@@ -2219,6 +2241,282 @@ button:focus-visible {
   color: var(--ink-muted);
   font-size: 12px;
   line-height: 1.55;
+}
+
+.chord-report-detail {
+  height: 100%;
+  min-height: 0;
+  padding: 18px 30px;
+  overflow: hidden;
+}
+
+.chord-report-detail__body {
+  display: grid;
+  width: min(100%, 1480px);
+  height: 100%;
+  min-height: 0;
+  margin: 0 auto;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.chord-report-identity {
+  display: flex;
+  min-height: 92px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 15px 22px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: linear-gradient(120deg, var(--surface-tint), var(--surface));
+  box-shadow: var(--shadow-soft);
+}
+
+.chord-report-identity h1,
+.chord-report-unavailable h1 {
+  margin: 4px 0 2px;
+  font-family: "Noto Serif SC", Georgia, serif;
+  font-size: 25px;
+  line-height: 1.25;
+}
+
+.chord-report-identity p,
+.chord-report-unavailable p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.chord-report-status {
+  flex: 0 0 auto;
+  padding: 8px 13px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--success) 14%, var(--surface));
+  color: color-mix(in srgb, var(--success) 82%, var(--ink));
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.chord-report-status.is-stopped {
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface));
+  color: var(--warning);
+}
+
+.chord-report-columns {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.chord-report-column {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 14px;
+}
+
+.chord-report-card {
+  min-width: 0;
+  padding: 17px 19px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.chord-report-card__heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.chord-report-card__heading h2 {
+  margin: 3px 0 0;
+  font-size: 18px;
+}
+
+.chord-report-card__heading > small {
+  color: var(--ink-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.chord-report-metrics,
+.chord-report-error-grid,
+.chord-report-rows {
+  margin: 0;
+}
+
+.chord-report-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.chord-report-metrics > div {
+  display: grid;
+  min-width: 0;
+  min-height: 69px;
+  align-content: center;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-tint);
+}
+
+.chord-report-metrics dt,
+.chord-report-error-grid dt,
+.chord-report-rows dt {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.chord-report-metrics dd,
+.chord-report-error-grid dd,
+.chord-report-rows dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+}
+
+.chord-report-metrics dd {
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chord-report-metrics > div.is-primary {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 58%, var(--surface));
+}
+
+.chord-report-metrics > div.is-primary dd {
+  color: var(--accent-ink);
+  font-size: 24px;
+}
+
+.chord-report-explanation {
+  margin: 10px 2px 0;
+  color: var(--ink-muted);
+  font-size: 10px;
+}
+
+.chord-report-error-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.chord-report-error-grid > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 13px;
+  background: var(--surface-tint);
+}
+
+.chord-report-error-grid dd {
+  font-size: 21px;
+  font-weight: 740;
+}
+
+.chord-report-rows {
+  display: grid;
+}
+
+.chord-report-rows > div {
+  display: grid;
+  min-height: 42px;
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.chord-report-rows > div:first-child {
+  border-top: 0;
+}
+
+.chord-report-rows dd {
+  text-align: right;
+}
+
+.chord-report-timing dd {
+  display: grid;
+  gap: 1px;
+}
+
+.chord-report-timing dd strong {
+  color: var(--accent-ink);
+  font-size: 15px;
+}
+
+.chord-report-timing dd small {
+  color: var(--ink-muted);
+  font-size: 9px;
+}
+
+.chord-report-session dd {
+  font-size: 12px;
+  font-weight: 660;
+}
+
+.chord-report-detail.is-unavailable {
+  display: grid;
+  place-items: center;
+}
+
+.chord-report-unavailable {
+  display: grid;
+  width: min(620px, 100%);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 1420px) and (orientation: landscape) {
+  .chord-report-detail {
+    padding: 14px 24px;
+  }
+
+  .chord-report-identity {
+    min-height: 84px;
+    padding: 12px 18px;
+  }
+
+  .chord-report-card {
+    padding: 14px 16px;
+  }
+
+  .chord-report-card__heading {
+    margin-bottom: 9px;
+  }
+
+  .chord-report-metrics > div {
+    min-height: 62px;
+    padding: 8px 10px;
+  }
+
+  .chord-report-rows > div {
+    min-height: 38px;
+  }
 }
 
 .settings-layout {

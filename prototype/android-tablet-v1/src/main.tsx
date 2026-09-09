@@ -61,6 +61,10 @@ import {
 import { projectChordHistory } from './chordPractice/historyProjection'
 import { projectMixedPracticeHistory, type MixedPracticeHistoryItem } from './mixedHistoryProjection'
 import {
+  projectChordReportDetail,
+  resolveChordReportById
+} from './chordPractice/reportDetailProjection'
+import {
   createPracticeKeepAwakeController,
   shouldKeepPracticeAwake
 } from './practiceKeepAwake'
@@ -81,6 +85,7 @@ type ScreenId =
   | 'sight-result'
   | 'chord-mode-select'
   | 'chord-practice'
+  | 'chord-report-detail'
   | 'history'
   | 'settings'
   | 'midi'
@@ -141,6 +146,7 @@ const screens: ScreenOption[] = [
   { id: 'sight-result', label: '识谱 · 结果', shortLabel: 'RESULT' },
   { id: 'chord-mode-select', label: '和弦 · 方式选择', shortLabel: 'CHORD MODE' },
   { id: 'chord-practice', label: '和弦 · 静态练习', shortLabel: 'CHORD V1' },
+  { id: 'chord-report-detail', label: '和弦 · 练习报告', shortLabel: 'CHORD REPORT' },
   { id: 'history', label: '练习记录', shortLabel: '记录' },
   { id: 'settings', label: '设置', shortLabel: '设置' },
   { id: 'midi', label: 'MIDI 连接状态', shortLabel: 'MIDI' },
@@ -1489,21 +1495,34 @@ function SightResultScreen({
   )
 }
 
-function HistoryRecord({ item }: { item: MixedPracticeHistoryItem }): JSX.Element {
+type HistoryFilter = 'all' | 'sight' | 'chord'
+
+function HistoryRecord({
+  item,
+  onOpenChordReport
+}: {
+  item: MixedPracticeHistoryItem
+  onOpenChordReport: (recordId: string) => void
+}): JSX.Element {
   if (item.module === 'chord') {
     const completed = item.plannedQuestionCount === null
       ? `完成 ${item.completedQuestions}`
       : `完成 ${item.completedQuestions}/${item.plannedQuestionCount}`
     return (
-      <article className={`history-row is-${item.completionReason}`}>
+      <button
+        aria-label={`打开${item.modeSummary}练习报告`}
+        className={`history-row is-${item.completionReason} is-interactive`}
+        type="button"
+        onClick={() => onOpenChordReport(item.recordId)}
+      >
         <span className="history-row__mark"><Icon name="book" /></span>
         <span className="history-row__copy">
           <small><b className="history-module-badge is-chord">和弦</b>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small>
           <strong>{item.modeSummary}</strong>
           <em>{completed} · 错误 {item.totalErrors} · 练习时长 {formatHistoryDuration(item.practiceDurationMs)}</em>
         </span>
-        <span className="history-row__score"><strong>{formatHistoryPercentage(item.firstPassCompletionRate)}%</strong><small>完成率</small></span>
-      </article>
+        <span className="history-row__score"><strong>{formatHistoryPercentage(item.firstPassCompletionRate)}%</strong><small>完成率 <Icon name="chevron" size={13} /></small></span>
+      </button>
     )
   }
   return (
@@ -1522,10 +1541,16 @@ function HistoryRecord({ item }: { item: MixedPracticeHistoryItem }): JSX.Elemen
 function HistoryScreen({
   chordHistory,
   chordPersistence,
+  filter,
+  onFilterChange,
+  onOpenChordReport,
   runtime
 }: {
   chordHistory: ChordPersistenceSnapshot
   chordPersistence: ChordReportPersistenceCoordinator
+  filter: HistoryFilter
+  onFilterChange: (filter: HistoryFilter) => void
+  onOpenChordReport: (recordId: string, filter: HistoryFilter) => void
   runtime: AndroidSightReadingRuntime
 }): JSX.Element {
   const history = runtime.historySnapshot
@@ -1533,7 +1558,6 @@ function HistoryScreen({
   const { summary } = sightProjection
   const chordItems = projectChordHistory(chordHistory.records)
   const mixedItems = projectMixedPracticeHistory(history.records, chordHistory.records)
-  const [filter, setFilter] = useState<'all' | 'sight' | 'chord'>('all')
   useEffect(() => {
     void runtime.refreshHistory()
     void chordPersistence.refresh()
@@ -1564,7 +1588,7 @@ function HistoryScreen({
             ['sight', '识谱'],
             ['chord', '和弦']
           ] as const).map(([value, label]) => (
-            <button className={filter === value ? 'is-active' : ''} key={value} type="button" onClick={() => setFilter(value)}>{label}</button>
+            <button className={filter === value ? 'is-active' : ''} key={value} type="button" onClick={() => onFilterChange(value)}>{label}</button>
           ))}
         </div>
         {filter === 'chord' && empty ? (
@@ -1590,7 +1614,7 @@ function HistoryScreen({
             <div className="history-list">
               <div className="list-heading"><h2>最近练习</h2><span>{listStatus}</span></div>
               <div className="history-list__rows">
-                {visibleItems.length > 0 ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} />) : (
+                {visibleItems.length > 0 ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} />) : (
                   <div className="history-empty" role={history.status === 'error' ? 'alert' : 'status'}>
                     <span className="history-row__mark"><Icon name={history.status === 'error' ? 'info' : 'history'} /></span>
                     <div><strong>{history.status === 'loading' ? '正在读取本地记录…' : history.status === 'error' ? '暂时无法读取练习记录' : '暂无真实练习记录'}</strong><p>{history.status === 'error' ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : '完成一轮识谱练习后，真实结果会显示在这里。'}</p></div>
@@ -1604,7 +1628,7 @@ function HistoryScreen({
             <div className="list-heading"><h2>{filter === 'all' ? '全部练习' : '和弦练习'}</h2><span>{listStatus}</span></div>
             <div className="history-list__rows">
               {visibleItems.length > 0
-                ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} />)
+                ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} />)
                 : (
                   <div className="history-empty" role={anyError ? 'alert' : 'status'}>
                     <span className="history-row__mark"><Icon name={anyError ? 'info' : 'history'} /></span>
@@ -1614,6 +1638,79 @@ function HistoryScreen({
             </div>
           </div>
         )}
+      </section>
+    </ProductFrame>
+  )
+}
+
+function ChordReportDetailScreen({
+  onBack,
+  report
+}: {
+  onBack: () => void
+  report: ChordPersistenceSnapshot['records'][number] | null
+}): JSX.Element {
+  if (!report) {
+    return (
+      <ProductFrame active="history" onBack={onBack} title="和弦练习报告">
+        <section className="chord-report-detail is-unavailable">
+          <div className="chord-report-unavailable" role="status">
+            <span className="history-row__mark"><Icon name="info" /></span>
+            <div><h1>记录不可用</h1><p>这条练习记录无法读取。</p></div>
+            <button className="primary-action" type="button" onClick={onBack}>返回记录</button>
+          </div>
+        </section>
+      </ProductFrame>
+    )
+  }
+
+  const detail = projectChordReportDetail(report)
+  return (
+    <ProductFrame active="history" onBack={onBack} title="和弦练习报告">
+      <section className="chord-report-detail">
+        <div className="chord-report-detail__body">
+          <header className="chord-report-identity">
+            <div><span className="eyebrow">练习记录</span><h1>{detail.modeIdentity}</h1><p>以下内容来自本轮已保存的练习事实。</p></div>
+            <span className={`chord-report-status is-${report.completionReason}`}>{detail.statusLabel}</span>
+          </header>
+          <div className="chord-report-columns">
+            <div className="chord-report-column">
+              <section className="chord-report-card chord-report-overview" aria-labelledby="chord-report-overview-title">
+                <div className="chord-report-card__heading"><div><span className="eyebrow">本轮概览</span><h2 id="chord-report-overview-title">练习结果</h2></div></div>
+                <dl className="chord-report-metrics">
+                  {detail.overviewMetrics.map((metric) => (
+                    <div className={metric.primary ? 'is-primary' : ''} key={metric.label}>
+                      <dt>{metric.label}</dt><dd>{metric.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="chord-report-explanation">分解与柱式均首次成功，才计为首次通过。</p>
+              </section>
+              <section className="chord-report-card" aria-labelledby="chord-report-errors-title">
+                <div className="chord-report-card__heading"><div><span className="eyebrow">事实计数</span><h2 id="chord-report-errors-title">错误分布</h2></div></div>
+                <dl className="chord-report-error-grid">
+                  {detail.errorRows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
+                </dl>
+              </section>
+            </div>
+            <div className="chord-report-column">
+              <section className="chord-report-card" aria-labelledby="chord-report-timing-title">
+                <div className="chord-report-card__heading"><div><span className="eyebrow">中位数</span><h2 id="chord-report-timing-title">演奏时间</h2></div><small>按已完成题目汇总</small></div>
+                <dl className="chord-report-rows chord-report-timing">
+                  {detail.timingRows.map((row) => (
+                    <div key={row.id}><dt>{row.label}</dt><dd><strong>{row.value}</strong><small>{row.sampleLabel}</small></dd></div>
+                  ))}
+                </dl>
+              </section>
+              <section className="chord-report-card" aria-labelledby="chord-report-session-title">
+                <div className="chord-report-card__heading"><div><span className="eyebrow">历史快照</span><h2 id="chord-report-session-title">本轮信息</h2></div></div>
+                <dl className="chord-report-rows chord-report-session">
+                  {detail.sessionRows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
+                </dl>
+              </section>
+            </div>
+          </div>
+        </div>
       </section>
     </ProductFrame>
   )
@@ -2119,6 +2216,8 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   const [chordPracticeMode, setChordPracticeMode] = useState<ChordPracticeMode>('comprehensive')
   const [chordSettings, setChordSettings] = useState<ChordSettings>(DEFAULT_CHORD_SETTINGS)
   const [chordSettingsReady, setChordSettingsReady] = useState(false)
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all')
+  const [selectedChordRecordId, setSelectedChordRecordId] = useState<string | null>(null)
 
   useEffect(() => {
     void chordPersistence.initialize()
@@ -2223,6 +2322,17 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
     navigate(activeSessionHost.consumeAuxiliaryReturn(screenRef.current, fallback) as ScreenId)
   }, [activeSessionHost])
 
+  const openChordReportDetail = useCallback((recordId: string, filter: HistoryFilter): void => {
+    setHistoryFilter(filter)
+    setSelectedChordRecordId(recordId)
+    navigate('chord-report-detail')
+  }, [])
+
+  const closeChordReportDetail = useCallback((): void => {
+    setSelectedChordRecordId(null)
+    navigate('history')
+  }, [])
+
   const endSightPractice = useCallback((): void => {
     const active = activeSessionHost.current
     runtime.stop()
@@ -2277,6 +2387,11 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
         return
       }
 
+      if (currentScreen === 'chord-report-detail') {
+        closeChordReportDetail()
+        return
+      }
+
       if (currentScreen === 'sight-early-end' && currentSnapshot.status === 'running') {
         runtime.resume()
         navigate(getPracticeScreen(runtime))
@@ -2304,6 +2419,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
         'sight-result': 'practice',
         'chord-mode-select': 'practice',
         'chord-practice': 'chord-mode-select',
+        'chord-report-detail': 'history',
         practice: 'home',
         tools: 'home',
         history: 'home',
@@ -2349,7 +2465,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       disposed = true
       for (const remove of removeListeners) void remove()
     }
-  }, [chordRuntime, endChordPractice, practiceKeepAwake, returnFromAuxiliary, runtime, updater])
+  }, [chordRuntime, closeChordReportDetail, endChordPractice, practiceKeepAwake, returnFromAuxiliary, runtime, updater])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -2402,7 +2518,22 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
           questionCount={chordQuestionCount}
         />
       )
-      case 'history': return <HistoryScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} runtime={runtime} />
+      case 'history': return (
+        <HistoryScreen
+          chordHistory={chordPersistenceSnapshot}
+          chordPersistence={chordPersistence}
+          filter={historyFilter}
+          onFilterChange={setHistoryFilter}
+          onOpenChordReport={openChordReportDetail}
+          runtime={runtime}
+        />
+      )
+      case 'chord-report-detail': return (
+        <ChordReportDetailScreen
+          onBack={closeChordReportDetail}
+          report={resolveChordReportById(chordPersistenceSnapshot.records, selectedChordRecordId)}
+        />
+      )
       case 'settings': return (
         <SettingsScreen
           onThemeChange={setTheme}

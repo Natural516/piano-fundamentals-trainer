@@ -17,15 +17,25 @@ export interface ChordHistoryItem {
   readonly practiceDurationMs: number
 }
 
+export function formatChordModeSummary(report: ChordPracticeReportV1): string {
+  return report.practiceMode === 'sequential' && report.sequentialKey
+    ? `循序练习 · ${formatWrittenPitchClass(getChordSequentialKeyTonic(report.sequentialKey))} 大调`
+    : '综合随机'
+}
+
+export function calculateChordCompletionRate(report: Pick<ChordPracticeReportV1, 'completedQuestions' | 'firstPassCompleteQuestions'>): number {
+  return report.completedQuestions === 0
+    ? 0
+    : report.firstPassCompleteQuestions / report.completedQuestions * 100
+}
+
 export function projectChordHistory(records: readonly ChordPracticeReportV1[]): readonly ChordHistoryItem[] {
   const unique = new Map<string, ChordPracticeReportV1>()
   for (const record of records) if (!unique.has(record.recordId)) unique.set(record.recordId, record)
   return Object.freeze([...unique.values()]
     .sort((left, right) => right.endedAtEpochMs - left.endedAtEpochMs || left.recordId.localeCompare(right.recordId))
     .map((record): ChordHistoryItem => {
-      const modeSummary = record.practiceMode === 'sequential' && record.sequentialKey
-        ? `循序练习 · ${formatWrittenPitchClass(getChordSequentialKeyTonic(record.sequentialKey))} 大调`
-        : '综合随机'
+      const modeSummary = formatChordModeSummary(record)
       return Object.freeze({
         module: 'chord',
         recordId: record.recordId,
@@ -37,7 +47,7 @@ export function projectChordHistory(records: readonly ChordPracticeReportV1[]): 
         completedQuestions: record.completedQuestions,
         plannedQuestionCount: record.plannedQuestionCount,
         firstPassCompleteQuestions: record.firstPassCompleteQuestions,
-        firstPassCompletionRate: record.firstPassCompleteQuestions / record.completedQuestions * 100,
+        firstPassCompletionRate: calculateChordCompletionRate(record),
         totalErrors: record.totalErrors,
         practiceDurationMs: record.practiceDurationMs
       })

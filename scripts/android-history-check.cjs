@@ -345,8 +345,9 @@ test('HIS23 History introduces no delete edit or session-recovery action', () =>
   const historyRows = historySource.slice(historySource.indexOf('<div className="history-list__rows">'))
   assert.doesNotMatch(historySource, /删除|编辑|继续上次|恢复练习/)
   assert.match(historySource, /className="history-filter"/)
-  assert.doesNotMatch(historyRows, /onClick=|<button/)
-  assert.match(historyPresentationSource, /<article className=/)
+  assert.match(historyRows, /onOpenChordReport/)
+  assert.match(historyPresentationSource, /item\.module === 'chord'[\s\S]*?<button/)
+  assert.match(historyPresentationSource, /<article className=\{`history-row is-\$\{item\.completionState\}`\}>/)
 })
 
 test('HIS25 Chord empty state remains truthful when no durable Chord record exists', () => {
@@ -384,7 +385,7 @@ test('HIS30 Chord completion rate derives from first-pass counters', () => {
 
 test('HIS31 Chord primary metric is called completion rate, not accuracy', () => {
   const chordBranch = historyPresentationSource.slice(historyPresentationSource.indexOf("if (item.module === 'chord')"), historyPresentationSource.indexOf("return (", historyPresentationSource.indexOf("if (item.module === 'chord')") + 100) + 1)
-  assert.match(historyPresentationSource, /<small>完成率<\/small>/)
+  assert.match(historyPresentationSource, /<small>完成率(?: <Icon name="chevron" size=\{13\} \/>)?<\/small>/)
   assert.doesNotMatch(chordBranch, /准确率|总体正确率/)
 })
 

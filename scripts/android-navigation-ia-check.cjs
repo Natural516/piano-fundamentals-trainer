@@ -22,6 +22,8 @@ const practice = between('function PracticeHubScreen', 'const THEORY_TOOL_PLACEH
 const tools = between('const THEORY_TOOL_PLACEHOLDERS', 'function ChordGroupBadge')
 const sightReady = between('function SightReadyScreen', 'function useRemainingTime')
 const history = between('function HistoryScreen', 'function SettingRow')
+const historyRecord = between('function HistoryRecord', 'function HistoryScreen')
+const chordReport = between('function ChordReportDetailScreen', 'function SettingRow')
 const chordEmpty = history.slice(history.indexOf('<div className="history-module-empty"'), history.indexOf(") : filter === 'sight' ? ("))
 const settings = between('function SettingsScreen', 'function MidiScreen')
 const productUi = ui.slice(ui.indexOf('function HomeScreen'), ui.indexOf('function MidiScreen'))
@@ -118,6 +120,24 @@ const tests = [
     assert.match(openAuxiliary, /if \(origin === destination\) return/)
     assert.ok(openAuxiliary.indexOf('if (origin === destination) return') < openAuxiliary.indexOf('rememberAuxiliaryReturn'))
     assert.match(css, /\.midi-status\.is-display-only \{[\s\S]*?cursor: default;[\s\S]*?user-select: none;/)
+  }],
+  ['NAV15', 'Chord History card opens production report detail by durable record identity', () => {
+    assert.match(historyRecord, /<button[\s\S]*?onOpenChordReport\(item\.recordId\)/)
+    assert.match(ui, /navigate\('chord-report-detail'\)/)
+    assert.match(ui, /resolveChordReportById\(chordPersistenceSnapshot\.records, selectedChordRecordId\)/)
+    assert.match(chordReport, /title="和弦练习报告"/)
+  }],
+  ['NAV16', 'Chord report Back restores History while filter remains app-owned', () => {
+    assert.match(ui, /const \[historyFilter, setHistoryFilter\] = useState<HistoryFilter>\('all'\)/)
+    assert.match(ui, /setHistoryFilter\(filter\)[\s\S]*setSelectedChordRecordId\(recordId\)/)
+    assert.match(ui, /setSelectedChordRecordId\(null\)[\s\S]*navigate\('history'\)/)
+    assert.match(ui, /currentScreen === 'chord-report-detail'[\s\S]*closeChordReportDetail\(\)/)
+  }],
+  ['NAV17', 'Sight History remains non-interactive and no router framework is introduced', () => {
+    const sightBranch = historyRecord.slice(historyRecord.lastIndexOf('  return ('))
+    assert.match(sightBranch, /<article/)
+    assert.doesNotMatch(sightBranch, /onClick|<button/)
+    assert.doesNotMatch(ui, /react-router|RouterProvider|createBrowserRouter/)
   }]
 ]
 
