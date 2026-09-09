@@ -22,7 +22,7 @@ const practice = between('function PracticeHubScreen', 'const THEORY_TOOL_PLACEH
 const tools = between('const THEORY_TOOL_PLACEHOLDERS', 'function ChordGroupBadge')
 const sightReady = between('function SightReadyScreen', 'function useRemainingTime')
 const history = between('function HistoryScreen', 'function SettingRow')
-const chordEmpty = history.slice(history.indexOf('<div className="history-module-empty"'), history.indexOf(') : ('))
+const chordEmpty = history.slice(history.indexOf('<div className="history-module-empty"'), history.indexOf(") : filter === 'sight' ? ("))
 const settings = between('function SettingsScreen', 'function MidiScreen')
 const productUi = ui.slice(ui.indexOf('function HomeScreen'), ui.indexOf('function MidiScreen'))
 
@@ -49,7 +49,7 @@ const tests = [
     for (const label of ['上次练习', 'MIDI 输入', '乐理工具']) assert.match(home, new RegExp(label))
     assert.doesNotMatch(home, /<small>应用版本<\/small>/)
     assert.doesNotMatch(home, /85% 正确率|今天 09:42|· 20 题/)
-    assert.match(home, /projectSightReadingHistory\(history\.records\)\.items\[0\]/)
+    assert.match(home, /projectMixedPracticeHistory\(history\.records, chordHistory\.records\)\[0\]/)
     assert.match(home, /runtime\.refreshHistory\(\)/)
     assert.match(home, /暂无练习记录/)
   }],
@@ -66,9 +66,10 @@ const tests = [
   }],
   ['NAV07', 'History presentation offers All Sight and Chord filters plus a factual Chord empty state', () => {
     for (const label of ["['all', '全部']", "['sight', '识谱']", "['chord', '和弦']", '暂无和弦练习记录']) assert.ok(history.includes(label))
-    assert.match(history, /filter === 'all' \? '还没有练习记录' : '还没有识谱练习记录'/)
-    assert.match(history, /filter === 'all'[\s\S]*?'完成一次练习后，记录会显示在这里。'/)
-    assert.match(history, /history-module-badge">识谱/)
+    assert.match(history, /filter === 'sight'[\s\S]*?filter === 'chord' \? chordItems : mixedItems/)
+    assert.match(history, /filter === 'all' \? '全部练习' : '和弦练习'/)
+    assert.match(ui, /history-module-badge">识谱/)
+    assert.match(ui, /history-module-badge is-chord">和弦/)
     assert.doesNotMatch(history, /piano\.v1\.|Preferences\.|localStorage/)
   }],
   ['NAV08', 'submodule and Android Back paths follow the frozen Chord-internal hierarchy', () => {

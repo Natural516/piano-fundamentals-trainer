@@ -2039,6 +2039,10 @@ button:focus-visible {
   background: var(--surface);
 }
 
+.history-list--module {
+  height: 100%;
+}
+
 .history-summary {
   display: grid;
   align-content: center;
@@ -2172,6 +2176,11 @@ button:focus-visible {
   color: var(--accent-ink);
   font-size: 9px;
   font-weight: 760;
+}
+
+.history-module-badge.is-chord {
+  background: color-mix(in srgb, var(--success) 13%, var(--surface));
+  color: color-mix(in srgb, var(--success) 82%, var(--ink));
 }
 
 .history-row__copy strong {

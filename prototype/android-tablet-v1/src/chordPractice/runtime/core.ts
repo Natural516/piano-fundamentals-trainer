@@ -56,6 +56,8 @@ export class ChordPracticeRuntime {
   private sequentialBagValue: ChordSequentialShuffleBag | null = null
   private countersValue: ChordRuntimeCounters = EMPTY_COUNTERS
   private readonly timingSamplesValue: Array<ChordRuntimeSnapshot['timingSamples'][number]> = []
+  private activePracticeAccumulatedMsValue = 0
+  private activePracticeSegmentStartedAtMsValue: number | null = null
   private physicalHeldNotes = new Set<number>()
   private transportReadyValue = true
   private resumeRequiredValue = false
@@ -91,6 +93,7 @@ export class ChordPracticeRuntime {
       judgement: this.judgementValue?.snapshot ?? null,
       counters: Object.freeze({ ...this.countersValue }),
       timingSamples: Object.freeze(this.timingSamplesValue.map((sample) => Object.freeze({ ...sample }))),
+      activePracticeDurationMs: this.readActivePracticeDuration(now),
       successFeedbackRemainingMs: remaining,
       waitingForInterQuestionRelease: this.waitingForInterQuestionReleaseValue,
       suspensionReason: this.suspensionReasonValue,
@@ -124,6 +127,8 @@ export class ChordPracticeRuntime {
       : null
     this.countersValue = EMPTY_COUNTERS
     this.timingSamplesValue.splice(0)
+    this.activePracticeAccumulatedMsValue = 0
+    this.activePracticeSegmentStartedAtMsValue = this.dependencies.clock.now()
     this.physicalHeldNotes.clear()
     this.resumeRequiredValue = false
     this.suspensionReasonValue = null
@@ -159,6 +164,7 @@ export class ChordPracticeRuntime {
             this.statusValue = 'RUNNING'
             this.suspensionReasonValue = null
             this.resumeRequiredValue = false
+            this.openActivePracticeSegment(event.timestamp)
             this.syncCaptureTimer()
           }
         }
@@ -183,6 +189,7 @@ export class ChordPracticeRuntime {
   pause(reason: ChordJudgementSuspensionReason = 'manual-pause', timestampMs = this.dependencies.clock.now()): void {
     assertTimestamp(timestampMs)
     if (this.statusValue === 'SUSPENDED' || this.statusValue === 'IDLE' || this.statusValue === 'STOPPED' || this.statusValue === 'SESSION_COMPLETE') return
+    this.closeActivePracticeSegment(timestampMs)
     this.cancelCaptureTimer()
     if (this.statusValue === 'SUCCESS_FEEDBACK') {
       this.successFeedbackRemainingMs = Math.max(0, (this.successFeedbackDeadlineMs ?? timestampMs) - timestampMs)
@@ -201,6 +208,7 @@ export class ChordPracticeRuntime {
     if (this.statusValue !== 'SUSPENDED' || !this.transportReadyValue) return
     if (this.judgementValue?.snapshot.state.phase === 'QUESTION_COMPLETE' && this.successFeedbackRemainingMs !== null) {
       this.statusValue = 'SUCCESS_FEEDBACK'
+      this.openActivePracticeSegment(timestampMs)
       this.suspensionReasonValue = null
       this.resumeRequiredValue = false
       this.scheduleSuccessFeedback(timestampMs, this.successFeedbackRemainingMs)
@@ -212,7 +220,10 @@ export class ChordPracticeRuntime {
     this.statusValue = waitingForRelease ? 'SUSPENDED' : 'RUNNING'
     this.suspensionReasonValue = waitingForRelease ? this.suspensionReasonValue : null
     this.resumeRequiredValue = false
-    if (!waitingForRelease) this.syncCaptureTimer()
+    if (!waitingForRelease) {
+      this.openActivePracticeSegment(timestampMs)
+      this.syncCaptureTimer()
+    }
     this.notify()
   }
 
@@ -238,6 +249,7 @@ export class ChordPracticeRuntime {
   stop(timestampMs = this.dependencies.clock.now()): void {
     assertTimestamp(timestampMs)
     if (this.statusValue === 'STOPPED' || this.statusValue === 'IDLE') return
+    this.closeActivePracticeSegment(timestampMs)
     this.invalidateAllTimers()
     if (this.judgementValue && this.judgementValue.snapshot.state.phase !== 'STOPPED') {
       this.processCoreOnly({ type: 'STOP', timestampMs })
@@ -345,6 +357,7 @@ export class ChordPracticeRuntime {
     this.successFeedbackRemainingMs = null
     this.waitingForInterQuestionReleaseValue = false
     if (this.questionCountValue !== 'endless' && this.countersValue.completedQuestions >= this.questionCountValue) {
+      this.closeActivePracticeSegment(timestampMs)
       this.statusValue = 'SESSION_COMPLETE'
       this.notify()
       return
@@ -409,6 +422,22 @@ export class ChordPracticeRuntime {
   private invalidateAllTimers(): void {
     this.cancelCaptureTimer()
     this.cancelSuccessTimer()
+  }
+
+  private readActivePracticeDuration(now: number): number {
+    return this.activePracticeAccumulatedMsValue + (this.activePracticeSegmentStartedAtMsValue === null
+      ? 0
+      : Math.max(0, now - this.activePracticeSegmentStartedAtMsValue))
+  }
+
+  private closeActivePracticeSegment(timestampMs: number): void {
+    if (this.activePracticeSegmentStartedAtMsValue === null) return
+    this.activePracticeAccumulatedMsValue += Math.max(0, timestampMs - this.activePracticeSegmentStartedAtMsValue)
+    this.activePracticeSegmentStartedAtMsValue = null
+  }
+
+  private openActivePracticeSegment(timestampMs: number): void {
+    if (this.activePracticeSegmentStartedAtMsValue === null) this.activePracticeSegmentStartedAtMsValue = timestampMs
   }
 
   private notify(): void {

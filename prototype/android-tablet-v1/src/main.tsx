@@ -53,6 +53,17 @@ import {
 } from './chordPractice/settings'
 import { CapacitorPreferencesBackend } from './androidPersistence'
 import { ActivePracticeSessionHost } from './activePracticeSession'
+import {
+  ChordReportPersistenceCoordinator,
+  ChordReportRepository,
+  type ChordPersistenceSnapshot
+} from './chordPractice/persistence'
+import { projectChordHistory } from './chordPractice/historyProjection'
+import { projectMixedPracticeHistory, type MixedPracticeHistoryItem } from './mixedHistoryProjection'
+import {
+  createPracticeKeepAwakeController,
+  shouldKeepPracticeAwake
+} from './practiceKeepAwake'
 import './styles.css'
 
 declare const __QA_BUILD__: boolean
@@ -240,6 +251,12 @@ function useSightReadingRuntime(runtime: AndroidSightReadingRuntime): SightRunti
 function useChordPracticeRuntime(runtime: ChordPracticeRuntime): ChordRuntimeSnapshot {
   const [snapshot, setSnapshot] = useState<ChordRuntimeSnapshot>(() => runtime.snapshot)
   useEffect(() => runtime.subscribe(() => setSnapshot(runtime.snapshot)), [runtime])
+  return snapshot
+}
+
+function useChordPersistence(coordinator: ChordReportPersistenceCoordinator): ChordPersistenceSnapshot {
+  const [snapshot, setSnapshot] = useState<ChordPersistenceSnapshot>(() => coordinator.snapshot)
+  useEffect(() => coordinator.subscribe(() => setSnapshot(coordinator.snapshot)), [coordinator])
   return snapshot
 }
 
@@ -501,16 +518,33 @@ function NotationPaper({
   )
 }
 
-function HomeScreen({ settings }: { settings: SightReadingSettings }): JSX.Element {
+function HomeScreen({
+  chordHistory,
+  chordPersistence,
+  settings
+}: {
+  chordHistory: ChordPersistenceSnapshot
+  chordPersistence: ChordReportPersistenceCoordinator
+  settings: SightReadingSettings
+}): JSX.Element {
   const { runtime } = useMidiUi()
   const { openAuxiliary } = useAppNavigation()
   const midiStatus = presentMidiStatus(runtime)
   const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
   const history = runtime.historySnapshot
-  const recentPractice = projectSightReadingHistory(history.records).items[0] ?? null
+  const recentPractice = projectMixedPracticeHistory(history.records, chordHistory.records)[0] ?? null
   useEffect(() => {
     void runtime.refreshHistory()
-  }, [runtime])
+    void chordPersistence.refresh()
+  }, [chordPersistence, runtime])
+  const recentPracticeTitle = recentPractice?.module === 'chord'
+    ? `${formatHistoryPercentage(recentPractice.firstPassCompletionRate)}% 完成率`
+    : recentPractice ? `${formatHistoryPercentage(recentPractice.accuracy)}% 正确率` : '暂无练习记录'
+  const recentPracticeDetail = recentPractice?.module === 'chord'
+    ? `${formatHistoryTimestamp(recentPractice.endedAt)} · ${recentPractice.modeSummary} · 完成 ${recentPractice.completedQuestions}${recentPractice.plannedQuestionCount === null ? '' : `/${recentPractice.plannedQuestionCount}`}`
+    : recentPractice
+      ? `${formatHistoryTimestamp(recentPractice.endedAt)} · 识谱 · 完成 ${recentPractice.completed}/${recentPractice.plannedQuestionCount}`
+      : '完成一次练习后，这里会显示最近结果。'
   return (
     <ProductFrame active="home" title="今天，读几页新音符">
       <section className="home-hero">
@@ -546,10 +580,8 @@ function HomeScreen({ settings }: { settings: SightReadingSettings }): JSX.Eleme
           <span className="glance-icon"><Icon name="chart" /></span>
           <span>
             <small>上次练习</small>
-            <strong>{history.status === 'loading' ? '正在读取记录' : recentPractice ? `${formatHistoryPercentage(recentPractice.accuracy)}% 正确率` : '暂无练习记录'}</strong>
-            <em>{recentPractice
-              ? `${formatHistoryTimestamp(recentPractice.endedAt)} · 完成 ${recentPractice.completed}/${recentPractice.plannedQuestionCount}`
-              : '完成一次练习后，这里会显示最近结果。'}</em>
+            <strong>{history.status === 'loading' || chordHistory.status === 'loading' ? '正在读取记录' : recentPracticeTitle}</strong>
+            <em>{recentPracticeDetail}</em>
           </span>
           <Icon name="chevron" size={20} />
         </button>
@@ -1078,6 +1110,9 @@ function ChordPracticeScreen({
     || snapshot.status === 'STOPPED'
     || resumeWaitingForRelease
     || (paused && !snapshot.transportReady)
+  const endActionLabel = snapshot.status === 'SESSION_COMPLETE'
+    ? '完成'
+    : snapshot.counters.completedQuestions > 0 ? '结束并保存' : '结束'
 
   useEffect(() => {
     const status = runtime.snapshot.status
@@ -1105,7 +1140,7 @@ function ChordPracticeScreen({
             <Icon name={paused ? 'play' : 'pause'} /><span>{paused ? '继续' : '暂停'}</span>
           </button>
           <button className="outline-action" type="button" onClick={leavePractice}>
-            <Icon name="stop" /><span>结束</span>
+            <Icon name="stop" /><span>{endActionLabel}</span>
           </button>
         </div>
       </header>
@@ -1454,26 +1489,72 @@ function SightResultScreen({
   )
 }
 
-function HistoryScreen({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element {
+function HistoryRecord({ item }: { item: MixedPracticeHistoryItem }): JSX.Element {
+  if (item.module === 'chord') {
+    const completed = item.plannedQuestionCount === null
+      ? `完成 ${item.completedQuestions}`
+      : `完成 ${item.completedQuestions}/${item.plannedQuestionCount}`
+    return (
+      <article className={`history-row is-${item.completionReason}`}>
+        <span className="history-row__mark"><Icon name="book" /></span>
+        <span className="history-row__copy">
+          <small><b className="history-module-badge is-chord">和弦</b>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small>
+          <strong>{item.modeSummary}</strong>
+          <em>{completed} · 错误 {item.totalErrors} · 练习时长 {formatHistoryDuration(item.practiceDurationMs)}</em>
+        </span>
+        <span className="history-row__score"><strong>{formatHistoryPercentage(item.firstPassCompletionRate)}%</strong><small>完成率</small></span>
+      </article>
+    )
+  }
+  return (
+    <article className={`history-row is-${item.completionState}`}>
+      <span className="history-row__mark"><Icon name="book" /></span>
+      <span className="history-row__copy">
+        <small><b className="history-module-badge">识谱</b>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small>
+        <strong>{item.title}</strong>
+        <em>{item.settingsSummary} · 完成 {item.completed}/{item.plannedQuestionCount} · 正确 {item.correct} / 错误 {item.wrong} / 超时 {item.timeout} · {formatHistoryDuration(item.durationMs)}</em>
+      </span>
+      <span className="history-row__score"><strong>{formatHistoryPercentage(item.accuracy)}%</strong><small>正确率</small></span>
+    </article>
+  )
+}
+
+function HistoryScreen({
+  chordHistory,
+  chordPersistence,
+  runtime
+}: {
+  chordHistory: ChordPersistenceSnapshot
+  chordPersistence: ChordReportPersistenceCoordinator
+  runtime: AndroidSightReadingRuntime
+}): JSX.Element {
   const history = runtime.historySnapshot
-  const projection = projectSightReadingHistory(history.records)
-  const { summary } = projection
+  const sightProjection = projectSightReadingHistory(history.records)
+  const { summary } = sightProjection
+  const chordItems = projectChordHistory(chordHistory.records)
+  const mixedItems = projectMixedPracticeHistory(history.records, chordHistory.records)
   const [filter, setFilter] = useState<'all' | 'sight' | 'chord'>('all')
   useEffect(() => {
     void runtime.refreshHistory()
-  }, [runtime])
+    void chordPersistence.refresh()
+  }, [chordPersistence, runtime])
 
-  const visibleItems = projection.items
+  const visibleItems: readonly MixedPracticeHistoryItem[] = filter === 'sight'
+    ? sightProjection.items.map((item) => ({ module: 'sight' as const, ...item }))
+    : filter === 'chord' ? chordItems : mixedItems
   const empty = visibleItems.length === 0
   const overallAccuracy = formatHistoryPercentage(summary.overallAccuracy)
   const averageReaction = summary.averageReactionMs === null ? '—' : (summary.averageReactionMs / 1000).toFixed(2)
-  const listStatus = history.status === 'loading'
+  const anyLoading = history.status === 'loading' || chordHistory.status === 'loading'
+  const anyError = history.status === 'error' || chordHistory.status === 'error'
+  const anyWarning = Boolean(history.warning || chordHistory.warning)
+  const listStatus = anyLoading
     ? '正在同步本地记录'
-    : history.status === 'error'
-      ? `共 ${summary.totalSessions} 条 · 读取异常`
-      : history.warning
-        ? `共 ${summary.totalSessions} 条 · 部分记录不可用`
-        : `共 ${summary.totalSessions} 条记录`
+    : anyError
+      ? `共 ${visibleItems.length} 条 · 读取异常`
+      : anyWarning
+        ? `共 ${visibleItems.length} 条 · 部分记录不可用`
+        : `共 ${visibleItems.length} 条记录`
   return (
     <ProductFrame active="history" title="练习记录">
       <section className="history-screen">
@@ -1486,23 +1567,21 @@ function HistoryScreen({ runtime }: { runtime: AndroidSightReadingRuntime }): JS
             <button className={filter === value ? 'is-active' : ''} key={value} type="button" onClick={() => setFilter(value)}>{label}</button>
           ))}
         </div>
-        {filter === 'chord' ? (
+        {filter === 'chord' && empty ? (
           <div className="history-module-empty" role="status">
             <span className="history-row__mark"><Icon name="history" /></span>
             <div><span className="eyebrow">和弦记录</span><h1>暂无和弦练习记录</h1><p>完成和弦练习后，记录会显示在这里。</p></div>
           </div>
-        ) : (
+        ) : filter === 'sight' ? (
           <div className="history-layout">
             <div className="history-summary">
               <div>
-                <span className="eyebrow">{filter === 'all' ? '全部记录' : '识谱记录'}</span>
+                <span className="eyebrow">识谱记录</span>
                 <h1>{empty
-                  ? filter === 'all' ? '还没有练习记录' : '还没有识谱练习记录'
+                  ? '还没有识谱练习记录'
                   : `已有 ${summary.totalSessions} 次练习记录`}</h1>
                 <p>{empty
-                  ? filter === 'all'
-                    ? '完成一次练习后，记录会显示在这里。'
-                    : '完成或提前结束并保存一轮识谱练习后，会在这里显示。'
+                  ? '完成或提前结束并保存一轮识谱练习后，会在这里显示。'
                   : `共完成 ${summary.totalCompletedQuestions} 题：正确 ${summary.totalCorrect}，错误 ${summary.totalWrong}，超时 ${summary.totalTimeout}。`}</p>
               </div>
               <div className="history-summary__stat"><strong>{overallAccuracy}{summary.overallAccuracy === null ? null : <small>%</small>}</strong><span>总体正确率</span></div>
@@ -1511,23 +1590,27 @@ function HistoryScreen({ runtime }: { runtime: AndroidSightReadingRuntime }): JS
             <div className="history-list">
               <div className="list-heading"><h2>最近练习</h2><span>{listStatus}</span></div>
               <div className="history-list__rows">
-                {visibleItems.length > 0 ? visibleItems.map((item) => (
-                  <article className={`history-row is-${item.completionState}`} key={item.recordId}>
-                    <span className="history-row__mark"><Icon name="book" /></span>
-                    <span className="history-row__copy">
-                      <small><b className="history-module-badge">识谱</b>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small>
-                      <strong>{item.title}</strong>
-                      <em>{item.settingsSummary} · 完成 {item.completed}/{item.plannedQuestionCount} · 正确 {item.correct} / 错误 {item.wrong} / 超时 {item.timeout} · {formatHistoryDuration(item.durationMs)}</em>
-                    </span>
-                    <span className="history-row__score"><strong>{formatHistoryPercentage(item.accuracy)}%</strong><small>正确率</small></span>
-                  </article>
-                )) : (
+                {visibleItems.length > 0 ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} />) : (
                   <div className="history-empty" role={history.status === 'error' ? 'alert' : 'status'}>
                     <span className="history-row__mark"><Icon name={history.status === 'error' ? 'info' : 'history'} /></span>
                     <div><strong>{history.status === 'loading' ? '正在读取本地记录…' : history.status === 'error' ? '暂时无法读取练习记录' : '暂无真实练习记录'}</strong><p>{history.status === 'error' ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : '完成一轮识谱练习后，真实结果会显示在这里。'}</p></div>
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        ) : (
+          <div className="history-list history-list--module">
+            <div className="list-heading"><h2>{filter === 'all' ? '全部练习' : '和弦练习'}</h2><span>{listStatus}</span></div>
+            <div className="history-list__rows">
+              {visibleItems.length > 0
+                ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} />)
+                : (
+                  <div className="history-empty" role={anyError ? 'alert' : 'status'}>
+                    <span className="history-row__mark"><Icon name={anyError ? 'info' : 'history'} /></span>
+                    <div><strong>{anyLoading ? '正在读取本地记录…' : anyError ? '暂时无法读取练习记录' : '暂无真实练习记录'}</strong><p>{anyError ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : '完成一轮练习后，真实结果会显示在这里。'}</p></div>
+                  </div>
+                )}
             </div>
           </div>
         )}
@@ -1995,6 +2078,17 @@ function PersistenceErrorNotice({ runtime }: { runtime: AndroidSightReadingRunti
   )
 }
 
+function ChordPersistenceErrorNotice({ persistence }: { persistence: ChordPersistenceSnapshot }): JSX.Element | null {
+  if (persistence.status !== 'error') return null
+  return (
+    <aside className="persistence-error" role="alert">
+      {persistence.errorContext === 'save'
+        ? <span><strong>练习已结束，但记录保存失败。</strong><small>和弦练习结果没有被加入练习记录。</small></span>
+        : <span><strong>暂时无法读取和弦练习记录。</strong><small>其他练习功能仍可正常使用。</small></span>}
+    </aside>
+  )
+}
+
 function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element {
   const snapshot = useSightReadingRuntime(runtime)
   const activeSessionHost = useMemo(() => new ActivePracticeSessionHost(), [])
@@ -2006,11 +2100,17 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
     },
     rng: () => Math.random()
   }), [])
+  const chordKeepAwakeSnapshot = useChordPracticeRuntime(chordRuntime)
+  const practiceKeepAwake = useMemo(() => createPracticeKeepAwakeController(), [])
   const updater = useMemo(() => createAndroidUpdaterController(), [])
   const chordSettingsRepository = useMemo(() => new ChordSettingsRepository(CapacitorPreferencesBackend), [])
+  const chordReportRepository = useMemo(() => new ChordReportRepository(CapacitorPreferencesBackend), [])
+  const chordPersistence = useMemo(() => new ChordReportPersistenceCoordinator(chordReportRepository), [chordReportRepository])
+  const chordPersistenceSnapshot = useChordPersistence(chordPersistence)
   const updaterSnapshot = useUpdaterSnapshot(updater)
   const settings = runtime.settings
   const [screen, setScreen] = useState<ScreenId>(() => readScreen())
+  const [appForeground, setAppForeground] = useState(true)
   const screenRef = useRef<ScreenId>(screen)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [chordCaseId, setChordCaseId] = useState(DEFAULT_CHORD_MOCK_CASE_ID)
@@ -2019,6 +2119,10 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   const [chordPracticeMode, setChordPracticeMode] = useState<ChordPracticeMode>('comprehensive')
   const [chordSettings, setChordSettings] = useState<ChordSettings>(DEFAULT_CHORD_SETTINGS)
   const [chordSettingsReady, setChordSettingsReady] = useState(false)
+
+  useEffect(() => {
+    void chordPersistence.initialize()
+  }, [chordPersistence])
 
   useEffect(() => {
     let active = true
@@ -2079,6 +2183,22 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
     screenRef.current = screen
   }, [screen])
 
+  const keepPracticeAwake = shouldKeepPracticeAwake({
+    appForeground,
+    screen,
+    sightStatus: snapshot.status,
+    sightPaused: snapshot.isPaused,
+    chordStatus: chordKeepAwakeSnapshot.status
+  })
+
+  useEffect(() => {
+    void practiceKeepAwake.setEnabled(keepPracticeAwake)
+  }, [keepPracticeAwake, practiceKeepAwake])
+
+  useEffect(() => () => {
+    void practiceKeepAwake.dispose()
+  }, [practiceKeepAwake])
+
   const openAuxiliary = useCallback((destination: 'midi' | 'update'): void => {
     const origin = screenRef.current
     if (origin === destination) return
@@ -2113,9 +2233,12 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   const endChordPractice = useCallback((): void => {
     const active = activeSessionHost.current
     chordRuntime.stop()
-    if (active?.module === 'chord') activeSessionHost.end(active.id)
+    if (active?.module === 'chord') {
+      const finalizedNow = activeSessionHost.end(active.id)
+      if (finalizedNow) void chordPersistence.finalize(active.id, chordRuntime.snapshot, 'stopped')
+    }
     navigate('chord-mode-select')
-  }, [activeSessionHost, chordRuntime])
+  }, [activeSessionHost, chordPersistence, chordRuntime])
 
   useEffect(() => {
     const active = activeSessionHost.current
@@ -2126,10 +2249,15 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
 
   useEffect(() => chordRuntime.subscribe(() => {
     const active = activeSessionHost.current
-    if (chordRuntime.snapshot.status === 'SESSION_COMPLETE' && active?.module === 'chord') {
-      activeSessionHost.finalize(active.id)
+    const current = chordRuntime.snapshot
+    if (active?.module === 'chord' && current.status !== 'IDLE' && current.status !== 'STOPPED') {
+      chordPersistence.beginSession(active.id)
     }
-  }), [activeSessionHost, chordRuntime])
+    if (current.status === 'SESSION_COMPLETE' && active?.module === 'chord') {
+      const finalizedNow = activeSessionHost.finalize(active.id)
+      if (finalizedNow) void chordPersistence.finalize(active.id, current, 'completed')
+    }
+  }), [activeSessionHost, chordPersistence, chordRuntime])
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
@@ -2200,9 +2328,12 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
 
     void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
+        setAppForeground(true)
         void runtime.resumeFromAppLifecycle()
         if (!__QA_BUILD__) void updater.refreshInstallPermission()
       } else {
+        setAppForeground(false)
+        void practiceKeepAwake.setEnabled(false)
         chordRuntime.pause('background')
         void runtime.suspendForAppLifecycle()
       }
@@ -2218,7 +2349,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       disposed = true
       for (const remove of removeListeners) void remove()
     }
-  }, [chordRuntime, endChordPractice, returnFromAuxiliary, runtime, updater])
+  }, [chordRuntime, endChordPractice, practiceKeepAwake, returnFromAuxiliary, runtime, updater])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -2242,7 +2373,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
 
   const content = (() => {
     switch (screen) {
-      case 'home': return <HomeScreen settings={settings} />
+      case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} />
       case 'practice': return <PracticeHubScreen />
       case 'tools': return <ToolsHubScreen />
       case 'chord-mode-select': return <ChordModeSelectScreen settingsReady={chordSettingsReady} onSelectMode={(mode) => { activeSessionHost.begin('chord', 'chord-practice'); setChordPracticeMode(mode); navigate('chord-practice') }} />
@@ -2271,7 +2402,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
           questionCount={chordQuestionCount}
         />
       )
-      case 'history': return <HistoryScreen runtime={runtime} />
+      case 'history': return <HistoryScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} runtime={runtime} />
       case 'settings': return (
         <SettingsScreen
           onThemeChange={setTheme}
@@ -2289,6 +2420,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
         <AppNavigationContext.Provider value={{ openAuxiliary, returnFromAuxiliary }}>
           <div className="tablet-app">{content}</div>
           <PersistenceErrorNotice runtime={runtime} />
+          <ChordPersistenceErrorNotice persistence={chordPersistenceSnapshot} />
           {SHOW_DEVELOPMENT_TOOLS ? (
             <ReviewDock
               active={screen}

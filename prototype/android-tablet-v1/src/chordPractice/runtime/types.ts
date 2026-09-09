@@ -49,6 +49,8 @@ export interface ChordRuntimeSnapshot {
   readonly judgement: ChordJudgementSnapshot | null
   readonly counters: ChordRuntimeCounters
   readonly timingSamples: readonly ChordQuestionTimingFacts[]
+  /** Monotonic active session time; approved pause/suspension intervals are excluded. */
+  readonly activePracticeDurationMs: number
   readonly successFeedbackRemainingMs: number | null
   readonly waitingForInterQuestionRelease: boolean
   readonly suspensionReason: ChordJudgementSuspensionReason | null

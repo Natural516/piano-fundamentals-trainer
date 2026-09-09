@@ -111,7 +111,7 @@ export const CHORD_REPORT_DETAIL_PRODUCT_CONTRACT = Object.freeze({
     ] as const)
   }),
   productionNavigationImplemented: false,
-  durableStorageImplemented: false
+  durableStorageImplemented: true
 } as const)
 
 export const CHORD_TIMING_METRIC_CONTRACTS = Object.freeze({

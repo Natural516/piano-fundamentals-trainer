@@ -373,7 +373,7 @@ test('CT17', 'Chord product contract freezes Arpeggio-first flow, capture, feedb
   assert.equal(core.CHORD_HISTORY_CARD_PRODUCT_CONTRACT.infiniteCompletedDisplay, 'completed-without-denominator')
   assert.equal(core.CHORD_HISTORY_CARD_PRODUCT_CONTRACT.sightReadingRecordsRemainNonInteractive, true)
   assert.equal(core.CHORD_REPORT_DETAIL_PRODUCT_CONTRACT.productionNavigationImplemented, false)
-  assert.equal(core.CHORD_REPORT_DETAIL_PRODUCT_CONTRACT.durableStorageImplemented, false)
+  assert.equal(core.CHORD_REPORT_DETAIL_PRODUCT_CONTRACT.durableStorageImplemented, true)
   assert.equal(core.CHORD_TIMING_METRIC_CONTRACTS.questionStartLatency.label, '开始弹奏用时')
   assert.deepEqual(core.CHORD_TIMING_METRIC_CONTRACTS.questionStartLatency, {
     label: '开始弹奏用时',
