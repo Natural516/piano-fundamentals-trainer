@@ -34,7 +34,10 @@ test('SK01 screen identity exists', () => assert.match(mainSource, /\| 'scale-ke
 test('SK02 Tools contains merged Scale and Key Signature card', () => assert.match(toolsSource, /title: '音阶与调号'/))
 test('SK03 separate Scale Query card is removed', () => assert.doesNotMatch(toolsSource, /title: '音阶查询'/))
 test('SK04 separate Key Signature Reference card is removed', () => assert.doesNotMatch(toolsSource, /title: '调号参考'/))
-test('SK05 Chord Query placeholder remains', () => assert.match(toolsSource, /title: '和弦查询'/))
+test('SK05 Chord Query card remains alongside Scale and opens its own screen', () => {
+  assert.match(toolsSource, /title: '和弦查询'[\s\S]*?screen: 'chord-query-tool'/)
+  assert.match(mainSource, /case 'chord-query-tool': return <ChordQueryToolScreen \/>/)
+})
 test('SK06 Interval Query placeholder remains', () => assert.match(toolsSource, /title: '音程查询'/))
 test('SK07 available scale types expose only Natural Major', () => assert.deepEqual(AVAILABLE_SCALE_TYPE_OPTIONS.map((item) => [item.id, item.label]), [['naturalMajor', '自然大调']]))
 test('SK08 future model represents Natural Minor', () => assert.ok(SCALE_TYPE_MODEL.some((item) => item.id === 'naturalMinor' && !item.available)))

@@ -850,6 +850,254 @@ button.tool-card {
   margin: -12px 0 0;
 }
 
+.chord-query-layout {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(250px, 30vh);
+  align-content: start;
+  gap: 20px;
+  padding: 0 2%;
+}
+
+.chord-query-header {
+  display: flex;
+  min-width: 0;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.chord-query-header > div:first-child {
+  min-width: 0;
+}
+
+.chord-query-header h1,
+.chord-query-header p,
+.chord-query-card h2,
+.chord-query-card p {
+  margin: 0;
+}
+
+.chord-query-header h1 {
+  margin-top: 4px;
+  font-family: "Noto Serif SC", Georgia, serif;
+  font-size: clamp(30px, 2.5vw, 40px);
+  letter-spacing: -.035em;
+}
+
+.chord-query-header p {
+  margin-top: 5px;
+  color: var(--ink-secondary);
+  font-size: 13px;
+}
+
+.chord-query-selectors {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: 104px 122px minmax(230px, 258px);
+  gap: 10px;
+}
+
+.chord-query-selectors label {
+  display: grid;
+  gap: 6px;
+}
+
+.chord-query-selectors label > span:first-child {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.chord-query-selectors .setting-select-wrap,
+.chord-query-selectors .setting-select {
+  min-width: 0;
+}
+
+.chord-query-selectors .setting-select {
+  min-height: 50px;
+  border-radius: 14px;
+  font-size: 15px;
+}
+
+.chord-query-selectors label:nth-child(-n + 2) .setting-select {
+  font-family: Georgia, "Times New Roman", "Noto Serif SC", serif;
+  font-size: 17px;
+}
+
+.chord-query-card {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.chord-query-answer {
+  display: grid;
+  align-items: center;
+  grid-template-columns: minmax(260px, .8fr) minmax(0, 1.7fr);
+  gap: 36px;
+  max-height: 470px;
+  padding: 34px 36px;
+}
+
+.chord-query-identity,
+.chord-query-composition {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+}
+
+.chord-query-identity {
+  padding-right: 30px;
+  border-right: 1px solid var(--line);
+}
+
+.chord-query-identity h2 {
+  margin-top: 8px;
+  font-family: Georgia, "Times New Roman", "Noto Serif SC", serif;
+  font-size: clamp(36px, 3.15vw, 46px);
+  font-weight: 690;
+  line-height: 1.08;
+  white-space: nowrap;
+}
+
+.chord-symbol {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.chord-symbol__letter {
+  line-height: 1;
+}
+
+.chord-symbol__accidental {
+  align-self: center;
+  margin-left: -.075em;
+  font-size: .78em;
+  transform: translateY(-.015em);
+}
+
+.chord-symbol__suffix {
+  display: inline-block;
+  align-self: baseline;
+  margin-left: -.01em;
+  font-size: .74em;
+  font-weight: 660;
+  letter-spacing: -.035em;
+  line-height: 1;
+  transform: translateY(-.12em);
+}
+
+.chord-query-identity p {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .28em;
+  margin-top: 7px;
+  color: var(--ink-secondary);
+  font-size: 15px;
+  font-weight: 580;
+}
+
+.chord-query-composition > .eyebrow {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.chord-query-composition > p {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-top: 9px;
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", "Noto Serif SC", serif;
+  font-size: clamp(24px, 2.25vw, 34px);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.chord-query-note-item {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.chord-theoretical-note-token {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.chord-theoretical-note-token__letter {
+  line-height: 1;
+}
+
+.chord-accidental-group {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.chord-theoretical-note-token__accidental {
+  margin-left: -.065em;
+  font-size: .9em;
+  transform: translateY(-.01em);
+}
+
+.chord-accidental-glyph {
+  display: block;
+  flex: 0 0 auto;
+  width: .46em;
+  height: 1em;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+  vector-effect: non-scaling-stroke;
+}
+
+.chord-accidental-glyph + .chord-accidental-glyph {
+  margin-left: -.09em;
+}
+
+.chord-accidental-glyph[data-accidental='flat'] {
+  width: .38em;
+}
+
+.chord-accidental-glyph[data-accidental='natural'] {
+  width: .43em;
+}
+
+.chord-accidental-glyph[data-accidental='double-flat'] {
+  width: .66em;
+}
+
+.chord-accidental-glyph[data-accidental='double-sharp'] {
+  width: .58em;
+  stroke: none;
+}
+
+.chord-accidental-glyph__fill {
+  fill: currentColor;
+}
+
+.chord-query-note-separator {
+  margin: 0 .3em;
+  color: var(--ink-secondary);
+  font-weight: 500;
+}
+
 .scale-tool-layout {
   display: grid;
   height: 100%;

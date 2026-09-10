@@ -72,6 +72,15 @@ import {
   type ScaleTypeId
 } from './scaleKeySignatureTool'
 import {
+  CHORD_QUERY_INPUT_ACCIDENTALS,
+  CHORD_QUERY_NOTE_LETTERS,
+  CHORD_QUERY_TYPE_GROUPS,
+  getChordQueryResult,
+  type ChordQueryInputAccidental,
+  type ChordQueryNoteLetter,
+  type ChordQueryTypeId
+} from './chordQueryTool'
+import {
   createPracticeKeepAwakeController,
   shouldKeepPracticeAwake
 } from './practiceKeepAwake'
@@ -83,6 +92,7 @@ type ScreenId =
   | 'home'
   | 'practice'
   | 'tools'
+  | 'chord-query-tool'
   | 'scale-key-signature-tool'
   | 'sight-ready'
   | 'sight-active'
@@ -145,6 +155,7 @@ const screens: ScreenOption[] = [
   { id: 'home', label: '首页', shortLabel: '首页' },
   { id: 'practice', label: '练习', shortLabel: '练习' },
   { id: 'tools', label: '乐理工具', shortLabel: '工具' },
+  { id: 'chord-query-tool', label: '和弦查询', shortLabel: '和弦查询' },
   { id: 'scale-key-signature-tool', label: '音阶与调号', shortLabel: '音阶与调号' },
   { id: 'sight-ready', label: '识谱 · 准备', shortLabel: 'READY' },
   { id: 'sight-active', label: '识谱 · 进行中', shortLabel: 'ACTIVE' },
@@ -718,7 +729,7 @@ function ChordModeSelectScreen({ onSelectMode, settingsReady }: { onSelectMode: 
 }
 
 const THEORY_TOOLS = [
-  { title: '和弦查询', detail: '查看常用和弦构成与转位', screen: null },
+  { title: '和弦查询', detail: '查看规范和弦名称与完整理论构成音', screen: 'chord-query-tool' },
   { title: '音阶与调号', detail: '查看自然大调音阶与五线谱调号', screen: 'scale-key-signature-tool' },
   { title: '音程查询', detail: '识别两个音之间的音程', screen: null }
 ] as const
@@ -760,6 +771,169 @@ function ScaleNoteToken({ value }: { value: string }): JSX.Element {
       <span>{letter}</span>
       {accidental ? <span className="scale-note-token__accidental">{accidental}</span> : null}
     </span>
+  )
+}
+
+type ChordAccidentalGlyphName = 'natural' | 'flat' | 'sharp' | 'double-flat' | 'double-sharp'
+
+function parseChordAccidentalGroup(value: string): ChordAccidentalGlyphName[] {
+  const glyphs: ChordAccidentalGlyphName[] = []
+  for (const symbol of Array.from(value)) {
+    if (symbol === '♮') glyphs.push('natural')
+    if (symbol === '♭') glyphs.push('flat')
+    if (symbol === '♯') glyphs.push('sharp')
+    if (symbol === '𝄫') glyphs.push('double-flat')
+    if (symbol === '𝄪') glyphs.push('double-sharp')
+  }
+  return glyphs
+}
+
+function ChordAccidentalGlyph({ name }: { name: ChordAccidentalGlyphName }): JSX.Element {
+  if (name === 'flat') {
+    return (
+      <svg className="chord-accidental-glyph" data-accidental="flat" viewBox="0 0 12 28">
+        <path d="M3.1 1.5v22.7c1.9-5.9 7.2-7.2 7.2-3.3 0 3-3 5.2-7.2 6" />
+      </svg>
+    )
+  }
+  if (name === 'sharp') {
+    return (
+      <svg className="chord-accidental-glyph" data-accidental="sharp" viewBox="0 0 15 28">
+        <path d="M5.1 2.2v23.6M10.2.9v23.6M1.5 10.1l12-2.4M1.5 19.1l12-2.4" />
+      </svg>
+    )
+  }
+  if (name === 'natural') {
+    return (
+      <svg className="chord-accidental-glyph" data-accidental="natural" viewBox="0 0 14 28">
+        <path d="M3.5 2.1v20.7M10.5 5.2v20.7M3.5 11l7-2.4M3.5 19.5l7-2.4" />
+      </svg>
+    )
+  }
+  if (name === 'double-flat') {
+    return (
+      <svg className="chord-accidental-glyph" data-accidental="double-flat" viewBox="0 0 21 28">
+        <path d="M3 1.5v22.7c1.9-5.9 7.1-7.2 7.1-3.3 0 3-3 5.2-7.1 6M11.2 1.5v22.7c1.9-5.9 7.1-7.2 7.1-3.3 0 3-3 5.2-7.1 6" />
+      </svg>
+    )
+  }
+  return (
+    <svg className="chord-accidental-glyph" data-accidental="double-sharp" viewBox="0 0 18 20">
+      <path className="chord-accidental-glyph__fill" d="M1.7 2.4h4L9 6.2l3.3-3.8h4v4L12.4 10l3.9 3.6v4h-4L9 13.8l-3.3 3.8h-4v-4L5.6 10 1.7 6.4z" />
+    </svg>
+  )
+}
+
+function ChordAccidentalGroup({ value, className = '' }: { value: string; className?: string }): JSX.Element | null {
+  const glyphs = parseChordAccidentalGroup(value)
+  if (glyphs.length === 0) return null
+  return (
+    <span aria-hidden="true" className={`chord-accidental-group ${className}`.trim()} data-accidental-group={value}>
+      {glyphs.map((name, index) => <ChordAccidentalGlyph key={`${name}-${index}`} name={name} />)}
+    </span>
+  )
+}
+
+function ChordSymbol({ letter, accidental, suffix, label }: { letter: string; accidental: string; suffix: string; label: string }): JSX.Element {
+  return (
+    <span aria-label={label} className="chord-symbol" role="text">
+      <span aria-hidden="true" className="chord-symbol__letter">{letter}</span>
+      <ChordAccidentalGroup className="chord-symbol__accidental" value={accidental} />
+      {suffix ? <span aria-hidden="true" className="chord-symbol__suffix">{suffix}</span> : null}
+    </span>
+  )
+}
+
+function ChordTheoreticalNoteToken({ letter, accidental, label }: { letter: string; accidental: string; label: string }): JSX.Element {
+  return (
+    <span aria-label={label} className="chord-theoretical-note-token" role="text">
+      <span aria-hidden="true" className="chord-theoretical-note-token__letter">{letter}</span>
+      <ChordAccidentalGroup className="chord-theoretical-note-token__accidental" value={accidental} />
+    </span>
+  )
+}
+
+function ChordQueryToolScreen(): JSX.Element {
+  const [noteLetter, setNoteLetter] = useState<ChordQueryNoteLetter>('C')
+  const [accidental, setAccidental] = useState<ChordQueryInputAccidental>(0)
+  const [chordType, setChordType] = useState<ChordQueryTypeId>('major')
+  const root = useMemo(() => ({ letter: noteLetter, accidental }), [noteLetter, accidental])
+  const result = useMemo(() => getChordQueryResult(root, chordType), [root, chordType])
+
+  return (
+    <ProductFrame active="tools" onBack={() => navigate('tools')} title="和弦查询">
+      <section className="chord-query-layout" aria-labelledby="chord-query-title">
+        <header className="chord-query-header">
+          <div>
+            <span className="eyebrow">CHORD REFERENCE</span>
+            <h1 id="chord-query-title">和弦查询</h1>
+            <p>选择根音和和弦类型，查看规范名称与完整理论构成音。</p>
+          </div>
+          <div className="chord-query-selectors" aria-label="和弦查询条件">
+            <label>
+              <span>音名</span>
+              <span className="setting-select-wrap">
+                <select className="setting-select" value={noteLetter} onChange={(event) => setNoteLetter(event.target.value as ChordQueryNoteLetter)}>
+                  {CHORD_QUERY_NOTE_LETTERS.map((letter) => <option key={letter} value={letter}>{letter}</option>)}
+                </select>
+                <Icon name="chevron-down" size={17} />
+              </span>
+            </label>
+            <label>
+              <span>变音记号</span>
+              <span className="setting-select-wrap">
+                <select className="setting-select" value={accidental} onChange={(event) => setAccidental(Number(event.target.value) as ChordQueryInputAccidental)}>
+                  {CHORD_QUERY_INPUT_ACCIDENTALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+                <Icon name="chevron-down" size={17} />
+              </span>
+            </label>
+            <label>
+              <span>和弦类型</span>
+              <span className="setting-select-wrap">
+                <select className="setting-select" value={chordType} onChange={(event) => setChordType(event.target.value as ChordQueryTypeId)}>
+                  {CHORD_QUERY_TYPE_GROUPS.map((group) => (
+                    <optgroup key={group.id} label={group.label}>
+                      {group.types.map((option) => <option key={option.id} value={option.id}>{option.selectorLabel}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+                <Icon name="chevron-down" size={17} />
+              </span>
+            </label>
+          </div>
+        </header>
+
+        <article className="chord-query-card chord-query-answer" aria-label={`${result.symbol} 查询结果`}>
+          <div className="chord-query-identity">
+            <span className="eyebrow">CHORD SYMBOL</span>
+            <h2>
+              <ChordSymbol
+                accidental={result.rootLabel.slice(1)}
+                label={result.symbol}
+                letter={result.root.letter}
+                suffix={result.type.suffix}
+              />
+            </h2>
+            <p>
+              <ChordTheoreticalNoteToken accidental={result.rootLabel.slice(1)} label={result.rootLabel} letter={result.root.letter} />
+              <span>{result.type.chineseName}</span>
+            </p>
+          </div>
+          <div className="chord-query-composition">
+            <span className="eyebrow">理论构成音</span>
+            <p aria-label={`${result.chineseLabel}理论构成音`}>
+              {result.pitches.map((pitch, index) => (
+                <span className="chord-query-note-item" key={`${pitch.label}-${pitch.degree}`}>
+                  {index > 0 ? <span aria-hidden="true" className="chord-query-note-separator">·</span> : null}
+                  <ChordTheoreticalNoteToken accidental={pitch.accidental} label={pitch.label} letter={pitch.letter} />
+                </span>
+              ))}
+            </p>
+          </div>
+        </article>
+      </section>
+    </ProductFrame>
   )
 }
 
@@ -2526,6 +2700,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
         'chord-mode-select': 'practice',
         'chord-practice': 'chord-mode-select',
         'chord-report-detail': 'history',
+        'chord-query-tool': 'tools',
         'scale-key-signature-tool': 'tools',
         practice: 'home',
         tools: 'home',
@@ -2599,6 +2774,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} />
       case 'practice': return <PracticeHubScreen />
       case 'tools': return <ToolsHubScreen />
+      case 'chord-query-tool': return <ChordQueryToolScreen />
       case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen />
       case 'chord-mode-select': return <ChordModeSelectScreen settingsReady={chordSettingsReady} onSelectMode={(mode) => { activeSessionHost.begin('chord', 'chord-practice'); setChordPracticeMode(mode); navigate('chord-practice') }} />
       case 'sight-ready': return <SightReadyScreen onSettingsChange={(changes) => { void runtime.updateSettings(changes) }} onStart={startPractice} settings={settings} />
