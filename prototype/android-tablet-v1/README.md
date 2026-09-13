@@ -536,7 +536,7 @@ manually installed QA bootstrap. Neither generated APK is committed.
 
 Normal `android-release` builds bind the production manifest endpoint to:
 
-`https://github.com/Natural516/piano-trainer-releases/releases/latest/download/latest.json`
+`https://github.com/Natural516/piano-fundamentals-trainer/releases/latest/download/latest.json`
 
 The endpoint has one committed source in `android/updater.properties`.
 `android-release` always uses this production endpoint and ignores the

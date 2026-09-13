@@ -19,11 +19,12 @@
 
 ### ANDROID-RELEASE-CODE-001 — Consumed public version code
 
-- Current release source: `versionCode=10`, `versionName=1.5.0`.
-- Public `versionCode=9` is already consumed.
-- It must never be reused or overwrite the existing `v1.4.0` release.
-- The 1.5.0 release consumes `versionCode=10`; every later distributable
-  Android build must use `versionCode > 10`.
+- Current release source: `versionCode=11`, `versionName=1.5.1`.
+- Public `versionCode=9` and `versionCode=10` are already consumed.
+- They must never be reused or overwrite the existing `v1.4.0` or `v1.5.0`
+  releases.
+- The 1.5.1 migration release consumes `versionCode=11`; every later
+  distributable Android build must use `versionCode > 11`.
 - Ordinary development must not increment `android/version.properties`; a
   version change requires an explicitly authorized release stage.
 
@@ -89,8 +90,11 @@ The following are maintenance concerns, not current product failures:
 - Discovered: Android A4.3A
 - Priority: P1
 - Status: CLOSED
-- Public release repository: `https://github.com/Natural516/piano-trainer-releases`.
-- Production Manifest endpoint: `https://github.com/Natural516/piano-trainer-releases/releases/latest/download/latest.json`.
+- Canonical public source and release repository: `https://github.com/Natural516/piano-fundamentals-trainer`.
+- Production Manifest endpoint: `https://github.com/Natural516/piano-fundamentals-trainer/releases/latest/download/latest.json`.
+- `https://github.com/Natural516/piano-trainer-releases` remains a temporary
+  compatibility bridge for clients released before 1.5.1; it receives no new
+  normal APK releases.
 - Closure evidence: the DEVICE-001 real-network Human QA run consumed the public Manifest through the Android app, downloaded the permanent-signed APK, passed the complete size/hash/package/version/current-signer/verified-token/FileProvider verification chain, completed an in-place system-installer update from `versionCode=7` to `versionCode=8`, and preserved durable settings and History data.
 - Hosting remains credential-free in the application. GitHub credentials or tokens are not part of the production updater contract.
 

@@ -35,7 +35,7 @@ try {
   const publicAssets = path.join(tempRoot, 'assets', 'public')
   assert.equal(fs.existsSync(publicAssets) && fs.statSync(publicAssets).isDirectory(), true, 'Release APK does not contain Capacitor public assets')
   const bundle = readTree(publicAssets)
-  const productionManifestUrl = 'https://github.com/Natural516/piano-trainer-releases/releases/latest/download/latest.json'
+  const productionManifestUrl = 'https://github.com/Natural516/piano-fundamentals-trainer/releases/latest/download/latest.json'
 
   const forbiddenDevelopmentTokens = [
     'A3.1 · DEBUG',

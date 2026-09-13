@@ -22,8 +22,8 @@ const checks = [
     assert.match(gradle, /qa\s*\{[\s\S]*?buildConfigField\s+["']String["'],\s*["']UPDATE_MANIFEST_URL["'],\s*'""'/)
   }],
   ['Production version is 10 / 1.5.0', () => {
-    assert.match(version, /^versionCode=10$/m)
-    assert.match(version, /^versionName=1\.5\.0$/m)
+    assert.match(version, /^versionCode=11$/m)
+    assert.match(version, /^versionName=1\.5\.1$/m)
   }],
   ['QA launcher name and package resources are distinct', () => {
     assert.match(qaStrings, />钢琴基本功训练器 QA</)

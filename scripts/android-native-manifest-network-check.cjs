@@ -21,13 +21,13 @@ for (const extension of ['.ts', '.tsx']) {
 
 const root = path.resolve(__dirname, '..')
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8')
-const productionManifestUrl = 'https://github.com/Natural516/piano-trainer-releases/releases/latest/download/latest.json'
+const productionManifestUrl = 'https://github.com/Natural516/piano-fundamentals-trainer/releases/latest/download/latest.json'
 const rawManifest = JSON.stringify({
   schemaVersion: 1,
   packageId: 'com.pianofundamentals.trainer',
   versionCode: 8,
   versionName: '1.3.4',
-  apkUrl: 'https://github.com/Natural516/piano-trainer-releases/releases/download/v1.3.4/piano-trainer-1.3.4.apk',
+  apkUrl: 'https://github.com/Natural516/piano-fundamentals-trainer/releases/download/v1.3.4/piano-trainer-1.3.4.apk',
   apkSha256: 'A'.repeat(64),
   apkSizeBytes: 4_000_000,
   publishedAt: '2026-09-04T00:00:00Z',
