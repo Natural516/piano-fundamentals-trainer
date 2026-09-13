@@ -81,6 +81,17 @@ import {
   type ChordQueryTypeId
 } from './chordQueryTool'
 import {
+  INTERVAL_QUERY_LETTERS,
+  INTERVAL_QUERY_OCTAVES,
+  INTERVAL_QUERY_VISIBLE_ACCIDENTALS,
+  formatIntervalAccidental,
+  getIntervalQueryResult,
+  type IntervalQueryLetter,
+  type IntervalQueryOctave,
+  type IntervalQueryVisibleAccidental,
+  type IntervalQueryWrittenPitch
+} from './intervalQueryTool'
+import {
   createPracticeKeepAwakeController,
   shouldKeepPracticeAwake
 } from './practiceKeepAwake'
@@ -94,6 +105,7 @@ type ScreenId =
   | 'tools'
   | 'chord-query-tool'
   | 'scale-key-signature-tool'
+  | 'interval-query-tool'
   | 'sight-ready'
   | 'sight-active'
   | 'sight-correct'
@@ -157,6 +169,7 @@ const screens: ScreenOption[] = [
   { id: 'tools', label: '乐理工具', shortLabel: '工具' },
   { id: 'chord-query-tool', label: '和弦查询', shortLabel: '和弦查询' },
   { id: 'scale-key-signature-tool', label: '音阶与调号', shortLabel: '音阶与调号' },
+  { id: 'interval-query-tool', label: '音程查询', shortLabel: '音程查询' },
   { id: 'sight-ready', label: '识谱 · 准备', shortLabel: 'READY' },
   { id: 'sight-active', label: '识谱 · 进行中', shortLabel: 'ACTIVE' },
   { id: 'sight-correct', label: '识谱 · 正确反馈', shortLabel: 'CORRECT' },
@@ -731,7 +744,7 @@ function ChordModeSelectScreen({ onSelectMode, settingsReady }: { onSelectMode: 
 const THEORY_TOOLS = [
   { title: '和弦查询', detail: '查看规范和弦名称与完整理论构成音', screen: 'chord-query-tool' },
   { title: '音阶与调号', detail: '查看自然大调音阶与五线谱调号', screen: 'scale-key-signature-tool' },
-  { title: '音程查询', detail: '识别两个音之间的音程', screen: null }
+  { title: '音程查询', detail: '识别两个音之间的音程', screen: 'interval-query-tool' }
 ] as const
 
 function ToolsHubScreen(): JSX.Element {
@@ -744,18 +757,12 @@ function ToolsHubScreen(): JSX.Element {
           <p>快速查询常用和弦、音阶、音程与调号基础信息。</p>
         </div>
         <div className="tool-card-grid">
-          {THEORY_TOOLS.map((tool) => tool.screen ? (
+          {THEORY_TOOLS.map((tool) => (
             <button className="tool-card is-interactive" key={tool.title} type="button" onClick={() => navigate(tool.screen)}>
               <span className="tool-card__icon"><Icon name="tools" size={27} /></span>
               <span><strong>{tool.title}</strong><small>{tool.detail}</small></span>
               <em>打开 <Icon name="chevron" size={15} /></em>
             </button>
-          ) : (
-            <div className="tool-card" key={tool.title} aria-disabled="true">
-              <span className="tool-card__icon"><Icon name="tools" size={27} /></span>
-              <span><strong>{tool.title}</strong><small>{tool.detail}</small></span>
-              <em>开发中</em>
-            </div>
           ))}
         </div>
       </section>
@@ -1014,6 +1021,149 @@ function ScaleKeySignatureToolScreen(): JSX.Element {
             </div>
           </article>
         </div>
+      </section>
+    </ProductFrame>
+  )
+}
+
+function IntervalPitchToken({ pitch }: { pitch: IntervalQueryWrittenPitch }): JSX.Element {
+  const accidental = formatIntervalAccidental(pitch.accidental)
+  const label = `${pitch.letter}${accidental}${pitch.octave}`
+  return (
+    <span aria-label={label} className="interval-query-pitch-token" role="text">
+      <span aria-hidden="true" className="interval-query-pitch-token__letter">{pitch.letter}</span>
+      <ChordAccidentalGroup className="interval-query-pitch-token__accidental" value={accidental} />
+      <span aria-hidden="true" className="interval-query-pitch-token__octave">{pitch.octave}</span>
+    </span>
+  )
+}
+
+function IntervalPitchSelector({
+  label,
+  pitch,
+  onLetterChange,
+  onAccidentalChange,
+  onOctaveChange
+}: {
+  label: string
+  pitch: IntervalQueryWrittenPitch
+  onLetterChange: (value: IntervalQueryLetter) => void
+  onAccidentalChange: (value: IntervalQueryVisibleAccidental) => void
+  onOctaveChange: (value: IntervalQueryOctave) => void
+}): JSX.Element {
+  return (
+    <fieldset className="interval-query-selector-group">
+      <legend>{label}</legend>
+      <label>
+        <span>音名</span>
+        <span className="setting-select-wrap">
+          <select className="setting-select" value={pitch.letter} onChange={(event) => onLetterChange(event.target.value as IntervalQueryLetter)}>
+            {INTERVAL_QUERY_LETTERS.map((letter) => <option key={letter} value={letter}>{letter}</option>)}
+          </select>
+          <Icon name="chevron-down" size={17} />
+        </span>
+      </label>
+      <label>
+        <span>变音记号</span>
+        <span className="setting-select-wrap">
+          <select aria-label={`${label} 变音记号`} className="setting-select" value={pitch.accidental} onChange={(event) => onAccidentalChange(Number(event.target.value) as IntervalQueryVisibleAccidental)}>
+            {INTERVAL_QUERY_VISIBLE_ACCIDENTALS.map((option) => <option aria-label={option.accessibleLabel} key={option.value} value={option.value}>{option.selectorLabel}</option>)}
+          </select>
+          <Icon name="chevron-down" size={17} />
+        </span>
+      </label>
+      <label>
+        <span>八度</span>
+        <span className="setting-select-wrap">
+          <select className="setting-select" value={pitch.octave} onChange={(event) => onOctaveChange(Number(event.target.value) as IntervalQueryOctave)}>
+            {INTERVAL_QUERY_OCTAVES.map((octave) => <option key={octave} value={octave}>{octave}</option>)}
+          </select>
+          <Icon name="chevron-down" size={17} />
+        </span>
+      </label>
+    </fieldset>
+  )
+}
+
+function IntervalQueryToolScreen(): JSX.Element {
+  const [startLetter, setStartLetter] = useState<IntervalQueryLetter>('C')
+  const [startAccidental, setStartAccidental] = useState<IntervalQueryVisibleAccidental>(0)
+  const [startOctave, setStartOctave] = useState<IntervalQueryOctave>(4)
+  const [targetLetter, setTargetLetter] = useState<IntervalQueryLetter>('G')
+  const [targetAccidental, setTargetAccidental] = useState<IntervalQueryVisibleAccidental>(0)
+  const [targetOctave, setTargetOctave] = useState<IntervalQueryOctave>(4)
+  const start = useMemo(() => ({ letter: startLetter, accidental: startAccidental, octave: startOctave }), [startAccidental, startLetter, startOctave])
+  const target = useMemo(() => ({ letter: targetLetter, accidental: targetAccidental, octave: targetOctave }), [targetAccidental, targetLetter, targetOctave])
+  const result = useMemo(() => getIntervalQueryResult(start, target), [start, target])
+
+  return (
+    <ProductFrame active="tools" onBack={() => navigate('tools')} title="音程查询">
+      <section className="interval-query-layout" aria-labelledby="interval-query-title">
+        <header className="interval-query-header">
+          <div className="interval-query-heading">
+            <span className="eyebrow">INTERVAL REFERENCE</span>
+            <h1 id="interval-query-title">音程查询</h1>
+            <p>选择起始音与目标音，查看音程名称、方向与等音程参考。</p>
+          </div>
+          <div className="interval-query-selectors" aria-label="音程查询条件">
+            <IntervalPitchSelector
+              label="START"
+              onAccidentalChange={setStartAccidental}
+              onLetterChange={setStartLetter}
+              onOctaveChange={setStartOctave}
+              pitch={start}
+            />
+            <span aria-hidden="true" className="interval-query-selector-arrow">→</span>
+            <IntervalPitchSelector
+              label="TARGET"
+              onAccidentalChange={setTargetAccidental}
+              onLetterChange={setTargetLetter}
+              onOctaveChange={setTargetOctave}
+              pitch={target}
+            />
+          </div>
+        </header>
+
+        <article className="interval-query-card interval-query-answer" aria-label={`${result.displayName}查询结果`}>
+          <div className="interval-query-identity">
+            <span className="eyebrow">INTERVAL RESULT</span>
+            <h2>{result.displayName}</h2>
+            <div className="interval-query-pitch-pair">
+              <IntervalPitchToken pitch={result.start} />
+              <span aria-hidden="true" className="interval-query-pitch-arrow">→</span>
+              <IntervalPitchToken pitch={result.target} />
+              {result.soundingRelationshipLabel ? <em>{result.soundingRelationshipLabel}</em> : null}
+            </div>
+          </div>
+          <div className="interval-query-facts">
+            <span className="eyebrow">结果信息</span>
+            <dl>
+              <div><dt>方向</dt><dd>{result.directionLabel}</dd></div>
+              <div><dt>度数</dt><dd>{result.intervalNumberLabel}</dd></div>
+              <div><dt>性质</dt><dd>{result.quality}</dd></div>
+              <div><dt>半音数</dt><dd>{result.semitoneDistance}</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article className="interval-query-card interval-query-references">
+          <header>
+            <div>
+              <span className="eyebrow">ENHARMONIC INTERVALS</span>
+              <h2>等音程参考</h2>
+            </div>
+            <p>保持 {result.semitoneDistance} 个半音不变，比较相邻级数的理论命名。</p>
+          </header>
+          <div className="interval-query-reference-list">
+            {result.enharmonicReferences.map((reference) => (
+              <div className={reference.isCurrent ? 'is-current' : ''} key={reference.intervalNumber}>
+                <span>{reference.intervalName}</span>
+                <small>{reference.semitoneDistance} 个半音</small>
+                {reference.isCurrent ? <em>当前</em> : <i aria-hidden="true" />}
+              </div>
+            ))}
+          </div>
+        </article>
       </section>
     </ProductFrame>
   )
@@ -2702,6 +2852,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
         'chord-report-detail': 'history',
         'chord-query-tool': 'tools',
         'scale-key-signature-tool': 'tools',
+        'interval-query-tool': 'tools',
         practice: 'home',
         tools: 'home',
         history: 'home',
@@ -2776,6 +2927,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       case 'tools': return <ToolsHubScreen />
       case 'chord-query-tool': return <ChordQueryToolScreen />
       case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen />
+      case 'interval-query-tool': return <IntervalQueryToolScreen />
       case 'chord-mode-select': return <ChordModeSelectScreen settingsReady={chordSettingsReady} onSelectMode={(mode) => { activeSessionHost.begin('chord', 'chord-practice'); setChordPracticeMode(mode); navigate('chord-practice') }} />
       case 'sight-ready': return <SightReadyScreen onSettingsChange={(changes) => { void runtime.updateSettings(changes) }} onStart={startPractice} settings={settings} />
       case 'sight-active':

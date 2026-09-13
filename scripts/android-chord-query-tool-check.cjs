@@ -251,9 +251,9 @@ test('CQ25', 'chord symbols use one structured nowrap root accidental suffix uni
   assert.doesNotMatch(suffixStyle, /vertical-align:\s*(?:sub|super)|position:\s*absolute/)
 })
 
-test('CQ26', 'Chord Query leaves Scale and Key Signature implemented and Interval Query unchanged', () => {
+test('CQ26', 'Chord Query leaves Scale and Interval Query sibling tools implemented', () => {
   assert.match(toolsSource, /title: '音阶与调号'[\s\S]*?screen: 'scale-key-signature-tool'/)
-  assert.match(toolsSource, /title: '音程查询'[\s\S]*?screen: null/)
+  assert.match(toolsSource, /title: '音程查询'[\s\S]*?screen: 'interval-query-tool'/)
 })
 
 test('CQ27', 'representative chord symbols are supplied to the structured renderer without natural signs', () => {

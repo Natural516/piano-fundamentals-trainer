@@ -41,16 +41,18 @@ const tests = [
     assert.match(practice, /navigate\('chord-mode-select'\)/)
     assert.match(practice, /function ChordModeSelectScreen/)
   }],
-  ['NAV03', 'Tools exposes three cards and opens the Chord Query and merged Scale screens', () => {
+  ['NAV03', 'Tools exposes three cards and opens Chord Scale and Interval screens', () => {
     for (const label of ['和弦查询', '音阶与调号', '音程查询']) assert.match(tools, new RegExp(label))
     assert.equal((tools.match(/title: '/g) ?? []).length, 3)
     assert.doesNotMatch(tools, /title: '音阶查询'|title: '调号参考'/)
-    assert.match(tools, /开发中/)
+    assert.doesNotMatch(tools, /开发中/)
     assert.match(tools, /navigate\(tool\.screen\)/)
     assert.match(ui, /case 'chord-query-tool': return <ChordQueryToolScreen \/>/)
     assert.match(ui, /'chord-query-tool': 'tools'/)
     assert.match(ui, /case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen \/>/)
     assert.match(ui, /'scale-key-signature-tool': 'tools'/)
+    assert.match(ui, /case 'interval-query-tool': return <IntervalQueryToolScreen \/>/)
+    assert.match(ui, /'interval-query-tool': 'tools'/)
     assert.match(tools, /<ProductFrame active="tools" onBack=\{\(\) => navigate\('tools'\)\}/)
   }],
   ['NAV04', 'Home glance cards are Last Practice MIDI Input and Theory Tools', () => {
