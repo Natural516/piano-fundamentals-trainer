@@ -26,6 +26,7 @@ const historyRecord = between('function HistoryRecord', 'function HistoryScreen'
 const chordReport = between('function ChordReportDetailScreen', 'function SettingRow')
 const chordEmpty = history.slice(history.indexOf('<div className="history-module-empty"'), history.indexOf(") : filter === 'sight' ? ("))
 const settings = between('function SettingsScreen', 'function MidiScreen')
+const updateScreen = between('function UpdateScreen', 'function ReviewDock')
 const productUi = ui.slice(ui.indexOf('function HomeScreen'), ui.indexOf('function MidiScreen'))
 
 const tests = [
@@ -90,8 +91,8 @@ const tests = [
     assert.match(ui, /aria-label="返回练习"/)
   }],
   ['NAV09', 'QA channel and production version identities remain frozen', () => {
-    assert.match(version, /^versionCode=11$/m)
-    assert.match(version, /^versionName=1\.5\.1$/m)
+    assert.match(version, /^versionCode=12$/m)
+    assert.match(version, /^versionName=1\.5\.2$/m)
     assert.match(ui, /if \(!__QA_BUILD__\) void updater\.initialize\(\)/)
     assert.match(settings, /正式更新通道已关闭/)
   }],
@@ -146,6 +147,12 @@ const tests = [
     assert.match(sightBranch, /<article/)
     assert.doesNotMatch(sightBranch, /onClick|<button/)
     assert.doesNotMatch(ui, /react-router|RouterProvider|createBrowserRouter/)
+  }],
+  ['NAV18', 'Settings and Update share installed package metadata without fixed release copy', () => {
+    assert.doesNotMatch(settings, /V\d+\.\d+\.\d+|versionCode \d+/)
+    assert.match(settings, /updater\.installed \? `V\$\{updater\.installed\.versionName\}` : '读取中'/)
+    assert.match(settings, /updater\.installed[\s\S]*?`versionCode \$\{updater\.installed\.versionCode\}`[\s\S]*?'正在读取版本信息'/)
+    assert.match(updateScreen, /snapshot\.installed \? `V\$\{snapshot\.installed\.versionName\} · \$\{snapshot\.installed\.versionCode\}` : '正在读取'/)
   }]
 ]
 

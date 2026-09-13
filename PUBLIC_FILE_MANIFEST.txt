@@ -1,6 +1,6 @@
 PIANO FUNDAMENTALS TRAINER — PUBLIC FILE MANIFEST
 
-Source checkpoint: e995d95e3f5ddc480dbf32d8f96724426694c206
+Source checkpoint: f7d1d3085e2f3be73ff5e186e1f2786f96922aef
 Snapshot scope: Android application plus required shared build/test dependencies
 Maintained with each reviewed public commit. Paths are repository-relative.
 

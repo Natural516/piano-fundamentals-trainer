@@ -109,13 +109,14 @@ share that file.
 The permanent Release chain began at A4.0B with `versionCode=1` and
 `versionName=1.0`. The current source values are:
 
-- `versionCode=11`
-- `versionName=1.5.1`
+- `versionCode=12`
+- `versionName=1.5.2`
 
 Public `versionCode=9` remains occupied by `versionName=1.4.0`, and
 `versionCode=10` remains occupied by `versionName=1.5.0`; neither may be reused
-or replaced. The 1.5.1 migration release consumes `versionCode=11`; any later
-distributable Android build must use `versionCode > 11`. Do not increment
+or replaced. The 1.5.1 migration release consumes `versionCode=11`, and the
+1.5.2 Settings version-display patch consumes `versionCode=12`; any later
+distributable Android build must use `versionCode > 12`. Do not increment
 `android/version.properties` during ordinary development or validation; the
 version bump belongs to a future explicitly authorized release stage.
 

@@ -2,12 +2,18 @@
 
 This changelog records supported Android release facts established by repository acceptance records.
 
+## 1.5.2 — versionCode 12
+
+- Fixed the Settings "Current Version" row continuing to show an old hardcoded version.
+- Settings and Update now read the same installed package version metadata.
+- Refreshed the public project introduction and production-device screenshots.
+- Removed obsolete documentation about the deleted legacy release repository.
+
 ## 1.5.1 — versionCode 11
 
 - Migrated the production updater endpoint to this canonical source repository.
 - Unified public source, official Android Releases, APK downloads and updater metadata in one repository.
 - Added no new product module and preserved package identity, permanent signing identity, local data compatibility and updater verification rules.
-- Retained the legacy release repository only as a temporary compatibility bridge for clients released before 1.5.1.
 
 ## 1.5.0 — versionCode 10
 

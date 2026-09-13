@@ -1,16 +1,14 @@
 # 钢琴基本功训练器
 
-Piano Fundamentals Trainer 是一款面向横屏 Android 平板的钢琴基本功训练应用。它通过 Android 原生 Bluetooth MIDI 接收真实数码钢琴输入，并以五线谱、即时判定和本地练习记录支持识谱与和弦练习。
+Piano Fundamentals Trainer 是一款面向横屏 Android 平板的钢琴基本功训练应用。通过 Android 原生 Bluetooth MIDI 接收真实数码钢琴输入，目前提供识谱练习、和弦练习，以及和弦、音阶与调号、音程等乐理查询工具，并支持本地练习记录和安全的应用内更新。
 
-当前公开源码对应 Android `1.5.1`（`versionCode 11`）。Android 是当前支持的产品目标；仓库仅保留 Android 运行、构建、测试及必要共享核心所需的代码。
+当前公开源码对应 Android `1.5.2`（`versionCode 12`）。Android 是当前支持的产品目标；仓库仅保留 Android 运行、构建、测试及必要共享核心所需的代码。
 
 ## 下载
 
-本仓库统一维护公开源码、官方 Android Releases、APK 下载与应用内更新元数据：
+本仓库是唯一的官方仓库，统一维护公开源码、官方 Android Releases、APK 下载、`latest.json` 与应用内更新元数据：
 
 - [下载最新正式版本](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest)
-
-旧的 `Natural516/piano-trainer-releases` 仓库暂时仅作为 1.5.1 以前客户端的更新兼容桥接；新的正常版本不再发布到该仓库。
 
 只有由 Natural516 控制的正式签名身份签署、并通过官方更新验证链校验的 APK 才属于官方构建。
 
@@ -45,7 +43,7 @@ Piano Fundamentals Trainer 是一款面向横屏 Android 平板的钢琴基本�
 
 ## 当前范围
 
-Android `1.5.0` 当前完成并发布的训练模块是 Sight Reading 与 Chord Practice。Chord Query Text V1、Natural Major Scale & Key Signature V1 和 Interval Query V1 是只读工具。以下内容不是当前 Android 发布功能：
+Android `1.5.2` 当前完成并发布的训练模块是 Sight Reading 与 Chord Practice。Chord Query Text V1、Natural Major Scale & Key Signature V1 和 Interval Query V1 是只读工具。以下内容不是当前 Android 发布功能：
 
 - Scale Practice
 - Rhythm
