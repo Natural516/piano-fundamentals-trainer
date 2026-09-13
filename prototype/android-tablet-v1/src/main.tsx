@@ -1,4 +1,4 @@
-import { StrictMode, createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { StrictMode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
@@ -25,10 +25,87 @@ import {
 import { createAndroidUpdaterController } from './androidUpdater'
 import { UpdaterController, type UpdaterSnapshot, type UpdaterStatus } from './updaterCore'
 import { getSightReadingPrompt } from './sightReadingPresentation'
+import { ChordGrandStaff } from './ChordGrandStaff'
+import {
+  CHORD_MOCK_CASES,
+  CHORD_MOCK_STATES,
+  DEFAULT_CHORD_MOCK_CASE_ID,
+  getChordMockCase,
+  getChordMockState,
+  type ChordGroupVisualState,
+  type ChordWrittenPitch,
+  type ChordMockStateId
+} from './chordPracticeMocks'
+import { ChordPracticeRuntime, type ChordRuntimeSnapshot } from './chordPractice/runtime'
+import type { ChordPracticeMode } from './chordPractice/runtime'
+import {
+  CHORD_SEQUENTIAL_MAJOR_KEY_IDS,
+  formatWrittenPitchClass,
+  getChordSequentialKeyTonic,
+  type ChordPracticeQuestion,
+  type ChordQuestionCount,
+  type ChordSequentialMajorKeyId
+} from './musicTheory/chords'
+import {
+  ChordSettingsRepository,
+  DEFAULT_CHORD_SETTINGS,
+  type ChordSettings
+} from './chordPractice/settings'
+import { CapacitorPreferencesBackend } from './androidPersistence'
+import { ActivePracticeSessionHost } from './activePracticeSession'
+import {
+  ChordReportPersistenceCoordinator,
+  ChordReportRepository,
+  type ChordPersistenceSnapshot
+} from './chordPractice/persistence'
+import { projectChordHistory } from './chordPractice/historyProjection'
+import { projectMixedPracticeHistory, type MixedPracticeHistoryItem } from './mixedHistoryProjection'
+import {
+  projectChordReportDetail,
+  resolveChordReportById
+} from './chordPractice/reportDetailProjection'
+import {
+  AVAILABLE_SCALE_TYPE_OPTIONS,
+  NATURAL_MAJOR_TOOL_ROOT_IDS,
+  formatScaleToolNoteName,
+  getNaturalMajorToolResult,
+  type ScaleTypeId
+} from './scaleKeySignatureTool'
+import {
+  CHORD_QUERY_INPUT_ACCIDENTALS,
+  CHORD_QUERY_NOTE_LETTERS,
+  CHORD_QUERY_TYPE_GROUPS,
+  getChordQueryResult,
+  type ChordQueryInputAccidental,
+  type ChordQueryNoteLetter,
+  type ChordQueryTypeId
+} from './chordQueryTool'
+import {
+  INTERVAL_QUERY_LETTERS,
+  INTERVAL_QUERY_OCTAVES,
+  INTERVAL_QUERY_VISIBLE_ACCIDENTALS,
+  formatIntervalAccidental,
+  getIntervalQueryResult,
+  type IntervalQueryLetter,
+  type IntervalQueryOctave,
+  type IntervalQueryVisibleAccidental,
+  type IntervalQueryWrittenPitch
+} from './intervalQueryTool'
+import {
+  createPracticeKeepAwakeController,
+  shouldKeepPracticeAwake
+} from './practiceKeepAwake'
 import './styles.css'
+
+declare const __QA_BUILD__: boolean
 
 type ScreenId =
   | 'home'
+  | 'practice'
+  | 'tools'
+  | 'chord-query-tool'
+  | 'scale-key-signature-tool'
+  | 'interval-query-tool'
   | 'sight-ready'
   | 'sight-active'
   | 'sight-correct'
@@ -36,6 +113,9 @@ type ScreenId =
   | 'sight-timeout'
   | 'sight-early-end'
   | 'sight-result'
+  | 'chord-mode-select'
+  | 'chord-practice'
+  | 'chord-report-detail'
   | 'history'
   | 'settings'
   | 'midi'
@@ -48,11 +128,13 @@ type IconName =
   | 'chart'
   | 'check'
   | 'chevron'
+  | 'chevron-down'
   | 'clock'
   | 'close'
   | 'history'
   | 'home'
   | 'info'
+  | 'grid'
   | 'moon'
   | 'pause'
   | 'play'
@@ -60,6 +142,7 @@ type IconName =
   | 'settings'
   | 'stop'
   | 'sun'
+  | 'tools'
 
 interface ScreenOption {
   id: ScreenId
@@ -82,6 +165,11 @@ interface ViewportMetrics {
 
 const screens: ScreenOption[] = [
   { id: 'home', label: '首页', shortLabel: '首页' },
+  { id: 'practice', label: '练习', shortLabel: '练习' },
+  { id: 'tools', label: '乐理工具', shortLabel: '工具' },
+  { id: 'chord-query-tool', label: '和弦查询', shortLabel: '和弦查询' },
+  { id: 'scale-key-signature-tool', label: '音阶与调号', shortLabel: '音阶与调号' },
+  { id: 'interval-query-tool', label: '音程查询', shortLabel: '音程查询' },
   { id: 'sight-ready', label: '识谱 · 准备', shortLabel: 'READY' },
   { id: 'sight-active', label: '识谱 · 进行中', shortLabel: 'ACTIVE' },
   { id: 'sight-correct', label: '识谱 · 正确反馈', shortLabel: 'CORRECT' },
@@ -89,6 +177,9 @@ const screens: ScreenOption[] = [
   { id: 'sight-timeout', label: '识谱 · 超时反馈', shortLabel: 'TIMEOUT' },
   { id: 'sight-early-end', label: '识谱 · 提前结束确认', shortLabel: 'EARLY END' },
   { id: 'sight-result', label: '识谱 · 结果', shortLabel: 'RESULT' },
+  { id: 'chord-mode-select', label: '和弦 · 方式选择', shortLabel: 'CHORD MODE' },
+  { id: 'chord-practice', label: '和弦 · 静态练习', shortLabel: 'CHORD V1' },
+  { id: 'chord-report-detail', label: '和弦 · 练习报告', shortLabel: 'CHORD REPORT' },
   { id: 'history', label: '练习记录', shortLabel: '记录' },
   { id: 'settings', label: '设置', shortLabel: '设置' },
   { id: 'midi', label: 'MIDI 连接状态', shortLabel: 'MIDI' },
@@ -97,12 +188,19 @@ const screens: ScreenOption[] = [
 
 const productNavigation = [
   { id: 'home' as const, label: '首页', icon: 'home' as const },
-  { id: 'sight-ready' as const, label: '识谱', icon: 'book' as const },
+  { id: 'practice' as const, label: '练习', icon: 'book' as const },
+  { id: 'tools' as const, label: '工具', icon: 'tools' as const },
   { id: 'history' as const, label: '记录', icon: 'history' as const },
   { id: 'settings' as const, label: '设置', icon: 'settings' as const }
 ]
 
-const SHOW_DEVELOPMENT_TOOLS = import.meta.env.DEV || import.meta.env.MODE === 'android-debug'
+const SHOW_DEVELOPMENT_TOOLS = import.meta.env.DEV || import.meta.env.MODE === 'android-debug' || __QA_BUILD__
+
+type ChordPreviewStateId = 'live' | ChordMockStateId
+
+function formatChordKeyName(keyId: ChordSequentialMajorKeyId): string {
+  return `${formatWrittenPitchClass(getChordSequentialKeyTonic(keyId))} 大调`
+}
 
 type SightRuntimeSnapshot = AndroidSightReadingRuntime['snapshot']
 
@@ -119,6 +217,13 @@ interface UpdaterUiContextValue {
 
 const UpdaterUiContext = createContext<UpdaterUiContextValue | null>(null)
 
+interface AppNavigationContextValue {
+  openAuxiliary: (screen: 'midi' | 'update') => void
+  returnFromAuxiliary: (fallback: ScreenId) => void
+}
+
+const AppNavigationContext = createContext<AppNavigationContextValue | null>(null)
+
 function useMidiUi(): MidiUiContextValue {
   const value = useContext(MidiUiContext)
   if (!value) throw new Error('MIDI UI must be rendered inside MidiUiContext')
@@ -128,6 +233,12 @@ function useMidiUi(): MidiUiContextValue {
 function useUpdaterUi(): UpdaterUiContextValue {
   const value = useContext(UpdaterUiContext)
   if (!value) throw new Error('Updater UI must be rendered inside UpdaterUiContext')
+  return value
+}
+
+function useAppNavigation(): AppNavigationContextValue {
+  const value = useContext(AppNavigationContext)
+  if (!value) throw new Error('App navigation must be rendered inside AppNavigationContext')
   return value
 }
 
@@ -174,6 +285,18 @@ function useSightReadingRuntime(runtime: AndroidSightReadingRuntime): SightRunti
   const [, render] = useState(0)
   useEffect(() => runtime.subscribe(() => render((version) => version + 1)), [runtime])
   return runtime.snapshot
+}
+
+function useChordPracticeRuntime(runtime: ChordPracticeRuntime): ChordRuntimeSnapshot {
+  const [snapshot, setSnapshot] = useState<ChordRuntimeSnapshot>(() => runtime.snapshot)
+  useEffect(() => runtime.subscribe(() => setSnapshot(runtime.snapshot)), [runtime])
+  return snapshot
+}
+
+function useChordPersistence(coordinator: ChordReportPersistenceCoordinator): ChordPersistenceSnapshot {
+  const [snapshot, setSnapshot] = useState<ChordPersistenceSnapshot>(() => coordinator.snapshot)
+  useEffect(() => coordinator.subscribe(() => setSnapshot(coordinator.snapshot)), [coordinator])
+  return snapshot
 }
 
 function getPracticeScreen(runtime: AndroidSightReadingRuntime): ScreenId {
@@ -224,6 +347,8 @@ function Icon({ name, size = 24 }: { name: IconName; size?: number }): JSX.Eleme
         return <><path {...common} d="M19.4 8.2A8 8 0 1 0 20 14" /><path {...common} d="M19.5 3.8v4.7h-4.7" /></>
       case 'chevron':
         return <path {...common} d="m9 5 7 7-7 7" />
+      case 'chevron-down':
+        return <path {...common} d="m5 9 7 7 7-7" />
       case 'sun':
         return <><circle {...common} cx="12" cy="12" r="4" /><path {...common} d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>
       case 'moon':
@@ -234,6 +359,10 @@ function Icon({ name, size = 24 }: { name: IconName; size?: number }): JSX.Eleme
         return <><path {...common} d="M5 20V9M12 20V4M19 20v-7" /><path {...common} d="M3 20h18" /></>
       case 'info':
         return <><circle {...common} cx="12" cy="12" r="9" /><path {...common} d="M12 10.8V17M12 7.2h.01" /></>
+      case 'grid':
+        return <><rect {...common} x="4" y="4" width="6" height="6" rx="1.2" /><rect {...common} x="14" y="4" width="6" height="6" rx="1.2" /><rect {...common} x="4" y="14" width="6" height="6" rx="1.2" /><rect {...common} x="14" y="14" width="6" height="6" rx="1.2" /></>
+      case 'tools':
+        return <><path {...common} d="M14.6 6.2a4 4 0 0 0-5.2 5.2L4 16.8 7.2 20l5.4-5.4a4 4 0 0 0 5.2-5.2l-2.5 2.5-3.2-3.2z" /><path {...common} d="m5.5 18.5 1-1" /></>
     }
   })()
 
@@ -246,6 +375,7 @@ function navigate(screen: ScreenId): void {
 
 function readScreen(): ScreenId {
   const value = window.location.hash.replace(/^#\/?/, '') as ScreenId
+  if (__QA_BUILD__ && value === 'update') return 'settings'
   return screens.some((screen) => screen.id === value) ? value : 'home'
 }
 
@@ -306,19 +436,32 @@ function useViewportMetrics(): ViewportMetrics | null {
   return metrics
 }
 
-function MidiStatusButton({ compact = false }: { compact?: boolean }): JSX.Element {
+function MidiStatusButton({ compact = false, interactive = true }: { compact?: boolean; interactive?: boolean }): JSX.Element {
   const { runtime } = useMidiUi()
+  const { openAuxiliary } = useAppNavigation()
   const status = presentMidiStatus(runtime)
-  return (
-    <button className={`midi-status is-${status.tone} ${compact ? 'is-compact' : ''}`} type="button" onClick={() => navigate('midi')}>
+  const content = (
+    <>
       <span className="midi-status__signal"><Icon name="bluetooth" size={18} /></span>
       {!compact ? <span><strong>{status.label}</strong><small>{status.detail}</small></span> : null}
-      <i aria-label={status.label} />
+      <i aria-hidden="true" />
+    </>
+  )
+  if (!interactive) {
+    return (
+      <div aria-label={status.label} className={`midi-status is-${status.tone} is-display-only ${compact ? 'is-compact' : ''}`} role="status">
+        {content}
+      </div>
+    )
+  }
+  return (
+    <button className={`midi-status is-${status.tone} ${compact ? 'is-compact' : ''}`} type="button" onClick={() => openAuxiliary('midi')}>
+      {content}
     </button>
   )
 }
 
-function ProductHeader({ title, onBack }: { title: string; onBack?: () => void }): JSX.Element {
+function ProductHeader({ midiStatusInteractive = true, title, onBack }: { midiStatusInteractive?: boolean; title: string; onBack?: () => void }): JSX.Element {
   return (
     <header className="product-header">
       <div className="product-header__left">
@@ -334,16 +477,18 @@ function ProductHeader({ title, onBack }: { title: string; onBack?: () => void }
           <strong>{title}</strong>
         </div>
       </div>
-      <MidiStatusButton />
+      <MidiStatusButton interactive={midiStatusInteractive} />
     </header>
   )
 }
 
-function BottomNavigation({ active }: { active: 'home' | 'sight' | 'history' | 'settings' }): JSX.Element {
+type ProductNavigationId = 'home' | 'practice' | 'tools' | 'history' | 'settings'
+
+function BottomNavigation({ active }: { active: ProductNavigationId }): JSX.Element {
   return (
     <nav className="bottom-navigation" aria-label="主要导航">
       {productNavigation.map((item) => {
-        const itemActive = item.id.startsWith('sight') ? active === 'sight' : item.id === active
+        const itemActive = item.id === active
         return (
           <button className={itemActive ? 'is-active' : ''} key={item.id} type="button" onClick={() => navigate(item.id)}>
             <Icon name={item.icon} />
@@ -358,15 +503,17 @@ function BottomNavigation({ active }: { active: 'home' | 'sight' | 'history' | '
 function ProductFrame({
   active,
   children,
+  onBack,
   title
 }: {
-  active: 'home' | 'sight' | 'history' | 'settings'
+  active: ProductNavigationId
   children: ReactNode
+  onBack?: () => void
   title: string
 }): JSX.Element {
   return (
     <div className="product-frame">
-      <ProductHeader title={title} />
+      <ProductHeader onBack={onBack} title={title} />
       <main className="product-content">{children}</main>
       <BottomNavigation active={active} />
     </div>
@@ -410,10 +557,33 @@ function NotationPaper({
   )
 }
 
-function HomeScreen({ settings }: { settings: SightReadingSettings }): JSX.Element {
+function HomeScreen({
+  chordHistory,
+  chordPersistence,
+  settings
+}: {
+  chordHistory: ChordPersistenceSnapshot
+  chordPersistence: ChordReportPersistenceCoordinator
+  settings: SightReadingSettings
+}): JSX.Element {
   const { runtime } = useMidiUi()
+  const { openAuxiliary } = useAppNavigation()
   const midiStatus = presentMidiStatus(runtime)
   const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
+  const history = runtime.historySnapshot
+  const recentPractice = projectMixedPracticeHistory(history.records, chordHistory.records)[0] ?? null
+  useEffect(() => {
+    void runtime.refreshHistory()
+    void chordPersistence.refresh()
+  }, [chordPersistence, runtime])
+  const recentPracticeTitle = recentPractice?.module === 'chord'
+    ? `${formatHistoryPercentage(recentPractice.firstPassCompletionRate)}% 完成率`
+    : recentPractice ? `${formatHistoryPercentage(recentPractice.accuracy)}% 正确率` : '暂无练习记录'
+  const recentPracticeDetail = recentPractice?.module === 'chord'
+    ? `${formatHistoryTimestamp(recentPractice.endedAt)} · ${recentPractice.modeSummary} · 完成 ${recentPractice.completedQuestions}${recentPractice.plannedQuestionCount === null ? '' : `/${recentPractice.plannedQuestionCount}`}`
+    : recentPractice
+      ? `${formatHistoryTimestamp(recentPractice.endedAt)} · 识谱 · 完成 ${recentPractice.completed}/${recentPractice.plannedQuestionCount}`
+      : '完成一次练习后，这里会显示最近结果。'
   return (
     <ProductFrame active="home" title="今天，读几页新音符">
       <section className="home-hero">
@@ -421,10 +591,16 @@ function HomeScreen({ settings }: { settings: SightReadingSettings }): JSX.Eleme
           <span className="eyebrow">今日练习</span>
           <h1>让眼睛先认出，<br />再让手指弹出来。</h1>
           <p>{STAFF_MODE_LABELS[settings.staffMode]} · {settings.questionCount} 题 · 每题固定 {answerTimeLimitSeconds} 秒</p>
-          <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>
-            <Icon name="play" />
-            开始识谱练习
-          </button>
+          <div className="home-practice-actions">
+            <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>
+              <Icon name="play" />
+              开始识谱练习
+            </button>
+            <button className="secondary-action" type="button" onClick={() => navigate('chord-mode-select')}>
+              <Icon name="book" />
+              和弦练习
+            </button>
+          </div>
         </div>
         <div className="home-hero__notation" aria-hidden="true">
           <span className="floating-note note-one">♪</span>
@@ -441,17 +617,21 @@ function HomeScreen({ settings }: { settings: SightReadingSettings }): JSX.Eleme
       <section className="home-glance" aria-label="今日概览">
         <button className="glance-item" type="button" onClick={() => navigate('history')}>
           <span className="glance-icon"><Icon name="chart" /></span>
-          <span><small>上次练习</small><strong>85% 正确率</strong><em>今天 09:42 · 20 题</em></span>
+          <span>
+            <small>上次练习</small>
+            <strong>{history.status === 'loading' || chordHistory.status === 'loading' ? '正在读取记录' : recentPracticeTitle}</strong>
+            <em>{recentPracticeDetail}</em>
+          </span>
           <Icon name="chevron" size={20} />
         </button>
-        <button className="glance-item" type="button" onClick={() => navigate('midi')}>
+        <button className="glance-item" type="button" onClick={() => openAuxiliary('midi')}>
           <span className="glance-icon is-blue"><Icon name="bluetooth" /></span>
           <span><small>MIDI 输入</small><strong>{midiStatus.label}</strong><em>{midiStatus.detail}</em></span>
           <span className={`status-dot is-${midiStatus.tone}`} />
         </button>
-        <button className="glance-item" type="button" onClick={() => navigate('update')}>
-          <span className="glance-icon is-amber"><Icon name="refresh" /></span>
-          <span><small>应用版本</small><strong>Android V1 Prototype</strong><em>已是最新版本</em></span>
+        <button className="glance-item" type="button" onClick={() => navigate('tools')}>
+          <span className="glance-icon is-amber"><Icon name="tools" /></span>
+          <span><small>乐理工具</small><strong>基础知识查询</strong><em>和弦、音阶、音程与调号</em></span>
           <Icon name="chevron" size={20} />
         </button>
       </section>
@@ -459,23 +639,1024 @@ function HomeScreen({ settings }: { settings: SightReadingSettings }): JSX.Eleme
   )
 }
 
+function PracticeHubScreen(): JSX.Element {
+  return (
+    <ProductFrame active="practice" title="练习">
+      <section className="hub-layout" aria-labelledby="practice-hub-title">
+        <div className="hub-heading">
+          <span className="eyebrow">PRACTICE</span>
+          <h1 id="practice-hub-title">选择今天的练习</h1>
+          <p>从识谱或和弦开始；后续训练模块将在这里自然扩展。</p>
+        </div>
+        <div className="practice-module-grid">
+          <button className="module-card" type="button" onClick={() => navigate('sight-ready')}>
+            <span className="module-card__icon"><Icon name="book" size={30} /></span>
+            <span className="module-card__copy">
+              <small>实时 MIDI 判定</small>
+              <strong>识谱练习</strong>
+              <em>单音 / 双音 · 高音 / 低音 / 大谱表</em>
+            </span>
+            <Icon name="chevron" />
+          </button>
+          <button className="module-card" type="button" onClick={() => navigate('chord-mode-select')}>
+            <span className="module-card__icon is-amber"><Icon name="grid" size={30} /></span>
+            <span className="module-card__copy">
+              <small>和弦与转位</small>
+              <strong>和弦练习</strong>
+              <em>三和弦 / 七和弦 · 原位与转位 · 柱式 + 分解</em>
+            </span>
+            <Icon name="chevron" />
+          </button>
+        </div>
+      </section>
+    </ProductFrame>
+  )
+}
+
+function ChordModeSelectScreen({ onSelectMode, settingsReady }: { onSelectMode: (mode: ChordPracticeMode) => void; settingsReady: boolean }): JSX.Element {
+  const [helpOpen, setHelpOpen] = useState(false)
+  return (
+    <ProductFrame active="practice" onBack={() => navigate('practice')} title="和弦练习">
+      <section className="hub-layout chord-mode-layout" aria-labelledby="chord-mode-title">
+        <div className="hub-heading chord-mode-heading">
+          <div>
+            <span className="eyebrow">CHORD PRACTICE</span>
+            <h1 id="chord-mode-title">选择和弦练习方式</h1>
+            <p>根据你的目标，选择更适合的练习模式。</p>
+          </div>
+          <button aria-label="查看和弦练习方式说明" className="chord-help-button" type="button" onClick={() => setHelpOpen(true)}>?</button>
+        </div>
+        <div className="practice-module-grid chord-mode-grid">
+          <button className="module-card chord-mode-card" disabled={!settingsReady} type="button" onClick={() => onSelectMode('sequential')}>
+            <span className="module-card__icon"><Icon name="book" size={30} /></span>
+            <span className="module-card__copy">
+              <small><b>推荐</b> 学习模式</small>
+              <strong>循序练习</strong>
+              <em>围绕单一大调，逐步扩展练习内容</em>
+              <i>适合记忆和弦构成、转位与调内和弦关系</i>
+              <span>三和弦 → 七和弦 → 转位</span>
+            </span>
+            <Icon name="chevron" />
+          </button>
+          <button className="module-card chord-mode-card" disabled={!settingsReady} type="button" onClick={() => onSelectMode('comprehensive')}>
+            <span className="module-card__icon is-amber"><Icon name="grid" size={30} /></span>
+            <span className="module-card__copy">
+              <small>综合复习</small>
+              <strong>综合随机</strong>
+              <em>从完整和弦范围中综合随机出题</em>
+              <i>适合复习、巩固与检验整体反应能力</i>
+              <span>根音 · 和弦类型 · 转位综合混合</span>
+            </span>
+            <Icon name="chevron" />
+          </button>
+        </div>
+      </section>
+      {helpOpen ? (
+        <div className="chord-mode-help-backdrop" onClick={() => setHelpOpen(false)}>
+          <section aria-labelledby="chord-mode-help-title" aria-modal="true" className="chord-mode-help" role="dialog" onClick={(event) => event.stopPropagation()}>
+            <header><h2 id="chord-mode-help-title">练习方式说明</h2><button aria-label="关闭练习方式说明" className="icon-button subtle" type="button" onClick={() => setHelpOpen(false)}><Icon name="close" /></button></header>
+            <div className="chord-mode-help__content">
+              <article>
+                <h3>循序练习</h3>
+                <p>每次练习只围绕一个大调的 7 个调内和弦出题。当前调由你选择，练习过程中不会自动切换到其他调。</p>
+                <dl>
+                  <div><dt>10 / 20 题</dt><dd>仅练习调内三和弦原位</dd></div>
+                  <div><dt>50 题</dt><dd>加入调内七和弦原位</dd></div>
+                  <div><dt>100 题</dt><dd>进一步加入三和弦转位</dd></div>
+                  <div><dt>无限</dt><dd>加入三和弦与七和弦的全部转位，并持续围绕当前调练习，直到手动结束</dd></div>
+                </dl>
+                <p>题目采用均衡题袋方式安排，尽量让当前范围内的和弦获得均匀练习机会。</p>
+              </article>
+              <article>
+                <h3>综合随机</h3>
+                <p>从完整和弦范围中综合随机出题，覆盖不同根音、和弦类型与转位。</p>
+                <p>它不会限制在单一大调内，适合已经熟悉基础内容后进行综合复习与反应训练。</p>
+              </article>
+            </div>
+            <button className="primary-action" type="button" onClick={() => setHelpOpen(false)}>知道了</button>
+          </section>
+        </div>
+      ) : null}
+    </ProductFrame>
+  )
+}
+
+const THEORY_TOOLS = [
+  { title: '和弦查询', detail: '查看规范和弦名称与完整理论构成音', screen: 'chord-query-tool' },
+  { title: '音阶与调号', detail: '查看自然大调音阶与五线谱调号', screen: 'scale-key-signature-tool' },
+  { title: '音程查询', detail: '识别两个音之间的音程', screen: 'interval-query-tool' }
+] as const
+
+function ToolsHubScreen(): JSX.Element {
+  return (
+    <ProductFrame active="tools" title="工具">
+      <section className="hub-layout tools-hub" aria-labelledby="tools-hub-title">
+        <div className="hub-heading">
+          <span className="eyebrow">THEORY REFERENCE</span>
+          <h1 id="tools-hub-title">乐理基础知识查询</h1>
+          <p>快速查询常用和弦、音阶、音程与调号基础信息。</p>
+        </div>
+        <div className="tool-card-grid">
+          {THEORY_TOOLS.map((tool) => (
+            <button className="tool-card is-interactive" key={tool.title} type="button" onClick={() => navigate(tool.screen)}>
+              <span className="tool-card__icon"><Icon name="tools" size={27} /></span>
+              <span><strong>{tool.title}</strong><small>{tool.detail}</small></span>
+              <em>打开 <Icon name="chevron" size={15} /></em>
+            </button>
+          ))}
+        </div>
+      </section>
+    </ProductFrame>
+  )
+}
+
+function ScaleNoteToken({ value }: { value: string }): JSX.Element {
+  const letter = value.slice(0, 1)
+  const accidental = value.slice(1)
+  return (
+    <span className="scale-note-token">
+      <span>{letter}</span>
+      {accidental ? <span className="scale-note-token__accidental">{accidental}</span> : null}
+    </span>
+  )
+}
+
+type ChordAccidentalGlyphName = 'natural' | 'flat' | 'sharp' | 'double-flat' | 'double-sharp'
+
+function parseChordAccidentalGroup(value: string): ChordAccidentalGlyphName[] {
+  const glyphs: ChordAccidentalGlyphName[] = []
+  for (const symbol of Array.from(value)) {
+    if (symbol === '♮') glyphs.push('natural')
+    if (symbol === '♭') glyphs.push('flat')
+    if (symbol === '♯') glyphs.push('sharp')
+    if (symbol === '𝄫') glyphs.push('double-flat')
+    if (symbol === '𝄪') glyphs.push('double-sharp')
+  }
+  return glyphs
+}
+
+function ChordAccidentalGlyph({ name }: { name: ChordAccidentalGlyphName }): JSX.Element {
+  if (name === 'flat') {
+    return (
+      <svg className="chord-accidental-glyph" data-accidental="flat" viewBox="0 0 12 28">
+        <path d="M3.1 1.5v22.7c1.9-5.9 7.2-7.2 7.2-3.3 0 3-3 5.2-7.2 6" />
+      </svg>
+    )
+  }
+  if (name === 'sharp') {
+    return (
+      <svg className="chord-accidental-glyph" data-accidental="sharp" viewBox="0 0 15 28">
+        <path d="M5.1 2.2v23.6M10.2.9v23.6M1.5 10.1l12-2.4M1.5 19.1l12-2.4" />
+      </svg>
+    )
+  }
+  if (name === 'natural') {
+    return (
+      <svg className="chord-accidental-glyph" data-accidental="natural" viewBox="0 0 14 28">
+        <path d="M3.5 2.1v20.7M10.5 5.2v20.7M3.5 11l7-2.4M3.5 19.5l7-2.4" />
+      </svg>
+    )
+  }
+  if (name === 'double-flat') {
+    return (
+      <svg className="chord-accidental-glyph" data-accidental="double-flat" viewBox="0 0 21 28">
+        <path d="M3 1.5v22.7c1.9-5.9 7.1-7.2 7.1-3.3 0 3-3 5.2-7.1 6M11.2 1.5v22.7c1.9-5.9 7.1-7.2 7.1-3.3 0 3-3 5.2-7.1 6" />
+      </svg>
+    )
+  }
+  return (
+    <svg className="chord-accidental-glyph" data-accidental="double-sharp" viewBox="0 0 18 20">
+      <path className="chord-accidental-glyph__fill" d="M1.7 2.4h4L9 6.2l3.3-3.8h4v4L12.4 10l3.9 3.6v4h-4L9 13.8l-3.3 3.8h-4v-4L5.6 10 1.7 6.4z" />
+    </svg>
+  )
+}
+
+function ChordAccidentalGroup({ value, className = '' }: { value: string; className?: string }): JSX.Element | null {
+  const glyphs = parseChordAccidentalGroup(value)
+  if (glyphs.length === 0) return null
+  return (
+    <span aria-hidden="true" className={`chord-accidental-group ${className}`.trim()} data-accidental-group={value}>
+      {glyphs.map((name, index) => <ChordAccidentalGlyph key={`${name}-${index}`} name={name} />)}
+    </span>
+  )
+}
+
+function ChordSymbol({ letter, accidental, suffix, label }: { letter: string; accidental: string; suffix: string; label: string }): JSX.Element {
+  return (
+    <span aria-label={label} className="chord-symbol" role="text">
+      <span aria-hidden="true" className="chord-symbol__letter">{letter}</span>
+      <ChordAccidentalGroup className="chord-symbol__accidental" value={accidental} />
+      {suffix ? <span aria-hidden="true" className="chord-symbol__suffix">{suffix}</span> : null}
+    </span>
+  )
+}
+
+function ChordTheoreticalNoteToken({ letter, accidental, label }: { letter: string; accidental: string; label: string }): JSX.Element {
+  return (
+    <span aria-label={label} className="chord-theoretical-note-token" role="text">
+      <span aria-hidden="true" className="chord-theoretical-note-token__letter">{letter}</span>
+      <ChordAccidentalGroup className="chord-theoretical-note-token__accidental" value={accidental} />
+    </span>
+  )
+}
+
+function ChordQueryToolScreen(): JSX.Element {
+  const [noteLetter, setNoteLetter] = useState<ChordQueryNoteLetter>('C')
+  const [accidental, setAccidental] = useState<ChordQueryInputAccidental>(0)
+  const [chordType, setChordType] = useState<ChordQueryTypeId>('major')
+  const root = useMemo(() => ({ letter: noteLetter, accidental }), [noteLetter, accidental])
+  const result = useMemo(() => getChordQueryResult(root, chordType), [root, chordType])
+
+  return (
+    <ProductFrame active="tools" onBack={() => navigate('tools')} title="和弦查询">
+      <section className="chord-query-layout" aria-labelledby="chord-query-title">
+        <header className="chord-query-header">
+          <div>
+            <span className="eyebrow">CHORD REFERENCE</span>
+            <h1 id="chord-query-title">和弦查询</h1>
+            <p>选择根音和和弦类型，查看规范名称与完整理论构成音。</p>
+          </div>
+          <div className="chord-query-selectors" aria-label="和弦查询条件">
+            <label>
+              <span>音名</span>
+              <span className="setting-select-wrap">
+                <select className="setting-select" value={noteLetter} onChange={(event) => setNoteLetter(event.target.value as ChordQueryNoteLetter)}>
+                  {CHORD_QUERY_NOTE_LETTERS.map((letter) => <option key={letter} value={letter}>{letter}</option>)}
+                </select>
+                <Icon name="chevron-down" size={17} />
+              </span>
+            </label>
+            <label>
+              <span>变音记号</span>
+              <span className="setting-select-wrap">
+                <select className="setting-select" value={accidental} onChange={(event) => setAccidental(Number(event.target.value) as ChordQueryInputAccidental)}>
+                  {CHORD_QUERY_INPUT_ACCIDENTALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+                <Icon name="chevron-down" size={17} />
+              </span>
+            </label>
+            <label>
+              <span>和弦类型</span>
+              <span className="setting-select-wrap">
+                <select className="setting-select" value={chordType} onChange={(event) => setChordType(event.target.value as ChordQueryTypeId)}>
+                  {CHORD_QUERY_TYPE_GROUPS.map((group) => (
+                    <optgroup key={group.id} label={group.label}>
+                      {group.types.map((option) => <option key={option.id} value={option.id}>{option.selectorLabel}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+                <Icon name="chevron-down" size={17} />
+              </span>
+            </label>
+          </div>
+        </header>
+
+        <article className="chord-query-card chord-query-answer" aria-label={`${result.symbol} 查询结果`}>
+          <div className="chord-query-identity">
+            <span className="eyebrow">CHORD SYMBOL</span>
+            <h2>
+              <ChordSymbol
+                accidental={result.rootLabel.slice(1)}
+                label={result.symbol}
+                letter={result.root.letter}
+                suffix={result.type.suffix}
+              />
+            </h2>
+            <p>
+              <ChordTheoreticalNoteToken accidental={result.rootLabel.slice(1)} label={result.rootLabel} letter={result.root.letter} />
+              <span>{result.type.chineseName}</span>
+            </p>
+          </div>
+          <div className="chord-query-composition">
+            <span className="eyebrow">理论构成音</span>
+            <p aria-label={`${result.chineseLabel}理论构成音`}>
+              {result.pitches.map((pitch, index) => (
+                <span className="chord-query-note-item" key={`${pitch.label}-${pitch.degree}`}>
+                  {index > 0 ? <span aria-hidden="true" className="chord-query-note-separator">·</span> : null}
+                  <ChordTheoreticalNoteToken accidental={pitch.accidental} label={pitch.label} letter={pitch.letter} />
+                </span>
+              ))}
+            </p>
+          </div>
+        </article>
+      </section>
+    </ProductFrame>
+  )
+}
+
+function ScaleKeySignatureToolScreen(): JSX.Element {
+  const [root, setRoot] = useState<MajorKeyId>('C')
+  const [scaleType, setScaleType] = useState<ScaleTypeId>('naturalMajor')
+  const result = useMemo(() => getNaturalMajorToolResult(root), [root])
+
+  return (
+    <ProductFrame active="tools" onBack={() => navigate('tools')} title="音阶与调号">
+      <section className="scale-tool-layout" aria-labelledby="scale-tool-title">
+        <header className="scale-tool-query">
+          <div>
+            <span className="eyebrow">SCALE REFERENCE</span>
+            <h1 id="scale-tool-title">音阶与调号</h1>
+            <p>选择主音，查看自然大调的规范音名与五线谱调号。</p>
+          </div>
+          <div className="scale-tool-selectors" aria-label="音阶查询条件">
+            <label>
+              <span>主音</span>
+              <span className="setting-select-wrap">
+                <select className="setting-select" value={root} onChange={(event) => setRoot(event.target.value as MajorKeyId)}>
+                  {NATURAL_MAJOR_TOOL_ROOT_IDS.map((keyId) => (
+                    <option key={keyId} value={keyId}>{formatScaleToolNoteName(keyId)}</option>
+                  ))}
+                </select>
+                <Icon name="chevron-down" size={17} />
+              </span>
+            </label>
+            <label>
+              <span>音阶类型</span>
+              <span className="setting-select-wrap">
+                <select className="setting-select" value={scaleType} onChange={(event) => setScaleType(event.target.value as ScaleTypeId)}>
+                  {AVAILABLE_SCALE_TYPE_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
+                  ))}
+                </select>
+                <Icon name="chevron-down" size={17} />
+              </span>
+            </label>
+          </div>
+        </header>
+
+        <div className="scale-tool-results">
+          <article className="scale-tool-card scale-tool-scale-card">
+            <div className="scale-tool-scale-content">
+              <h2><ScaleNoteToken value={result.tonicLabel} /> <span>自然大调</span></h2>
+              <span className="eyebrow scale-tool-section-label">音阶构成</span>
+              <p className="scale-tool-note-sequence" aria-label={`${result.title}音阶构成`}>
+                {result.notes.ascending.map((note, index) => (
+                  <span className="scale-tool-sequence-item" key={`${note}-${index}`}>
+                    {index > 0 ? <span aria-hidden="true" className="scale-tool-note-separator">·</span> : null}
+                    <ScaleNoteToken value={note} />
+                  </span>
+                ))}
+              </p>
+            </div>
+            <div className="scale-tool-relative-section">
+              <span className="eyebrow scale-tool-section-label">关系调</span>
+              <small>相对小调</small>
+              <strong><ScaleNoteToken value={result.relativeMinorTonicLabel} /> <span>小调</span></strong>
+            </div>
+          </article>
+
+          <article className="scale-tool-card scale-tool-signature-card">
+            <div className="scale-tool-card-heading">
+              <span className="eyebrow">KEY SIGNATURE</span>
+              <h2>调号</h2>
+            </div>
+            <div className="scale-key-signature-paper">
+              <MusicStaffRenderer
+                ariaLabel={`${result.title}调号大谱表`}
+                feedback={null}
+                keySignature={result.keySignatureId}
+                notes={[]}
+                staffMode="grand"
+              />
+            </div>
+          </article>
+        </div>
+      </section>
+    </ProductFrame>
+  )
+}
+
+function IntervalPitchToken({ pitch }: { pitch: IntervalQueryWrittenPitch }): JSX.Element {
+  const accidental = formatIntervalAccidental(pitch.accidental)
+  const label = `${pitch.letter}${accidental}${pitch.octave}`
+  return (
+    <span aria-label={label} className="interval-query-pitch-token" role="text">
+      <span aria-hidden="true" className="interval-query-pitch-token__letter">{pitch.letter}</span>
+      <ChordAccidentalGroup className="interval-query-pitch-token__accidental" value={accidental} />
+      <span aria-hidden="true" className="interval-query-pitch-token__octave">{pitch.octave}</span>
+    </span>
+  )
+}
+
+function IntervalPitchSelector({
+  label,
+  pitch,
+  onLetterChange,
+  onAccidentalChange,
+  onOctaveChange
+}: {
+  label: string
+  pitch: IntervalQueryWrittenPitch
+  onLetterChange: (value: IntervalQueryLetter) => void
+  onAccidentalChange: (value: IntervalQueryVisibleAccidental) => void
+  onOctaveChange: (value: IntervalQueryOctave) => void
+}): JSX.Element {
+  return (
+    <fieldset className="interval-query-selector-group">
+      <legend>{label}</legend>
+      <label>
+        <span>音名</span>
+        <span className="setting-select-wrap">
+          <select className="setting-select" value={pitch.letter} onChange={(event) => onLetterChange(event.target.value as IntervalQueryLetter)}>
+            {INTERVAL_QUERY_LETTERS.map((letter) => <option key={letter} value={letter}>{letter}</option>)}
+          </select>
+          <Icon name="chevron-down" size={17} />
+        </span>
+      </label>
+      <label>
+        <span>变音记号</span>
+        <span className="setting-select-wrap">
+          <select aria-label={`${label} 变音记号`} className="setting-select" value={pitch.accidental} onChange={(event) => onAccidentalChange(Number(event.target.value) as IntervalQueryVisibleAccidental)}>
+            {INTERVAL_QUERY_VISIBLE_ACCIDENTALS.map((option) => <option aria-label={option.accessibleLabel} key={option.value} value={option.value}>{option.selectorLabel}</option>)}
+          </select>
+          <Icon name="chevron-down" size={17} />
+        </span>
+      </label>
+      <label>
+        <span>八度</span>
+        <span className="setting-select-wrap">
+          <select className="setting-select" value={pitch.octave} onChange={(event) => onOctaveChange(Number(event.target.value) as IntervalQueryOctave)}>
+            {INTERVAL_QUERY_OCTAVES.map((octave) => <option key={octave} value={octave}>{octave}</option>)}
+          </select>
+          <Icon name="chevron-down" size={17} />
+        </span>
+      </label>
+    </fieldset>
+  )
+}
+
+function IntervalQueryToolScreen(): JSX.Element {
+  const [startLetter, setStartLetter] = useState<IntervalQueryLetter>('C')
+  const [startAccidental, setStartAccidental] = useState<IntervalQueryVisibleAccidental>(0)
+  const [startOctave, setStartOctave] = useState<IntervalQueryOctave>(4)
+  const [targetLetter, setTargetLetter] = useState<IntervalQueryLetter>('G')
+  const [targetAccidental, setTargetAccidental] = useState<IntervalQueryVisibleAccidental>(0)
+  const [targetOctave, setTargetOctave] = useState<IntervalQueryOctave>(4)
+  const start = useMemo(() => ({ letter: startLetter, accidental: startAccidental, octave: startOctave }), [startAccidental, startLetter, startOctave])
+  const target = useMemo(() => ({ letter: targetLetter, accidental: targetAccidental, octave: targetOctave }), [targetAccidental, targetLetter, targetOctave])
+  const result = useMemo(() => getIntervalQueryResult(start, target), [start, target])
+
+  return (
+    <ProductFrame active="tools" onBack={() => navigate('tools')} title="音程查询">
+      <section className="interval-query-layout" aria-labelledby="interval-query-title">
+        <header className="interval-query-header">
+          <div className="interval-query-heading">
+            <span className="eyebrow">INTERVAL REFERENCE</span>
+            <h1 id="interval-query-title">音程查询</h1>
+            <p>选择起始音与目标音，查看音程名称、方向与等音程参考。</p>
+          </div>
+          <div className="interval-query-selectors" aria-label="音程查询条件">
+            <IntervalPitchSelector
+              label="START"
+              onAccidentalChange={setStartAccidental}
+              onLetterChange={setStartLetter}
+              onOctaveChange={setStartOctave}
+              pitch={start}
+            />
+            <span aria-hidden="true" className="interval-query-selector-arrow">→</span>
+            <IntervalPitchSelector
+              label="TARGET"
+              onAccidentalChange={setTargetAccidental}
+              onLetterChange={setTargetLetter}
+              onOctaveChange={setTargetOctave}
+              pitch={target}
+            />
+          </div>
+        </header>
+
+        <article className="interval-query-card interval-query-answer" aria-label={`${result.displayName}查询结果`}>
+          <div className="interval-query-identity">
+            <span className="eyebrow">INTERVAL RESULT</span>
+            <h2>{result.displayName}</h2>
+            <div className="interval-query-pitch-pair">
+              <IntervalPitchToken pitch={result.start} />
+              <span aria-hidden="true" className="interval-query-pitch-arrow">→</span>
+              <IntervalPitchToken pitch={result.target} />
+              {result.soundingRelationshipLabel ? <em>{result.soundingRelationshipLabel}</em> : null}
+            </div>
+          </div>
+          <div className="interval-query-facts">
+            <span className="eyebrow">结果信息</span>
+            <dl>
+              <div><dt>方向</dt><dd>{result.directionLabel}</dd></div>
+              <div><dt>度数</dt><dd>{result.intervalNumberLabel}</dd></div>
+              <div><dt>性质</dt><dd>{result.quality}</dd></div>
+              <div><dt>半音数</dt><dd>{result.semitoneDistance}</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article className="interval-query-card interval-query-references">
+          <header>
+            <div>
+              <span className="eyebrow">ENHARMONIC INTERVALS</span>
+              <h2>等音程参考</h2>
+            </div>
+            <p>保持 {result.semitoneDistance} 个半音不变，比较相邻级数的理论命名。</p>
+          </header>
+          <div className="interval-query-reference-list">
+            {result.enharmonicReferences.map((reference) => (
+              <div className={reference.isCurrent ? 'is-current' : ''} key={reference.intervalNumber}>
+                <span>{reference.intervalName}</span>
+                <small>{reference.semitoneDistance} 个半音</small>
+                {reference.isCurrent ? <em>当前</em> : <i aria-hidden="true" />}
+              </div>
+            ))}
+          </div>
+        </article>
+      </section>
+    </ProductFrame>
+  )
+}
+
+function ChordGroupBadge({
+  label,
+  state
+}: {
+  label: string
+  state: 'active' | 'completed' | 'wrong' | 'secondary'
+}): JSX.Element {
+  const stateLabel = state === 'completed'
+    ? '已完成'
+    : state === 'wrong'
+      ? '需重试'
+      : state === 'active' ? '当前' : '稍后'
+  return (
+    <div className={`chord-group-badge is-${state}`}>
+      <span>{label}</span>
+      <strong>
+        {state === 'completed' ? <Icon name="check" size={16} /> : null}
+        {state === 'wrong' ? <Icon name="close" size={16} /> : null}
+        {stateLabel}
+      </strong>
+    </div>
+  )
+}
+
+function ChordSettingsDrawer({
+  chordSettings,
+  mode,
+  onClose,
+  onChordSettingsChange,
+  onQuestionCountChange,
+  questionCount
+}: {
+  chordSettings: ChordSettings
+  mode: ChordPracticeMode
+  onClose: () => void
+  onChordSettingsChange: (changes: Partial<Pick<ChordSettings, 'sequentialKey' | 'showChordTones'>>) => void
+  onQuestionCountChange: (value: ChordQuestionCount) => void
+  questionCount: ChordQuestionCount
+}): JSX.Element {
+  const options: readonly { label: string; value: ChordQuestionCount }[] = [
+    { label: '10', value: 10 },
+    { label: '20', value: 20 },
+    { label: '50', value: 50 },
+    { label: '100', value: 100 },
+    { label: '无限', value: 'endless' }
+  ]
+  const keyIndex = CHORD_SEQUENTIAL_MAJOR_KEY_IDS.indexOf(chordSettings.sequentialKey)
+  const selectAdjacentKey = (offset: -1 | 1): void => {
+    const nextIndex = (keyIndex + offset + CHORD_SEQUENTIAL_MAJOR_KEY_IDS.length) % CHORD_SEQUENTIAL_MAJOR_KEY_IDS.length
+    onChordSettingsChange({ sequentialKey: CHORD_SEQUENTIAL_MAJOR_KEY_IDS[nextIndex] })
+  }
+  return (
+    <div className="chord-drawer-backdrop" onClick={onClose}>
+      <aside
+        aria-labelledby="chord-settings-title"
+        aria-modal="true"
+        className="chord-settings-drawer"
+        role="dialog"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="chord-settings-drawer__header">
+          <div><span className="eyebrow">练习设置</span><h2 id="chord-settings-title">和弦练习</h2></div>
+          <button aria-label="关闭练习设置" className="icon-button subtle" type="button" onClick={onClose}><Icon name="close" /></button>
+        </div>
+        {mode === 'sequential' ? (
+          <section className="chord-settings-section">
+            <div className="group-title"><span>当前调</span><small>新练习开始时生效</small></div>
+            <div className="chord-key-stepper">
+              <button aria-label="上一个大调" type="button" onClick={() => selectAdjacentKey(-1)}>‹</button>
+              <select
+                aria-label="选择循序练习当前调"
+                value={chordSettings.sequentialKey}
+                onChange={(event) => onChordSettingsChange({ sequentialKey: event.target.value as ChordSequentialMajorKeyId })}
+              >
+                {CHORD_SEQUENTIAL_MAJOR_KEY_IDS.map((keyId) => <option key={keyId} value={keyId}>{formatChordKeyName(keyId)}</option>)}
+              </select>
+              <button aria-label="下一个大调" type="button" onClick={() => selectAdjacentKey(1)}>›</button>
+            </div>
+          </section>
+        ) : null}
+        <section className="chord-settings-section">
+          <div className="group-title"><span>题数</span><small>选择本轮练习题量</small></div>
+          <div className="chord-question-count" role="group" aria-label="和弦练习题数">
+            {options.map((option) => (
+              <button
+                className={questionCount === option.value ? 'is-active' : ''}
+                key={option.value}
+                type="button"
+                onClick={() => onQuestionCountChange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </section>
+        <section className="chord-settings-section chord-tone-setting">
+          <div className="group-title"><span>显示构成音</span><small>按当前转位顺序显示</small></div>
+          <button
+            aria-label={`显示构成音已${chordSettings.showChordTones ? '开启' : '关闭'}`}
+            className={`mock-switch ${chordSettings.showChordTones ? 'is-on' : ''}`}
+            type="button"
+            onClick={() => onChordSettingsChange({ showChordTones: !chordSettings.showChordTones })}
+          >
+            <small>{chordSettings.showChordTones ? 'On' : 'Off'}</small><i />
+          </button>
+        </section>
+        <section className="chord-settings-section chord-settings-summary">
+          <div className="group-title"><span>本次训练</span><small>{mode === 'sequential' ? formatChordKeyName(chordSettings.sequentialKey) : '完整随机范围'}</small></div>
+          <div><Icon name="check" size={18} /><span>{mode === 'sequential' ? '题数决定循序范围' : '三和弦 + 七和弦'}</span></div>
+          <div><Icon name="check" size={18} /><span>{mode === 'sequential' ? '均衡题袋' : '全部转位'}</span></div>
+          <div><Icon name="check" size={18} /><span>随机音区</span></div>
+          <div><Icon name="check" size={18} /><span>分解 + 柱式</span></div>
+        </section>
+        <small className="chord-settings-note">题数和当前调将在下一轮练习开始时生效；构成音显示立即生效。</small>
+      </aside>
+    </div>
+  )
+}
+
+function SightSettingsRows({
+  onSettingsChange,
+  settings
+}: {
+  onSettingsChange: (changes: Partial<SightReadingSettings>) => void
+  settings: SightReadingSettings
+}): JSX.Element {
+  const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
+  return (
+    <>
+      <SettingRow
+        description="高音谱表、低音谱表或大谱表"
+        icon="book"
+        title="默认谱表"
+        action={<SettingSelect
+          ariaLabel="默认谱表"
+          value={settings.staffMode}
+          onChange={(staffMode: SightReadingStaffMode) => onSettingsChange({ staffMode })}
+          options={[
+            { value: 'treble', label: '高音谱表' },
+            { value: 'bass', label: '低音谱表' },
+            { value: 'grand', label: '大谱表' }
+          ]}
+        />}
+      />
+      <SettingRow
+        description="支持现有 15 个大调"
+        icon="book"
+        title="调性"
+        action={<SettingSelect
+          ariaLabel="调性"
+          value={settings.keySignature}
+          onChange={(keySignature: MajorKeyId) => onSettingsChange({ keySignature })}
+          options={MAJOR_KEY_DISPLAY_SIGNATURES.map((key) => ({ value: key.id, label: key.displayName }))}
+        />}
+      />
+      <SettingRow
+        description="单音保持原有首音判定；双音使用 150ms 同时音捕获"
+        icon="book"
+        title="音符数量"
+        action={<SettingSelect
+          ariaLabel="音符数量"
+          value={settings.noteMode}
+          onChange={(noteMode: SightReadingNoteMode) => onSettingsChange({ noteMode })}
+          options={[
+            { value: 'single', label: '单音' },
+            { value: 'double', label: '双音' }
+          ]}
+        />}
+      />
+      <SettingRow
+        description="调内音或包含临时变音"
+        icon="chart"
+        title="音符内容"
+        action={settings.noteMode === 'double'
+          ? <strong>双音固定调内</strong>
+          : <SettingSelect
+              ariaLabel="音符内容"
+              value={settings.notePoolMode}
+              onChange={(notePoolMode: SightReadingNotePoolMode) => onSettingsChange({ notePoolMode })}
+              options={[
+                { value: 'diatonic', label: '调内音' },
+                { value: 'chromatic', label: '含临时变音' }
+              ]}
+            />}
+      />
+      <SettingRow
+        description="10、20、50 或 100 题"
+        icon="chart"
+        title="默认题数"
+        action={<SettingSelect
+          ariaLabel="默认题数"
+          value={String(settings.questionCount)}
+          onChange={(value: string) => onSettingsChange({ questionCount: Number(value) as SightReadingQuestionCount })}
+          options={[10, 20, 50, 100].map((value) => ({ value: String(value), label: String(value) }))}
+        />}
+      />
+      <SettingRow description={`当前模式固定为 ${answerTimeLimitSeconds} 秒`} icon="clock" title="每题时限" action={<strong>{answerTimeLimitSeconds} 秒</strong>} />
+      <SettingRow
+        description={settings.noteNameVisible ? '答题前显示目标音名' : '答题前不显示目标音名'}
+        icon="info"
+        title="显示音名"
+        action={(
+          <button
+            aria-label={`显示音名已${settings.noteNameVisible ? '开启' : '关闭'}`}
+            className={`mock-switch ${settings.noteNameVisible ? 'is-on' : ''}`}
+            type="button"
+            onClick={() => onSettingsChange({ noteNameVisible: !settings.noteNameVisible })}
+          >
+            <small>{settings.noteNameVisible ? 'On' : 'Off'}</small><i />
+          </button>
+        )}
+      />
+    </>
+  )
+}
+
+function SightSettingsDrawer({
+  onClose,
+  onSettingsChange,
+  settings
+}: {
+  onClose: () => void
+  onSettingsChange: (changes: Partial<SightReadingSettings>) => void
+  settings: SightReadingSettings
+}): JSX.Element {
+  return (
+    <div className="module-settings-backdrop" onClick={onClose}>
+      <aside aria-labelledby="sight-settings-title" aria-modal="true" className="module-settings-drawer" role="dialog" onClick={(event) => event.stopPropagation()}>
+        <div className="module-settings-drawer__header">
+          <div><span className="eyebrow">下一轮生效</span><h2 id="sight-settings-title">识谱练习设置</h2></div>
+          <button aria-label="关闭识谱练习设置" className="icon-button subtle" type="button" onClick={onClose}><Icon name="close" /></button>
+        </div>
+        <div className="module-settings-rows settings-group--sight">
+          <SightSettingsRows onSettingsChange={onSettingsChange} settings={settings} />
+        </div>
+      </aside>
+    </div>
+  )
+}
+
+interface ChordPracticePresentation {
+  arpeggio: ChordGroupVisualState
+  block: ChordGroupVisualState
+  prompt: string
+  promptTone: 'active' | 'danger' | 'warning' | 'success'
+  stageLabel: '分解' | '过渡' | '柱式' | '完成'
+}
+
+function presentLiveChord(snapshot: ChordRuntimeSnapshot): ChordPracticePresentation {
+  const state = snapshot.judgement?.state
+  if (snapshot.status === 'SESSION_COMPLETE' || state?.phase === 'QUESTION_COMPLETE') {
+    return {
+      arpeggio: 'completed',
+      block: 'completed',
+      prompt: snapshot.status === 'SESSION_COMPLETE' ? '本轮练习完成' : '正确',
+      promptTone: 'success',
+      stageLabel: '完成'
+    }
+  }
+  if (state?.phase === 'ARPEGGIO_WRONG_WAIT_RELEASE') {
+    return { arpeggio: 'wrong', block: 'secondary', prompt: '松开琴键后从分解第一个音重新开始', promptTone: 'danger', stageLabel: '分解' }
+  }
+  if (state?.phase === 'WAIT_ALL_KEYS_UP_BEFORE_BLOCK') {
+    return { arpeggio: 'completed', block: 'secondary', prompt: '分解完成 · 请松开琴键', promptTone: 'warning', stageLabel: '过渡' }
+  }
+  if (state?.phase === 'BLOCK_WRONG_WAIT_RELEASE') {
+    return { arpeggio: 'completed', block: 'wrong', prompt: '柱式错误 · 松开琴键后从分解重新开始', promptTone: 'danger', stageLabel: '柱式' }
+  }
+  if (state?.phase === 'WAIT_ALL_KEYS_UP_AFTER_BLOCK') {
+    return { arpeggio: 'completed', block: 'completed', prompt: '柱式完成 · 请松开琴键', promptTone: 'warning', stageLabel: '过渡' }
+  }
+  const resumeTarget = state?.phase === 'SUSPENDED' || state?.phase === 'RESUME_WAIT_ALL_KEYS_UP'
+    ? state.resumeTarget
+    : null
+  if (state?.phase === 'BLOCK_READY' || state?.phase === 'BLOCK_CAPTURE' || resumeTarget === 'BLOCK_READY') {
+    return { arpeggio: 'completed', block: 'active', prompt: '请弹奏柱式和弦', promptTone: 'active', stageLabel: '柱式' }
+  }
+  if (resumeTarget === 'QUESTION_COMPLETE') {
+    return { arpeggio: 'completed', block: 'completed', prompt: '柱式完成 · 请松开琴键', promptTone: 'warning', stageLabel: '过渡' }
+  }
+  return { arpeggio: 'active', block: 'secondary', prompt: '请按谱面顺序弹奏分解和弦', promptTone: 'active', stageLabel: '分解' }
+}
+
+function toChordWrittenPitches(question: ChordPracticeQuestion): readonly ChordWrittenPitch[] {
+  const accidental = (value: number): ChordWrittenPitch['accidental'] => {
+    if (value === -2) return 'bb'
+    if (value === -1) return 'b'
+    if (value === 1) return '#'
+    if (value === 2) return '##'
+    return null
+  }
+  const displayAccidental = (value: number): string => value === -2
+    ? '♭♭'
+    : value === -1 ? '♭' : value === 1 ? '♯' : value === 2 ? '♯♯' : ''
+  return question.blockNotes.map((pitch) => {
+    const vexAccidental = accidental(pitch.accidental)
+    return Object.freeze({
+      accidental: vexAccidental,
+      clef: pitch.soundingMidi < 60 ? 'bass' : 'treble',
+      letter: pitch.letter,
+      octave: pitch.octave,
+      soundingMidiNumber: pitch.soundingMidi,
+      spelling: `${pitch.letter}${displayAccidental(pitch.accidental)}${pitch.octave}`,
+      vexFlowKey: `${pitch.letter.toLowerCase()}${vexAccidental ?? ''}/${pitch.octave}`
+    })
+  })
+}
+
+function ChordPracticeScreen({
+  caseId,
+  chordSettings,
+  mode,
+  previewStateId,
+  runtime,
+  midiRuntime,
+  onExplicitEnd,
+  onChordSettingsChange,
+  onQuestionCountChange,
+  questionCount
+}: {
+  caseId: string
+  chordSettings: ChordSettings
+  mode: ChordPracticeMode
+  previewStateId: ChordPreviewStateId
+  runtime: ChordPracticeRuntime
+  midiRuntime: AndroidSightReadingRuntime
+  onExplicitEnd: () => void
+  onChordSettingsChange: (changes: Partial<Pick<ChordSettings, 'sequentialKey' | 'showChordTones'>>) => void
+  onQuestionCountChange: (value: ChordQuestionCount) => void
+  questionCount: ChordQuestionCount
+}): JSX.Element {
+  const snapshot = useChordPracticeRuntime(runtime)
+  const initialSessionConfig = useRef({ mode, questionCount, sequentialKey: chordSettings.sequentialKey })
+  const preview = previewStateId === 'live' ? null : getChordMockState(previewStateId)
+  const mockChord = getChordMockCase(caseId)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const livePresentation = presentLiveChord(snapshot)
+  const presentation: ChordPracticePresentation = preview
+    ? {
+        arpeggio: preview.arpeggio,
+        block: preview.block,
+        prompt: preview.prompt,
+        promptTone: previewStateId === 'question-correct'
+          ? 'success'
+          : previewStateId.includes('wrong') ? 'danger' : previewStateId.startsWith('wait-release') ? 'warning' : 'active',
+        stageLabel: previewStateId.startsWith('arpeggio')
+          ? '分解'
+          : previewStateId.startsWith('wait-release') ? '过渡' : previewStateId === 'question-correct' ? '完成' : '柱式'
+      }
+    : livePresentation
+  const liveQuestion = snapshot.question
+  const chord = preview
+    ? {
+        symbol: mockChord.symbol,
+        inversion: mockChord.inversion,
+        writtenPitches: mockChord.writtenPitches
+      }
+    : liveQuestion
+      ? {
+          symbol: liveQuestion.chordSymbol,
+          inversion: liveQuestion.chineseInversionLabel,
+          writtenPitches: toChordWrittenPitches(liveQuestion)
+        }
+      : { symbol: '—', inversion: '正在准备', writtenPitches: [] }
+  const chordToneText = preview
+    ? mockChord.writtenPitches.map((pitch) => pitch.spelling.replace(/\d+$/, '')).join(' · ')
+    : liveQuestion?.blockNotes.map(formatWrittenPitchClass).join(' · ') ?? ''
+  const paused = !preview && snapshot.status === 'SUSPENDED'
+  const resumeWaitingForRelease = snapshot.judgement?.state.phase === 'RESUME_WAIT_ALL_KEYS_UP'
+  const activeQuestionCount = snapshot.questionCount
+  const progressLabel = activeQuestionCount === 'endless'
+    ? `已完成 ${snapshot.counters.completedQuestions}`
+    : `${String(Math.min(snapshot.questionIndex, activeQuestionCount)).padStart(2, '0')} / ${activeQuestionCount}`
+  const pauseBlocked = snapshot.status === 'SESSION_COMPLETE'
+    || snapshot.status === 'STOPPED'
+    || resumeWaitingForRelease
+    || (paused && !snapshot.transportReady)
+  const endActionLabel = snapshot.status === 'SESSION_COMPLETE'
+    ? '完成'
+    : snapshot.counters.completedQuestions > 0 ? '结束并保存' : '结束'
+
+  useEffect(() => {
+    const status = runtime.snapshot.status
+    if (status === 'IDLE' || status === 'STOPPED') runtime.start(initialSessionConfig.current)
+    if (midiRuntime.midiSource === 'bluetooth' && midiRuntime.bluetoothSnapshot.connectionState !== 'CONNECTED') {
+      runtime.handleTransportLost()
+    }
+  }, [midiRuntime, runtime])
+
+  const leavePractice = (): void => {
+    onExplicitEnd()
+  }
+
+  return (
+    <div className={`chord-focus-frame ${paused ? 'is-paused' : ''}`}>
+      <header className="chord-focus-header">
+        <div className="chord-focus-header__left">
+          <button aria-label="返回练习" className="icon-button subtle" type="button" onClick={leavePractice}><Icon name="arrow-left" /></button>
+          <div><small>PIANO FUNDAMENTALS</small><strong>{mode === 'sequential' ? '循序练习' : '综合随机'}</strong></div>
+        </div>
+        <div className="focus-actions">
+          <MidiStatusButton compact />
+          <button aria-label="练习设置" className="icon-button subtle" type="button" onClick={() => setSettingsOpen(true)}><Icon name="settings" /></button>
+          <button className="outline-action" disabled={pauseBlocked} type="button" onClick={() => paused ? runtime.resume() : runtime.pause()}>
+            <Icon name={paused ? 'play' : 'pause'} /><span>{paused ? '继续' : '暂停'}</span>
+          </button>
+          <button className="outline-action" type="button" onClick={leavePractice}>
+            <Icon name="stop" /><span>{endActionLabel}</span>
+          </button>
+        </div>
+      </header>
+
+      <main className="chord-focus-content">
+        <div className="chord-identity">
+          <span>当前和弦</span>
+          <h1>{chord.symbol}</h1>
+          <strong>{chord.inversion}{chordSettings.showChordTones && chordToneText ? <span> · 构成音：{chordToneText}</span> : null}</strong>
+        </div>
+
+        <section className="chord-notation-card" aria-label={`${chord.symbol} ${chord.inversion}`}>
+          <div className="chord-group-labels" aria-hidden="true">
+            <ChordGroupBadge label="分解" state={presentation.arpeggio} />
+            <ChordGroupBadge label="柱式" state={presentation.block} />
+          </div>
+          <span className="chord-group-divider" aria-hidden="true" />
+          <ChordGrandStaff
+            arpeggioState={presentation.arpeggio}
+            blockState={presentation.block}
+            pitches={chord.writtenPitches}
+            symbol={chord.symbol}
+          />
+          {paused ? (
+            <div className="chord-pause-overlay"><Icon name="pause" size={34} /><strong>练习已暂停</strong></div>
+          ) : null}
+        </section>
+
+        <section className={`chord-stage-prompt is-${presentation.promptTone}`} aria-live="polite">
+          <span className="chord-stage-prompt__icon">
+            <Icon name={presentation.promptTone === 'success' ? 'check' : presentation.promptTone === 'danger' ? 'close' : presentation.promptTone === 'warning' ? 'clock' : 'play'} />
+          </span>
+          <div><small>当前阶段 · {presentation.stageLabel}</small><strong>{paused ? !snapshot.transportReady ? 'MIDI 已断开，练习已安全暂停' : resumeWaitingForRelease ? '请先松开琴键以继续' : '练习已暂停' : presentation.prompt}</strong></div>
+        </section>
+
+        <footer className="chord-progress-footer">
+          <span><small>{activeQuestionCount === 'endless' ? '进度' : '当前题目'}</small><strong>{progressLabel}</strong></span>
+          <i />
+          <span><small>本轮状态</small><strong>连续正确 {snapshot.counters.currentFirstPassStreak}</strong></span>
+        </footer>
+      </main>
+
+      {settingsOpen ? (
+        <ChordSettingsDrawer
+          chordSettings={chordSettings}
+          mode={mode}
+          onClose={() => setSettingsOpen(false)}
+          onChordSettingsChange={onChordSettingsChange}
+          onQuestionCountChange={onQuestionCountChange}
+          questionCount={questionCount}
+        />
+      ) : null}
+    </div>
+  )
+}
+
 function SightReadyScreen({
   onStart,
+  onSettingsChange,
   settings
 }: {
   onStart: () => void
+  onSettingsChange: (changes: Partial<SightReadingSettings>) => void
   settings: SightReadingSettings
 }): JSX.Element {
   const { runtime } = useMidiUi()
+  const { openAuxiliary } = useAppNavigation()
   const midiStatus = presentMidiStatus(runtime)
   const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
+  const [settingsOpen, setSettingsOpen] = useState(false)
   return (
-    <ProductFrame active="sight" title="识谱练习">
+    <ProductFrame active="practice" onBack={() => navigate('practice')} title="识谱练习">
       <section className="ready-layout">
         <div className="ready-stage">
           <div className="section-heading">
             <div><span className="eyebrow">练习预览</span><h1>{STAFF_MODE_LABELS[settings.staffMode]}识谱</h1></div>
-            <span className="ready-badge">准备就绪</span>
+            <div className="ready-heading-actions">
+              <span className="ready-badge">准备就绪</span>
+              <button aria-label="识谱练习设置" className="icon-button" type="button" onClick={() => setSettingsOpen(true)}><Icon name="settings" /></button>
+            </div>
           </div>
           <NotationPaper
             empty
@@ -501,7 +1682,7 @@ function SightReadyScreen({
             <div><small>题数</small><strong>{settings.questionCount}</strong></div>
             <div><small>每题时限</small><strong>固定 {answerTimeLimitSeconds} 秒</strong></div>
           </div>
-          <button className="ready-device" type="button" onClick={() => navigate('midi')}>
+          <button className="ready-device" type="button" onClick={() => openAuxiliary('midi')}>
             <span><Icon name="bluetooth" /></span><div><strong>{midiStatus.label}</strong><small>{midiStatus.detail}</small></div><i className={`is-${midiStatus.tone}`} />
           </button>
           <button className="primary-action is-wide" type="button" onClick={onStart}>
@@ -509,6 +1690,7 @@ function SightReadyScreen({
           </button>
         </aside>
       </section>
+      {settingsOpen ? <SightSettingsDrawer onClose={() => setSettingsOpen(false)} onSettingsChange={onSettingsChange} settings={settings} /> : null}
     </ProductFrame>
   )
 }
@@ -581,11 +1763,13 @@ function PracticeMetric({ label, value, tone }: { label: string; value: string; 
 }
 
 function SightFocusScreen({
+  onStopAndSave,
   runtime,
   screen,
   settings,
   snapshot
 }: {
+  onStopAndSave: () => void
   runtime: AndroidSightReadingRuntime
   screen: ScreenId
   settings: SightReadingSettings
@@ -614,8 +1798,7 @@ function SightFocusScreen({
     navigate(getPracticeScreen(runtime))
   }
   const stopAndSave = (): void => {
-    runtime.stop()
-    navigate('sight-ready')
+    onStopAndSave()
   }
 
   return (
@@ -705,7 +1888,7 @@ function SightResultScreen({
     : 0
 
   return (
-    <ProductFrame active="sight" title="本轮完成">
+    <ProductFrame active="practice" onBack={() => navigate('practice')} title="本轮完成">
       <section className="result-layout">
         <div className="result-score">
           <span className="eyebrow">识谱练习结果</span>
@@ -734,7 +1917,7 @@ function SightResultScreen({
           </div>
           <div className="result-actions">
             <button className="secondary-action" type="button" onClick={() => navigate('sight-ready')}>再练一轮</button>
-            <button className="primary-action" type="button" onClick={() => navigate('home')}><Icon name="check" />完成</button>
+            <button className="primary-action" type="button" onClick={() => navigate('practice')}><Icon name="check" />完成</button>
           </div>
         </div>
       </section>
@@ -742,57 +1925,220 @@ function SightResultScreen({
   )
 }
 
-function HistoryScreen({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element {
+type HistoryFilter = 'all' | 'sight' | 'chord'
+
+function HistoryRecord({
+  item,
+  onOpenChordReport
+}: {
+  item: MixedPracticeHistoryItem
+  onOpenChordReport: (recordId: string) => void
+}): JSX.Element {
+  if (item.module === 'chord') {
+    const completed = item.plannedQuestionCount === null
+      ? `完成 ${item.completedQuestions}`
+      : `完成 ${item.completedQuestions}/${item.plannedQuestionCount}`
+    return (
+      <button
+        aria-label={`打开${item.modeSummary}练习报告`}
+        className={`history-row is-${item.completionReason} is-interactive`}
+        type="button"
+        onClick={() => onOpenChordReport(item.recordId)}
+      >
+        <span className="history-row__mark"><Icon name="book" /></span>
+        <span className="history-row__copy">
+          <small><b className="history-module-badge is-chord">和弦</b>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small>
+          <strong>{item.modeSummary}</strong>
+          <em>{completed} · 错误 {item.totalErrors} · 练习时长 {formatHistoryDuration(item.practiceDurationMs)}</em>
+        </span>
+        <span className="history-row__score"><strong>{formatHistoryPercentage(item.firstPassCompletionRate)}%</strong><small>完成率 <Icon name="chevron" size={13} /></small></span>
+      </button>
+    )
+  }
+  return (
+    <article className={`history-row is-${item.completionState}`}>
+      <span className="history-row__mark"><Icon name="book" /></span>
+      <span className="history-row__copy">
+        <small><b className="history-module-badge">识谱</b>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small>
+        <strong>{item.title}</strong>
+        <em>{item.settingsSummary} · 完成 {item.completed}/{item.plannedQuestionCount} · 正确 {item.correct} / 错误 {item.wrong} / 超时 {item.timeout} · {formatHistoryDuration(item.durationMs)}</em>
+      </span>
+      <span className="history-row__score"><strong>{formatHistoryPercentage(item.accuracy)}%</strong><small>正确率</small></span>
+    </article>
+  )
+}
+
+function HistoryScreen({
+  chordHistory,
+  chordPersistence,
+  filter,
+  onFilterChange,
+  onOpenChordReport,
+  runtime
+}: {
+  chordHistory: ChordPersistenceSnapshot
+  chordPersistence: ChordReportPersistenceCoordinator
+  filter: HistoryFilter
+  onFilterChange: (filter: HistoryFilter) => void
+  onOpenChordReport: (recordId: string, filter: HistoryFilter) => void
+  runtime: AndroidSightReadingRuntime
+}): JSX.Element {
   const history = runtime.historySnapshot
-  const projection = projectSightReadingHistory(history.records)
-  const { summary } = projection
+  const sightProjection = projectSightReadingHistory(history.records)
+  const { summary } = sightProjection
+  const chordItems = projectChordHistory(chordHistory.records)
+  const mixedItems = projectMixedPracticeHistory(history.records, chordHistory.records)
   useEffect(() => {
     void runtime.refreshHistory()
-  }, [runtime])
+    void chordPersistence.refresh()
+  }, [chordPersistence, runtime])
 
-  const empty = projection.items.length === 0
+  const visibleItems: readonly MixedPracticeHistoryItem[] = filter === 'sight'
+    ? sightProjection.items.map((item) => ({ module: 'sight' as const, ...item }))
+    : filter === 'chord' ? chordItems : mixedItems
+  const empty = visibleItems.length === 0
   const overallAccuracy = formatHistoryPercentage(summary.overallAccuracy)
   const averageReaction = summary.averageReactionMs === null ? '—' : (summary.averageReactionMs / 1000).toFixed(2)
-  const listStatus = history.status === 'loading'
+  const anyLoading = history.status === 'loading' || chordHistory.status === 'loading'
+  const anyError = history.status === 'error' || chordHistory.status === 'error'
+  const anyWarning = Boolean(history.warning || chordHistory.warning)
+  const listStatus = anyLoading
     ? '正在同步本地记录'
-    : history.status === 'error'
-      ? `共 ${summary.totalSessions} 条 · 读取异常`
-      : history.warning
-        ? `共 ${summary.totalSessions} 条 · 部分记录不可用`
-        : `共 ${summary.totalSessions} 条记录`
+    : anyError
+      ? `共 ${visibleItems.length} 条 · 读取异常`
+      : anyWarning
+        ? `共 ${visibleItems.length} 条 · 部分记录不可用`
+        : `共 ${visibleItems.length} 条记录`
   return (
     <ProductFrame active="history" title="练习记录">
-      <section className="history-layout">
-        <div className="history-summary">
-          <div>
-            <span className="eyebrow">全部记录</span>
-            <h1>{empty ? '还没有练习记录' : `已有 ${summary.totalSessions} 次练习记录`}</h1>
-            <p>{empty
-              ? '完成或提前结束并保存一轮识谱练习后，会在这里显示。'
-              : `共完成 ${summary.totalCompletedQuestions} 题：正确 ${summary.totalCorrect}，错误 ${summary.totalWrong}，超时 ${summary.totalTimeout}。`}</p>
-          </div>
-          <div className="history-summary__stat"><strong>{overallAccuracy}{summary.overallAccuracy === null ? null : <small>%</small>}</strong><span>总体正确率</span></div>
-          <div className="history-summary__stat"><strong>{averageReaction}{summary.averageReactionMs === null ? null : <small>s</small>}</strong><span>平均反应</span></div>
+      <section className="history-screen">
+        <div className="history-filter" aria-label="练习模块筛选" role="group">
+          {([
+            ['all', '全部'],
+            ['sight', '识谱'],
+            ['chord', '和弦']
+          ] as const).map(([value, label]) => (
+            <button className={filter === value ? 'is-active' : ''} key={value} type="button" onClick={() => onFilterChange(value)}>{label}</button>
+          ))}
         </div>
-        <div className="history-list">
-          <div className="list-heading"><h2>最近练习</h2><span>{listStatus}</span></div>
-          <div className="history-list__rows">
-            {projection.items.length > 0 ? projection.items.map((item) => (
-              <article className={`history-row is-${item.completionState}`} key={item.recordId}>
-                <span className="history-row__mark"><Icon name="book" /></span>
-                <span className="history-row__copy">
-                  <small>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small>
-                  <strong>{item.title}</strong>
-                  <em>{item.settingsSummary} · 完成 {item.completed}/{item.plannedQuestionCount} · 正确 {item.correct} / 错误 {item.wrong} / 超时 {item.timeout} · {formatHistoryDuration(item.durationMs)}</em>
-                </span>
-                <span className="history-row__score"><strong>{formatHistoryPercentage(item.accuracy)}%</strong><small>正确率</small></span>
-              </article>
-            )) : (
-              <div className="history-empty" role={history.status === 'error' ? 'alert' : 'status'}>
-                <span className="history-row__mark"><Icon name={history.status === 'error' ? 'info' : 'history'} /></span>
-                <div><strong>{history.status === 'loading' ? '正在读取本地记录…' : history.status === 'error' ? '暂时无法读取练习记录' : '暂无真实练习记录'}</strong><p>{history.status === 'error' ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : '完成一轮识谱练习后，真实结果会显示在这里。'}</p></div>
+        {filter === 'chord' && empty ? (
+          <div className="history-module-empty" role="status">
+            <span className="history-row__mark"><Icon name="history" /></span>
+            <div><span className="eyebrow">和弦记录</span><h1>暂无和弦练习记录</h1><p>完成和弦练习后，记录会显示在这里。</p></div>
+          </div>
+        ) : filter === 'sight' ? (
+          <div className="history-layout">
+            <div className="history-summary">
+              <div>
+                <span className="eyebrow">识谱记录</span>
+                <h1>{empty
+                  ? '还没有识谱练习记录'
+                  : `已有 ${summary.totalSessions} 次练习记录`}</h1>
+                <p>{empty
+                  ? '完成或提前结束并保存一轮识谱练习后，会在这里显示。'
+                  : `共完成 ${summary.totalCompletedQuestions} 题：正确 ${summary.totalCorrect}，错误 ${summary.totalWrong}，超时 ${summary.totalTimeout}。`}</p>
               </div>
-            )}
+              <div className="history-summary__stat"><strong>{overallAccuracy}{summary.overallAccuracy === null ? null : <small>%</small>}</strong><span>总体正确率</span></div>
+              <div className="history-summary__stat"><strong>{averageReaction}{summary.averageReactionMs === null ? null : <small>s</small>}</strong><span>平均反应</span></div>
+            </div>
+            <div className="history-list">
+              <div className="list-heading"><h2>最近练习</h2><span>{listStatus}</span></div>
+              <div className="history-list__rows">
+                {visibleItems.length > 0 ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} />) : (
+                  <div className="history-empty" role={history.status === 'error' ? 'alert' : 'status'}>
+                    <span className="history-row__mark"><Icon name={history.status === 'error' ? 'info' : 'history'} /></span>
+                    <div><strong>{history.status === 'loading' ? '正在读取本地记录…' : history.status === 'error' ? '暂时无法读取练习记录' : '暂无真实练习记录'}</strong><p>{history.status === 'error' ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : '完成一轮识谱练习后，真实结果会显示在这里。'}</p></div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="history-list history-list--module">
+            <div className="list-heading"><h2>{filter === 'all' ? '全部练习' : '和弦练习'}</h2><span>{listStatus}</span></div>
+            <div className="history-list__rows">
+              {visibleItems.length > 0
+                ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} />)
+                : (
+                  <div className="history-empty" role={anyError ? 'alert' : 'status'}>
+                    <span className="history-row__mark"><Icon name={anyError ? 'info' : 'history'} /></span>
+                    <div><strong>{anyLoading ? '正在读取本地记录…' : anyError ? '暂时无法读取练习记录' : '暂无真实练习记录'}</strong><p>{anyError ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : '完成一轮练习后，真实结果会显示在这里。'}</p></div>
+                  </div>
+                )}
+            </div>
+          </div>
+        )}
+      </section>
+    </ProductFrame>
+  )
+}
+
+function ChordReportDetailScreen({
+  onBack,
+  report
+}: {
+  onBack: () => void
+  report: ChordPersistenceSnapshot['records'][number] | null
+}): JSX.Element {
+  if (!report) {
+    return (
+      <ProductFrame active="history" onBack={onBack} title="和弦练习报告">
+        <section className="chord-report-detail is-unavailable">
+          <div className="chord-report-unavailable" role="status">
+            <span className="history-row__mark"><Icon name="info" /></span>
+            <div><h1>记录不可用</h1><p>这条练习记录无法读取。</p></div>
+            <button className="primary-action" type="button" onClick={onBack}>返回记录</button>
+          </div>
+        </section>
+      </ProductFrame>
+    )
+  }
+
+  const detail = projectChordReportDetail(report)
+  return (
+    <ProductFrame active="history" onBack={onBack} title="和弦练习报告">
+      <section className="chord-report-detail">
+        <div className="chord-report-detail__body">
+          <header className="chord-report-identity">
+            <div><span className="eyebrow">练习记录</span><h1>{detail.modeIdentity}</h1><p>以下内容来自本轮已保存的练习事实。</p></div>
+            <span className={`chord-report-status is-${report.completionReason}`}>{detail.statusLabel}</span>
+          </header>
+          <div className="chord-report-columns">
+            <div className="chord-report-column">
+              <section className="chord-report-card chord-report-overview" aria-labelledby="chord-report-overview-title">
+                <div className="chord-report-card__heading"><div><span className="eyebrow">本轮概览</span><h2 id="chord-report-overview-title">练习结果</h2></div></div>
+                <dl className="chord-report-metrics">
+                  {detail.overviewMetrics.map((metric) => (
+                    <div className={metric.primary ? 'is-primary' : ''} key={metric.label}>
+                      <dt>{metric.label}</dt><dd>{metric.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="chord-report-explanation">分解与柱式均首次成功，才计为首次通过。</p>
+              </section>
+              <section className="chord-report-card" aria-labelledby="chord-report-errors-title">
+                <div className="chord-report-card__heading"><div><span className="eyebrow">事实计数</span><h2 id="chord-report-errors-title">错误分布</h2></div></div>
+                <dl className="chord-report-error-grid">
+                  {detail.errorRows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
+                </dl>
+              </section>
+            </div>
+            <div className="chord-report-column">
+              <section className="chord-report-card" aria-labelledby="chord-report-timing-title">
+                <div className="chord-report-card__heading"><div><span className="eyebrow">中位数</span><h2 id="chord-report-timing-title">演奏时间</h2></div><small>按已完成题目汇总</small></div>
+                <dl className="chord-report-rows chord-report-timing">
+                  {detail.timingRows.map((row) => (
+                    <div key={row.id}><dt>{row.label}</dt><dd><strong>{row.value}</strong><small>{row.sampleLabel}</small></dd></div>
+                  ))}
+                </dl>
+              </section>
+              <section className="chord-report-card" aria-labelledby="chord-report-session-title">
+                <div className="chord-report-card__heading"><div><span className="eyebrow">历史快照</span><h2 id="chord-report-session-title">本轮信息</h2></div></div>
+                <dl className="chord-report-rows chord-report-session">
+                  {detail.sessionRows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
+                </dl>
+              </section>
+            </div>
           </div>
         </div>
       </section>
@@ -835,38 +2181,31 @@ function SettingSelect<Value extends string | number>({
   value: Value
 }): JSX.Element {
   return (
-    <select
-      aria-label={ariaLabel}
-      className="setting-select"
-      value={value}
-      onChange={(event) => onChange(event.target.value as Value)}
-    >
-      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-    </select>
+    <span className="setting-select-wrap">
+      <select
+        aria-label={ariaLabel}
+        className="setting-select"
+        value={value}
+        onChange={(event) => onChange(event.target.value as Value)}
+      >
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      <Icon name="chevron-down" size={17} />
+    </span>
   )
 }
 
 function SettingsScreen({
-  onSettingsChange,
-  settings,
   theme,
   onThemeChange
 }: {
-  onSettingsChange: (changes: Partial<SightReadingSettings>) => void
-  settings: SightReadingSettings
   theme: 'light' | 'dark'
   onThemeChange: (theme: 'light' | 'dark') => void
 }): JSX.Element {
-  const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
   const { runtime } = useMidiUi()
   const { snapshot: updater } = useUpdaterUi()
+  const { openAuxiliary } = useAppNavigation()
   const midiStatus = presentMidiStatus(runtime)
-  const persistence = runtime.persistenceSnapshot
-  const settingsStatus = persistence.settingsStatus === 'saving'
-    ? '正在保存'
-    : persistence.settingsStatus === 'error'
-      ? '保存失败'
-      : persistence.settingsStatus === 'saved' ? '已保存到此设备' : '使用默认设置'
   const updaterLabel = updater.status === 'updateAvailable'
     ? '发现新版本'
     : updater.status === 'readyToInstall'
@@ -883,99 +2222,11 @@ function SettingsScreen({
             <SettingRow
               description={midiStatus.detail}
               icon="bluetooth"
-              onClick={() => navigate('midi')}
+              onClick={() => openAuxiliary('midi')}
               title={runtime.bluetoothSnapshot.connectedDeviceName ?? 'Roland FP-30X'}
               action={<span className={`connected-label is-${midiStatus.tone}`}><i />{midiStatus.label}</span>}
             />
           </div>
-          <div className="settings-group settings-group--sight">
-            <div className="group-title"><span>识谱练习</span><small>下一轮生效 · {settingsStatus}</small></div>
-            <SettingRow
-              description="高音谱表、低音谱表或大谱表"
-              icon="book"
-              title="默认谱表"
-              action={<SettingSelect
-                ariaLabel="默认谱表"
-                value={settings.staffMode}
-                onChange={(staffMode: SightReadingStaffMode) => onSettingsChange({ staffMode })}
-                options={[
-                  { value: 'treble', label: '高音谱表' },
-                  { value: 'bass', label: '低音谱表' },
-                  { value: 'grand', label: '大谱表' }
-                ]}
-              />}
-            />
-            <SettingRow
-              description="支持现有 15 个大调"
-              icon="book"
-              title="调性"
-              action={<SettingSelect
-                ariaLabel="调性"
-                value={settings.keySignature}
-                onChange={(keySignature: MajorKeyId) => onSettingsChange({ keySignature })}
-                options={MAJOR_KEY_DISPLAY_SIGNATURES.map((key) => ({ value: key.id, label: key.displayName }))}
-              />}
-            />
-            <SettingRow
-              description="单音保持原有首音判定；双音使用 150ms 同时音捕获"
-              icon="book"
-              title="音符数量"
-              action={<SettingSelect
-                ariaLabel="音符数量"
-                value={settings.noteMode}
-                onChange={(noteMode: SightReadingNoteMode) => onSettingsChange({ noteMode })}
-                options={[
-                  { value: 'single', label: '单音' },
-                  { value: 'double', label: '双音' }
-                ]}
-              />}
-            />
-            <SettingRow
-              description="调内音或包含临时变音"
-              icon="chart"
-              title="音符内容"
-              action={settings.noteMode === 'double'
-                ? <strong>双音固定调内</strong>
-                : <SettingSelect
-                    ariaLabel="音符内容"
-                    value={settings.notePoolMode}
-                    onChange={(notePoolMode: SightReadingNotePoolMode) => onSettingsChange({ notePoolMode })}
-                    options={[
-                      { value: 'diatonic', label: '调内音' },
-                      { value: 'chromatic', label: '含临时变音' }
-                    ]}
-                  />}
-            />
-            <SettingRow
-              description="10、20、50 或 100 题"
-              icon="chart"
-              title="默认题数"
-              action={<SettingSelect
-                ariaLabel="默认题数"
-                value={String(settings.questionCount)}
-                onChange={(value: string) => onSettingsChange({ questionCount: Number(value) as SightReadingQuestionCount })}
-                options={[10, 20, 50, 100].map((value) => ({ value: String(value), label: String(value) }))}
-              />}
-            />
-            <SettingRow description={`当前模式固定为 ${answerTimeLimitSeconds} 秒`} icon="clock" title="每题时限" action={<strong>{answerTimeLimitSeconds} 秒</strong>} />
-            <SettingRow
-              description={settings.noteNameVisible ? '答题前显示目标音名' : '答题前不显示目标音名'}
-              icon="info"
-              title="显示音名"
-              action={(
-                <button
-                  aria-label={`显示音名已${settings.noteNameVisible ? '开启' : '关闭'}`}
-                  className={`mock-switch ${settings.noteNameVisible ? 'is-on' : ''}`}
-                  type="button"
-                  onClick={() => onSettingsChange({ noteNameVisible: !settings.noteNameVisible })}
-                >
-                  <small>{settings.noteNameVisible ? 'On' : 'Off'}</small><i />
-                </button>
-              )}
-            />
-          </div>
-        </div>
-        <div className="settings-column">
           <div className="settings-group">
             <div className="group-title"><span>外观</span><small>适合谱架距离阅读</small></div>
             <div className="theme-setting">
@@ -987,10 +2238,18 @@ function SettingsScreen({
               </div>
             </div>
           </div>
+        </div>
+        <div className="settings-column">
           <div className="settings-group">
             <div className="group-title"><span>关于</span><small>个人版</small></div>
-            <SettingRow description="查看版本与更新状态" icon="refresh" onClick={() => navigate('update')} title="检查更新" action={<strong>{updaterLabel}</strong>} />
-            <SettingRow description="Android Tablet Personal Edition" icon="info" title="当前版本" action={<strong>{updater.installed ? `V${updater.installed.versionName}` : '正在读取'}</strong>} />
+            <SettingRow description="Android Tablet Personal Edition" icon="info" title="钢琴基本功训练器" action={<strong>Android</strong>} />
+            <SettingRow description="versionCode 9" icon="info" title="当前版本" action={<strong>V1.4.0</strong>} />
+            {__QA_BUILD__ ? (
+              <SettingRow description="与正式版独立安装；正式更新通道已关闭" icon="refresh" title="更新通道" action={<strong>QA Debug</strong>} />
+            ) : (
+              <SettingRow description="查看版本与更新状态" icon="refresh" onClick={() => openAuxiliary('update')} title="检查更新" action={<strong>{updaterLabel}</strong>} />
+            )}
+            <SettingRow description="Natural516 / Apache-2.0" icon="book" title="开源项目" action={<strong>GitHub</strong>} />
           </div>
         </div>
       </section>
@@ -1000,6 +2259,7 @@ function SettingsScreen({
 
 function MidiScreen(): JSX.Element {
   const { runtime } = useMidiUi()
+  const { returnFromAuxiliary } = useAppNavigation()
   const midi = runtime.bluetoothSnapshot
   const status = presentMidiStatus(runtime)
   const scanActive = midi.connectionState === 'SCANNING' || midi.connectionState === 'DEVICE_FOUND'
@@ -1025,7 +2285,7 @@ function MidiScreen(): JSX.Element {
 
   return (
     <div className="standalone-frame">
-      <ProductHeader title="MIDI 连接" onBack={() => navigate('settings')} />
+      <ProductHeader midiStatusInteractive={false} title="MIDI 连接" onBack={() => returnFromAuxiliary('settings')} />
       <main className="standalone-content">
         <section className="device-hero">
           <div className="device-orbit"><span><Icon name="bluetooth" size={42} /></span><i /><i /><i /></div>
@@ -1098,6 +2358,7 @@ function updaterStatusCopy(status: UpdaterStatus): { eyebrow: string; title: str
 
 function UpdateScreen(): JSX.Element {
   const { controller, snapshot } = useUpdaterUi()
+  const { returnFromAuxiliary } = useAppNavigation()
   const copy = updaterStatusCopy(snapshot.status)
   const currentVersion = snapshot.installed ? `V${snapshot.installed.versionName} · ${snapshot.installed.versionCode}` : '正在读取'
   const targetVersion = snapshot.manifest ? `V${snapshot.manifest.versionName} · ${snapshot.manifest.versionCode}` : '—'
@@ -1134,7 +2395,7 @@ function UpdateScreen(): JSX.Element {
 
   return (
     <div className="standalone-frame">
-      <ProductHeader title="检查更新" onBack={() => navigate('settings')} />
+      <ProductHeader title="检查更新" onBack={() => returnFromAuxiliary('settings')} />
       <main className="update-content">
         <section className={`update-card is-${snapshot.status}`} aria-live="polite">
           <div className="update-illustration"><Icon name={icon} size={52} /><span /></div>
@@ -1172,17 +2433,26 @@ function UpdateScreen(): JSX.Element {
 
 function ReviewDock({
   active,
+  chordCaseId,
+  chordMockStateId,
+  onChordCaseChange,
+  onChordMockStateChange,
   runtime,
   snapshot
 }: {
   active: ScreenId
+  chordCaseId: string
+  chordMockStateId: ChordPreviewStateId
+  onChordCaseChange: (value: string) => void
+  onChordMockStateChange: (value: ChordPreviewStateId) => void
   runtime: AndroidSightReadingRuntime
   snapshot: SightRuntimeSnapshot
 }): JSX.Element {
   const [open, setOpen] = useState(false)
   const [midiNumber, setMidiNumber] = useState('60')
   const metrics = useViewportMetrics()
-  const activeLabel = screens.find((screen) => screen.id === active)?.shortLabel ?? '首页'
+  const reviewScreens = __QA_BUILD__ ? screens.filter((screen) => screen.id !== 'update') : screens
+  const activeLabel = reviewScreens.find((screen) => screen.id === active)?.shortLabel ?? '首页'
   const canAnswer = snapshot.status === 'running' && snapshot.phase === 'answering' && !snapshot.isPaused
   const reports = runtime.reports.list()
   const latestReport = runtime.reports.latest()
@@ -1205,7 +2475,7 @@ function ReviewDock({
       {open ? (
         <div className="review-dock__menu">
           <div><strong>Human UI Review</strong><button aria-label="关闭状态列表" type="button" onClick={() => setOpen(false)}><Icon name="close" size={18} /></button></div>
-          {screens.map((screen) => (
+          {reviewScreens.map((screen) => (
             <button
               className={screen.id === active ? 'is-active' : ''}
               key={screen.id}
@@ -1215,6 +2485,28 @@ function ReviewDock({
               <span>{screen.label}</span>{screen.id === active ? <Icon name="check" size={18} /> : null}
             </button>
           ))}
+          {active === 'chord-practice' ? (
+            <section className="developer-chord" aria-label="和弦静态界面检查控制">
+              <div className="developer-midi__heading">
+                <span>DEVELOPMENT ONLY</span>
+                <strong>Chord V1 运行 / 静态状态</strong>
+              </div>
+              <label>
+                <span>UI STATE</span>
+                <select value={chordMockStateId} onChange={(event) => onChordMockStateChange(event.target.value as ChordPreviewStateId)}>
+                  <option value="live">LIVE · REAL RUNTIME</option>
+                  {CHORD_MOCK_STATES.map((state) => <option key={state.id} value={state.id}>{state.label}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>QA CASE</span>
+                <select value={chordCaseId} onChange={(event) => onChordCaseChange(event.target.value)}>
+                  {CHORD_MOCK_CASES.map((item) => <option key={item.id} value={item.id}>{item.qaLabel}</option>)}
+                </select>
+              </label>
+              <small>LIVE 使用真实 Runtime；其余选项仅覆盖静态画面，不改变判题或保存记录。</small>
+            </section>
+          ) : null}
           {SHOW_DEVELOPMENT_TOOLS ? (
             <section className="developer-midi" aria-label="开发模拟 MIDI 控制">
               <div className="developer-midi__heading">
@@ -1313,21 +2605,99 @@ function PersistenceErrorNotice({ runtime }: { runtime: AndroidSightReadingRunti
   )
 }
 
+function ChordPersistenceErrorNotice({ persistence }: { persistence: ChordPersistenceSnapshot }): JSX.Element | null {
+  if (persistence.status !== 'error') return null
+  return (
+    <aside className="persistence-error" role="alert">
+      {persistence.errorContext === 'save'
+        ? <span><strong>练习已结束，但记录保存失败。</strong><small>和弦练习结果没有被加入练习记录。</small></span>
+        : <span><strong>暂时无法读取和弦练习记录。</strong><small>其他练习功能仍可正常使用。</small></span>}
+    </aside>
+  )
+}
+
 function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element {
   const snapshot = useSightReadingRuntime(runtime)
+  const activeSessionHost = useMemo(() => new ActivePracticeSessionHost(), [])
+  const chordRuntime = useMemo(() => new ChordPracticeRuntime({
+    clock: { now: () => performance.now() },
+    scheduler: {
+      schedule: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      cancel: (id) => window.clearTimeout(id)
+    },
+    rng: () => Math.random()
+  }), [])
+  const chordKeepAwakeSnapshot = useChordPracticeRuntime(chordRuntime)
+  const practiceKeepAwake = useMemo(() => createPracticeKeepAwakeController(), [])
   const updater = useMemo(() => createAndroidUpdaterController(), [])
+  const chordSettingsRepository = useMemo(() => new ChordSettingsRepository(CapacitorPreferencesBackend), [])
+  const chordReportRepository = useMemo(() => new ChordReportRepository(CapacitorPreferencesBackend), [])
+  const chordPersistence = useMemo(() => new ChordReportPersistenceCoordinator(chordReportRepository), [chordReportRepository])
+  const chordPersistenceSnapshot = useChordPersistence(chordPersistence)
   const updaterSnapshot = useUpdaterSnapshot(updater)
   const settings = runtime.settings
   const [screen, setScreen] = useState<ScreenId>(() => readScreen())
+  const [appForeground, setAppForeground] = useState(true)
   const screenRef = useRef<ScreenId>(screen)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [chordCaseId, setChordCaseId] = useState(DEFAULT_CHORD_MOCK_CASE_ID)
+  const [chordMockStateId, setChordMockStateId] = useState<ChordPreviewStateId>('live')
+  const [chordQuestionCount, setChordQuestionCount] = useState<ChordQuestionCount>(20)
+  const [chordPracticeMode, setChordPracticeMode] = useState<ChordPracticeMode>('comprehensive')
+  const [chordSettings, setChordSettings] = useState<ChordSettings>(DEFAULT_CHORD_SETTINGS)
+  const [chordSettingsReady, setChordSettingsReady] = useState(false)
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all')
+  const [selectedChordRecordId, setSelectedChordRecordId] = useState<string | null>(null)
+
+  useEffect(() => {
+    void chordPersistence.initialize()
+  }, [chordPersistence])
+
+  useEffect(() => {
+    let active = true
+    void chordSettingsRepository.load().then((loaded) => {
+      if (active) {
+        setChordSettings(loaded)
+        setChordSettingsReady(true)
+      }
+    }).catch(() => {
+      if (active) {
+        setChordSettings(DEFAULT_CHORD_SETTINGS)
+        setChordSettingsReady(true)
+      }
+    })
+    return () => { active = false }
+  }, [chordSettingsRepository])
+
+  const updateChordSettings = (changes: Partial<Pick<ChordSettings, 'sequentialKey' | 'showChordTones'>>): void => {
+    setChordSettings((current) => {
+      const next: ChordSettings = Object.freeze({ ...current, ...changes })
+      void chordSettingsRepository.save(next).catch(() => {})
+      return next
+    })
+  }
 
   useEffect(() => {
     void runtime.startMidi()
   }, [runtime])
 
   useEffect(() => {
-    void updater.initialize()
+    const unsubscribe = runtime.midiRouter.subscribe((event) => chordRuntime.handleMidi(event))
+    return unsubscribe
+  }, [chordRuntime, runtime])
+
+  const chordTransportReady = runtime.midiSource === 'development'
+    || runtime.bluetoothSnapshot.connectionState === 'CONNECTED'
+  const previousChordTransportReady = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (previousChordTransportReady.current === chordTransportReady) return
+    previousChordTransportReady.current = chordTransportReady
+    if (chordTransportReady) chordRuntime.handleTransportReady()
+    else chordRuntime.handleTransportLost()
+  }, [chordRuntime, chordTransportReady])
+
+  useEffect(() => {
+    if (!__QA_BUILD__) void updater.initialize()
     return () => { void updater.dispose() }
   }, [updater])
 
@@ -1342,6 +2712,93 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
     screenRef.current = screen
   }, [screen])
 
+  const keepPracticeAwake = shouldKeepPracticeAwake({
+    appForeground,
+    screen,
+    sightStatus: snapshot.status,
+    sightPaused: snapshot.isPaused,
+    chordStatus: chordKeepAwakeSnapshot.status
+  })
+
+  useEffect(() => {
+    void practiceKeepAwake.setEnabled(keepPracticeAwake)
+  }, [keepPracticeAwake, practiceKeepAwake])
+
+  useEffect(() => () => {
+    void practiceKeepAwake.dispose()
+  }, [practiceKeepAwake])
+
+  const openAuxiliary = useCallback((destination: 'midi' | 'update'): void => {
+    const origin = screenRef.current
+    if (origin === destination) return
+    activeSessionHost.rememberAuxiliaryReturn(origin, destination)
+
+    const sightPracticeScreens: ScreenId[] = [
+      'sight-active', 'sight-correct', 'sight-wrong', 'sight-timeout', 'sight-early-end'
+    ]
+    if (sightPracticeScreens.includes(origin) && runtime.snapshot.status === 'running' && !runtime.snapshot.isPaused) {
+      runtime.pause()
+    }
+    if (origin === 'chord-practice') {
+      const chordStatus = chordRuntime.snapshot.status
+      if (chordStatus === 'RUNNING' || chordStatus === 'SUCCESS_FEEDBACK') {
+        chordRuntime.pause('manual-pause')
+      }
+    }
+    navigate(destination)
+  }, [activeSessionHost, chordRuntime, runtime])
+
+  const returnFromAuxiliary = useCallback((fallback: ScreenId): void => {
+    navigate(activeSessionHost.consumeAuxiliaryReturn(screenRef.current, fallback) as ScreenId)
+  }, [activeSessionHost])
+
+  const openChordReportDetail = useCallback((recordId: string, filter: HistoryFilter): void => {
+    setHistoryFilter(filter)
+    setSelectedChordRecordId(recordId)
+    navigate('chord-report-detail')
+  }, [])
+
+  const closeChordReportDetail = useCallback((): void => {
+    setSelectedChordRecordId(null)
+    navigate('history')
+  }, [])
+
+  const endSightPractice = useCallback((): void => {
+    const active = activeSessionHost.current
+    runtime.stop()
+    if (active?.module === 'sight') activeSessionHost.end(active.id)
+    navigate('sight-ready')
+  }, [activeSessionHost, runtime])
+
+  const endChordPractice = useCallback((): void => {
+    const active = activeSessionHost.current
+    chordRuntime.stop()
+    if (active?.module === 'chord') {
+      const finalizedNow = activeSessionHost.end(active.id)
+      if (finalizedNow) void chordPersistence.finalize(active.id, chordRuntime.snapshot, 'stopped')
+    }
+    navigate('chord-mode-select')
+  }, [activeSessionHost, chordPersistence, chordRuntime])
+
+  useEffect(() => {
+    const active = activeSessionHost.current
+    if (snapshot.status === 'finished' && active?.module === 'sight') {
+      activeSessionHost.finalize(active.id)
+    }
+  }, [activeSessionHost, snapshot.status])
+
+  useEffect(() => chordRuntime.subscribe(() => {
+    const active = activeSessionHost.current
+    const current = chordRuntime.snapshot
+    if (active?.module === 'chord' && current.status !== 'IDLE' && current.status !== 'STOPPED') {
+      chordPersistence.beginSession(active.id)
+    }
+    if (current.status === 'SESSION_COMPLETE' && active?.module === 'chord') {
+      const finalizedNow = activeSessionHost.finalize(active.id)
+      if (finalizedNow) void chordPersistence.finalize(active.id, current, 'completed')
+    }
+  }), [activeSessionHost, chordPersistence, chordRuntime])
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
@@ -1354,6 +2811,16 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       const practiceScreens: ScreenId[] = [
         'sight-active', 'sight-correct', 'sight-wrong', 'sight-timeout'
       ]
+
+      if (currentScreen === 'midi' || currentScreen === 'update') {
+        returnFromAuxiliary('settings')
+        return
+      }
+
+      if (currentScreen === 'chord-report-detail') {
+        closeChordReportDetail()
+        return
+      }
 
       if (currentScreen === 'sight-early-end' && currentSnapshot.status === 'running') {
         runtime.resume()
@@ -1372,9 +2839,22 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
         return
       }
 
+      if (currentScreen === 'chord-practice') {
+        endChordPractice()
+        return
+      }
+
       const parentScreen: Partial<Record<ScreenId, ScreenId>> = {
-        'sight-ready': 'home',
-        'sight-result': 'home',
+        'sight-ready': 'practice',
+        'sight-result': 'practice',
+        'chord-mode-select': 'practice',
+        'chord-practice': 'chord-mode-select',
+        'chord-report-detail': 'history',
+        'chord-query-tool': 'tools',
+        'scale-key-signature-tool': 'tools',
+        'interval-query-tool': 'tools',
+        practice: 'home',
+        tools: 'home',
         history: 'home',
         settings: 'home',
         midi: 'settings',
@@ -1397,9 +2877,13 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
 
     void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
+        setAppForeground(true)
         void runtime.resumeFromAppLifecycle()
-        void updater.refreshInstallPermission()
+        if (!__QA_BUILD__) void updater.refreshInstallPermission()
       } else {
+        setAppForeground(false)
+        void practiceKeepAwake.setEnabled(false)
+        chordRuntime.pause('background')
         void runtime.suspendForAppLifecycle()
       }
     }).then((handle) => {
@@ -1414,7 +2898,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       disposed = true
       for (const remove of removeListeners) void remove()
     }
-  }, [runtime, updater])
+  }, [chordRuntime, closeChordReportDetail, endChordPractice, practiceKeepAwake, returnFromAuxiliary, runtime, updater])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -1431,30 +2915,64 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   }, [runtime, screen, snapshot.phase, snapshot.result, snapshot.status])
 
   const startPractice = (): void => {
+    activeSessionHost.begin('sight', 'sight-active')
     runtime.start()
     navigate('sight-active')
   }
 
   const content = (() => {
     switch (screen) {
-      case 'home': return <HomeScreen settings={settings} />
-      case 'sight-ready': return <SightReadyScreen onStart={startPractice} settings={settings} />
+      case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} />
+      case 'practice': return <PracticeHubScreen />
+      case 'tools': return <ToolsHubScreen />
+      case 'chord-query-tool': return <ChordQueryToolScreen />
+      case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen />
+      case 'interval-query-tool': return <IntervalQueryToolScreen />
+      case 'chord-mode-select': return <ChordModeSelectScreen settingsReady={chordSettingsReady} onSelectMode={(mode) => { activeSessionHost.begin('chord', 'chord-practice'); setChordPracticeMode(mode); navigate('chord-practice') }} />
+      case 'sight-ready': return <SightReadyScreen onSettingsChange={(changes) => { void runtime.updateSettings(changes) }} onStart={startPractice} settings={settings} />
       case 'sight-active':
       case 'sight-correct':
       case 'sight-wrong':
       case 'sight-timeout':
       case 'sight-early-end':
-        return <SightFocusScreen runtime={runtime} screen={screen} settings={settings} snapshot={snapshot} />
+        return <SightFocusScreen onStopAndSave={endSightPractice} runtime={runtime} screen={screen} settings={settings} snapshot={snapshot} />
       case 'sight-result':
         return snapshot.report
           ? <SightResultScreen report={snapshot.report} />
-          : <SightReadyScreen onStart={startPractice} settings={settings} />
-      case 'history': return <HistoryScreen runtime={runtime} />
+          : <SightReadyScreen onSettingsChange={(changes) => { void runtime.updateSettings(changes) }} onStart={startPractice} settings={settings} />
+      case 'chord-practice': return (
+        <ChordPracticeScreen
+          caseId={chordCaseId}
+          chordSettings={chordSettings}
+          mode={chordPracticeMode}
+          previewStateId={chordMockStateId}
+          runtime={chordRuntime}
+          midiRuntime={runtime}
+          onExplicitEnd={endChordPractice}
+          onChordSettingsChange={updateChordSettings}
+          onQuestionCountChange={setChordQuestionCount}
+          questionCount={chordQuestionCount}
+        />
+      )
+      case 'history': return (
+        <HistoryScreen
+          chordHistory={chordPersistenceSnapshot}
+          chordPersistence={chordPersistence}
+          filter={historyFilter}
+          onFilterChange={setHistoryFilter}
+          onOpenChordReport={openChordReportDetail}
+          runtime={runtime}
+        />
+      )
+      case 'chord-report-detail': return (
+        <ChordReportDetailScreen
+          onBack={closeChordReportDetail}
+          report={resolveChordReportById(chordPersistenceSnapshot.records, selectedChordRecordId)}
+        />
+      )
       case 'settings': return (
         <SettingsScreen
-          onSettingsChange={(changes) => { void runtime.updateSettings(changes) }}
           onThemeChange={setTheme}
-          settings={settings}
           theme={theme}
         />
       )
@@ -1466,10 +2984,23 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   return (
     <UpdaterUiContext.Provider value={{ controller: updater, snapshot: updaterSnapshot }}>
       <MidiUiContext.Provider value={{ runtime }}>
-        <div className="tablet-app">{content}</div>
-        <PersistenceErrorNotice runtime={runtime} />
-        {SHOW_DEVELOPMENT_TOOLS ? <ReviewDock active={screen} runtime={runtime} snapshot={snapshot} /> : null}
-        <OrientationNotice />
+        <AppNavigationContext.Provider value={{ openAuxiliary, returnFromAuxiliary }}>
+          <div className="tablet-app">{content}</div>
+          <PersistenceErrorNotice runtime={runtime} />
+          <ChordPersistenceErrorNotice persistence={chordPersistenceSnapshot} />
+          {SHOW_DEVELOPMENT_TOOLS ? (
+            <ReviewDock
+              active={screen}
+              chordCaseId={chordCaseId}
+              chordMockStateId={chordMockStateId}
+              onChordCaseChange={setChordCaseId}
+              onChordMockStateChange={setChordMockStateId}
+              runtime={runtime}
+              snapshot={snapshot}
+            />
+          ) : null}
+          <OrientationNotice />
+        </AppNavigationContext.Provider>
       </MidiUiContext.Provider>
     </UpdaterUiContext.Provider>
   )

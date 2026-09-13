@@ -1,16 +1,16 @@
 # 钢琴基本功训练器
 
-Piano Fundamentals Trainer 是一款面向横屏 Android 平板的钢琴识谱训练应用。它通过 Android 原生 Bluetooth MIDI 接收真实数码钢琴输入，并以五线谱、即时判定和本地练习记录帮助用户进行专注的识谱训练。
+Piano Fundamentals Trainer 是一款面向横屏 Android 平板的钢琴基本功训练应用。它通过 Android 原生 Bluetooth MIDI 接收真实数码钢琴输入，并以五线谱、即时判定和本地练习记录支持识谱与和弦练习。
 
-当前公开源码对应 Android `1.4.0`（`versionCode 9`）。Android 是当前支持的产品目标；仓库仅保留 Android 运行、构建、测试及必要共享核心所需的代码。
+当前公开源码对应 Android `1.5.0`（`versionCode 10`）。Android 是当前支持的产品目标；仓库仅保留 Android 运行、构建、测试及必要共享核心所需的代码。
 
 ## 下载
 
-官方 Android Release、APK 与当前更新清单统一由本仓库的 GitHub Releases 提供：
+官方 Android Release、APK 与当前更新清单由独立发布仓库提供：
 
-- [下载最新正式版本](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest)
+- [下载最新正式版本](https://github.com/Natural516/piano-trainer-releases/releases/latest)
 
-原 [Natural516/piano-trainer-releases](https://github.com/Natural516/piano-trainer-releases) 仓库将作为 Legacy Update Bridge / Historical Release Archive 保留，用于兼容已经发布的旧版 App 更新入口及保存旧版本发布历史。
+[Natural516/piano-trainer-releases](https://github.com/Natural516/piano-trainer-releases) 同时保存历史正式版本，并继续作为应用内更新器的公开 HTTPS 来源。
 
 只有由 Natural516 控制的正式签名身份签署、并通过官方更新验证链校验的 APK 才属于官方构建。
 
@@ -22,6 +22,11 @@ Piano Fundamentals Trainer 是一款面向横屏 Android 平板的钢琴识谱�
 - 双音音程训练和答题后音程反馈
 - Android 原生 Bluetooth MIDI 输入
 - 正确、错误与超时反馈，以及暂停和安全提前结束
+- 和弦综合练习与顺序练习（分解和弦 → 柱式和弦）
+- 和弦练习报告、持久化记录与历史详情
+- 和弦文本查询
+- 自然大调音阶与调号查询
+- 音程查询
 - 本地持久化设置、已完成报告和停止后的部分报告
 - 基于真实本地报告的只读练习历史
 - 用户主动触发、包含包名/版本/哈希/签名验证的安全更新流程
@@ -40,14 +45,16 @@ Piano Fundamentals Trainer 是一款面向横屏 Android 平板的钢琴识谱�
 
 ## 当前范围
 
-Android `1.4.0` 当前完成并发布的训练模块是 Sight Reading。以下模块不是当前 Android 发布功能：
+Android `1.5.0` 当前完成并发布的训练模块是 Sight Reading 与 Chord Practice。Chord Query Text V1、Natural Major Scale & Key Signature V1 和 Interval Query V1 是只读工具。以下内容不是当前 Android 发布功能：
 
 - Scale Practice
 - Rhythm
-- Chord
 - Coordination
 - Free Practice
 - Score Practice
+- Chord Query Virtual Piano
+- Minor-scale Tool expansion
+- Coach / Planner
 
 Android 版本不包含内置钢琴采样发声，也不提供自动/静默安装、后台练习或停止后恢复同一会话。
 
@@ -58,6 +65,7 @@ Android 版本不包含内置钢琴采样发声，也不提供自动/静默安�
 - VexFlow + Bravura 五线谱渲染
 - Kotlin Android Bluetooth MIDI 插件
 - 平台无关的 Sight Reading 控制器和确定性时钟/调度边界
+- 确定性和弦理论、判定、运行时与报告边界
 - Capacitor Preferences 本地持久化
 - 原生 HTTPS 下载、严格 TypeScript 清单解析和 Android 系统安装器交接
 

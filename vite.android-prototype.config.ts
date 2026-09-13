@@ -10,6 +10,7 @@ if (!productionManifestUrl || new URL(productionManifestUrl).protocol !== 'https
 }
 
 export default defineConfig(({ mode }) => {
+  const isQaBuild = mode === 'android-qa'
   const updateManifestUrl = mode === 'android-release'
     ? productionManifestUrl
     : process.env.UPDATE_MANIFEST_URL?.trim() ?? ''
@@ -18,6 +19,7 @@ export default defineConfig(({ mode }) => {
     root: resolve('prototype/android-tablet-v1'),
     base: './',
     define: {
+      __QA_BUILD__: JSON.stringify(isQaBuild),
       __UPDATE_MANIFEST_URL__: JSON.stringify(updateManifestUrl)
     },
     plugins: [react()],

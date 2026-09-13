@@ -1,6 +1,6 @@
 PIANO FUNDAMENTALS TRAINER — PUBLIC SNAPSHOT EXCLUSIONS
 
-Source checkpoint: 352e02a3c78b0f0b1a5ffbf5a270ba8e97c1cf27
+Source checkpoint: 9d393eb91677a8624982f6a9677bbc479b732702
 Snapshot scope: Android application plus required shared build/test dependencies
 
 EXCLUDED FROM THE PUBLIC SNAPSHOT
@@ -12,7 +12,7 @@ native-audio-poc/
   Windows-only feasibility experiment; not part of Android runtime or build.
 
 resources/piano-samples/salamander/
-  Legacy desktop audio samples; Android 1.4.0 has no internal piano sound.
+  Legacy desktop audio samples; the Android product has no internal piano sound.
 
 src/main/
 src/preload/

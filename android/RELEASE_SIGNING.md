@@ -107,10 +107,19 @@ share that file.
 
 `android/version.properties` is the single Android package-version source.
 The permanent Release chain began at A4.0B with `versionCode=1` and
-`versionName=1.0`. The current A4.3C blocker-fix target values are:
+`versionName=1.0`. The current source values are:
 
-- `versionCode=8`
-- `versionName=1.3.4`
+- `versionCode=10`
+- `versionName=1.5.0`
+
+Public `versionCode=9` remains occupied by `versionName=1.4.0` and must never
+be reused or replaced. The 1.5.0 release consumes `versionCode=10`; any later
+distributable Android build must use `versionCode > 10`. Do not increment
+`android/version.properties` during ordinary development or validation; the
+version bump belongs to a future explicitly authorized release stage.
+
+The production package and permanent signer remain frozen. The QA package is
+separate from production, and its updater remains disabled/fail-closed.
 
 For every distributable update:
 

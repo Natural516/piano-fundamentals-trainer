@@ -148,6 +148,7 @@ export class AndroidMidiInputRouter {
   private eventId = 0
   private activeSourceValue: AndroidMidiInputSource
   private lastAcceptedEventValue: SightReadingMidiEvent | null = null
+  private readonly observers = new Set<(event: SightReadingMidiEvent) => void>()
 
   constructor(
     private readonly clock: Clock,
@@ -166,6 +167,15 @@ export class AndroidMidiInputRouter {
   }
 
   readWatermark = (): number => this.eventId
+
+  /**
+   * Observe the already-normalized application event stream. The primary sink
+   * remains authoritative; observers cannot alter routing, identity or timing.
+   */
+  subscribe(observer: (event: SightReadingMidiEvent) => void): () => void {
+    this.observers.add(observer)
+    return () => { this.observers.delete(observer) }
+  }
 
   setActiveSource(source: AndroidMidiInputSource): boolean {
     if (source === this.activeSourceValue) return false
@@ -193,6 +203,7 @@ export class AndroidMidiInputRouter {
     })
     this.lastAcceptedEventValue = event
     this.sink(event)
+    for (const observer of this.observers) observer(event)
     return event
   }
 }

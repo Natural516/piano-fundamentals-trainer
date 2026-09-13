@@ -99,6 +99,13 @@ android {
         }
     }
     buildTypes {
+        qa {
+            initWith debug
+            applicationIdSuffix ".qa"
+            debuggable true
+            buildConfigField "String", "UPDATE_MANIFEST_URL", '""'
+            matchingFallbacks = ['debug']
+        }
         release {
             if (releaseSigningReady) {
                 signingConfig signingConfigs.getByName('release')

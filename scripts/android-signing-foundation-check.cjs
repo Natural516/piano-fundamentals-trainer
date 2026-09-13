@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
+const { execFileSync } = require('node:child_process')
 
 const repositoryRoot = path.resolve(__dirname, '..')
 const read = (relativePath) => fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8')
@@ -20,8 +21,8 @@ check('permanent Android identity remains frozen', () => {
 check('Android version has one explicit committed source', () => {
   const version = read('android/version.properties')
   const gradle = read('android/app/build.gradle')
-  assert.match(version, /^versionCode=9$/m)
-  assert.match(version, /^versionName=1\.4\.0$/m)
+  assert.match(version, /^versionCode=10$/m)
+  assert.match(version, /^versionName=1\.5\.0$/m)
   assert.match(gradle, /rootProject\.file\('version\.properties'\)/)
   assert.match(gradle, /versionCode appVersionCode/)
   assert.match(gradle, /versionName appVersionName/)
@@ -45,19 +46,11 @@ check('local secrets and private key extensions are ignored', () => {
   assert.match(ignore, /^\*\.keystore$/m)
   assert.match(ignore, /^\*\.p12$/m)
   assert.match(ignore, /^\*\.pfx$/m)
-  const visibleFiles = []
-  const walk = (directory, relative = '') => {
-    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      if (['node_modules', '.git', 'build', 'dist'].includes(entry.name)) continue
-      const childRelative = path.join(relative, entry.name)
-      const child = path.join(directory, entry.name)
-      if (entry.isDirectory()) walk(child, childRelative)
-      else visibleFiles.push(childRelative.replaceAll('\\', '/'))
-    }
-  }
-  walk(repositoryRoot)
-  assert.equal(visibleFiles.some((file) => /(^|\/)keystore\.properties$/i.test(file)), false)
-  assert.equal(visibleFiles.some((file) => /\.(jks|keystore|p12|pfx)$/i.test(file)), false)
+  const tracked = execFileSync('git', ['ls-files'], { cwd: repositoryRoot, encoding: 'utf8' })
+    .split(/\r?\n/)
+    .filter(Boolean)
+  assert.equal(tracked.some((file) => /(^|\/)keystore\.properties$/i.test(file)), false)
+  assert.equal(tracked.some((file) => /\.(jks|keystore|p12|pfx)$/i.test(file)), false)
 })
 
 check('committed signing example contains placeholders but no passwords', () => {
