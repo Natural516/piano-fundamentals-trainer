@@ -19,9 +19,11 @@
 
 ### ANDROID-RELEASE-CODE-001 — Consumed public version code
 
-- Current source: `versionCode=9`, `versionName=1.4.0`.
+- Current release source: `versionCode=10`, `versionName=1.5.0`.
 - Public `versionCode=9` is already consumed.
-- Every future distributable Android build must use `versionCode > 9`.
+- It must never be reused or overwrite the existing `v1.4.0` release.
+- The 1.5.0 release consumes `versionCode=10`; every later distributable
+  Android build must use `versionCode > 10`.
 - Ordinary development must not increment `android/version.properties`; a
   version change requires an explicitly authorized release stage.
 

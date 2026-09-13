@@ -13,7 +13,7 @@ be used to infer Android feature availability or the Android next stage.
 - Stable source HEAD entering this maintenance pass:
   `dadd61bd2c70d3b4ace522e32cc2764180fe6bdd`
 - Production package: `com.pianofundamentals.trainer`
-- Current source version: `versionCode=9`, `versionName=1.4.0`
+- Current source version: `versionCode=10`, `versionName=1.5.0`
 - Primary device: Lenovo Xiaoxin Pad Pro 12.7, landscape
 - Production Android input: native Bluetooth MIDI, validated with Roland
   FP-30X
@@ -58,10 +58,11 @@ are not Android features and are not evidence that these Android modules exist.
 
 ## Release boundary
 
-Public `versionCode=9` is consumed by Android `versionName=1.4.0`. Every future
-distributable Android build must use a `versionCode` greater than 9. Ordinary
-development and validation work must not increment the version; that change
-belongs to an explicitly authorized release stage.
+Public `versionCode=9` remains consumed by Android `versionName=1.4.0` and must
+never be reused. Android `versionName=1.5.0` uses `versionCode=10`; after this
+release, every later distributable Android build must use a `versionCode`
+greater than 10. Ordinary development and validation work must not increment
+the version; that change belongs to an explicitly authorized release stage.
 
 Release signing remains fail-closed, permanent signing material remains
 outside the repository, the QA package remains separate, and the QA updater
