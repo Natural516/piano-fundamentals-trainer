@@ -1,6 +1,6 @@
 # Android Project State
 
-Updated: 2026-09-13
+Updated: 2026-09-14
 
 This document is the current source of truth for the Android tablet product.
 The generic `PROJECT_STATE.md`, `STAGE_LOG.md`, `ARCHITECTURE.md`, and
@@ -13,7 +13,7 @@ be used to infer Android feature availability or the Android next stage.
 - Stable source HEAD entering this maintenance pass:
   `dadd61bd2c70d3b4ace522e32cc2764180fe6bdd`
 - Production package: `com.pianofundamentals.trainer`
-- Current source version: `versionCode=11`, `versionName=1.5.1`
+- Current source version: `versionCode=12`, `versionName=1.5.2`
 - Primary device: Lenovo Xiaoxin Pad Pro 12.7, landscape
 - Production Android input: native Bluetooth MIDI, validated with Roland
   FP-30X
@@ -60,9 +60,10 @@ are not Android features and are not evidence that these Android modules exist.
 
 Public `versionCode=9` remains consumed by Android `versionName=1.4.0`, and
 `versionCode=10` remains consumed by Android `versionName=1.5.0`; neither may
-be reused. Android migration release `versionName=1.5.1` uses `versionCode=11`;
+be reused. Android migration release `versionName=1.5.1` uses `versionCode=11`,
+and the Settings version-display patch `versionName=1.5.2` uses `versionCode=12`;
 after this release, every later distributable Android build must use a
-`versionCode` greater than 11. Ordinary development and validation work must not increment
+`versionCode` greater than 12. Ordinary development and validation work must not increment
 the version; that change belongs to an explicitly authorized release stage.
 
 Release signing remains fail-closed, permanent signing material remains

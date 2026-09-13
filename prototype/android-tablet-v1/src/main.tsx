@@ -2213,6 +2213,10 @@ function SettingsScreen({
       : updater.status === 'checking' || updater.status === 'downloading' || updater.status === 'verifying'
         ? '处理中'
         : updater.status === 'error' ? '需要检查' : '检查更新'
+  const installedVersionAction = updater.installed ? `V${updater.installed.versionName}` : '读取中'
+  const installedVersionDescription = updater.installed
+    ? `versionCode ${updater.installed.versionCode}`
+    : '正在读取版本信息'
   return (
     <ProductFrame active="settings" title="设置">
       <section className="settings-layout">
@@ -2243,7 +2247,7 @@ function SettingsScreen({
           <div className="settings-group">
             <div className="group-title"><span>关于</span><small>个人版</small></div>
             <SettingRow description="Android Tablet Personal Edition" icon="info" title="钢琴基本功训练器" action={<strong>Android</strong>} />
-            <SettingRow description="versionCode 9" icon="info" title="当前版本" action={<strong>V1.4.0</strong>} />
+            <SettingRow description={installedVersionDescription} icon="info" title="当前版本" action={<strong>{installedVersionAction}</strong>} />
             {__QA_BUILD__ ? (
               <SettingRow description="与正式版独立安装；正式更新通道已关闭" icon="refresh" title="更新通道" action={<strong>QA Debug</strong>} />
             ) : (
