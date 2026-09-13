@@ -1,5 +1,9 @@
 # PROJECT_STATE
 
+> **Legacy Windows/Electron document.** This file records the earlier desktop
+> product and is not the Android tablet project's current state or roadmap. For
+> the current Android source of truth, use `ANDROID_PROJECT_STATE.md`.
+
 Updated: 2026-08-13
 
 ## Current stage

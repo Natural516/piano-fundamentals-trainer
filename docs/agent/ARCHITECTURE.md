@@ -1,5 +1,9 @@
 # ARCHITECTURE
 
+> **Legacy Windows/Electron architecture.** This file documents the desktop
+> renderer and is not the architecture inventory for the Android tablet app.
+> See `ANDROID_PROJECT_STATE.md` for the current Android product boundary.
+
 ## MIDI
 
 `Web MIDI callback → parseMidiMessage → publishMidiEvent → practice hook subscription`

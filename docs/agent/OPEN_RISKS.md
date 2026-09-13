@@ -1,5 +1,46 @@
 # OPEN_RISKS
 
+> This file contains historical and cross-platform entries. The authoritative
+> current Android product status is `ANDROID_PROJECT_STATE.md`. In particular,
+> legacy Windows/Electron roadmap items below do not select the next Android
+> feature stage.
+
+## Android current maintenance and release constraints
+
+### ANDROID-VALIDATION-001 — Icon validation baseline
+
+- Priority: high-priority maintenance
+- Status: DIRTY / REVIEWABLE in the validation-baseline repair pass
+- The former I03 assertion required committed launcher resources to differ
+  from the clean worktree, so it necessarily failed after a correct commit.
+- The replacement validates the committed launcher bitmaps and QA previews
+  against fixed SHA-256 facts for the approved generated artifacts. Icon bytes
+  and product behavior remain unchanged.
+
+### ANDROID-RELEASE-CODE-001 — Consumed public version code
+
+- Current source: `versionCode=9`, `versionName=1.4.0`.
+- Public `versionCode=9` is already consumed.
+- Every future distributable Android build must use `versionCode > 9`.
+- Ordinary development must not increment `android/version.properties`; a
+  version change requires an explicitly authorized release stage.
+
+### Android medium-term technical debt
+
+The following are maintenance concerns, not current product failures:
+
+- large Android `main.tsx` and stylesheet;
+- notation/theme source-path coupling to the renderer tree;
+- UI coverage weighted toward source/contract assertions rather than rendered
+  visual regression;
+- separate Chord Practice and Chord Query theory catalogs;
+- no automated public-snapshot export boundary;
+- process-local theme selection;
+- Gradle future-compatibility warnings;
+- production logging configuration review before the next public release.
+
+## Historical and cross-platform risk register
+
 ## P0
 - None known after automated validation.
 
@@ -103,6 +144,8 @@
 ### UI-004 — Core Exercise Practice Surface Redesign
 
 - Priority: P1
-- Status: NEXT / READY TO START
-- Scope: UI-004A Scale Practice, UI-004B Rhythm & Syncopation, UI-004C Coordination, and UI-004D Chord Practice.
-- Complete UI-004 before large-scale F4 Curriculum implementation.
+- Status: LEGACY WINDOWS/ELECTRON ROADMAP — NOT AN ANDROID NEXT STAGE
+- Historical desktop scope: UI-004A Scale Practice, UI-004B Rhythm &
+  Syncopation, UI-004C Coordination, and UI-004D Chord Practice.
+- This entry does not describe current Android feature availability and must not
+  be used to choose Android work. Consult `ANDROID_PROJECT_STATE.md`.

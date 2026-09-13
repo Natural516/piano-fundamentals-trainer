@@ -1,5 +1,9 @@
 # QA_MATRIX
 
+> **Legacy Windows/Electron QA matrix.** This matrix is retained as desktop
+> history and must not be used as the Android tablet validation baseline. See
+> `ANDROID_PROJECT_STATE.md` for current Android status and boundaries.
+
 Legend: UNIT PASS / INTEGRATION PASS / REGRESSION PASS / HARDWARE QA PENDING / HUMAN QA PENDING / MUSICAL QA PENDING
 
 | Feature | Unit | Integration | Regression | Hardware | Human | Musical |

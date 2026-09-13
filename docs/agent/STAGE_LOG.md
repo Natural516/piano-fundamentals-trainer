@@ -1,5 +1,9 @@
 # STAGE_LOG
 
+> **Legacy Windows/Electron stage log.** These stages are retained as desktop
+> history and must not be treated as implemented Android features or the next
+> Android stage. See `ANDROID_PROJECT_STATE.md` for current Android status.
+
 ## Stage 0 — MIDI per-event layer + scale time-axis + report cleanup
 
 - Goal: fix MIDI multi-event loss (P0), scale 8/8 missed (P1), simplify sight-reading report, unify report back action, add real event-chain tests.
