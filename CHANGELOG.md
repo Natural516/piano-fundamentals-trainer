@@ -2,6 +2,13 @@
 
 This changelog records supported Android release facts established by repository acceptance records.
 
+## 1.5.1 — versionCode 11
+
+- Migrated the production updater endpoint to this canonical source repository.
+- Unified public source, official Android Releases, APK downloads and updater metadata in one repository.
+- Added no new product module and preserved package identity, permanent signing identity, local data compatibility and updater verification rules.
+- Retained the legacy release repository only as a temporary compatibility bridge for clients released before 1.5.1.
+
 ## 1.5.0 — versionCode 10
 
 - Added Chord Practice V1 with comprehensive and sequential practice flows.

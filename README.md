@@ -2,15 +2,15 @@
 
 Piano Fundamentals Trainer 是一款面向横屏 Android 平板的钢琴基本功训练应用。它通过 Android 原生 Bluetooth MIDI 接收真实数码钢琴输入，并以五线谱、即时判定和本地练习记录支持识谱与和弦练习。
 
-当前公开源码对应 Android `1.5.0`（`versionCode 10`）。Android 是当前支持的产品目标；仓库仅保留 Android 运行、构建、测试及必要共享核心所需的代码。
+当前公开源码对应 Android `1.5.1`（`versionCode 11`）。Android 是当前支持的产品目标；仓库仅保留 Android 运行、构建、测试及必要共享核心所需的代码。
 
 ## 下载
 
-官方 Android Release、APK 与当前更新清单由独立发布仓库提供：
+本仓库统一维护公开源码、官方 Android Releases、APK 下载与应用内更新元数据：
 
-- [下载最新正式版本](https://github.com/Natural516/piano-trainer-releases/releases/latest)
+- [下载最新正式版本](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest)
 
-[Natural516/piano-trainer-releases](https://github.com/Natural516/piano-trainer-releases) 同时保存历史正式版本，并继续作为应用内更新器的公开 HTTPS 来源。
+旧的 `Natural516/piano-trainer-releases` 仓库暂时仅作为 1.5.1 以前客户端的更新兼容桥接；新的正常版本不再发布到该仓库。
 
 只有由 Natural516 控制的正式签名身份签署、并通过官方更新验证链校验的 APK 才属于官方构建。
 

@@ -1,6 +1,6 @@
 PIANO FUNDAMENTALS TRAINER — PUBLIC SNAPSHOT EXCLUSIONS
 
-Source checkpoint: 9d393eb91677a8624982f6a9677bbc479b732702
+Source checkpoint: e995d95e3f5ddc480dbf32d8f96724426694c206
 Snapshot scope: Android application plus required shared build/test dependencies
 
 EXCLUDED FROM THE PUBLIC SNAPSHOT
