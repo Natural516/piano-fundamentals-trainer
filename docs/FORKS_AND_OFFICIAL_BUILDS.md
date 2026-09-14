@@ -3,8 +3,8 @@
 ## Official identity
 
 - Package ID: `com.pianofundamentals.trainer`
-- Official release repository: `Natural516/piano-trainer-releases`
-- Official update Manifest: `https://github.com/Natural516/piano-trainer-releases/releases/latest/download/latest.json`
+- Official source and release repository: `Natural516/piano-fundamentals-trainer`
+- Official update Manifest: `https://github.com/Natural516/piano-fundamentals-trainer/releases/latest/download/latest.json`
 - Official builds are signed with the Natural516-controlled permanent release identity. Private signing material is not public.
 
 Android signature rules and the updater's exact signer-set verification protect the official package. They do not make an unchanged fork identity safe for redistribution: a modified build can conflict with the installed official app, query the official channel and present confusing update information.

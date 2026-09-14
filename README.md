@@ -94,23 +94,41 @@ npm.cmd run android:verify:debug
 
 ## 截图
 
-以下画面来自真实 Android 平板上的正式应用界面。系统状态栏仅包含常规时间、电量与导航信息。
+以下画面均来自 Lenovo Xiaoxin Pad Pro 12.7 横屏平板上的 Android 1.5.2 正式 Release，并使用真实本地数据与 Roland FP-30X Bluetooth MIDI 输入。
 
-### 首页
+### 首页与练习
 
 ![首页](docs/screenshots/home.png)
 
+![练习](docs/screenshots/practice.png)
+
 ### 识谱练习
 
-![识谱练习设置](docs/screenshots/sight-reading-settings.png)
+![识谱练习](docs/screenshots/sight-reading.png)
 
-![单音识谱练习](docs/screenshots/sight-reading-single.png)
+### 和弦练习
 
-![双音识谱练习](docs/screenshots/sight-reading-double.png)
+![和弦练习](docs/screenshots/chord-practice.png)
 
-### 练习记录
+### 乐理工具
+
+![乐理工具](docs/screenshots/tools.png)
+
+![和弦查询](docs/screenshots/chord-query.png)
+
+![音阶与调号](docs/screenshots/scale-key-signature.png)
+
+![音程查询](docs/screenshots/interval-query.png)
+
+### 记录与设置
 
 ![练习记录](docs/screenshots/history.png)
+
+![设置](docs/screenshots/settings.png)
+
+### 应用更新
+
+![应用更新](docs/screenshots/update.png)
 
 ## 许可证
 

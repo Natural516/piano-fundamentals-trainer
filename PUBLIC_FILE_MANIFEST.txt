@@ -9,9 +9,9 @@ ANDROID_RUNTIME: 83
 ANDROID_SHARED_CORE: 18
 ANDROID_TEST: 31
 LICENSE_ATTRIBUTION: 9
-PUBLIC_ASSET: 6
+PUBLIC_ASSET: 12
 PUBLIC_DOCUMENTATION: 12
-TOTAL: 189
+TOTAL: 195
 
 CATEGORY	PATH
 ANDROID_BUILD	.gitattributes
@@ -92,11 +92,17 @@ PUBLIC_DOCUMENTATION	docs/BRANDING.md
 PUBLIC_DOCUMENTATION	docs/BUILDING_ANDROID.md
 PUBLIC_DOCUMENTATION	docs/DEPENDENCY_LICENSES.md
 PUBLIC_DOCUMENTATION	docs/FORKS_AND_OFFICIAL_BUILDS.md
+PUBLIC_ASSET	docs/screenshots/chord-practice.png
+PUBLIC_ASSET	docs/screenshots/chord-query.png
 PUBLIC_ASSET	docs/screenshots/history.png
 PUBLIC_ASSET	docs/screenshots/home.png
-PUBLIC_ASSET	docs/screenshots/sight-reading-double.png
-PUBLIC_ASSET	docs/screenshots/sight-reading-settings.png
-PUBLIC_ASSET	docs/screenshots/sight-reading-single.png
+PUBLIC_ASSET	docs/screenshots/interval-query.png
+PUBLIC_ASSET	docs/screenshots/practice.png
+PUBLIC_ASSET	docs/screenshots/scale-key-signature.png
+PUBLIC_ASSET	docs/screenshots/settings.png
+PUBLIC_ASSET	docs/screenshots/sight-reading.png
+PUBLIC_ASSET	docs/screenshots/tools.png
+PUBLIC_ASSET	docs/screenshots/update.png
 LICENSE_ATTRIBUTION	LICENSE
 ANDROID_BUILD	package-lock.json
 ANDROID_BUILD	package.json
