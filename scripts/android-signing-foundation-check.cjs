@@ -2,6 +2,13 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const { execFileSync } = require('node:child_process')
+const { loadUpdaterCore } = require('./android-updater-contract-loader.cjs')
+const { assertExactReleaseSigner } = require('./android-apk-verification-core.cjs')
+const {
+  LEGACY_RELEASE_REPOSITORY_URL,
+  assertNoLegacyRepositoryReferences,
+  parseArguments
+} = require('./android-release-preflight.cjs')
 
 const repositoryRoot = path.resolve(__dirname, '..')
 const read = (relativePath) => fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8')
@@ -66,6 +73,10 @@ check('release, verification and signing-test commands are explicit', () => {
   assert.equal(scripts['android:apk:release'], 'npm run android:sync:release && cd android && gradlew.bat assembleRelease')
   assert.match(scripts['android:verify:debug'], /--expect-debug$/)
   assert.match(scripts['android:verify:release'], /--expect-release$/)
+  assert.equal(
+    scripts['android:release:preflight'],
+    'node scripts/android-release-preflight.cjs --apk=android/app/build/outputs/apk/release/app-release.apk --public-repository=Natural516/piano-fundamentals-trainer --public-ref=main'
+  )
   assert.equal(scripts['test:android-signing'], 'node scripts/android-signing-foundation-check.cjs')
 })
 
@@ -75,7 +86,76 @@ check('APK verifier reports public metadata without reading signing secrets', ()
   assert.match(verifier, /Version code:/)
   assert.match(verifier, /Version name:/)
   assert.match(verifier, /Signer certificate SHA-256:/)
+  assert.match(verifier, /Permanent signer pin match: PASS/)
+  assert.match(verifier, /assertExactReleaseSigner/)
+  assert.doesNotMatch(verifier, /19:3D:A3:16/)
   assert.doesNotMatch(verifier, /STORE_PASSWORD|KEY_PASSWORD|keystore\.properties/)
+})
+
+const canonicalUpdater = loadUpdaterCore(repositoryRoot)
+const approvedDigest = canonicalUpdater.UPDATER_PINNED_SIGNER_SHA256.replaceAll(':', '')
+const signerReport = (distinguishedName, digest = approvedDigest) => [
+  `Signer #1 certificate DN: ${distinguishedName}`,
+  `Signer #1 certificate SHA-256 digest: ${digest}`
+].join('\n')
+
+check('approved permanent signer passes exact verification', () => {
+  const signer = assertExactReleaseSigner(signerReport('CN=Natural516 Release, O=Piano Fundamentals Trainer'), canonicalUpdater.UPDATER_PINNED_SIGNER_SHA256)
+  assert.equal(signer.fingerprint, canonicalUpdater.UPDATER_PINNED_SIGNER_SHA256)
+})
+
+check('different non-debug signer fails exact verification', () => {
+  assert.throws(
+    () => assertExactReleaseSigner(signerReport('CN=Another Release, O=Other', 'AA'.repeat(32)), canonicalUpdater.UPDATER_PINNED_SIGNER_SHA256),
+    /does not match the frozen permanent signer/
+  )
+})
+
+check('Android Debug signer fails exact verification', () => {
+  assert.throws(
+    () => assertExactReleaseSigner(signerReport('CN=Android Debug, O=Android'), canonicalUpdater.UPDATER_PINNED_SIGNER_SHA256),
+    /Android Debug certificate/
+  )
+})
+
+check('missing or malformed signer output fails closed', () => {
+  assert.throws(() => assertExactReleaseSigner('', canonicalUpdater.UPDATER_PINNED_SIGNER_SHA256), /output is missing/)
+  assert.throws(
+    () => assertExactReleaseSigner(signerReport('CN=Natural516 Release', 'not-a-sha256'), canonicalUpdater.UPDATER_PINNED_SIGNER_SHA256),
+    /fingerprint is malformed/
+  )
+})
+
+check('release preflight is read-only and requires explicit artifact/public inputs', () => {
+  const source = read('scripts/android-release-preflight.cjs')
+  assert.doesNotMatch(source, /writeFile|appendFile|createWriteStream|renameSync|unlinkSync|rmSync|mkdirSync/)
+  assert.doesNotMatch(source, /git[^\n]*(?:push|commit|tag)|gh[^\n]*release|npm[^\n]*publish/)
+  assert.deepEqual(
+    parseArguments([
+      '--apk=android/app/build/outputs/apk/release/app-release.apk',
+      '--public-repository=Natural516/piano-fundamentals-trainer',
+      '--public-ref=main'
+    ]),
+    {
+      apk: 'android/app/build/outputs/apk/release/app-release.apk',
+      'public-repository': 'Natural516/piano-fundamentals-trainer',
+      'public-ref': 'main'
+    }
+  )
+})
+
+check('current-state files reject the retired repository while historical provenance remains', () => {
+  const current = new Map([
+    ['docs/agent/OPEN_RISKS.md', read('docs/agent/OPEN_RISKS.md')],
+    ['docs/agent/ANDROID_PROJECT_STATE.md', read('docs/agent/ANDROID_PROJECT_STATE.md')],
+    ['android/updater.properties', read('android/updater.properties')]
+  ])
+  assertNoLegacyRepositoryReferences(current, 'current-state files')
+  assert.match(read('docs/agent/ANDROID_V1_FINAL_ACCEPTANCE.md'), new RegExp(LEGACY_RELEASE_REPOSITORY_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  assert.throws(
+    () => assertNoLegacyRepositoryReferences(new Map([['current.md', LEGACY_RELEASE_REPOSITORY_URL]]), 'fixture'),
+    /retired release-repository URL/
+  )
 })
 
 check('release-signing runbook covers interactive generation, migration and backup', () => {

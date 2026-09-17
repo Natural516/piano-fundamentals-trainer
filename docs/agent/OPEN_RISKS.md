@@ -93,9 +93,8 @@ The following are maintenance concerns, not current product failures:
 - Status: CLOSED
 - Canonical public source and release repository: `https://github.com/Natural516/piano-fundamentals-trainer`.
 - Production Manifest endpoint: `https://github.com/Natural516/piano-fundamentals-trainer/releases/latest/download/latest.json`.
-- `https://github.com/Natural516/piano-trainer-releases` remains a temporary
-  compatibility bridge for clients released before 1.5.1; it receives no new
-  normal APK releases.
+- The former split release repository is retired. Maintained clients and all
+  future releases use the canonical repository above.
 - Closure evidence: the DEVICE-001 real-network Human QA run consumed the public Manifest through the Android app, downloaded the permanent-signed APK, passed the complete size/hash/package/version/current-signer/verified-token/FileProvider verification chain, completed an in-place system-installer update from `versionCode=7` to `versionCode=8`, and preserved durable settings and History data.
 - Hosting remains credential-free in the application. GitHub credentials or tokens are not part of the production updater contract.
 

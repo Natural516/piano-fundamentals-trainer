@@ -21,6 +21,7 @@
     "android:verify:debug": "node scripts/android-apk-signing-report.cjs android/app/build/outputs/apk/debug/app-debug.apk --expect-debug",
     "android:verify:qa": "node scripts/android-apk-signing-report.cjs android/app/build/outputs/apk/qa/app-qa.apk --expect-debug --expected-application-id=com.pianofundamentals.trainer.qa",
     "android:verify:release": "node scripts/android-apk-signing-report.cjs android/app/build/outputs/apk/release/app-release.apk --expect-release",
+    "android:release:preflight": "node scripts/android-release-preflight.cjs --apk=android/app/build/outputs/apk/release/app-release.apk --public-repository=Natural516/piano-fundamentals-trainer --public-ref=main",
     "diagnose:piano-latency": "electron scripts/measure-piano-latency.cjs",
     "poc:native-audio:build": "cmake -S native-audio-poc -B native-audio-poc/build -A x64 && cmake --build native-audio-poc/build --config Release",
     "poc:native-audio:auto": "electron scripts/native-audio-poc.cjs",

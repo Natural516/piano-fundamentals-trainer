@@ -2,8 +2,8 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const { spawnSync } = require('node:child_process')
-
-const EXPECTED_ANDROID_APPLICATION_ID = 'com.pianofundamentals.trainer'
+const { loadUpdaterCore } = require('./android-updater-contract-loader.cjs')
+const { parseSignerReport, assertExactReleaseSigner } = require('./android-apk-verification-core.cjs')
 
 function fail(message) {
   process.stderr.write(`Android APK verification failed: ${message}\n`)
@@ -53,7 +53,6 @@ function resolveAndroidSdkRoot(repositoryRoot) {
 const argumentsList = process.argv.slice(2)
 const apkArgument = argumentsList.find((argument) => !argument.startsWith('--'))
 const expectedApplicationIdArgument = argumentsList.find((argument) => argument.startsWith('--expected-application-id='))
-const expectedApplicationId = expectedApplicationIdArgument?.slice('--expected-application-id='.length) || EXPECTED_ANDROID_APPLICATION_ID
 const expectDebug = argumentsList.includes('--expect-debug')
 const expectRelease = argumentsList.includes('--expect-release')
 if (!apkArgument || expectDebug === expectRelease) {
@@ -61,6 +60,13 @@ if (!apkArgument || expectDebug === expectRelease) {
 }
 
 const repositoryRoot = path.resolve(__dirname, '..')
+let updaterContract
+try {
+  updaterContract = loadUpdaterCore(repositoryRoot)
+} catch (error) {
+  fail(error.message)
+}
+const expectedApplicationId = expectedApplicationIdArgument?.slice('--expected-application-id='.length) || updaterContract.UPDATER_PACKAGE_ID
 const apkPath = path.resolve(repositoryRoot, apkArgument)
 if (!fs.existsSync(apkPath)) fail(`APK not found: ${apkPath}`)
 
@@ -91,21 +97,23 @@ if (expectDebug) assert.equal(debuggable, true, 'expected a debuggable APK')
 if (expectRelease) assert.equal(debuggable, false, 'release APK must not be debuggable')
 
 const signerReport = runTool(apksigner, ['verify', '--print-certs', apkPath])
-const signerDn = signerReport.match(/Signer #1 certificate DN:\s*(.+)/i)?.[1]?.trim() ?? 'unknown'
-const signerSha256 = signerReport.match(/Signer #1 certificate SHA-256 digest:\s*([0-9a-f]+)/i)?.[1]
-if (!signerSha256) fail('apksigner did not return a signer SHA-256 certificate digest')
-if (expectRelease && /CN=Android Debug/i.test(signerDn)) {
-  fail('release APK is signed with the Android Debug certificate')
+let signer
+try {
+  signer = expectRelease
+    ? assertExactReleaseSigner(signerReport, updaterContract.UPDATER_PINNED_SIGNER_SHA256)
+    : parseSignerReport(signerReport)[0]
+} catch (error) {
+  fail(error.message)
 }
 
-const fingerprint = signerSha256.toUpperCase().match(/.{1,2}/g).join(':')
 process.stdout.write([
   `APK: ${apkPath}`,
   `Package ID: ${applicationId}`,
   `Build status: ${debuggable ? 'DEBUG' : 'RELEASE / NON-DEBUGGABLE'}`,
   `Version code: ${versionCode}`,
   `Version name: ${versionName}`,
-  `Signer certificate DN: ${signerDn}`,
-  `Signer certificate SHA-256: ${fingerprint}`,
+  `Signer certificate DN: ${signer.distinguishedName}`,
+  `Signer certificate SHA-256: ${signer.fingerprint}`,
+  ...(expectRelease ? ['Permanent signer pin match: PASS'] : []),
   'APK signature verification: PASS'
 ].join('\n') + '\n')
