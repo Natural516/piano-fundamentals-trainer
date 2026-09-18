@@ -95,7 +95,6 @@ import {
   createPracticeKeepAwakeController,
   shouldKeepPracticeAwake
 } from './practiceKeepAwake'
-import bocchiHomeBlueForeground from './assets/themes/bocchi/home/home-blue-foreground.png'
 import bocchiHomeDoodles from './assets/themes/bocchi/home/home-doodles-small.png'
 import bocchiHomeHandwrittenTitle from './assets/themes/bocchi/home/home-handwritten-title.png'
 import bocchiHomeHero from './assets/themes/bocchi/home/home-hero.png'
@@ -635,9 +634,12 @@ function HomeScreen({
           </div>
           <small className="bocchi-home-hero__memo">一步一步，靠近喜欢的音乐。</small>
         </div>
-        <span className="bocchi-home-hero__blue-overlap" aria-hidden="true">
-          <img src={bocchiHomeBlueForeground} alt="" />
-        </span>
+        <img
+          className="bocchi-home-hero__art bocchi-home-hero__art--foreground"
+          src={bocchiHomeHero}
+          alt=""
+          aria-hidden="true"
+        />
         <span className="bocchi-home-hero__sparkle is-one" aria-hidden="true">☆</span>
         <span className="bocchi-home-hero__sparkle is-two" aria-hidden="true">♪</span>
         <span className="bocchi-home-hero__asset-star" aria-hidden="true">
