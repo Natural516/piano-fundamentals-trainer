@@ -610,10 +610,50 @@ button:focus-visible {
 .bocchi-home-preview .product-header {
   position: relative;
   z-index: 5;
+  isolation: isolate;
+  overflow: hidden;
   border-bottom-color: rgba(218, 195, 183, .78);
-  background: rgba(255, 253, 248, .92);
+  background:
+    radial-gradient(circle at 27% 24%, rgba(244, 55, 126, .12) 0 2px, transparent 2.5px) 0 0 / 18px 18px,
+    linear-gradient(105deg, rgba(255, 253, 248, .97) 0 27%, rgba(255, 246, 249, .94) 45%, rgba(255, 250, 230, .94) 68%, rgba(255, 253, 248, .97) 100%);
   box-shadow: 0 6px 22px rgba(78, 51, 57, .05);
   backdrop-filter: blur(12px);
+}
+
+.bocchi-home-preview .product-header::before,
+.bocchi-home-preview .product-header::after {
+  position: absolute;
+  z-index: -1;
+  content: '';
+  pointer-events: none;
+}
+
+.bocchi-home-preview .product-header::before {
+  top: -22px;
+  bottom: -20px;
+  left: 29%;
+  width: 43%;
+  background:
+    linear-gradient(116deg, transparent 0 12%, rgba(246, 76, 139, .2) 12% 17%, transparent 17% 25%, rgba(53, 43, 75, .12) 25% 38%, transparent 38% 51%, rgba(255, 210, 68, .25) 51% 58%, transparent 58%),
+    repeating-linear-gradient(120deg, rgba(244, 57, 129, .11) 0 7px, transparent 7px 18px);
+  clip-path: polygon(7% 0, 100% 9%, 91% 88%, 2% 100%);
+  transform: rotate(-1deg);
+}
+
+.bocchi-home-preview .product-header::after {
+  top: 12px;
+  left: 58%;
+  width: 64px;
+  height: 35px;
+  border-top: 3px solid rgba(243, 60, 129, .2);
+  border-right: 3px solid rgba(243, 60, 129, .16);
+  border-radius: 50%;
+  transform: rotate(-7deg);
+}
+
+.bocchi-home-preview .product-header > * {
+  position: relative;
+  z-index: 1;
 }
 
 .bocchi-home-preview .brand-mark {
@@ -660,16 +700,76 @@ button:focus-visible {
   pointer-events: none;
 }
 
+.bocchi-home-hero__paper-layer {
+  position: absolute;
+  pointer-events: none;
+}
+
+.bocchi-home-hero__paper-layer.is-back {
+  z-index: 1;
+  top: 21px;
+  bottom: 23px;
+  left: 42px;
+  width: clamp(402px, 35.2%, 476px);
+  border: 1px solid rgba(231, 174, 197, .42);
+  background:
+    linear-gradient(145deg, rgba(255, 219, 235, .95), rgba(255, 244, 221, .9)),
+    #ffe4ef;
+  box-shadow: 10px 15px 28px rgba(53, 37, 45, .14);
+  clip-path: polygon(1.5% 2%, 25% .5%, 47% 2%, 71% 0, 99% 2.5%, 98% 25%, 100% 51%, 98% 77%, 99.5% 98%, 74% 99%, 48% 97.5%, 23% 100%, 0 97%, 1.5% 72%, 0 47%, 2% 23%);
+  opacity: .9;
+  transform: rotate(1.35deg);
+}
+
+.bocchi-home-hero__paper-layer.is-scrap {
+  z-index: 3;
+  top: 42px;
+  left: clamp(390px, 32.8%, 446px);
+  width: 108px;
+  height: 132px;
+  background-position: -14px -102px;
+  background-repeat: no-repeat;
+  background-size: 780px auto;
+  filter: drop-shadow(7px 9px 11px rgba(43, 30, 40, .16));
+  opacity: .94;
+  transform: rotate(3.2deg);
+}
+
+.bocchi-home-hero__paper-layer.is-scrap::before {
+  position: absolute;
+  top: 14px;
+  right: 10px;
+  color: rgba(243, 56, 126, .7);
+  content: '☆';
+  font-family: Georgia, serif;
+  font-size: 29px;
+  transform: rotate(-9deg);
+}
+
+.bocchi-home-hero__paper-layer.is-note {
+  z-index: 3;
+  bottom: 26px;
+  left: clamp(397px, 33.4%, 455px);
+  width: 92px;
+  height: 78px;
+  background-position: -18px -179px;
+  background-repeat: no-repeat;
+  background-size: 420px auto;
+  filter: drop-shadow(5px 7px 8px rgba(43, 30, 40, .14));
+  opacity: .9;
+  transform: rotate(-6deg);
+}
+
 .bocchi-home-preview .home-hero__copy {
   position: absolute;
   z-index: 2;
-  top: 25px;
-  bottom: 25px;
-  left: 27px;
-  width: clamp(410px, 36.5%, 500px);
+  top: 28px;
+  bottom: 29px;
+  left: 30px;
+  width: clamp(400px, 34.2%, 466px);
   align-items: flex-start;
   justify-content: center;
-  padding: 34px 42px 50px;
+  padding: 32px 36px 46px 42px;
   border: 1px solid rgba(215, 196, 184, .8);
   border-radius: 4px 16px 10px 7px;
   background:
@@ -677,9 +777,9 @@ button:focus-visible {
     linear-gradient(90deg, rgba(241, 221, 214, .42) 1px, transparent 1px),
     rgba(255, 253, 247, .935);
   background-size: 22px 22px;
-  box-shadow: 8px 14px 28px rgba(52, 35, 43, .16);
-  clip-path: polygon(.8% 1.2%, 30% 0, 61% .9%, 99% 0, 100% 22%, 99.3% 46%, 100% 70%, 99.2% 97.8%, 79% 99%, 58% 98.3%, 37% 100%, 18% 99.1%, 2% 100%, 0 76%, .8% 52%, 0 28%);
-  transform: rotate(-.25deg);
+  box-shadow: 5px 11px 22px rgba(52, 35, 43, .15);
+  clip-path: polygon(.8% 1.2%, 30% 0, 61% .9%, 97.8% 0, 99.2% 11%, 97.4% 23%, 99.5% 35%, 97.8% 47%, 100% 59%, 98% 72%, 99.3% 84%, 97.1% 98%, 79% 99%, 58% 98.3%, 37% 100%, 18% 99.1%, 2% 100%, 0 76%, .8% 52%, 0 28%);
+  transform: rotate(-.78deg);
 }
 
 .bocchi-home-preview .home-hero__copy::before {
@@ -737,16 +837,54 @@ button:focus-visible {
 }
 
 .bocchi-home-preview .home-hero__copy h1 {
-  margin: 13px 0 14px;
-  font-family: "Noto Serif SC", "Microsoft YaHei UI", sans-serif;
-  font-size: clamp(34px, 3vw, 47px);
-  font-weight: 820;
-  letter-spacing: -.045em;
-  line-height: 1.16;
+  margin: 10px -11px 7px -12px;
 }
 
-.bocchi-home-preview .home-hero__copy h1 span {
-  color: #f2367c;
+.bocchi-home-hero__headline img {
+  display: block;
+  width: min(100%, 408px);
+  height: auto;
+  filter: drop-shadow(0 2px 0 rgba(255, 255, 255, .88));
+  transform: rotate(-.55deg);
+}
+
+.bocchi-home-hero__blue-overlap {
+  position: absolute;
+  z-index: 4;
+  top: 35%;
+  bottom: 7%;
+  left: 33.1%;
+  width: 92px;
+  overflow: hidden;
+  clip-path: polygon(20% 0, 100% 5%, 88% 25%, 100% 47%, 85% 72%, 96% 100%, 7% 97%, 0 70%, 12% 44%, 0 18%);
+  filter: drop-shadow(-5px 6px 7px rgba(39, 31, 46, .16));
+  pointer-events: none;
+}
+
+.bocchi-home-hero__blue-overlap::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 252, 246, .08), transparent 22% 82%, rgba(44, 33, 54, .08));
+  content: '';
+}
+
+.bocchi-home-hero__blue-overlap img {
+  position: absolute;
+  top: -173px;
+  left: -8px;
+  width: 528px;
+  max-width: none;
+}
+
+.bocchi-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .bocchi-home-preview .home-hero__copy p {
@@ -842,6 +980,56 @@ button:focus-visible {
   max-width: none;
 }
 
+.bocchi-home-hero__side-note {
+  position: absolute;
+  z-index: 2;
+  right: 2.2%;
+  top: 5.5%;
+  display: grid;
+  width: 108px;
+  min-height: 62px;
+  padding: 10px 13px;
+  place-items: center;
+  color: #46404b;
+  font-family: "KaiTi", "STKaiti", cursive;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
+  background: rgba(255, 249, 218, .91);
+  box-shadow: 4px 7px 15px rgba(35, 25, 38, .17);
+  clip-path: polygon(2% 3%, 97% 0, 100% 95%, 77% 98%, 52% 96%, 25% 100%, 0 96%);
+  pointer-events: none;
+  transform: rotate(3.5deg);
+}
+
+.bocchi-home-hero__side-note::before {
+  position: absolute;
+  top: -8px;
+  left: 29px;
+  width: 52px;
+  height: 15px;
+  background: rgba(255, 160, 194, .68);
+  content: '';
+  transform: rotate(-3deg);
+}
+
+.bocchi-home-hero__edge-tape {
+  position: absolute;
+  z-index: 3;
+  bottom: -7px;
+  left: 34.4%;
+  width: 132px;
+  height: 35px;
+  background-position: -318px -10px;
+  background-repeat: no-repeat;
+  background-size: 720px auto;
+  filter: saturate(.92);
+  opacity: .82;
+  pointer-events: none;
+  transform: rotate(-3deg);
+}
+
 .bocchi-home-glance {
   position: relative;
   height: 126px;
@@ -865,24 +1053,30 @@ button:focus-visible {
 .bocchi-home-glance .glance-item {
   position: relative;
   overflow: hidden;
-  grid-template-columns: 46px minmax(0, 1fr) 96px;
+  grid-template-columns: 46px minmax(0, 1fr);
   gap: 12px;
-  padding: 12px 12px 12px 15px;
+  padding: 12px 154px 12px 15px;
   border-color: rgba(226, 210, 202, .9);
   border-radius: 22px;
   box-shadow: 0 8px 22px rgba(83, 57, 63, .07);
 }
 
 .bocchi-home-glance .glance-item.is-history {
-  background: linear-gradient(120deg, #fff7fa, #fff1f6);
+  background:
+    radial-gradient(circle at 91% 52%, rgba(255, 188, 216, .42), transparent 31%),
+    linear-gradient(120deg, #fff7fa, #fff1f6);
 }
 
 .bocchi-home-glance .glance-item.is-midi {
-  background: linear-gradient(120deg, #f7fcff, #eaf7ff);
+  background:
+    radial-gradient(circle at 91% 52%, rgba(160, 215, 255, .42), transparent 32%),
+    linear-gradient(120deg, #f7fcff, #eaf7ff);
 }
 
 .bocchi-home-glance .glance-item.is-tools {
-  background: linear-gradient(120deg, #fffdf7, #fff6d9);
+  background:
+    radial-gradient(circle at 91% 52%, rgba(255, 219, 113, .45), transparent 32%),
+    linear-gradient(120deg, #fffdf7, #fff6d9);
 }
 
 .bocchi-home-glance .glance-icon {
@@ -913,36 +1107,52 @@ button:focus-visible {
 }
 
 .bocchi-glance-art {
-  position: relative;
-  align-self: stretch;
-  overflow: hidden;
-  min-height: 78px;
-  border-radius: 15px;
-  background: rgba(255, 255, 255, .55);
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 168px;
+  pointer-events: none;
+}
+
+.bocchi-glance-art::before {
+  position: absolute;
+  z-index: -1;
+  inset: 20px 2px 12px 12px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, .8), transparent 69%);
+  content: '';
+  filter: blur(5px);
 }
 
 .bocchi-glance-art > img {
   position: absolute;
-  top: -5%;
-  width: auto;
-  height: 110%;
+  z-index: 0;
+  display: block;
   max-width: none;
+  filter: drop-shadow(0 5px 7px rgba(60, 45, 52, .14));
 }
 
 .bocchi-glance-art.is-history > img {
-  left: 0;
-  clip-path: inset(0 67% 0 0);
+  right: -11px;
+  bottom: -18px;
+  width: 130px;
+  transform: rotate(-1.4deg);
 }
 
 .bocchi-glance-art.is-midi > img {
-  left: 50%;
-  clip-path: inset(0 31% 0 34%);
-  transform: translateX(-50%);
+  right: -12px;
+  bottom: -9px;
+  width: 176px;
+  transform: rotate(-1deg);
 }
 
 .bocchi-glance-art.is-tools > img {
-  right: 0;
-  clip-path: inset(0 0 0 70%);
+  right: -7px;
+  bottom: -13px;
+  width: 148px;
+  transform: rotate(1.4deg);
 }
 
 .bocchi-glance-art > i {
@@ -959,6 +1169,12 @@ button:focus-visible {
   color: #3d4650;
   font-style: normal;
   box-shadow: 0 3px 10px rgba(33, 37, 43, .1);
+}
+
+.bocchi-home-glance .glance-item > .glance-icon,
+.bocchi-home-glance .glance-item > span:nth-child(2) {
+  position: relative;
+  z-index: 1;
 }
 
 .bocchi-glance-art > i.status-dot {

@@ -95,10 +95,15 @@ import {
   createPracticeKeepAwakeController,
   shouldKeepPracticeAwake
 } from './practiceKeepAwake'
-import bocchiHomeCardIllustrations from './assets/themes/bocchi/home/home-card-illustrations.png'
+import bocchiHomeBlueForeground from './assets/themes/bocchi/home/home-blue-foreground.png'
 import bocchiHomeDoodles from './assets/themes/bocchi/home/home-doodles-small.png'
+import bocchiHomeHandwrittenTitle from './assets/themes/bocchi/home/home-handwritten-title.png'
 import bocchiHomeHero from './assets/themes/bocchi/home/home-hero.png'
+import bocchiHomeMidiAmp from './assets/themes/bocchi/home/home-midi-amp.png'
+import bocchiHomePaperKit from './assets/themes/bocchi/home/home-paper-kit.png'
+import bocchiHomeRecentCharacter from './assets/themes/bocchi/home/home-recent-character.png'
 import bocchiHomeTapes from './assets/themes/bocchi/home/home-tapes-textures.png'
+import bocchiHomeTheoryBird from './assets/themes/bocchi/home/home-theory-bird.png'
 import './styles.css'
 
 declare const __QA_BUILD__: boolean
@@ -595,6 +600,17 @@ function HomeScreen({
       <section className="home-hero bocchi-home-hero">
         <img className="bocchi-home-hero__art" src={bocchiHomeHero} alt="" aria-hidden="true" />
         <div className="bocchi-home-hero__veil" aria-hidden="true" />
+        <span className="bocchi-home-hero__paper-layer is-back" aria-hidden="true" />
+        <span
+          className="bocchi-home-hero__paper-layer is-scrap"
+          style={{ backgroundImage: `url(${bocchiHomePaperKit})` }}
+          aria-hidden="true"
+        />
+        <span
+          className="bocchi-home-hero__paper-layer is-note"
+          style={{ backgroundImage: `url(${bocchiHomePaperKit})` }}
+          aria-hidden="true"
+        />
         <div className="home-hero__copy">
           <span
             className="bocchi-home-hero__tape"
@@ -602,7 +618,10 @@ function HomeScreen({
             aria-hidden="true"
           />
           <span className="eyebrow">今日练习</span>
-          <h1>让眼睛先认出，<br />再让手指<span>弹出来。</span></h1>
+          <h1 className="bocchi-home-hero__headline">
+            <span className="bocchi-sr-only">让眼睛先认出，再让手指弹出来。</span>
+            <img src={bocchiHomeHandwrittenTitle} alt="" aria-hidden="true" />
+          </h1>
           <p>{STAFF_MODE_LABELS[settings.staffMode]} · {settings.questionCount} 题 · 每题固定 {answerTimeLimitSeconds} 秒</p>
           <div className="home-practice-actions">
             <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>
@@ -616,11 +635,22 @@ function HomeScreen({
           </div>
           <small className="bocchi-home-hero__memo">一步一步，靠近喜欢的音乐。</small>
         </div>
+        <span className="bocchi-home-hero__blue-overlap" aria-hidden="true">
+          <img src={bocchiHomeBlueForeground} alt="" />
+        </span>
         <span className="bocchi-home-hero__sparkle is-one" aria-hidden="true">☆</span>
         <span className="bocchi-home-hero__sparkle is-two" aria-hidden="true">♪</span>
         <span className="bocchi-home-hero__asset-star" aria-hidden="true">
           <img src={bocchiHomeDoodles} alt="" />
         </span>
+        <span className="bocchi-home-hero__side-note" aria-hidden="true">
+          今天也<br />弹一点。
+        </span>
+        <span
+          className="bocchi-home-hero__edge-tape"
+          style={{ backgroundImage: `url(${bocchiHomeTapes})` }}
+          aria-hidden="true"
+        />
       </section>
 
       <section className="home-glance bocchi-home-glance" aria-label="今日概览">
@@ -631,24 +661,33 @@ function HomeScreen({
             <strong>{history.status === 'loading' || chordHistory.status === 'loading' ? '正在读取记录' : recentPracticeTitle}</strong>
             <em>{recentPracticeDetail}</em>
           </span>
-          <span className="bocchi-glance-art is-history" aria-hidden="true">
-            <img src={bocchiHomeCardIllustrations} alt="" />
+          <span
+            className="bocchi-glance-art is-history"
+            aria-hidden="true"
+          >
+            <img src={bocchiHomeRecentCharacter} alt="" />
             <i><Icon name="chevron" size={20} /></i>
           </span>
         </button>
         <button className="glance-item is-midi" type="button" onClick={() => openAuxiliary('midi')}>
           <span className="glance-icon is-blue"><Icon name="bluetooth" /></span>
           <span><small>MIDI 输入</small><strong>{midiStatus.label}</strong><em>{midiStatus.detail}</em></span>
-          <span className="bocchi-glance-art is-midi" aria-hidden="true">
-            <img src={bocchiHomeCardIllustrations} alt="" />
+          <span
+            className="bocchi-glance-art is-midi"
+            aria-hidden="true"
+          >
+            <img src={bocchiHomeMidiAmp} alt="" />
             <i className={`status-dot is-${midiStatus.tone}`} />
           </span>
         </button>
         <button className="glance-item is-tools" type="button" onClick={() => navigate('tools')}>
           <span className="glance-icon is-amber"><Icon name="tools" /></span>
           <span><small>乐理工具</small><strong>基础知识查询</strong><em>和弦、音阶、音程与调号</em></span>
-          <span className="bocchi-glance-art is-tools" aria-hidden="true">
-            <img src={bocchiHomeCardIllustrations} alt="" />
+          <span
+            className="bocchi-glance-art is-tools"
+            aria-hidden="true"
+          >
+            <img src={bocchiHomeTheoryBird} alt="" />
             <i><Icon name="chevron" size={20} /></i>
           </span>
         </button>
