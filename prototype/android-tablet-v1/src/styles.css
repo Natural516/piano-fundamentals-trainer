@@ -643,11 +643,11 @@ button:focus-visible {
 
 .bocchi-home-hero__art {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: -1.2% -1.1%;
+  width: 102.2%;
+  height: 102.4%;
   object-fit: cover;
-  object-position: 51% 48%;
+  object-position: 53% 47.5%;
   pointer-events: none;
 }
 
@@ -655,7 +655,7 @@ button:focus-visible {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(255, 252, 244, .34) 0%, rgba(255, 252, 244, .12) 36%, transparent 51%),
+    linear-gradient(90deg, rgba(255, 252, 244, .38) 0%, rgba(255, 252, 244, .15) 35%, transparent 49%),
     linear-gradient(0deg, rgba(35, 25, 38, .1), transparent 35%);
   pointer-events: none;
 }
@@ -669,16 +669,16 @@ button:focus-visible {
   width: clamp(410px, 36.5%, 500px);
   align-items: flex-start;
   justify-content: center;
-  padding: 38px 42px 31px;
+  padding: 34px 42px 50px;
   border: 1px solid rgba(215, 196, 184, .8);
   border-radius: 4px 16px 10px 7px;
   background:
     linear-gradient(rgba(241, 221, 214, .42) 1px, transparent 1px),
     linear-gradient(90deg, rgba(241, 221, 214, .42) 1px, transparent 1px),
-    rgba(255, 253, 247, .95);
+    rgba(255, 253, 247, .935);
   background-size: 22px 22px;
   box-shadow: 8px 14px 28px rgba(52, 35, 43, .16);
-  clip-path: polygon(.5% 1.2%, 99% 0, 100% 97.8%, 2% 100%, 0 58%);
+  clip-path: polygon(.8% 1.2%, 30% 0, 61% .9%, 99% 0, 100% 22%, 99.3% 46%, 100% 70%, 99.2% 97.8%, 79% 99%, 58% 98.3%, 37% 100%, 18% 99.1%, 2% 100%, 0 76%, .8% 52%, 0 28%);
   transform: rotate(-.25deg);
 }
 
@@ -690,6 +690,17 @@ button:focus-visible {
   width: 2px;
   background: rgba(245, 73, 130, .23);
   content: '';
+}
+
+.bocchi-home-preview .home-hero__copy::after {
+  position: absolute;
+  top: 67px;
+  bottom: 58px;
+  left: -1px;
+  width: 18px;
+  background: radial-gradient(circle, rgba(236, 196, 208, .72) 0 4px, transparent 4.7px) 0 0 / 18px 38px repeat-y;
+  content: '';
+  opacity: .84;
 }
 
 .bocchi-home-hero__tape {
@@ -704,6 +715,19 @@ button:focus-visible {
   filter: saturate(.92);
   opacity: .92;
   transform: rotate(-2deg);
+}
+
+.bocchi-home-hero__tape::after {
+  position: absolute;
+  top: 9px;
+  left: 262px;
+  width: 102px;
+  height: 28px;
+  border: 1px solid rgba(228, 191, 76, .12);
+  background: rgba(255, 222, 91, .68);
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, .28);
+  content: '';
+  transform: rotate(3deg);
 }
 
 .bocchi-home-preview .home-hero__copy .eyebrow {
@@ -754,12 +778,25 @@ button:focus-visible {
 }
 
 .bocchi-home-hero__memo {
+  position: relative;
   margin-top: 21px;
   color: #3e424a;
   font-family: "KaiTi", "STKaiti", cursive;
   font-size: 15px;
   font-weight: 700;
   transform: rotate(-2deg);
+}
+
+.bocchi-home-hero__memo::after {
+  position: absolute;
+  right: -16px;
+  bottom: -7px;
+  left: 23px;
+  height: 5px;
+  border-bottom: 3px solid rgba(244, 59, 128, .5);
+  border-radius: 50%;
+  content: '';
+  transform: rotate(-1deg);
 }
 
 .bocchi-home-hero__sparkle {
@@ -773,10 +810,7 @@ button:focus-visible {
 }
 
 .bocchi-home-hero__sparkle.is-one {
-  top: 11%;
-  left: 38.5%;
-  font-size: 48px;
-  transform: rotate(-12deg);
+  display: none;
 }
 
 .bocchi-home-hero__sparkle.is-two {
@@ -787,10 +821,45 @@ button:focus-visible {
   transform: rotate(10deg);
 }
 
+.bocchi-home-hero__asset-star {
+  position: absolute;
+  z-index: 2;
+  top: 9.5%;
+  left: 37.9%;
+  width: 76px;
+  height: 82px;
+  overflow: hidden;
+  filter: drop-shadow(0 3px 8px rgba(48, 31, 42, .18));
+  pointer-events: none;
+  transform: rotate(-8deg);
+}
+
+.bocchi-home-hero__asset-star img {
+  position: absolute;
+  top: -10px;
+  left: -94px;
+  width: 500px;
+  max-width: none;
+}
+
 .bocchi-home-glance {
+  position: relative;
   height: 126px;
   gap: 13px;
   padding-top: 13px;
+}
+
+.bocchi-home-glance::after {
+  position: absolute;
+  z-index: 2;
+  top: -3px;
+  right: 31.8%;
+  color: rgba(242, 57, 126, .68);
+  content: '♪';
+  font-family: Georgia, serif;
+  font-size: 22px;
+  pointer-events: none;
+  transform: rotate(9deg);
 }
 
 .bocchi-home-glance .glance-item {
@@ -854,25 +923,26 @@ button:focus-visible {
 
 .bocchi-glance-art > img {
   position: absolute;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  top: -5%;
+  width: auto;
+  height: 110%;
+  max-width: none;
 }
 
 .bocchi-glance-art.is-history > img {
-  object-position: 57% 42%;
+  left: 0;
+  clip-path: inset(0 67% 0 0);
 }
 
 .bocchi-glance-art.is-midi > img {
-  object-position: 27% 62%;
+  left: 50%;
+  clip-path: inset(0 31% 0 34%);
+  transform: translateX(-50%);
 }
 
 .bocchi-glance-art.is-tools > img {
-  top: -428px;
-  left: -170px;
-  width: 720px;
-  height: auto;
-  max-width: none;
+  right: 0;
+  clip-path: inset(0 0 0 70%);
 }
 
 .bocchi-glance-art > i {

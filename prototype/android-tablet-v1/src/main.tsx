@@ -95,6 +95,7 @@ import {
   createPracticeKeepAwakeController,
   shouldKeepPracticeAwake
 } from './practiceKeepAwake'
+import bocchiHomeCardIllustrations from './assets/themes/bocchi/home/home-card-illustrations.png'
 import bocchiHomeDoodles from './assets/themes/bocchi/home/home-doodles-small.png'
 import bocchiHomeHero from './assets/themes/bocchi/home/home-hero.png'
 import bocchiHomeTapes from './assets/themes/bocchi/home/home-tapes-textures.png'
@@ -617,6 +618,9 @@ function HomeScreen({
         </div>
         <span className="bocchi-home-hero__sparkle is-one" aria-hidden="true">☆</span>
         <span className="bocchi-home-hero__sparkle is-two" aria-hidden="true">♪</span>
+        <span className="bocchi-home-hero__asset-star" aria-hidden="true">
+          <img src={bocchiHomeDoodles} alt="" />
+        </span>
       </section>
 
       <section className="home-glance bocchi-home-glance" aria-label="今日概览">
@@ -628,7 +632,7 @@ function HomeScreen({
             <em>{recentPracticeDetail}</em>
           </span>
           <span className="bocchi-glance-art is-history" aria-hidden="true">
-            <img src={bocchiHomeHero} alt="" />
+            <img src={bocchiHomeCardIllustrations} alt="" />
             <i><Icon name="chevron" size={20} /></i>
           </span>
         </button>
@@ -636,7 +640,7 @@ function HomeScreen({
           <span className="glance-icon is-blue"><Icon name="bluetooth" /></span>
           <span><small>MIDI 输入</small><strong>{midiStatus.label}</strong><em>{midiStatus.detail}</em></span>
           <span className="bocchi-glance-art is-midi" aria-hidden="true">
-            <img src={bocchiHomeHero} alt="" />
+            <img src={bocchiHomeCardIllustrations} alt="" />
             <i className={`status-dot is-${midiStatus.tone}`} />
           </span>
         </button>
@@ -644,7 +648,7 @@ function HomeScreen({
           <span className="glance-icon is-amber"><Icon name="tools" /></span>
           <span><small>乐理工具</small><strong>基础知识查询</strong><em>和弦、音阶、音程与调号</em></span>
           <span className="bocchi-glance-art is-tools" aria-hidden="true">
-            <img src={bocchiHomeDoodles} alt="" />
+            <img src={bocchiHomeCardIllustrations} alt="" />
             <i><Icon name="chevron" size={20} /></i>
           </span>
         </button>
