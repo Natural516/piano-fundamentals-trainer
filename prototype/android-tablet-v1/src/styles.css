@@ -550,6 +550,382 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+/* V1.5.3 home-only visual preview. Keep these tokens and selectors scoped so
+   the approved practice, tools, history and settings surfaces remain intact. */
+.bocchi-home-preview {
+  --app-bg: #fff9f2;
+  --surface: #fffdf9;
+  --surface-raised: #ffffff;
+  --surface-soft: #fff2f6;
+  --surface-tint: #fff4e9;
+  --ink: #24242d;
+  --ink-secondary: #586776;
+  --ink-muted: #7a8795;
+  --line: #ebdfd8;
+  --line-strong: #ddcfc8;
+  --accent: #f33b81;
+  --accent-strong: #dc286c;
+  --accent-soft: #ffe2ed;
+  --accent-ink: #d72267;
+  --blue: #278bd7;
+  --blue-soft: #dff2ff;
+  --amber: #b67b08;
+  --amber-soft: #fff0be;
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 4% 88%, rgba(255, 205, 226, .72) 0 2px, transparent 2.5px) 0 0 / 17px 17px,
+    linear-gradient(115deg, #fffaf4 0%, #fffdf9 47%, #fff8ed 100%);
+  color: var(--ink);
+}
+
+.bocchi-home-preview::before,
+.bocchi-home-preview::after {
+  position: absolute;
+  z-index: -1;
+  content: '';
+  pointer-events: none;
+}
+
+.bocchi-home-preview::before {
+  top: 86px;
+  right: -32px;
+  width: 170px;
+  height: 120px;
+  background: repeating-linear-gradient(120deg, rgba(255, 214, 78, .42) 0 8px, transparent 8px 20px);
+  clip-path: polygon(28% 0, 100% 8%, 82% 100%, 0 80%);
+  opacity: .64;
+}
+
+.bocchi-home-preview::after {
+  right: 18px;
+  bottom: 82px;
+  width: 118px;
+  height: 72px;
+  border: 10px solid rgba(244, 58, 131, .14);
+  border-radius: 50%;
+  transform: rotate(-12deg);
+}
+
+.bocchi-home-preview .product-header {
+  position: relative;
+  z-index: 5;
+  border-bottom-color: rgba(218, 195, 183, .78);
+  background: rgba(255, 253, 248, .92);
+  box-shadow: 0 6px 22px rgba(78, 51, 57, .05);
+  backdrop-filter: blur(12px);
+}
+
+.bocchi-home-preview .brand-mark {
+  background: linear-gradient(145deg, #f85291, #ed2470);
+  box-shadow: 0 8px 18px rgba(235, 42, 110, .24);
+}
+
+.bocchi-home-preview .product-header__left small {
+  color: #ef397d;
+}
+
+.bocchi-home-preview .product-content {
+  padding: 16px 24px;
+}
+
+.bocchi-home-hero {
+  position: relative;
+  display: block;
+  height: calc(100% - 126px);
+  min-height: 440px;
+  overflow: hidden;
+  border: 1px solid rgba(229, 205, 193, .95);
+  border-radius: 26px;
+  background: #342e45;
+  box-shadow: 0 18px 42px rgba(67, 41, 52, .17);
+}
+
+.bocchi-home-hero__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 51% 48%;
+  pointer-events: none;
+}
+
+.bocchi-home-hero__veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 252, 244, .34) 0%, rgba(255, 252, 244, .12) 36%, transparent 51%),
+    linear-gradient(0deg, rgba(35, 25, 38, .1), transparent 35%);
+  pointer-events: none;
+}
+
+.bocchi-home-preview .home-hero__copy {
+  position: absolute;
+  z-index: 2;
+  top: 25px;
+  bottom: 25px;
+  left: 27px;
+  width: clamp(410px, 36.5%, 500px);
+  align-items: flex-start;
+  justify-content: center;
+  padding: 38px 42px 31px;
+  border: 1px solid rgba(215, 196, 184, .8);
+  border-radius: 4px 16px 10px 7px;
+  background:
+    linear-gradient(rgba(241, 221, 214, .42) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(241, 221, 214, .42) 1px, transparent 1px),
+    rgba(255, 253, 247, .95);
+  background-size: 22px 22px;
+  box-shadow: 8px 14px 28px rgba(52, 35, 43, .16);
+  clip-path: polygon(.5% 1.2%, 99% 0, 100% 97.8%, 2% 100%, 0 58%);
+  transform: rotate(-.25deg);
+}
+
+.bocchi-home-preview .home-hero__copy::before {
+  position: absolute;
+  top: 22px;
+  bottom: 22px;
+  left: 20px;
+  width: 2px;
+  background: rgba(245, 73, 130, .23);
+  content: '';
+}
+
+.bocchi-home-hero__tape {
+  position: absolute;
+  top: -13px;
+  left: 78px;
+  width: 148px;
+  height: 42px;
+  background-repeat: no-repeat;
+  background-position: -3px -5px;
+  background-size: 700px auto;
+  filter: saturate(.92);
+  opacity: .92;
+  transform: rotate(-2deg);
+}
+
+.bocchi-home-preview .home-hero__copy .eyebrow {
+  color: #ef3479;
+  font-size: 13px;
+  letter-spacing: .04em;
+}
+
+.bocchi-home-preview .home-hero__copy h1 {
+  margin: 13px 0 14px;
+  font-family: "Noto Serif SC", "Microsoft YaHei UI", sans-serif;
+  font-size: clamp(34px, 3vw, 47px);
+  font-weight: 820;
+  letter-spacing: -.045em;
+  line-height: 1.16;
+}
+
+.bocchi-home-preview .home-hero__copy h1 span {
+  color: #f2367c;
+}
+
+.bocchi-home-preview .home-hero__copy p {
+  margin: 0 0 22px;
+  color: #596b7b;
+  font-size: 14px;
+  font-weight: 580;
+}
+
+.bocchi-home-preview .home-practice-actions {
+  gap: 10px;
+}
+
+.bocchi-home-preview .home-practice-actions button {
+  min-height: 50px;
+  border-radius: 15px;
+}
+
+.bocchi-home-preview .home-practice-actions .primary-action {
+  border-color: #f33b81;
+  background: linear-gradient(135deg, #fa4f91, #ed2874);
+  color: white;
+  box-shadow: 0 10px 22px rgba(239, 45, 118, .25);
+}
+
+.bocchi-home-preview .home-practice-actions .secondary-action {
+  border-color: #d9cfc9;
+  background: rgba(255, 255, 255, .88);
+}
+
+.bocchi-home-hero__memo {
+  margin-top: 21px;
+  color: #3e424a;
+  font-family: "KaiTi", "STKaiti", cursive;
+  font-size: 15px;
+  font-weight: 700;
+  transform: rotate(-2deg);
+}
+
+.bocchi-home-hero__sparkle {
+  position: absolute;
+  z-index: 2;
+  color: #ffd93d;
+  font-family: Georgia, serif;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(44, 30, 42, .32);
+  pointer-events: none;
+}
+
+.bocchi-home-hero__sparkle.is-one {
+  top: 11%;
+  left: 38.5%;
+  font-size: 48px;
+  transform: rotate(-12deg);
+}
+
+.bocchi-home-hero__sparkle.is-two {
+  right: 3.2%;
+  bottom: 8%;
+  color: #ff6ca4;
+  font-size: 35px;
+  transform: rotate(10deg);
+}
+
+.bocchi-home-glance {
+  height: 126px;
+  gap: 13px;
+  padding-top: 13px;
+}
+
+.bocchi-home-glance .glance-item {
+  position: relative;
+  overflow: hidden;
+  grid-template-columns: 46px minmax(0, 1fr) 96px;
+  gap: 12px;
+  padding: 12px 12px 12px 15px;
+  border-color: rgba(226, 210, 202, .9);
+  border-radius: 22px;
+  box-shadow: 0 8px 22px rgba(83, 57, 63, .07);
+}
+
+.bocchi-home-glance .glance-item.is-history {
+  background: linear-gradient(120deg, #fff7fa, #fff1f6);
+}
+
+.bocchi-home-glance .glance-item.is-midi {
+  background: linear-gradient(120deg, #f7fcff, #eaf7ff);
+}
+
+.bocchi-home-glance .glance-item.is-tools {
+  background: linear-gradient(120deg, #fffdf7, #fff6d9);
+}
+
+.bocchi-home-glance .glance-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  background: #ffe1ec;
+  color: #ee337a;
+}
+
+.bocchi-home-glance .glance-icon.is-blue {
+  background: #dcefff;
+  color: #207fc7;
+}
+
+.bocchi-home-glance .glance-icon.is-amber {
+  background: #ffedb5;
+  color: #a76e00;
+}
+
+.bocchi-home-glance .glance-item strong {
+  font-size: 16px;
+}
+
+.bocchi-home-glance .glance-item small,
+.bocchi-home-glance .glance-item em {
+  font-size: 11px;
+}
+
+.bocchi-glance-art {
+  position: relative;
+  align-self: stretch;
+  overflow: hidden;
+  min-height: 78px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, .55);
+}
+
+.bocchi-glance-art > img {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bocchi-glance-art.is-history > img {
+  object-position: 57% 42%;
+}
+
+.bocchi-glance-art.is-midi > img {
+  object-position: 27% 62%;
+}
+
+.bocchi-glance-art.is-tools > img {
+  top: -428px;
+  left: -170px;
+  width: 720px;
+  height: auto;
+  max-width: none;
+}
+
+.bocchi-glance-art > i {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 1;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .86);
+  color: #3d4650;
+  font-style: normal;
+  box-shadow: 0 3px 10px rgba(33, 37, 43, .1);
+}
+
+.bocchi-glance-art > i.status-dot {
+  top: auto;
+  right: 9px;
+  bottom: 9px;
+  width: 12px;
+  height: 12px;
+  border: 3px solid rgba(255, 255, 255, .92);
+  background: currentColor;
+  box-shadow: 0 0 0 2px rgba(35, 112, 165, .13);
+}
+
+.bocchi-home-preview .bottom-navigation {
+  align-self: center;
+  width: min(920px, calc(100% - 88px));
+  height: 62px;
+  margin: 0 auto;
+  border: 1px solid rgba(225, 210, 203, .96);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 10px 30px rgba(67, 48, 55, .11);
+  backdrop-filter: blur(10px);
+}
+
+.bocchi-home-preview .bottom-navigation button {
+  min-width: 132px;
+  height: 50px;
+  border-radius: 17px;
+  color: #607080;
+}
+
+.bocchi-home-preview .bottom-navigation button.is-active {
+  background: linear-gradient(135deg, #ffe7f0, #ffdce9);
+  color: #e92f75;
+}
+
 .hub-layout {
   display: grid;
   height: 100%;

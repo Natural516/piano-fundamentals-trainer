@@ -95,6 +95,9 @@ import {
   createPracticeKeepAwakeController,
   shouldKeepPracticeAwake
 } from './practiceKeepAwake'
+import bocchiHomeDoodles from './assets/themes/bocchi/home/home-doodles-small.png'
+import bocchiHomeHero from './assets/themes/bocchi/home/home-hero.png'
+import bocchiHomeTapes from './assets/themes/bocchi/home/home-tapes-textures.png'
 import './styles.css'
 
 declare const __QA_BUILD__: boolean
@@ -503,16 +506,18 @@ function BottomNavigation({ active }: { active: ProductNavigationId }): JSX.Elem
 function ProductFrame({
   active,
   children,
+  className,
   onBack,
   title
 }: {
   active: ProductNavigationId
   children: ReactNode
+  className?: string
   onBack?: () => void
   title: string
 }): JSX.Element {
   return (
-    <div className="product-frame">
+    <div className={`product-frame${className ? ` ${className}` : ''}`}>
       <ProductHeader onBack={onBack} title={title} />
       <main className="product-content">{children}</main>
       <BottomNavigation active={active} />
@@ -585,11 +590,18 @@ function HomeScreen({
       ? `${formatHistoryTimestamp(recentPractice.endedAt)} · 识谱 · 完成 ${recentPractice.completed}/${recentPractice.plannedQuestionCount}`
       : '完成一次练习后，这里会显示最近结果。'
   return (
-    <ProductFrame active="home" title="今天，读几页新音符">
-      <section className="home-hero">
+    <ProductFrame active="home" className="bocchi-home-preview" title="今天，读几页新音符">
+      <section className="home-hero bocchi-home-hero">
+        <img className="bocchi-home-hero__art" src={bocchiHomeHero} alt="" aria-hidden="true" />
+        <div className="bocchi-home-hero__veil" aria-hidden="true" />
         <div className="home-hero__copy">
+          <span
+            className="bocchi-home-hero__tape"
+            style={{ backgroundImage: `url(${bocchiHomeTapes})` }}
+            aria-hidden="true"
+          />
           <span className="eyebrow">今日练习</span>
-          <h1>让眼睛先认出，<br />再让手指弹出来。</h1>
+          <h1>让眼睛先认出，<br />再让手指<span>弹出来。</span></h1>
           <p>{STAFF_MODE_LABELS[settings.staffMode]} · {settings.questionCount} 题 · 每题固定 {answerTimeLimitSeconds} 秒</p>
           <div className="home-practice-actions">
             <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>
@@ -601,38 +613,40 @@ function HomeScreen({
               和弦练习
             </button>
           </div>
+          <small className="bocchi-home-hero__memo">一步一步，靠近喜欢的音乐。</small>
         </div>
-        <div className="home-hero__notation" aria-hidden="true">
-          <span className="floating-note note-one">♪</span>
-          <span className="floating-note note-two">♩</span>
-          <NotationPaper
-            keySignature={settings.keySignature}
-            label="识谱练习预览"
-            note={spellMidiPitch(67, settings.keySignature, settings.staffMode)}
-            staffMode={settings.staffMode}
-          />
-        </div>
+        <span className="bocchi-home-hero__sparkle is-one" aria-hidden="true">☆</span>
+        <span className="bocchi-home-hero__sparkle is-two" aria-hidden="true">♪</span>
       </section>
 
-      <section className="home-glance" aria-label="今日概览">
-        <button className="glance-item" type="button" onClick={() => navigate('history')}>
+      <section className="home-glance bocchi-home-glance" aria-label="今日概览">
+        <button className="glance-item is-history" type="button" onClick={() => navigate('history')}>
           <span className="glance-icon"><Icon name="chart" /></span>
           <span>
             <small>上次练习</small>
             <strong>{history.status === 'loading' || chordHistory.status === 'loading' ? '正在读取记录' : recentPracticeTitle}</strong>
             <em>{recentPracticeDetail}</em>
           </span>
-          <Icon name="chevron" size={20} />
+          <span className="bocchi-glance-art is-history" aria-hidden="true">
+            <img src={bocchiHomeHero} alt="" />
+            <i><Icon name="chevron" size={20} /></i>
+          </span>
         </button>
-        <button className="glance-item" type="button" onClick={() => openAuxiliary('midi')}>
+        <button className="glance-item is-midi" type="button" onClick={() => openAuxiliary('midi')}>
           <span className="glance-icon is-blue"><Icon name="bluetooth" /></span>
           <span><small>MIDI 输入</small><strong>{midiStatus.label}</strong><em>{midiStatus.detail}</em></span>
-          <span className={`status-dot is-${midiStatus.tone}`} />
+          <span className="bocchi-glance-art is-midi" aria-hidden="true">
+            <img src={bocchiHomeHero} alt="" />
+            <i className={`status-dot is-${midiStatus.tone}`} />
+          </span>
         </button>
-        <button className="glance-item" type="button" onClick={() => navigate('tools')}>
+        <button className="glance-item is-tools" type="button" onClick={() => navigate('tools')}>
           <span className="glance-icon is-amber"><Icon name="tools" /></span>
           <span><small>乐理工具</small><strong>基础知识查询</strong><em>和弦、音阶、音程与调号</em></span>
-          <Icon name="chevron" size={20} />
+          <span className="bocchi-glance-art is-tools" aria-hidden="true">
+            <img src={bocchiHomeDoodles} alt="" />
+            <i><Icon name="chevron" size={20} /></i>
+          </span>
         </button>
       </section>
     </ProductFrame>
