@@ -5,13 +5,13 @@ The original downloads remain unchanged.
 
 | Original file | Project file | First-pass use |
 | --- | --- | --- |
-| `ChatGPT Image 2026年9月18日 20_45_29.png` | `home-hero.png` | Four-member band hero used for both the complete background and the pixel-aligned masked foreground at the paper edge. |
+| `ChatGPT Image 2026年9月18日 20_45_29.png` | `home-hero.png` | Sole Hero artwork, including its original paper/character overlap; live copy uses a transparent HTML positioning layer above it. |
 | `ChatGPT Image 2026年9月18日 20_55_26 (1).png` | `home-doodles-small.png` | Transparent sticker sheet; a clipped yellow-bird crop decorates the theory-tools card. |
 | `ChatGPT Image 2026年9月18日 20_55_27 (2).png` | `home-paper-kit.png` | Paper-note sprite used for the torn grid-paper bridge and yellow sticky-note layer at the copy/character boundary. |
 | `ChatGPT Image 2026年9月18日 20_56_59.png` | Not copied | Dense decorative sticker sheet. It duplicates motifs already present in the hero and would make the first pass visually noisy. |
 | `ChatGPT Image 2026年9月18日 21_03_36.png` | `home-tapes-textures.png` | Transparent tape/paper texture sheet; clipped to create the tape accent on the live HTML practice card. |
 | `ChatGPT Image 2026年9月18日 21_34_34.png` | `home-card-illustrations.png` | Retained for provenance only; Fourth Pass no longer imports the old three-part card sprite. |
-| `ChatGPT Image 2026年9月18日 22_24_44.png` | `home-blue-foreground.png` | Retained for provenance only. The Home runtime does not import or render it because its pose cannot align with `home-hero.png`. |
+| `ChatGPT Image 2026年9月18日 22_24_44.png` | `home-blue-foreground.png` | Retained for provenance only. The independent pose does not align with the Hero character, so Home does not render it as a foreground overlay. |
 | `ChatGPT Image 2026年9月19日 06_19_57.png` | `home-recent-character.png` | Independent transparent pink-haired guitarist used as the recent-practice card decoration. |
 | `ChatGPT Image 2026年9月19日 06_22_30.png` | `home-handwritten-title.png` | Transparent handwritten rendering of the exact real Home headline; the matching semantic HTML heading remains in the DOM. |
 | `ChatGPT Image 2026年9月19日 06_28_21.png` | `home-midi-amp.png` | Independent transparent amplifier/cable art used by the MIDI card. |

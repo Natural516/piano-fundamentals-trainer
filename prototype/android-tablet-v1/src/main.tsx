@@ -95,13 +95,10 @@ import {
   createPracticeKeepAwakeController,
   shouldKeepPracticeAwake
 } from './practiceKeepAwake'
-import bocchiHomeDoodles from './assets/themes/bocchi/home/home-doodles-small.png'
 import bocchiHomeHandwrittenTitle from './assets/themes/bocchi/home/home-handwritten-title.png'
 import bocchiHomeHero from './assets/themes/bocchi/home/home-hero.png'
 import bocchiHomeMidiAmp from './assets/themes/bocchi/home/home-midi-amp.png'
-import bocchiHomePaperKit from './assets/themes/bocchi/home/home-paper-kit.png'
 import bocchiHomeRecentCharacter from './assets/themes/bocchi/home/home-recent-character.png'
-import bocchiHomeTapes from './assets/themes/bocchi/home/home-tapes-textures.png'
 import bocchiHomeTheoryBird from './assets/themes/bocchi/home/home-theory-bird.png'
 import './styles.css'
 
@@ -598,24 +595,7 @@ function HomeScreen({
     <ProductFrame active="home" className="bocchi-home-preview" title="今天，读几页新音符">
       <section className="home-hero bocchi-home-hero">
         <img className="bocchi-home-hero__art" src={bocchiHomeHero} alt="" aria-hidden="true" />
-        <div className="bocchi-home-hero__veil" aria-hidden="true" />
-        <span className="bocchi-home-hero__paper-layer is-back" aria-hidden="true" />
-        <span
-          className="bocchi-home-hero__paper-layer is-scrap"
-          style={{ backgroundImage: `url(${bocchiHomePaperKit})` }}
-          aria-hidden="true"
-        />
-        <span
-          className="bocchi-home-hero__paper-layer is-note"
-          style={{ backgroundImage: `url(${bocchiHomePaperKit})` }}
-          aria-hidden="true"
-        />
         <div className="home-hero__copy">
-          <span
-            className="bocchi-home-hero__tape"
-            style={{ backgroundImage: `url(${bocchiHomeTapes})` }}
-            aria-hidden="true"
-          />
           <span className="eyebrow">今日练习</span>
           <h1 className="bocchi-home-hero__headline">
             <span className="bocchi-sr-only">让眼睛先认出，再让手指弹出来。</span>
@@ -634,25 +614,6 @@ function HomeScreen({
           </div>
           <small className="bocchi-home-hero__memo">一步一步，靠近喜欢的音乐。</small>
         </div>
-        <img
-          className="bocchi-home-hero__art bocchi-home-hero__art--foreground"
-          src={bocchiHomeHero}
-          alt=""
-          aria-hidden="true"
-        />
-        <span className="bocchi-home-hero__sparkle is-one" aria-hidden="true">☆</span>
-        <span className="bocchi-home-hero__sparkle is-two" aria-hidden="true">♪</span>
-        <span className="bocchi-home-hero__asset-star" aria-hidden="true">
-          <img src={bocchiHomeDoodles} alt="" />
-        </span>
-        <span className="bocchi-home-hero__side-note" aria-hidden="true">
-          今天也<br />弹一点。
-        </span>
-        <span
-          className="bocchi-home-hero__edge-tape"
-          style={{ backgroundImage: `url(${bocchiHomeTapes})` }}
-          aria-hidden="true"
-        />
       </section>
 
       <section className="home-glance bocchi-home-glance" aria-label="今日概览">
