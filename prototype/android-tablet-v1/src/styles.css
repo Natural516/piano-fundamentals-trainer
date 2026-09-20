@@ -2,21 +2,29 @@
 
 :root {
   color-scheme: light;
+  /* Neutral startup fallback. Runtime themes replace every semantic token from
+     the registry before the application becomes interactive. */
   --app-bg: #f2f0e9;
   --surface: #fcfbf7;
-  --surface-raised: #ffffff;
   --surface-soft: #e9eee9;
+  --surface-elevated: #ffffff;
   --surface-tint: #e5eee8;
-  --paper: #ffffff;
-  --ink: #17231e;
-  --ink-secondary: #52605a;
-  --ink-muted: #7a8580;
-  --line: #dbe0db;
+  --text-primary: #17231e;
+  --text-secondary: #52605a;
+  --text-muted: #7a8580;
+  --border: #dbe0db;
+  --divider: #dbe0db;
   --line-strong: #c8d0ca;
   --accent: #2f6f58;
   --accent-strong: #245744;
   --accent-soft: #dcebe3;
   --accent-ink: #174734;
+  --nav-bg: #fcfbf7;
+  --nav-active-bg: #dcebe3;
+  --nav-active-text: #174734;
+  --button-primary-bg: #2f6f58;
+  --button-primary-text: #ffffff;
+  --paper: #ffffff;
   --blue: #3d6f8d;
   --blue-soft: #e1edf3;
   --amber: #a56a24;
@@ -28,6 +36,12 @@
   --warning: #c17b2b;
   --shadow: 0 14px 40px rgba(37, 48, 42, 0.08);
   --shadow-soft: 0 6px 20px rgba(37, 48, 42, 0.06);
+  /* Compatibility aliases keep the migration intentionally small. */
+  --surface-raised: var(--surface-elevated);
+  --ink: var(--text-primary);
+  --ink-secondary: var(--text-secondary);
+  --ink-muted: var(--text-muted);
+  --line: var(--border);
   --radius-xl: 30px;
   --radius-lg: 22px;
   --radius-md: 16px;
@@ -36,32 +50,10 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --app-bg: #111713;
-  --surface: #18201b;
-  --surface-raised: #1d2721;
-  --surface-soft: #253029;
-  --surface-tint: #20372c;
-  --paper: #ffffff;
-  --ink: #edf3ee;
-  --ink-secondary: #bac6bd;
-  --ink-muted: #86948a;
-  --line: #303c34;
-  --line-strong: #445248;
-  --accent: #7cc2a1;
-  --accent-strong: #98d5b8;
-  --accent-soft: #254637;
-  --accent-ink: #b9ead1;
-  --blue: #8ebbd3;
-  --blue-soft: #233c49;
-  --amber: #e1ad69;
-  --amber-soft: #45351f;
-  --success: #6fc69a;
-  --success-soft: #214132;
-  --danger: #ec8b86;
-  --danger-soft: #4a2929;
-  --warning: #e3ae67;
-  --shadow: 0 16px 44px rgba(0, 0, 0, 0.26);
-  --shadow-soft: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme='bocchi-dev'] {
+  color-scheme: light;
 }
 
 * {
@@ -80,7 +72,7 @@ body,
 body {
   min-width: 960px;
   background: var(--app-bg);
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
@@ -128,7 +120,7 @@ button:focus-visible {
   align-items: center;
   justify-content: space-between;
   padding: 0 34px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--divider);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
 }
 
@@ -197,8 +189,8 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-top: 1px solid var(--line);
-  background: var(--surface);
+  border-top: 1px solid var(--divider);
+  background: var(--nav-bg);
 }
 
 .bottom-navigation button {
@@ -212,15 +204,15 @@ button:focus-visible {
   border: 0;
   border-radius: 18px;
   background: transparent;
-  color: var(--ink-muted);
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 15px;
   font-weight: 650;
 }
 
 .bottom-navigation button.is-active {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
+  background: var(--nav-active-bg);
+  color: var(--nav-active-text);
 }
 
 .midi-status {
@@ -358,14 +350,10 @@ button:focus-visible {
 }
 
 .primary-action {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: white;
+  border: 1px solid var(--button-primary-bg);
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
   box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 24%, transparent);
-}
-
-:root[data-theme='dark'] .primary-action {
-  color: #10231a;
 }
 
 .primary-action.is-wide {
@@ -374,9 +362,9 @@ button:focus-visible {
 
 .secondary-action,
 .outline-action {
-  border: 1px solid var(--line-strong);
-  background: var(--surface-raised);
-  color: var(--ink);
+  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
 }
 
 .home-hero {
@@ -385,7 +373,7 @@ button:focus-visible {
   min-height: 370px;
   grid-template-columns: minmax(420px, 0.9fr) minmax(500px, 1.1fr);
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -499,7 +487,7 @@ button:focus-visible {
   grid-template-columns: 46px minmax(0, 1fr) auto;
   gap: 13px;
   padding: 14px 17px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
   color: inherit;
@@ -552,25 +540,7 @@ button:focus-visible {
 
 /* V1.5.3 home-only visual preview. Keep these tokens and selectors scoped so
    the approved practice, tools, history and settings surfaces remain intact. */
-.bocchi-home-preview {
-  --app-bg: #fff9f2;
-  --surface: #fffdf9;
-  --surface-raised: #ffffff;
-  --surface-soft: #fff2f6;
-  --surface-tint: #fff4e9;
-  --ink: #24242d;
-  --ink-secondary: #586776;
-  --ink-muted: #7a8795;
-  --line: #ebdfd8;
-  --line-strong: #ddcfc8;
-  --accent: #f33b81;
-  --accent-strong: #dc286c;
-  --accent-soft: #ffe2ed;
-  --accent-ink: #d72267;
-  --blue: #278bd7;
-  --blue-soft: #dff2ff;
-  --amber: #b67b08;
-  --amber-soft: #fff0be;
+:root[data-theme='bocchi-dev'] .bocchi-home-preview {
   position: relative;
   isolation: isolate;
   background:
@@ -579,15 +549,15 @@ button:focus-visible {
   color: var(--ink);
 }
 
-.bocchi-home-preview::before,
-.bocchi-home-preview::after {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview::before,
+:root[data-theme='bocchi-dev'] .bocchi-home-preview::after {
   position: absolute;
   z-index: -1;
   content: '';
   pointer-events: none;
 }
 
-.bocchi-home-preview::before {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview::before {
   top: 86px;
   right: -32px;
   width: 170px;
@@ -597,7 +567,7 @@ button:focus-visible {
   opacity: .64;
 }
 
-.bocchi-home-preview::after {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview::after {
   right: 18px;
   bottom: 82px;
   width: 118px;
@@ -607,7 +577,7 @@ button:focus-visible {
   transform: rotate(-12deg);
 }
 
-.bocchi-home-preview .product-header {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header {
   position: relative;
   z-index: 5;
   isolation: isolate;
@@ -620,15 +590,15 @@ button:focus-visible {
   backdrop-filter: blur(12px);
 }
 
-.bocchi-home-preview .product-header::before,
-.bocchi-home-preview .product-header::after {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header::before,
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header::after {
   position: absolute;
   z-index: -1;
   content: '';
   pointer-events: none;
 }
 
-.bocchi-home-preview .product-header::before {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header::before {
   top: -22px;
   bottom: -20px;
   left: 29%;
@@ -640,7 +610,7 @@ button:focus-visible {
   transform: rotate(-1deg);
 }
 
-.bocchi-home-preview .product-header::after {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header::after {
   top: 12px;
   left: 58%;
   width: 64px;
@@ -651,25 +621,25 @@ button:focus-visible {
   transform: rotate(-7deg);
 }
 
-.bocchi-home-preview .product-header > * {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header > * {
   position: relative;
   z-index: 1;
 }
 
-.bocchi-home-preview .brand-mark {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .brand-mark {
   background: linear-gradient(145deg, #f85291, #ed2470);
   box-shadow: 0 8px 18px rgba(235, 42, 110, .24);
 }
 
-.bocchi-home-preview .product-header__left small {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header__left small {
   color: #ef397d;
 }
 
-.bocchi-home-preview .product-content {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-content {
   padding: 16px 24px;
 }
 
-.bocchi-home-hero {
+:root[data-theme='bocchi-dev'] .bocchi-home-hero {
   position: relative;
   display: block;
   height: calc(100% - 126px);
@@ -681,7 +651,7 @@ button:focus-visible {
   box-shadow: 0 18px 42px rgba(67, 41, 52, .17);
 }
 
-.bocchi-home-hero__art {
+:root[data-theme='bocchi-dev'] .themed-home-hero__art {
   position: absolute;
   z-index: 0;
   inset: -1.2% -1.1%;
@@ -692,7 +662,7 @@ button:focus-visible {
   pointer-events: none;
 }
 
-.bocchi-home-preview .home-hero__copy {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-hero__copy {
   position: absolute;
   z-index: 2;
   top: 10%;
@@ -704,17 +674,17 @@ button:focus-visible {
   padding: 18px 12px 20px 14px;
 }
 
-.bocchi-home-preview .home-hero__copy .eyebrow {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-hero__copy .eyebrow {
   color: #ef3479;
   font-size: 13px;
   letter-spacing: .04em;
 }
 
-.bocchi-home-preview .home-hero__copy h1 {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-hero__copy h1 {
   margin: 10px -11px 7px -12px;
 }
 
-.bocchi-home-hero__headline img {
+:root[data-theme='bocchi-dev'] .themed-home-hero__headline img {
   display: block;
   width: min(100%, 408px);
   height: auto;
@@ -722,7 +692,7 @@ button:focus-visible {
   transform: rotate(-.55deg);
 }
 
-.bocchi-sr-only {
+:root[data-theme='bocchi-dev'] .themed-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -733,35 +703,35 @@ button:focus-visible {
   border: 0;
 }
 
-.bocchi-home-preview .home-hero__copy p {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-hero__copy p {
   margin: 0 0 22px;
   color: #596b7b;
   font-size: 14px;
   font-weight: 580;
 }
 
-.bocchi-home-preview .home-practice-actions {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-practice-actions {
   gap: 10px;
 }
 
-.bocchi-home-preview .home-practice-actions button {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-practice-actions button {
   min-height: 50px;
   border-radius: 15px;
 }
 
-.bocchi-home-preview .home-practice-actions .primary-action {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-practice-actions .primary-action {
   border-color: #f33b81;
   background: linear-gradient(135deg, #fa4f91, #ed2874);
   color: white;
   box-shadow: 0 10px 22px rgba(239, 45, 118, .25);
 }
 
-.bocchi-home-preview .home-practice-actions .secondary-action {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-practice-actions .secondary-action {
   border-color: #d9cfc9;
   background: rgba(255, 255, 255, .88);
 }
 
-.bocchi-home-hero__memo {
+:root[data-theme='bocchi-dev'] .themed-home-hero__memo {
   position: relative;
   margin-top: 21px;
   color: #3e424a;
@@ -771,7 +741,7 @@ button:focus-visible {
   transform: rotate(-2deg);
 }
 
-.bocchi-home-hero__memo::after {
+:root[data-theme='bocchi-dev'] .themed-home-hero__memo::after {
   position: absolute;
   right: -16px;
   bottom: -7px;
@@ -783,14 +753,14 @@ button:focus-visible {
   transform: rotate(-1deg);
 }
 
-.bocchi-home-glance {
+:root[data-theme='bocchi-dev'] .themed-home-glance {
   position: relative;
   height: 126px;
   gap: 13px;
   padding-top: 13px;
 }
 
-.bocchi-home-glance::after {
+:root[data-theme='bocchi-dev'] .themed-home-glance::after {
   position: absolute;
   z-index: 2;
   top: -3px;
@@ -803,7 +773,7 @@ button:focus-visible {
   transform: rotate(9deg);
 }
 
-.bocchi-home-glance .glance-item {
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item {
   position: relative;
   overflow: hidden;
   grid-template-columns: 46px minmax(0, 1fr);
@@ -814,25 +784,25 @@ button:focus-visible {
   box-shadow: 0 8px 22px rgba(83, 57, 63, .07);
 }
 
-.bocchi-home-glance .glance-item.is-history {
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item.is-history {
   background:
     radial-gradient(circle at 91% 52%, rgba(255, 188, 216, .42), transparent 31%),
     linear-gradient(120deg, #fff7fa, #fff1f6);
 }
 
-.bocchi-home-glance .glance-item.is-midi {
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item.is-midi {
   background:
     radial-gradient(circle at 91% 52%, rgba(160, 215, 255, .42), transparent 32%),
     linear-gradient(120deg, #f7fcff, #eaf7ff);
 }
 
-.bocchi-home-glance .glance-item.is-tools {
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item.is-tools {
   background:
     radial-gradient(circle at 91% 52%, rgba(255, 219, 113, .45), transparent 32%),
     linear-gradient(120deg, #fffdf7, #fff6d9);
 }
 
-.bocchi-home-glance .glance-icon {
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-icon {
   width: 46px;
   height: 46px;
   border-radius: 15px;
@@ -840,26 +810,26 @@ button:focus-visible {
   color: #ee337a;
 }
 
-.bocchi-home-glance .glance-icon.is-blue {
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-icon.is-blue {
   background: #dcefff;
   color: #207fc7;
 }
 
-.bocchi-home-glance .glance-icon.is-amber {
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-icon.is-amber {
   background: #ffedb5;
   color: #a76e00;
 }
 
-.bocchi-home-glance .glance-item strong {
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item strong {
   font-size: 16px;
 }
 
-.bocchi-home-glance .glance-item small,
-.bocchi-home-glance .glance-item em {
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item small,
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item em {
   font-size: 11px;
 }
 
-.bocchi-glance-art {
+:root[data-theme='bocchi-dev'] .themed-glance-art {
   position: absolute;
   z-index: 0;
   top: 0;
@@ -869,7 +839,7 @@ button:focus-visible {
   pointer-events: none;
 }
 
-.bocchi-glance-art::before {
+:root[data-theme='bocchi-dev'] .themed-glance-art::before {
   position: absolute;
   z-index: -1;
   inset: 20px 2px 12px 12px;
@@ -879,7 +849,7 @@ button:focus-visible {
   filter: blur(5px);
 }
 
-.bocchi-glance-art > img {
+:root[data-theme='bocchi-dev'] .themed-glance-art > img {
   position: absolute;
   z-index: 0;
   display: block;
@@ -887,28 +857,28 @@ button:focus-visible {
   filter: drop-shadow(0 5px 7px rgba(60, 45, 52, .14));
 }
 
-.bocchi-glance-art.is-history > img {
+:root[data-theme='bocchi-dev'] .themed-glance-art.is-history > img {
   right: -11px;
   bottom: -18px;
   width: 130px;
   transform: rotate(-1.4deg);
 }
 
-.bocchi-glance-art.is-midi > img {
+:root[data-theme='bocchi-dev'] .themed-glance-art.is-midi > img {
   right: -12px;
   bottom: -9px;
   width: 176px;
   transform: rotate(-1deg);
 }
 
-.bocchi-glance-art.is-tools > img {
+:root[data-theme='bocchi-dev'] .themed-glance-art.is-tools > img {
   right: -7px;
   bottom: -13px;
   width: 148px;
   transform: rotate(1.4deg);
 }
 
-.bocchi-glance-art > i {
+:root[data-theme='bocchi-dev'] .themed-glance-art > i {
   position: absolute;
   top: 7px;
   right: 7px;
@@ -924,13 +894,13 @@ button:focus-visible {
   box-shadow: 0 3px 10px rgba(33, 37, 43, .1);
 }
 
-.bocchi-home-glance .glance-item > .glance-icon,
-.bocchi-home-glance .glance-item > span:nth-child(2) {
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item > .glance-icon,
+:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item > span:nth-child(2) {
   position: relative;
   z-index: 1;
 }
 
-.bocchi-glance-art > i.status-dot {
+:root[data-theme='bocchi-dev'] .themed-glance-art > i.status-dot {
   top: auto;
   right: 9px;
   bottom: 9px;
@@ -941,7 +911,7 @@ button:focus-visible {
   box-shadow: 0 0 0 2px rgba(35, 112, 165, .13);
 }
 
-.bocchi-home-preview .bottom-navigation {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .bottom-navigation {
   align-self: center;
   width: min(920px, calc(100% - 88px));
   height: 62px;
@@ -953,14 +923,14 @@ button:focus-visible {
   backdrop-filter: blur(10px);
 }
 
-.bocchi-home-preview .bottom-navigation button {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .bottom-navigation button {
   min-width: 132px;
   height: 50px;
   border-radius: 17px;
   color: #607080;
 }
 
-.bocchi-home-preview .bottom-navigation button.is-active {
+:root[data-theme='bocchi-dev'] .bocchi-home-preview .bottom-navigation button.is-active {
   background: linear-gradient(135deg, #ffe7f0, #ffdce9);
   color: #e92f75;
 }

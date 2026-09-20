@@ -53,6 +53,7 @@
     "test:android-practice-keep-awake": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && node scripts/android-practice-keep-awake-check.cjs",
     "test:android-navigation-ia": "node scripts/android-navigation-ia-check.cjs",
     "test:android-qa-channel": "node scripts/android-qa-channel-check.cjs",
+    "test:android-theme-architecture": "node scripts/android-theme-architecture-check.cjs",
     "test:android-shell": "node scripts/android-shell-check.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "build": "npm run typecheck && electron-vite build",

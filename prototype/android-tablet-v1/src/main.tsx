@@ -1,4 +1,4 @@
-import { StrictMode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { StrictMode, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
@@ -95,11 +95,14 @@ import {
   createPracticeKeepAwakeController,
   shouldKeepPracticeAwake
 } from './practiceKeepAwake'
-import bocchiHomeHandwrittenTitle from './assets/themes/bocchi/home/home-handwritten-title.png'
-import bocchiHomeHero from './assets/themes/bocchi/home/home-hero.png'
-import bocchiHomeMidiAmp from './assets/themes/bocchi/home/home-midi-amp.png'
-import bocchiHomeRecentCharacter from './assets/themes/bocchi/home/home-recent-character.png'
-import bocchiHomeTheoryBird from './assets/themes/bocchi/home/home-theory-bird.png'
+import {
+  applyThemeDefinition,
+  resolveInitialThemeId,
+  resolveTheme,
+  type PublicThemeId,
+  type ThemeDefinition,
+  type ThemeId
+} from './theme/themeRegistry'
 import './styles.css'
 
 declare const __QA_BUILD__: boolean
@@ -567,11 +570,13 @@ function NotationPaper({
 function HomeScreen({
   chordHistory,
   chordPersistence,
-  settings
+  settings,
+  theme
 }: {
   chordHistory: ChordPersistenceSnapshot
   chordPersistence: ChordReportPersistenceCoordinator
   settings: SightReadingSettings
+  theme: ThemeDefinition
 }): JSX.Element {
   const { runtime } = useMidiUi()
   const { openAuxiliary } = useAppNavigation()
@@ -591,16 +596,20 @@ function HomeScreen({
     : recentPractice
       ? `${formatHistoryTimestamp(recentPractice.endedAt)} · 识谱 · 完成 ${recentPractice.completed}/${recentPractice.plannedQuestionCount}`
       : '完成一次练习后，这里会显示最近结果。'
+  const homeVisual = theme.capabilities.homeVisual
+  const composedHome = homeVisual.kind === 'single-image-hero' ? homeVisual : null
   return (
-    <ProductFrame active="home" className="bocchi-home-preview" title="今天，读几页新音符">
-      <section className="home-hero bocchi-home-hero">
-        <img className="bocchi-home-hero__art" src={bocchiHomeHero} alt="" aria-hidden="true" />
+    <ProductFrame active="home" className={composedHome?.frameClassName} title="今天，读几页新音符">
+      <section className={`home-hero${composedHome ? ` ${composedHome.heroClassName}` : ''}`}>
+        {composedHome ? <img className="themed-home-hero__art" src={composedHome.assets.hero} alt="" aria-hidden="true" /> : null}
         <div className="home-hero__copy">
           <span className="eyebrow">今日练习</span>
-          <h1 className="bocchi-home-hero__headline">
-            <span className="bocchi-sr-only">让眼睛先认出，再让手指弹出来。</span>
-            <img src={bocchiHomeHandwrittenTitle} alt="" aria-hidden="true" />
-          </h1>
+          {composedHome ? (
+            <h1 className="themed-home-hero__headline">
+              <span className="themed-sr-only">让眼睛先认出，再让手指弹出来。</span>
+              <img src={composedHome.assets.headline} alt="" aria-hidden="true" />
+            </h1>
+          ) : <h1>让眼睛先认出，<br />再让手指弹出来。</h1>}
           <p>{STAFF_MODE_LABELS[settings.staffMode]} · {settings.questionCount} 题 · 每题固定 {answerTimeLimitSeconds} 秒</p>
           <div className="home-practice-actions">
             <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>
@@ -612,47 +621,56 @@ function HomeScreen({
               和弦练习
             </button>
           </div>
-          <small className="bocchi-home-hero__memo">一步一步，靠近喜欢的音乐。</small>
+          {composedHome ? <small className="themed-home-hero__memo">{composedHome.memo}</small> : null}
         </div>
+        {!composedHome ? (
+          <div className="home-hero__notation" aria-hidden="true">
+            <span className="floating-note note-one">♪</span>
+            <span className="floating-note note-two">♩</span>
+            <NotationPaper
+              keySignature={settings.keySignature}
+              label="识谱练习预览"
+              note={spellMidiPitch(67, settings.keySignature, settings.staffMode)}
+              staffMode={settings.staffMode}
+            />
+          </div>
+        ) : null}
       </section>
 
-      <section className="home-glance bocchi-home-glance" aria-label="今日概览">
-        <button className="glance-item is-history" type="button" onClick={() => navigate('history')}>
+      <section className={`home-glance${composedHome ? ' themed-home-glance' : ''}`} aria-label="今日概览">
+        <button className={`glance-item${composedHome ? ' is-history' : ''}`} type="button" onClick={() => navigate('history')}>
           <span className="glance-icon"><Icon name="chart" /></span>
           <span>
             <small>上次练习</small>
             <strong>{history.status === 'loading' || chordHistory.status === 'loading' ? '正在读取记录' : recentPracticeTitle}</strong>
             <em>{recentPracticeDetail}</em>
           </span>
-          <span
-            className="bocchi-glance-art is-history"
-            aria-hidden="true"
-          >
-            <img src={bocchiHomeRecentCharacter} alt="" />
-            <i><Icon name="chevron" size={20} /></i>
-          </span>
+          {composedHome ? (
+            <span className="themed-glance-art is-history" aria-hidden="true">
+              <img src={composedHome.assets.recentPractice} alt="" />
+              <i><Icon name="chevron" size={20} /></i>
+            </span>
+          ) : <Icon name="chevron" size={20} />}
         </button>
-        <button className="glance-item is-midi" type="button" onClick={() => openAuxiliary('midi')}>
+        <button className={`glance-item${composedHome ? ' is-midi' : ''}`} type="button" onClick={() => openAuxiliary('midi')}>
           <span className="glance-icon is-blue"><Icon name="bluetooth" /></span>
           <span><small>MIDI 输入</small><strong>{midiStatus.label}</strong><em>{midiStatus.detail}</em></span>
-          <span
-            className="bocchi-glance-art is-midi"
-            aria-hidden="true"
-          >
-            <img src={bocchiHomeMidiAmp} alt="" />
-            <i className={`status-dot is-${midiStatus.tone}`} />
-          </span>
+          {composedHome ? (
+            <span className="themed-glance-art is-midi" aria-hidden="true">
+              <img src={composedHome.assets.midi} alt="" />
+              <i className={`status-dot is-${midiStatus.tone}`} />
+            </span>
+          ) : <span className={`status-dot is-${midiStatus.tone}`} />}
         </button>
-        <button className="glance-item is-tools" type="button" onClick={() => navigate('tools')}>
+        <button className={`glance-item${composedHome ? ' is-tools' : ''}`} type="button" onClick={() => navigate('tools')}>
           <span className="glance-icon is-amber"><Icon name="tools" /></span>
           <span><small>乐理工具</small><strong>基础知识查询</strong><em>和弦、音阶、音程与调号</em></span>
-          <span
-            className="bocchi-glance-art is-tools"
-            aria-hidden="true"
-          >
-            <img src={bocchiHomeTheoryBird} alt="" />
-            <i><Icon name="chevron" size={20} /></i>
-          </span>
+          {composedHome ? (
+            <span className="themed-glance-art is-tools" aria-hidden="true">
+              <img src={composedHome.assets.tools} alt="" />
+              <i><Icon name="chevron" size={20} /></i>
+            </span>
+          ) : <Icon name="chevron" size={20} />}
         </button>
       </section>
     </ProductFrame>
@@ -2219,8 +2237,8 @@ function SettingsScreen({
   theme,
   onThemeChange
 }: {
-  theme: 'light' | 'dark'
-  onThemeChange: (theme: 'light' | 'dark') => void
+  theme: PublicThemeId
+  onThemeChange: (theme: PublicThemeId) => void
 }): JSX.Element {
   const { runtime } = useMidiUi()
   const { snapshot: updater } = useUpdaterUi()
@@ -2663,7 +2681,9 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   const [screen, setScreen] = useState<ScreenId>(() => readScreen())
   const [appForeground, setAppForeground] = useState(true)
   const screenRef = useRef<ScreenId>(screen)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [themeId, setThemeId] = useState<ThemeId>(() => resolveInitialThemeId(window.location.search, SHOW_DEVELOPMENT_TOOLS))
+  const activeTheme = resolveTheme(themeId)
+  const publicTheme: PublicThemeId = themeId === 'dark' ? 'dark' : 'light'
   const [chordCaseId, setChordCaseId] = useState(DEFAULT_CHORD_MOCK_CASE_ID)
   const [chordMockStateId, setChordMockStateId] = useState<ChordPreviewStateId>('live')
   const [chordQuestionCount, setChordQuestionCount] = useState<ChordQuestionCount>(20)
@@ -2924,9 +2944,9 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
     }
   }, [chordRuntime, closeChordReportDetail, endChordPractice, practiceKeepAwake, returnFromAuxiliary, runtime, updater])
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-  }, [theme])
+  useLayoutEffect(() => {
+    applyThemeDefinition(document.documentElement, activeTheme)
+  }, [activeTheme])
 
   useEffect(() => {
     const dynamicScreens: ScreenId[] = [
@@ -2946,7 +2966,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
 
   const content = (() => {
     switch (screen) {
-      case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} />
+      case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
       case 'practice': return <PracticeHubScreen />
       case 'tools': return <ToolsHubScreen />
       case 'chord-query-tool': return <ChordQueryToolScreen />
@@ -2996,8 +3016,8 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       )
       case 'settings': return (
         <SettingsScreen
-          onThemeChange={setTheme}
-          theme={theme}
+          onThemeChange={setThemeId}
+          theme={publicTheme}
         />
       )
       case 'midi': return <MidiScreen />
