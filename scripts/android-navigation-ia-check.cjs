@@ -43,7 +43,7 @@ const tests = [
     assert.match(practice, /function ChordModeSelectScreen/)
   }],
   ['NAV03', 'Tools exposes three cards and opens Chord Scale and Interval screens', () => {
-    for (const label of ['和弦查询', '音阶与调号', '音程查询']) assert.match(tools, new RegExp(label))
+    for (const label of ['和弦查询', '自然大调音阶与调号', '音程查询']) assert.match(tools, new RegExp(label))
     assert.equal((tools.match(/title: '/g) ?? []).length, 3)
     assert.doesNotMatch(tools, /title: '音阶查询'|title: '调号参考'/)
     assert.doesNotMatch(tools, /开发中/)

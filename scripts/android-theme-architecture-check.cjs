@@ -10,6 +10,7 @@ const architecture = fs.readFileSync(path.join(root, 'docs/agent/THEME_ARCHITECT
 
 const home = main.slice(main.indexOf('function HomeScreen'), main.indexOf('function PracticeHubScreen'))
 const practice = main.slice(main.indexOf('function PracticeHubScreen'), main.indexOf('function ChordModeSelectScreen'))
+const tools = main.slice(main.indexOf('const THEORY_TOOLS'), main.indexOf('function ScaleNoteToken'))
 const settings = main.slice(main.indexOf('function SettingsScreen'), main.indexOf('function MidiScreen'))
 
 const tests = [
@@ -34,7 +35,7 @@ const tests = [
     assert.doesNotMatch(home, /bocchi-dev|assets\/themes\/bocchi/)
   }],
   ['THM04', 'Light and Dark use the standard Home without themed assets', () => {
-    assert.equal((registry.match(/capabilities: \{ homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual \}/g) ?? []).length, 2)
+    assert.equal((registry.match(/capabilities: \{ homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual \}/g) ?? []).length, 2)
     assert.match(home, /!composedHome[\s\S]*?<NotationPaper/)
   }],
   ['THM05', 'Bocchi strong Home CSS is scoped to its active theme', () => {
@@ -78,6 +79,19 @@ const tests = [
     assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-practice-preview/)
     assert.equal((practice.match(/className=\{`module-card/g) ?? []).length, 2)
     assert.doesNotMatch(practice, /自由练习|节拍器/)
+  }],
+  ['THM13', 'Tools consumes a visual capability without theme-name coupling', () => {
+    assert.match(tools, /theme\.capabilities\.toolsVisual/)
+    assert.match(tools, /toolsVisual\.kind === 'hero-cards'/)
+    assert.doesNotMatch(tools, /bocchi-dev|assets\/themes\/bocchi/)
+    for (const route of ['chord-query-tool', 'interval-query-tool', 'scale-key-signature-tool']) assert.match(tools, new RegExp(route))
+  }],
+  ['THM14', 'Bocchi Tools uses one hero and three decorations while reference D stays inert', () => {
+    for (const asset of ['00_05_48.png', '00_25_10.png', '00_27_04.png', '00_30_34.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
+    assert.doesNotMatch(registry, /00_38_00\.png/)
+    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-tools-preview/)
+    assert.equal((tools.match(/screen: '/g) ?? []).length, 3)
+    assert.doesNotMatch(tools, /搜索工具|最近使用|基础乐理|节拍器/)
   }]
 ]
 

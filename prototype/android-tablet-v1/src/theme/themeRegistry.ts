@@ -6,6 +6,10 @@ import bocchiHomeTheoryBird from '../assets/themes/bocchi/home/home-theory-bird.
 import bocchiPracticeHero from '../assets/themes/bocchi/practice/ChatGPT Image 2026年9月23日 20_53_32.png'
 import bocchiPracticeSightDecoration from '../assets/themes/bocchi/practice/ChatGPT Image 2026年9月23日 20_56_06.png'
 import bocchiPracticeChordDecoration from '../assets/themes/bocchi/practice/ChatGPT Image 2026年9月23日 20_57_50.png'
+import bocchiToolsHero from '../assets/themes/bocchi/tools/ChatGPT Image 2026年9月24日 00_05_48.png'
+import bocchiToolsChordDecoration from '../assets/themes/bocchi/tools/ChatGPT Image 2026年9月24日 00_25_10.png'
+import bocchiToolsIntervalDecoration from '../assets/themes/bocchi/tools/ChatGPT Image 2026年9月24日 00_27_04.png'
+import bocchiToolsScaleDecoration from '../assets/themes/bocchi/tools/ChatGPT Image 2026年9月24日 00_30_34.png'
 
 export type ThemeId = 'light' | 'dark' | 'bocchi-dev'
 export type PublicThemeId = 'light' | 'dark'
@@ -84,6 +88,23 @@ export interface HeroCardsPracticeVisual {
 
 export type PracticeVisual = StandardPracticeVisual | HeroCardsPracticeVisual
 
+export interface StandardToolsVisual {
+  kind: 'standard'
+}
+
+export interface HeroCardsToolsVisual {
+  kind: 'hero-cards'
+  frameClassName: string
+  assets: Readonly<{
+    hero: string
+    chord: string
+    interval: string
+    scale: string
+  }>
+}
+
+export type ToolsVisual = StandardToolsVisual | HeroCardsToolsVisual
+
 export interface ThemeDefinition {
   id: ThemeId
   displayName: string
@@ -93,6 +114,7 @@ export interface ThemeDefinition {
   capabilities: Readonly<{
     homeVisual: HomeVisual
     practiceVisual: PracticeVisual
+    toolsVisual: ToolsVisual
   }>
 }
 
@@ -203,6 +225,7 @@ const bocchiTokens: ThemeTokens = {
 
 const standardHomeVisual: StandardHomeVisual = { kind: 'standard' }
 const standardPracticeVisual: StandardPracticeVisual = { kind: 'standard' }
+const standardToolsVisual: StandardToolsVisual = { kind: 'standard' }
 
 export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
   light: {
@@ -211,7 +234,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
     source: 'built-in',
     colorScheme: 'light',
     tokens: lightTokens,
-    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual }
+    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual }
   },
   dark: {
     id: 'dark',
@@ -219,7 +242,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
     source: 'built-in',
     colorScheme: 'dark',
     tokens: darkTokens,
-    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual }
+    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual }
   },
   'bocchi-dev': {
     id: 'bocchi-dev',
@@ -249,6 +272,16 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
           hero: bocchiPracticeHero,
           sight: bocchiPracticeSightDecoration,
           chord: bocchiPracticeChordDecoration
+        }
+      },
+      toolsVisual: {
+        kind: 'hero-cards',
+        frameClassName: 'bocchi-tools-preview',
+        assets: {
+          hero: bocchiToolsHero,
+          chord: bocchiToolsChordDecoration,
+          interval: bocchiToolsIntervalDecoration,
+          scale: bocchiToolsScaleDecoration
         }
       }
     }

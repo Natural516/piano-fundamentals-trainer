@@ -31,7 +31,7 @@ const tests = []
 const test = (name, callback) => tests.push({ name, callback })
 
 test('SK01 screen identity exists', () => assert.match(mainSource, /\| 'scale-key-signature-tool'/))
-test('SK02 Tools contains merged Scale and Key Signature card', () => assert.match(toolsSource, /title: '音阶与调号'/))
+test('SK02 Tools contains merged Natural Major Scale and Key Signature card', () => assert.match(toolsSource, /title: '自然大调音阶与调号'/))
 test('SK03 separate Scale Query card is removed', () => assert.doesNotMatch(toolsSource, /title: '音阶查询'/))
 test('SK04 separate Key Signature Reference card is removed', () => assert.doesNotMatch(toolsSource, /title: '调号参考'/))
 test('SK05 Chord Query card remains alongside Scale and opens its own screen', () => {

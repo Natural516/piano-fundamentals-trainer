@@ -833,29 +833,60 @@ function ChordModeSelectScreen({ onSelectMode, settingsReady }: { onSelectMode: 
 }
 
 const THEORY_TOOLS = [
-  { title: '和弦查询', detail: '查看规范和弦名称与完整理论构成音', screen: 'chord-query-tool' },
-  { title: '音阶与调号', detail: '查看自然大调音阶与五线谱调号', screen: 'scale-key-signature-tool' },
-  { title: '音程查询', detail: '识别两个音之间的音程', screen: 'interval-query-tool' }
+  { id: 'chord', title: '和弦查询', detail: '查看规范和弦名称与完整理论构成音', screen: 'chord-query-tool' },
+  { id: 'interval', title: '音程查询', detail: '识别两个音之间的音程', screen: 'interval-query-tool' },
+  { id: 'scale', title: '自然大调音阶与调号', detail: '查看自然大调音阶与五线谱调号', screen: 'scale-key-signature-tool' }
 ] as const
 
-function ToolsHubScreen(): JSX.Element {
+function ToolsHubScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
+  const toolsVisual = theme.capabilities.toolsVisual
+  const composedTools = toolsVisual.kind === 'hero-cards' ? toolsVisual : null
+  const toolCards = THEORY_TOOLS.map((tool) => (
+    <button
+      className={`tool-card is-interactive${composedTools ? ` themed-tool-card is-${tool.id}` : ''}`}
+      key={tool.id}
+      type="button"
+      onClick={() => navigate(tool.screen)}
+    >
+      <span className="tool-card__icon"><Icon name="tools" size={27} /></span>
+      <span className="tool-card__copy"><strong>{tool.title}</strong><small>{tool.detail}</small></span>
+      {composedTools ? (
+        <span className="themed-tool-card__art" aria-hidden="true">
+          <img src={composedTools.assets[tool.id]} alt="" />
+        </span>
+      ) : null}
+      <em>{composedTools ? '打开工具' : '打开'} <Icon name="chevron" size={15} /></em>
+    </button>
+  ))
+
   return (
-    <ProductFrame active="tools" title="工具">
-      <section className="hub-layout tools-hub" aria-labelledby="tools-hub-title">
-        <div className="hub-heading">
-          <span className="eyebrow">THEORY REFERENCE</span>
-          <h1 id="tools-hub-title">乐理基础知识查询</h1>
-          <p>快速查询常用和弦、音阶、音程与调号基础信息。</p>
-        </div>
-        <div className="tool-card-grid">
-          {THEORY_TOOLS.map((tool) => (
-            <button className="tool-card is-interactive" key={tool.title} type="button" onClick={() => navigate(tool.screen)}>
-              <span className="tool-card__icon"><Icon name="tools" size={27} /></span>
-              <span><strong>{tool.title}</strong><small>{tool.detail}</small></span>
-              <em>打开 <Icon name="chevron" size={15} /></em>
-            </button>
-          ))}
-        </div>
+    <ProductFrame active="tools" className={composedTools?.frameClassName} title="工具">
+      <section className={`hub-layout tools-hub${composedTools ? ' themed-tools-hub' : ''}`} aria-labelledby="tools-hub-title">
+        {composedTools ? (
+          <>
+            <div className="themed-tools-hero" aria-hidden="true">
+              <img src={composedTools.assets.hero} alt="" />
+              <span>低音，也能让音乐更有重量。</span>
+            </div>
+            <div className="themed-tools-panel">
+              <div className="themed-tools-heading">
+                <span className="eyebrow">THEORY REFERENCE</span>
+                <h1 id="tools-hub-title">乐理工具</h1>
+                <p>快速查询和弦、音程与自然大调音阶、调号。</p>
+              </div>
+              <div className="tool-card-grid themed-tool-card-grid">{toolCards}</div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="hub-heading">
+              <span className="eyebrow">THEORY REFERENCE</span>
+              <h1 id="tools-hub-title">乐理基础知识查询</h1>
+              <p>快速查询常用和弦、音阶、音程与调号基础信息。</p>
+            </div>
+            <div className="tool-card-grid">{toolCards}</div>
+          </>
+        )}
       </section>
     </ProductFrame>
   )
@@ -3021,7 +3052,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
     switch (screen) {
       case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
       case 'practice': return <PracticeHubScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
-      case 'tools': return <ToolsHubScreen />
+      case 'tools': return <ToolsHubScreen theme={activeTheme} />
       case 'chord-query-tool': return <ChordQueryToolScreen />
       case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen />
       case 'interval-query-tool': return <IntervalQueryToolScreen />

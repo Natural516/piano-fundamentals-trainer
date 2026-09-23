@@ -252,7 +252,7 @@ test('CQ25', 'chord symbols use one structured nowrap root accidental suffix uni
 })
 
 test('CQ26', 'Chord Query leaves Scale and Interval Query sibling tools implemented', () => {
-  assert.match(toolsSource, /title: '音阶与调号'[\s\S]*?screen: 'scale-key-signature-tool'/)
+  assert.match(toolsSource, /title: '自然大调音阶与调号'[\s\S]*?screen: 'scale-key-signature-tool'/)
   assert.match(toolsSource, /title: '音程查询'[\s\S]*?screen: 'interval-query-tool'/)
 })
 
