@@ -9,6 +9,7 @@ const css = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/sty
 const architecture = fs.readFileSync(path.join(root, 'docs/agent/THEME_ARCHITECTURE.md'), 'utf8')
 
 const home = main.slice(main.indexOf('function HomeScreen'), main.indexOf('function PracticeHubScreen'))
+const practice = main.slice(main.indexOf('function PracticeHubScreen'), main.indexOf('function ChordModeSelectScreen'))
 const settings = main.slice(main.indexOf('function SettingsScreen'), main.indexOf('function MidiScreen'))
 
 const tests = [
@@ -33,7 +34,7 @@ const tests = [
     assert.doesNotMatch(home, /bocchi-dev|assets\/themes\/bocchi/)
   }],
   ['THM04', 'Light and Dark use the standard Home without themed assets', () => {
-    assert.equal((registry.match(/capabilities: \{ homeVisual: standardHomeVisual \}/g) ?? []).length, 2)
+    assert.equal((registry.match(/capabilities: \{ homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual \}/g) ?? []).length, 2)
     assert.match(home, /!composedHome[\s\S]*?<NotationPaper/)
   }],
   ['THM05', 'Bocchi strong Home CSS is scoped to its active theme', () => {
@@ -63,6 +64,20 @@ const tests = [
     for (const phrase of ['Product layer', 'Peer themes', 'Single visual source', 'Future external-theme compatibility', 'Themes cannot alter business logic']) {
       assert.match(architecture, new RegExp(phrase))
     }
+  }],
+  ['THM11', 'Practice consumes a visual capability without theme-name coupling', () => {
+    assert.match(practice, /theme\.capabilities\.practiceVisual/)
+    assert.match(practice, /practiceVisual\.kind === 'hero-cards'/)
+    assert.doesNotMatch(practice, /bocchi-dev|assets\/themes\/bocchi/)
+    assert.match(practice, /navigate\('sight-ready'\)/)
+    assert.match(practice, /navigate\('chord-mode-select'\)/)
+  }],
+  ['THM12', 'Bocchi Practice uses A B and C while D remains reference-only', () => {
+    for (const asset of ['20_53_32.png', '20_56_06.png', '20_57_50.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
+    assert.doesNotMatch(registry, /21_03_05\.png/)
+    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-practice-preview/)
+    assert.equal((practice.match(/className=\{`module-card/g) ?? []).length, 2)
+    assert.doesNotMatch(practice, /自由练习|节拍器/)
   }]
 ]
 

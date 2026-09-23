@@ -3,6 +3,9 @@ import bocchiHomeHero from '../assets/themes/bocchi/home/home-hero.png'
 import bocchiHomeMidiAmp from '../assets/themes/bocchi/home/home-midi-amp.png'
 import bocchiHomeRecentCharacter from '../assets/themes/bocchi/home/home-recent-character.png'
 import bocchiHomeTheoryBird from '../assets/themes/bocchi/home/home-theory-bird.png'
+import bocchiPracticeHero from '../assets/themes/bocchi/practice/ChatGPT Image 2026年9月23日 20_53_32.png'
+import bocchiPracticeSightDecoration from '../assets/themes/bocchi/practice/ChatGPT Image 2026年9月23日 20_56_06.png'
+import bocchiPracticeChordDecoration from '../assets/themes/bocchi/practice/ChatGPT Image 2026年9月23日 20_57_50.png'
 
 export type ThemeId = 'light' | 'dark' | 'bocchi-dev'
 export type PublicThemeId = 'light' | 'dark'
@@ -64,6 +67,23 @@ export interface SingleImageHomeVisual {
 
 export type HomeVisual = StandardHomeVisual | SingleImageHomeVisual
 
+export interface StandardPracticeVisual {
+  kind: 'standard'
+}
+
+export interface HeroCardsPracticeVisual {
+  kind: 'hero-cards'
+  frameClassName: string
+  heroClassName: string
+  assets: Readonly<{
+    hero: string
+    sight: string
+    chord: string
+  }>
+}
+
+export type PracticeVisual = StandardPracticeVisual | HeroCardsPracticeVisual
+
 export interface ThemeDefinition {
   id: ThemeId
   displayName: string
@@ -72,6 +92,7 @@ export interface ThemeDefinition {
   tokens: ThemeTokens
   capabilities: Readonly<{
     homeVisual: HomeVisual
+    practiceVisual: PracticeVisual
   }>
 }
 
@@ -181,6 +202,7 @@ const bocchiTokens: ThemeTokens = {
 }
 
 const standardHomeVisual: StandardHomeVisual = { kind: 'standard' }
+const standardPracticeVisual: StandardPracticeVisual = { kind: 'standard' }
 
 export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
   light: {
@@ -189,7 +211,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
     source: 'built-in',
     colorScheme: 'light',
     tokens: lightTokens,
-    capabilities: { homeVisual: standardHomeVisual }
+    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual }
   },
   dark: {
     id: 'dark',
@@ -197,7 +219,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
     source: 'built-in',
     colorScheme: 'dark',
     tokens: darkTokens,
-    capabilities: { homeVisual: standardHomeVisual }
+    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual }
   },
   'bocchi-dev': {
     id: 'bocchi-dev',
@@ -218,6 +240,16 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
           tools: bocchiHomeTheoryBird
         },
         memo: '一步一步，靠近喜欢的音乐。'
+      },
+      practiceVisual: {
+        kind: 'hero-cards',
+        frameClassName: 'bocchi-practice-preview',
+        heroClassName: 'bocchi-practice-hero',
+        assets: {
+          hero: bocchiPracticeHero,
+          sight: bocchiPracticeSightDecoration,
+          chord: bocchiPracticeChordDecoration
+        }
       }
     }
   }

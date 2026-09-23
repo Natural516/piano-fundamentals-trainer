@@ -60,6 +60,7 @@ import {
 } from './chordPractice/persistence'
 import { projectChordHistory } from './chordPractice/historyProjection'
 import { projectMixedPracticeHistory, type MixedPracticeHistoryItem } from './mixedHistoryProjection'
+import { projectPracticeHubRecentSummary } from './practiceHubProjection'
 import {
   projectChordReportDetail,
   resolveChordReportById
@@ -677,33 +678,85 @@ function HomeScreen({
   )
 }
 
-function PracticeHubScreen(): JSX.Element {
+function PracticeHubScreen({
+  chordHistory,
+  chordPersistence,
+  settings,
+  theme
+}: {
+  chordHistory: ChordPersistenceSnapshot
+  chordPersistence: ChordReportPersistenceCoordinator
+  settings: SightReadingSettings
+  theme: ThemeDefinition
+}): JSX.Element {
+  const { runtime } = useMidiUi()
+  const sightHistory = runtime.historySnapshot
+  const recent = projectPracticeHubRecentSummary(sightHistory.records, chordHistory.records)
+  const practiceVisual = theme.capabilities.practiceVisual
+  const composedPractice = practiceVisual.kind === 'hero-cards' ? practiceVisual : null
+  const sightRecentSummary = sightHistory.status === 'loading' && sightHistory.records.length === 0
+    ? '正在读取记录'
+    : recent.sight?.summary ?? '暂无练习记录'
+  const chordRecentSummary = chordHistory.status === 'loading' && chordHistory.records.length === 0
+    ? '正在读取记录'
+    : recent.chord?.summary ?? '暂无练习记录'
+  const sightConfigurationSummary = `${settings.noteMode === 'double' ? '双音' : '单音'} · ${STAFF_MODE_LABELS[settings.staffMode]} · ${settings.questionCount} 题`
+
+  useEffect(() => {
+    void runtime.refreshHistory()
+    void chordPersistence.refresh()
+  }, [chordPersistence, runtime])
+
   return (
-    <ProductFrame active="practice" title="练习">
-      <section className="hub-layout" aria-labelledby="practice-hub-title">
-        <div className="hub-heading">
-          <span className="eyebrow">PRACTICE</span>
-          <h1 id="practice-hub-title">选择今天的练习</h1>
-          <p>从识谱或和弦开始；后续训练模块将在这里自然扩展。</p>
-        </div>
-        <div className="practice-module-grid">
-          <button className="module-card" type="button" onClick={() => navigate('sight-ready')}>
+    <ProductFrame active="practice" className={composedPractice?.frameClassName} title="练习">
+      <section className={`hub-layout${composedPractice ? ' themed-practice-hub' : ''}`} aria-labelledby="practice-hub-title">
+        {composedPractice ? (
+          <div className={`themed-practice-hero ${composedPractice.heroClassName}`}>
+            <img className="themed-practice-hero__art" src={composedPractice.assets.hero} alt="" aria-hidden="true" />
+            <div className="themed-practice-hero__copy">
+              <span className="eyebrow">练习中心</span>
+              <h1 id="practice-hub-title">每天一点练习，<br />让喜欢的音乐离你更近。</h1>
+              <p>选择识谱或和弦练习，把基础一步一步练扎实。</p>
+              <small>今天，也弹一点。</small>
+            </div>
+          </div>
+        ) : (
+          <div className="hub-heading">
+            <span className="eyebrow">PRACTICE</span>
+            <h1 id="practice-hub-title">选择今天的练习</h1>
+            <p>从识谱或和弦开始；后续训练模块将在这里自然扩展。</p>
+          </div>
+        )}
+        <div className={`practice-module-grid${composedPractice ? ' themed-practice-module-grid' : ''}`}>
+          <button className={`module-card${composedPractice ? ' themed-practice-card is-sight' : ''}`} type="button" onClick={() => navigate('sight-ready')}>
             <span className="module-card__icon"><Icon name="book" size={30} /></span>
             <span className="module-card__copy">
-              <small>实时 MIDI 判定</small>
+              <small>识谱训练</small>
               <strong>识谱练习</strong>
-              <em>单音 / 双音 · 高音 / 低音 / 大谱表</em>
+              <em>{sightConfigurationSummary}</em>
+              <span className="module-card__recent">{sightRecentSummary}</span>
             </span>
-            <Icon name="chevron" />
+            {composedPractice ? (
+              <>
+                <span className="themed-practice-card__art" aria-hidden="true"><img src={composedPractice.assets.sight} alt="" /></span>
+                <span className="themed-practice-card__action"><Icon name="play" size={19} />开始练习</span>
+              </>
+            ) : <Icon name="chevron" />}
           </button>
-          <button className="module-card" type="button" onClick={() => navigate('chord-mode-select')}>
+          <button className={`module-card${composedPractice ? ' themed-practice-card is-chord' : ''}`} type="button" onClick={() => navigate('chord-mode-select')}>
             <span className="module-card__icon is-amber"><Icon name="grid" size={30} /></span>
             <span className="module-card__copy">
               <small>和弦与转位</small>
               <strong>和弦练习</strong>
               <em>三和弦 / 七和弦 · 原位与转位 · 柱式 + 分解</em>
+              <span className="module-card__recent">{chordRecentSummary}</span>
             </span>
-            <Icon name="chevron" />
+            {composedPractice ? (
+              <>
+                <span className="themed-practice-card__art" aria-hidden="true"><img src={composedPractice.assets.chord} alt="" /></span>
+                <span className="themed-practice-card__action"><Icon name="play" size={19} />开始练习</span>
+              </>
+            ) : <Icon name="chevron" />}
           </button>
         </div>
       </section>
@@ -2967,7 +3020,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   const content = (() => {
     switch (screen) {
       case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
-      case 'practice': return <PracticeHubScreen />
+      case 'practice': return <PracticeHubScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
       case 'tools': return <ToolsHubScreen />
       case 'chord-query-tool': return <ChordQueryToolScreen />
       case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen />
