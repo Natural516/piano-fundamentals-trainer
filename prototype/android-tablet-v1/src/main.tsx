@@ -60,6 +60,12 @@ import {
 } from './chordPractice/persistence'
 import { projectChordHistory } from './chordPractice/historyProjection'
 import { projectMixedPracticeHistory, type MixedPracticeHistoryItem } from './mixedHistoryProjection'
+import {
+  projectHistoryDashboard,
+  type HistoryDailyBucket,
+  type HistoryDashboardFilter,
+  type HistoryDashboardRange
+} from './historyDashboardProjection'
 import { projectPracticeHubRecentSummary } from './practiceHubProjection'
 import {
   projectChordReportDetail,
@@ -2047,7 +2053,55 @@ function SightResultScreen({
   )
 }
 
-type HistoryFilter = 'all' | 'sight' | 'chord'
+type HistoryFilter = HistoryDashboardFilter
+
+function HistoryTrendChart({ buckets }: { buckets: readonly HistoryDailyBucket[] }): JSX.Element {
+  const width = 560
+  const height = 152
+  const plotLeft = 30
+  const plotRight = 544
+  const plotTop = 12
+  const plotBottom = 118
+  const plotWidth = plotRight - plotLeft
+  const plotHeight = plotBottom - plotTop
+  const divisor = Math.max(1, buckets.length - 1)
+  const maxQuestions = Math.max(1, ...buckets.map((bucket) => bucket.completedQuestions))
+  const maxSessions = Math.max(1, ...buckets.map((bucket) => bucket.sessions))
+  const points = buckets.map((bucket, index) => ({
+    ...bucket,
+    x: plotLeft + index / divisor * plotWidth,
+    y: plotBottom - bucket.completedQuestions / maxQuestions * plotHeight
+  }))
+  const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ')
+  const barWidth = Math.max(3, Math.min(18, plotWidth / Math.max(1, buckets.length) * 0.48))
+  const hasActivity = buckets.some((bucket) => bucket.sessions > 0 || bucket.completedQuestions > 0)
+  const labelStep = buckets.length <= 8 ? 1 : Math.ceil(buckets.length / 6)
+
+  return (
+    <div className="history-trend-chart" aria-label="按本地自然日统计的练习趋势" role="img">
+      <svg viewBox={`0 0 ${width} ${height}`}>
+        {[0, 0.5, 1].map((ratio) => {
+          const y = plotTop + ratio * plotHeight
+          return <line className="history-trend-chart__grid" key={ratio} x1={plotLeft} x2={plotRight} y1={y} y2={y} />
+        })}
+        {points.map((point) => {
+          const barHeight = point.sessions / maxSessions * (plotHeight * 0.66)
+          return <rect className="history-trend-chart__bar" height={barHeight} key={`bar-${point.dateKey}`} rx="3" width={barWidth} x={point.x - barWidth / 2} y={plotBottom - barHeight} />
+        })}
+        {hasActivity ? <path className="history-trend-chart__line" d={path} /> : null}
+        {hasActivity ? points.map((point) => (
+          <circle className="history-trend-chart__point" cx={point.x} cy={point.y} key={`point-${point.dateKey}`} r="3.5" />
+        )) : null}
+        {points.map((point, index) => (
+          index % labelStep === 0 || index === points.length - 1
+            ? <text className="history-trend-chart__label" key={`label-${point.dateKey}`} textAnchor="middle" x={point.x} y={143}>{point.label}</text>
+            : null
+        ))}
+      </svg>
+      {!hasActivity ? <span className="history-trend-chart__empty">当前范围内暂无练习记录</span> : null}
+    </div>
+  )
+}
 
 function HistoryRecord({
   item,
@@ -2096,7 +2150,8 @@ function HistoryScreen({
   filter,
   onFilterChange,
   onOpenChordReport,
-  runtime
+  runtime,
+  theme
 }: {
   chordHistory: ChordPersistenceSnapshot
   chordPersistence: ChordReportPersistenceCoordinator
@@ -2104,12 +2159,16 @@ function HistoryScreen({
   onFilterChange: (filter: HistoryFilter) => void
   onOpenChordReport: (recordId: string, filter: HistoryFilter) => void
   runtime: AndroidSightReadingRuntime
+  theme: ThemeDefinition
 }): JSX.Element {
   const history = runtime.historySnapshot
   const sightProjection = projectSightReadingHistory(history.records)
-  const { summary } = sightProjection
   const chordItems = projectChordHistory(chordHistory.records)
   const mixedItems = projectMixedPracticeHistory(history.records, chordHistory.records)
+  const [trendRange, setTrendRange] = useState<HistoryDashboardRange>('7d')
+  const dashboard = projectHistoryDashboard(history.records, chordHistory.records, { filter, range: trendRange })
+  const historyVisual = theme.capabilities.historyVisual
+  const composedHistory = historyVisual.kind === 'dashboard' ? historyVisual : null
   useEffect(() => {
     void runtime.refreshHistory()
     void chordPersistence.refresh()
@@ -2118,9 +2177,6 @@ function HistoryScreen({
   const visibleItems: readonly MixedPracticeHistoryItem[] = filter === 'sight'
     ? sightProjection.items.map((item) => ({ module: 'sight' as const, ...item }))
     : filter === 'chord' ? chordItems : mixedItems
-  const empty = visibleItems.length === 0
-  const overallAccuracy = formatHistoryPercentage(summary.overallAccuracy)
-  const averageReaction = summary.averageReactionMs === null ? '—' : (summary.averageReactionMs / 1000).toFixed(2)
   const anyLoading = history.status === 'loading' || chordHistory.status === 'loading'
   const anyError = history.status === 'error' || chordHistory.status === 'error'
   const anyWarning = Boolean(history.warning || chordHistory.warning)
@@ -2131,65 +2187,70 @@ function HistoryScreen({
       : anyWarning
         ? `共 ${visibleItems.length} 条 · 部分记录不可用`
         : `共 ${visibleItems.length} 条记录`
+  const emptyTitle = filter === 'chord'
+    ? '暂无和弦练习记录'
+    : filter === 'sight' ? '暂无识谱练习记录' : '暂无真实练习记录'
+  const emptyDetail = filter === 'chord'
+    ? '完成和弦练习后，记录会显示在这里。'
+    : filter === 'sight' ? '完成一轮识谱练习后，真实结果会显示在这里。' : '完成一轮练习后，真实结果会显示在这里。'
   return (
-    <ProductFrame active="history" title="练习记录">
-      <section className="history-screen">
-        <div className="history-filter" aria-label="练习模块筛选" role="group">
-          {([
-            ['all', '全部'],
-            ['sight', '识谱'],
-            ['chord', '和弦']
-          ] as const).map(([value, label]) => (
-            <button className={filter === value ? 'is-active' : ''} key={value} type="button" onClick={() => onFilterChange(value)}>{label}</button>
-          ))}
-        </div>
-        {filter === 'chord' && empty ? (
-          <div className="history-module-empty" role="status">
-            <span className="history-row__mark"><Icon name="history" /></span>
-            <div><span className="eyebrow">和弦记录</span><h1>暂无和弦练习记录</h1><p>完成和弦练习后，记录会显示在这里。</p></div>
+    <ProductFrame active="history" className={composedHistory?.frameClassName} title="练习记录">
+      <section className={`history-screen history-dashboard${composedHistory ? ' themed-history-dashboard' : ''}`}>
+        <section className="history-dashboard__hero" aria-labelledby="history-dashboard-title">
+          {composedHistory ? <img className="history-dashboard__hero-art" src={composedHistory.assets.hero} alt="" aria-hidden="true" /> : null}
+          <div className="history-dashboard__hero-copy">
+            <span className="eyebrow">PRACTICE JOURNAL</span>
+            <h1 id="history-dashboard-title">每一次坚持，<br />都让梦想更靠近。</h1>
+            <p>{dashboard.summary.totalSessions > 0 ? `这里保存着 ${dashboard.summary.totalSessions} 次真实练习。` : '完成一次练习后，这里会留下你的进步。'}</p>
           </div>
-        ) : filter === 'sight' ? (
-          <div className="history-layout">
-            <div className="history-summary">
-              <div>
-                <span className="eyebrow">识谱记录</span>
-                <h1>{empty
-                  ? '还没有识谱练习记录'
-                  : `已有 ${summary.totalSessions} 次练习记录`}</h1>
-                <p>{empty
-                  ? '完成或提前结束并保存一轮识谱练习后，会在这里显示。'
-                  : `共完成 ${summary.totalCompletedQuestions} 题：正确 ${summary.totalCorrect}，错误 ${summary.totalWrong}，超时 ${summary.totalTimeout}。`}</p>
-              </div>
-              <div className="history-summary__stat"><strong>{overallAccuracy}{summary.overallAccuracy === null ? null : <small>%</small>}</strong><span>总体正确率</span></div>
-              <div className="history-summary__stat"><strong>{averageReaction}{summary.averageReactionMs === null ? null : <small>s</small>}</strong><span>平均反应</span></div>
+          {composedHistory ? <img className="history-dashboard__hero-memo" src={composedHistory.assets.memo} alt="" aria-hidden="true" /> : null}
+        </section>
+
+        <section className="history-dashboard__summary" aria-label="练习汇总">
+          <article className="history-stat-card is-sessions"><span><Icon name="chart" /></span><div><small>已保存练习</small><strong>{dashboard.summary.totalSessions}<b>次</b></strong><p>识谱与和弦的真实记录</p></div></article>
+          <article className="history-stat-card is-streak"><span><Icon name="grid" /></span><div><small>连续练习天数</small><strong>{dashboard.summary.currentStreakDays}<b>天</b></strong><p>按当前设备本地自然日</p></div></article>
+          <article className="history-stat-card is-questions"><span><Icon name="book" /></span><div><small>累计完成题数</small><strong>{dashboard.summary.totalCompletedQuestions}<b>题</b></strong><p>包含已保存的部分练习</p></div></article>
+        </section>
+
+        <div className="history-dashboard__workspace">
+          <section className="history-list history-dashboard__recent">
+            <div className="history-dashboard__section-heading">
+              <div><span className="eyebrow">RECENT PRACTICE</span><h2>最近练习记录</h2></div>
+              <span>{listStatus}</span>
             </div>
-            <div className="history-list">
-              <div className="list-heading"><h2>最近练习</h2><span>{listStatus}</span></div>
-              <div className="history-list__rows">
-                {visibleItems.length > 0 ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} />) : (
-                  <div className="history-empty" role={history.status === 'error' ? 'alert' : 'status'}>
-                    <span className="history-row__mark"><Icon name={history.status === 'error' ? 'info' : 'history'} /></span>
-                    <div><strong>{history.status === 'loading' ? '正在读取本地记录…' : history.status === 'error' ? '暂时无法读取练习记录' : '暂无真实练习记录'}</strong><p>{history.status === 'error' ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : '完成一轮识谱练习后，真实结果会显示在这里。'}</p></div>
-                  </div>
-                )}
-              </div>
+            <div className="history-filter" aria-label="练习模块筛选" role="group">
+              {([['all', '全部'], ['sight', '识谱'], ['chord', '和弦']] as const).map(([value, label]) => (
+                <button className={filter === value ? 'is-active' : ''} key={value} type="button" onClick={() => onFilterChange(value)}>{label}</button>
+              ))}
             </div>
-          </div>
-        ) : (
-          <div className="history-list history-list--module">
-            <div className="list-heading"><h2>{filter === 'all' ? '全部练习' : '和弦练习'}</h2><span>{listStatus}</span></div>
             <div className="history-list__rows">
               {visibleItems.length > 0
                 ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} />)
                 : (
                   <div className="history-empty" role={anyError ? 'alert' : 'status'}>
                     <span className="history-row__mark"><Icon name={anyError ? 'info' : 'history'} /></span>
-                    <div><strong>{anyLoading ? '正在读取本地记录…' : anyError ? '暂时无法读取练习记录' : '暂无真实练习记录'}</strong><p>{anyError ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : '完成一轮练习后，真实结果会显示在这里。'}</p></div>
+                    <div><strong>{anyLoading ? '正在读取本地记录…' : anyError ? '暂时无法读取练习记录' : emptyTitle}</strong><p>{anyError ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : emptyDetail}</p></div>
                   </div>
                 )}
             </div>
-          </div>
-        )}
+            {composedHistory ? <img className="history-dashboard__lower-decor" src={composedHistory.assets.lower} alt="" aria-hidden="true" /> : null}
+          </section>
+
+          <section className="history-dashboard__trend">
+            <div className="history-dashboard__section-heading">
+              <div><span className="eyebrow">PRACTICE TREND</span><h2>练习趋势</h2></div>
+              <div className="history-range-filter" aria-label="趋势时间范围" role="group">
+                {([['7d', '近7天'], ['30d', '近30天'], ['all', '全部']] as const).map(([value, label]) => (
+                  <button className={trendRange === value ? 'is-active' : ''} key={value} type="button" onClick={() => setTrendRange(value)}>{label}</button>
+                ))}
+              </div>
+            </div>
+            <HistoryTrendChart buckets={dashboard.trend} />
+            <div className="history-trend-legend"><span className="is-line"><i />完成题数</span><span className="is-bar"><i />练习次数</span></div>
+            <p className="history-trend-note">{filter === 'all' ? '当前显示识谱与和弦的活动量，不混合两种不同的成绩定义。' : filter === 'sight' ? '当前仅显示识谱练习活动量。' : '当前仅显示和弦练习活动量。'}</p>
+            {composedHistory ? <img className="history-dashboard__trend-decor" src={composedHistory.assets.trend} alt="" aria-hidden="true" /> : null}
+          </section>
+        </div>
       </section>
     </ProductFrame>
   )
@@ -3090,6 +3151,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
           onFilterChange={setHistoryFilter}
           onOpenChordReport={openChordReportDetail}
           runtime={runtime}
+          theme={activeTheme}
         />
       )
       case 'chord-report-detail': return (

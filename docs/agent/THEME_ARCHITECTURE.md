@@ -20,7 +20,7 @@ The theme layer owns how those product surfaces look: semantic colors, typograph
 - a complete semantic token map;
 - optional page-visual capabilities.
 
-Product components receive the resolved active definition. They ask for capabilities such as `homeVisual`; they do not branch on `light`, `dark`, or `bocchi-dev` names.
+Product components receive the resolved active definition. They ask for capabilities such as `homeVisual`, `practiceVisual`, `toolsVisual`, or `historyVisual`; they do not branch on `light`, `dark`, or `bocchi-dev` names.
 
 ## 4. Semantic tokens
 
@@ -31,6 +31,8 @@ Tokens cover shared UI foundations. They do not attempt to express every strong-
 ## 5. Strong-theme assets
 
 A strong theme may register optional page-specific assets and a compatible rendering capability. The current `single-image-hero` Home capability supplies one composed Hero, a decorative headline, and card illustrations. The Home product still owns all real copy, data, routes, button semantics, and MIDI/history state.
+
+The shared History dashboard is a Product-layer surface: summary facts, local-day aggregation, ranges, filters, trend geometry, record rows, and empty/error states remain available under every theme. `historyVisual` may provide only Hero and collage artwork plus a scoped frame class; it cannot provide values or redefine metrics.
 
 Theme-specific selectors must be scoped to the active theme. Bocchi Home rules therefore require `data-theme="bocchi-dev"`; Light and Dark do not render or inherit Bocchi Home artwork.
 

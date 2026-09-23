@@ -24,7 +24,6 @@ const sightReady = between('function SightReadyScreen', 'function useRemainingTi
 const history = between('function HistoryScreen', 'function SettingRow')
 const historyRecord = between('function HistoryRecord', 'function HistoryScreen')
 const chordReport = between('function ChordReportDetailScreen', 'function SettingRow')
-const chordEmpty = history.slice(history.indexOf('<div className="history-module-empty"'), history.indexOf(") : filter === 'sight' ? ("))
 const settings = between('function SettingsScreen', 'function MidiScreen')
 const updateScreen = between('function UpdateScreen', 'function ReviewDock')
 const productUi = ui.slice(ui.indexOf('function HomeScreen'), ui.indexOf('function MidiScreen'))
@@ -78,7 +77,8 @@ const tests = [
   ['NAV07', 'History presentation offers All Sight and Chord filters plus a factual Chord empty state', () => {
     for (const label of ["['all', '全部']", "['sight', '识谱']", "['chord', '和弦']", '暂无和弦练习记录']) assert.ok(history.includes(label))
     assert.match(history, /filter === 'sight'[\s\S]*?filter === 'chord' \? chordItems : mixedItems/)
-    assert.match(history, /filter === 'all' \? '全部练习' : '和弦练习'/)
+    assert.match(history, /最近练习记录/)
+    assert.match(history, /练习趋势/)
     assert.match(ui, /history-module-badge">识谱/)
     assert.match(ui, /history-module-badge is-chord">和弦/)
     assert.doesNotMatch(history, /piano\.v1\.|Preferences\.|localStorage/)
@@ -97,9 +97,9 @@ const tests = [
     assert.match(settings, /正式更新通道已关闭/)
   }],
   ['NAV10', 'Chord History empty state contains no Sight Reading or fabricated metric', () => {
-    assert.match(chordEmpty, /暂无和弦练习记录/)
-    assert.match(chordEmpty, /完成和弦练习后，记录会显示在这里。/)
-    assert.doesNotMatch(chordEmpty, /平均反应|总体正确率|Accuracy|Block Errors|Arpeggio Errors/)
+    assert.match(history, /filter === 'chord'[\s\S]*?'暂无和弦练习记录'/)
+    assert.match(history, /filter === 'chord'[\s\S]*?'完成和弦练习后，记录会显示在这里。'/)
+    assert.doesNotMatch(history, /平均反应|总体正确率|Accuracy|Block Errors|Arpeggio Errors/)
   }],
   ['NAV11', 'normal product copy exposes no storage key or implementation-contract wording', () => {
     assert.doesNotMatch(productUi, /piano\.v1\.sightReading\.settings|persistence\/history|仅调整设置入口位置|不会在这里伪造记录|QA Static UI/)

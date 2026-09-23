@@ -219,11 +219,11 @@ test('HIS08 correct wrong and timeout facts are preserved', () => {
   assert.deepEqual([item.correct, item.wrong, item.timeout], [6, 3, 1])
 })
 
-test('HIS09 nullable reaction remains null and renders a neutral summary', () => {
+test('HIS09 nullable reaction remains null and dashboard does not fabricate it', () => {
   const history = projectSightReadingHistory([record({ averageReactionMs: null, fastestReactionMs: null, slowestReactionMs: null })])
   assert.equal(history.items[0].averageReactionMs, null)
   assert.equal(history.summary.averageReactionMs, null)
-  assert.match(historySource, /averageReactionMs === null \? '—'/)
+  assert.doesNotMatch(historySource, /averageReactionMs[^\n]*\?[^\n]*0/)
 })
 
 test('HIS10 overall accuracy uses weighted question totals', () => {
@@ -427,8 +427,8 @@ test('HIS38 mixed History orders newest record first', () => {
 })
 
 test('HIS39 All History has no misleading combined accuracy aggregate', () => {
-  assert.match(historySource, /filter === 'sight' \? \(/)
-  assert.match(historySource, /history-summary/)
+  assert.match(historySource, /不混合两种不同的成绩定义/)
+  assert.doesNotMatch(historySource, /combinedAccuracy|mixedAccuracy/)
   assert.doesNotMatch(projectionSource, /Chord|chord/)
 })
 

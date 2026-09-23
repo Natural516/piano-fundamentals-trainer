@@ -11,6 +11,7 @@ const architecture = fs.readFileSync(path.join(root, 'docs/agent/THEME_ARCHITECT
 const home = main.slice(main.indexOf('function HomeScreen'), main.indexOf('function PracticeHubScreen'))
 const practice = main.slice(main.indexOf('function PracticeHubScreen'), main.indexOf('function ChordModeSelectScreen'))
 const tools = main.slice(main.indexOf('const THEORY_TOOLS'), main.indexOf('function ScaleNoteToken'))
+const history = main.slice(main.indexOf('function HistoryScreen'), main.indexOf('function ChordReportDetailScreen'))
 const settings = main.slice(main.indexOf('function SettingsScreen'), main.indexOf('function MidiScreen'))
 
 const tests = [
@@ -35,7 +36,7 @@ const tests = [
     assert.doesNotMatch(home, /bocchi-dev|assets\/themes\/bocchi/)
   }],
   ['THM04', 'Light and Dark use the standard Home without themed assets', () => {
-    assert.equal((registry.match(/capabilities: \{ homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual \}/g) ?? []).length, 2)
+    assert.equal((registry.match(/capabilities: \{ homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual \}/g) ?? []).length, 2)
     assert.match(home, /!composedHome[\s\S]*?<NotationPaper/)
   }],
   ['THM05', 'Bocchi strong Home CSS is scoped to its active theme', () => {
@@ -92,6 +93,18 @@ const tests = [
     assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-tools-preview/)
     assert.equal((tools.match(/screen: '/g) ?? []).length, 3)
     assert.doesNotMatch(tools, /搜索工具|最近使用|基础乐理|节拍器/)
+  }],
+  ['THM15', 'History dashboard structure is shared while Bocchi visuals stay theme-owned', () => {
+    assert.match(history, /theme\.capabilities\.historyVisual/)
+    assert.match(history, /historyVisual\.kind === 'dashboard'/)
+    assert.doesNotMatch(history, /bocchi-dev|assets\/themes\/bocchi/)
+    for (const asset of ['02_27_13.png', '02_32_25.png', '02_30_40.png', '02_34_11.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
+    assert.doesNotMatch(registry, /02_47_09\.png/)
+    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-history-preview/)
+    assert.match(history, /已保存练习/)
+    assert.match(history, /累计完成题数/)
+    assert.match(history, /练习趋势/)
+    assert.doesNotMatch(history, /混合正确率|combinedAccuracy/)
   }]
 ]
 
