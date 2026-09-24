@@ -364,6 +364,21 @@ test('APS20', 'production navigation guard precedes every side effect and MIDI-p
   assert.match(practiceHeader, /<MidiStatusButton compact \/>/)
 })
 
+test('APS21', 'Sight early-end confirmation exposes no internal completion contract fields', () => {
+  const sightFocus = mainSource.slice(mainSource.indexOf('function SightFocusScreen'), mainSource.indexOf('function SightResultScreen'))
+  assert.doesNotMatch(sightFocus, /completionState\s*=/)
+  assert.doesNotMatch(sightFocus, /partialEvidence\s*=/)
+  assert.match(sightFocus, /结束本轮？/)
+  assert.match(sightFocus, /继续练习/)
+  assert.match(sightFocus, /结束并保存/)
+})
+
+test('APS22', 'compact interactive MIDI button has a stable action-oriented accessible name', () => {
+  const status = mainSource.slice(mainSource.indexOf('function MidiStatusButton'), mainSource.indexOf('function ProductHeader'))
+  assert.match(status, /aria-label=\{compact \? '打开 MIDI 设备' : undefined\}/)
+  assert.match(status, /onClick=\{\(\) => openAuxiliary\('midi'\)\}/)
+})
+
 ;(async () => {
   let failed = 0
   for (const item of tests) {

@@ -471,7 +471,7 @@ function MidiStatusButton({ compact = false, interactive = true }: { compact?: b
     )
   }
   return (
-    <button className={`midi-status is-${status.tone} ${compact ? 'is-compact' : ''}`} type="button" onClick={() => openAuxiliary('midi')}>
+    <button aria-label={compact ? '打开 MIDI 设备' : undefined} className={`midi-status is-${status.tone} ${compact ? 'is-compact' : ''}`} type="button" onClick={() => openAuxiliary('midi')}>
       {content}
     </button>
   )
@@ -1997,7 +1997,6 @@ function SightFocusScreen({
               <button className="secondary-action" type="button" onClick={continuePractice}>继续练习</button>
               <button className="primary-action" type="button" onClick={stopAndSave}>结束并保存</button>
             </div>
-            <small>completionState = stopped · partialEvidence = true</small>
           </section>
         </div>
       ) : null}
