@@ -106,13 +106,14 @@ import {
   applyThemeDefinition,
   resolveInitialThemeId,
   resolveTheme,
-  type PublicThemeId,
   type ThemeDefinition,
   type ThemeId
 } from './theme/themeRegistry'
 import './styles.css'
 
 declare const __QA_BUILD__: boolean
+declare const __ANDROID_VERSION_CODE__: number
+declare const __ANDROID_VERSION_NAME__: string
 
 type ScreenId =
   | 'home'
@@ -2378,16 +2379,64 @@ function SettingSelect<Value extends string | number>({
   )
 }
 
+const SETTINGS_THEME_OPTIONS: readonly {
+  id: ThemeId
+  label: string
+  description: string
+  icon: IconName
+}[] = [
+  { id: 'light', label: '浅色', description: '明亮清晰', icon: 'sun' },
+  { id: 'dark', label: '深色', description: '低光舒适', icon: 'moon' },
+  { id: 'bocchi-dev', label: '个性', description: '开发预览', icon: 'grid' }
+]
+
+function SettingsThemeOption({
+  active,
+  description,
+  icon,
+  label,
+  onSelect,
+  preview
+}: {
+  active: boolean
+  description: string
+  icon: IconName
+  label: string
+  onSelect: () => void
+  preview: ThemeId
+}): JSX.Element {
+  return (
+    <button
+      aria-pressed={active}
+      className={`settings-theme-option is-${preview}${active ? ' is-active' : ''}`}
+      type="button"
+      onClick={onSelect}
+    >
+      <span className="settings-theme-option__preview" aria-hidden="true">
+        <i /><i /><i />
+        <Icon name={icon} size={18} />
+      </span>
+      <span><strong>{label}</strong><small>{description}</small></span>
+      {active ? <span className="settings-theme-option__check"><Icon name="check" size={16} /></span> : null}
+    </button>
+  )
+}
+
 function SettingsScreen({
   theme,
   onThemeChange
 }: {
-  theme: PublicThemeId
-  onThemeChange: (theme: PublicThemeId) => void
+  theme: ThemeDefinition
+  onThemeChange: (theme: ThemeId) => void
 }): JSX.Element {
   const { runtime } = useMidiUi()
   const { snapshot: updater } = useUpdaterUi()
   const { openAuxiliary } = useAppNavigation()
+  const settingsVisual = theme.capabilities.settingsVisual
+  const composedSettings = settingsVisual.kind === 'hero-cards' ? settingsVisual : null
+  const visibleThemeOptions = SHOW_DEVELOPMENT_TOOLS
+    ? SETTINGS_THEME_OPTIONS
+    : SETTINGS_THEME_OPTIONS.filter((option) => option.id !== 'bocchi-dev')
   const midiStatus = presentMidiStatus(runtime)
   const updaterLabel = updater.status === 'updateAvailable'
     ? '发现新版本'
@@ -2396,15 +2445,25 @@ function SettingsScreen({
       : updater.status === 'checking' || updater.status === 'downloading' || updater.status === 'verifying'
         ? '处理中'
         : updater.status === 'error' ? '需要检查' : '检查更新'
-  const installedVersionAction = updater.installed ? `V${updater.installed.versionName}` : '读取中'
+  const installedVersionAction = updater.installed ? `V${updater.installed.versionName}` : `V${__ANDROID_VERSION_NAME__}`
   const installedVersionDescription = updater.installed
     ? `versionCode ${updater.installed.versionCode}`
-    : '正在读取版本信息'
+    : `versionCode ${__ANDROID_VERSION_CODE__}`
   return (
-    <ProductFrame active="settings" title="设置">
-      <section className="settings-layout">
-        <div className="settings-column">
-          <div className="settings-group">
+    <ProductFrame active="settings" className={composedSettings?.frameClassName} title="设置">
+      <section className={`settings-dashboard${composedSettings ? ' has-settings-visual' : ''}`}>
+        {composedSettings ? (
+          <aside className="settings-hero" aria-label="个性主题设置主视觉">
+            <img alt="红发吉他手主题插画" src={composedSettings.assets.hero} />
+            <div className="settings-hero__caption">
+              <span>MY FAVORITE SETUP</span>
+              <h1>让喜欢的声音，<br />一直陪着练习。</h1>
+              <p>连接设备、选择主题，也别忘了保持应用更新。</p>
+            </div>
+          </aside>
+        ) : null}
+        <div className="settings-panels">
+          <section className="settings-group settings-card settings-card--midi">
             <div className="group-title"><span>设备</span><small>Android 原生 BLE MIDI</small></div>
             <SettingRow
               description={midiStatus.detail}
@@ -2413,21 +2472,32 @@ function SettingsScreen({
               title={runtime.bluetoothSnapshot.connectedDeviceName ?? 'Roland FP-30X'}
               action={<span className={`connected-label is-${midiStatus.tone}`}><i />{midiStatus.label}</span>}
             />
-          </div>
-          <div className="settings-group">
+            {composedSettings ? <img alt="" aria-hidden="true" className="settings-card__decoration" src={composedSettings.assets.midi} /> : null}
+          </section>
+          <section className="settings-group settings-card settings-card--theme">
             <div className="group-title"><span>外观</span><small>适合谱架距离阅读</small></div>
-            <div className="theme-setting">
-              <span className="setting-row__icon"><Icon name={theme === 'light' ? 'sun' : 'moon'} /></span>
-              <span className="setting-row__copy"><strong>显示主题</strong><small>原型支持浅色与深色预览</small></span>
-              <div className="theme-segmented">
-                <button className={theme === 'light' ? 'is-active' : ''} type="button" onClick={() => onThemeChange('light')}><Icon name="sun" size={18} />浅色</button>
-                <button className={theme === 'dark' ? 'is-active' : ''} type="button" onClick={() => onThemeChange('dark')}><Icon name="moon" size={18} />深色</button>
+            <div className="settings-theme-content">
+              <div className="settings-theme-heading">
+                <span className="setting-row__icon"><Icon name="grid" /></span>
+                <span className="setting-row__copy"><strong>显示主题</strong><small>当前：{theme.displayName}</small></span>
+              </div>
+              <div className="settings-theme-options" role="group" aria-label="显示主题">
+                {visibleThemeOptions.map((option) => (
+                  <SettingsThemeOption
+                    active={theme.id === option.id}
+                    description={option.description}
+                    icon={option.icon}
+                    key={option.id}
+                    label={option.label}
+                    onSelect={() => onThemeChange(option.id)}
+                    preview={option.id}
+                  />
+                ))}
               </div>
             </div>
-          </div>
-        </div>
-        <div className="settings-column">
-          <div className="settings-group">
+            {composedSettings ? <img alt="" aria-hidden="true" className="settings-card__decoration" src={composedSettings.assets.theme} /> : null}
+          </section>
+          <section className="settings-group settings-card settings-card--about">
             <div className="group-title"><span>关于</span><small>个人版</small></div>
             <SettingRow description="Android Tablet Personal Edition" icon="info" title="钢琴基本功训练器" action={<strong>Android</strong>} />
             <SettingRow description={installedVersionDescription} icon="info" title="当前版本" action={<strong>{installedVersionAction}</strong>} />
@@ -2437,7 +2507,8 @@ function SettingsScreen({
               <SettingRow description="查看版本与更新状态" icon="refresh" onClick={() => openAuxiliary('update')} title="检查更新" action={<strong>{updaterLabel}</strong>} />
             )}
             <SettingRow description="Natural516 / Apache-2.0" icon="book" title="开源项目" action={<strong>GitHub</strong>} />
-          </div>
+            {composedSettings ? <img alt="" aria-hidden="true" className="settings-card__decoration" src={composedSettings.assets.about} /> : null}
+          </section>
         </div>
       </section>
     </ProductFrame>
@@ -2828,7 +2899,6 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   const screenRef = useRef<ScreenId>(screen)
   const [themeId, setThemeId] = useState<ThemeId>(() => resolveInitialThemeId(window.location.search, SHOW_DEVELOPMENT_TOOLS))
   const activeTheme = resolveTheme(themeId)
-  const publicTheme: PublicThemeId = themeId === 'dark' ? 'dark' : 'light'
   const [chordCaseId, setChordCaseId] = useState(DEFAULT_CHORD_MOCK_CASE_ID)
   const [chordMockStateId, setChordMockStateId] = useState<ChordPreviewStateId>('live')
   const [chordQuestionCount, setChordQuestionCount] = useState<ChordQuestionCount>(20)
@@ -3163,7 +3233,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       case 'settings': return (
         <SettingsScreen
           onThemeChange={setThemeId}
-          theme={publicTheme}
+          theme={activeTheme}
         />
       )
       case 'midi': return <MidiScreen />

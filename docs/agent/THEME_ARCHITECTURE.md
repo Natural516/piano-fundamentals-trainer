@@ -20,7 +20,7 @@ The theme layer owns how those product surfaces look: semantic colors, typograph
 - a complete semantic token map;
 - optional page-visual capabilities.
 
-Product components receive the resolved active definition. They ask for capabilities such as `homeVisual`, `practiceVisual`, `toolsVisual`, or `historyVisual`; they do not branch on `light`, `dark`, or `bocchi-dev` names.
+Product components receive the resolved active definition. They ask for capabilities such as `homeVisual`, `practiceVisual`, `toolsVisual`, `historyVisual`, or `settingsVisual`; they do not branch on `light`, `dark`, or `bocchi-dev` names.
 
 ## 4. Semantic tokens
 
@@ -33,6 +33,8 @@ Tokens cover shared UI foundations. They do not attempt to express every strong-
 A strong theme may register optional page-specific assets and a compatible rendering capability. The current `single-image-hero` Home capability supplies one composed Hero, a decorative headline, and card illustrations. The Home product still owns all real copy, data, routes, button semantics, and MIDI/history state.
 
 The shared History dashboard is a Product-layer surface: summary facts, local-day aggregation, ranges, filters, trend geometry, record rows, and empty/error states remain available under every theme. `historyVisual` may provide only Hero and collage artwork plus a scoped frame class; it cannot provide values or redefine metrics.
+
+Settings follows the same boundary. MIDI state and navigation, the theme-selection state, installed package metadata, QA update isolation, the production Update route, and open-source information remain Product-layer facts. `settingsVisual` may provide one Hero and decorative artwork for the Device, Theme, and About cards, but it cannot provide status, version, or action semantics.
 
 Theme-specific selectors must be scoped to the active theme. Bocchi Home rules therefore require `data-theme="bocchi-dev"`; Light and Dark do not render or inherit Bocchi Home artwork.
 
@@ -52,7 +54,7 @@ The `external` source value is reserved only as an architectural boundary in thi
 
 This phase does not implement `.pttheme`, file picking, ZIP handling, a manifest parser, package validation, encryption, external-theme persistence, import/deletion UI, or a hidden theme entry. It also does not design an Original theme.
 
-`bocchi-dev` is activated only in development/QA. The ordinary Settings UI remains limited to the existing Light and Dark choices.
+`bocchi-dev` is activated only in development/QA. Development and QA Settings may expose it as a registry-backed preview choice; ordinary production Settings remains limited to the built-in Light and Dark choices.
 
 ## 9. Product features must exist across themes
 

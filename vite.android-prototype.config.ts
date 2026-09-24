@@ -4,9 +4,15 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 const updaterProperties = readFileSync(resolve('android/updater.properties'), 'utf8')
+const versionProperties = readFileSync(resolve('android/version.properties'), 'utf8')
 const productionManifestUrl = updaterProperties.match(/^manifestUrl=(.+)$/m)?.[1]?.trim() ?? ''
+const androidVersionCode = Number(versionProperties.match(/^versionCode=(\d+)$/m)?.[1])
+const androidVersionName = versionProperties.match(/^versionName=(.+)$/m)?.[1]?.trim() ?? ''
 if (!productionManifestUrl || new URL(productionManifestUrl).protocol !== 'https:') {
   throw new Error('android/updater.properties must define a valid HTTPS manifestUrl')
+}
+if (!Number.isSafeInteger(androidVersionCode) || androidVersionCode < 1 || !androidVersionName) {
+  throw new Error('android/version.properties must define valid versionCode and versionName values')
 }
 
 export default defineConfig(({ mode }) => {
@@ -20,6 +26,8 @@ export default defineConfig(({ mode }) => {
     base: './',
     define: {
       __QA_BUILD__: JSON.stringify(isQaBuild),
+      __ANDROID_VERSION_CODE__: JSON.stringify(androidVersionCode),
+      __ANDROID_VERSION_NAME__: JSON.stringify(androidVersionName),
       __UPDATE_MANIFEST_URL__: JSON.stringify(updateManifestUrl)
     },
     plugins: [react()],

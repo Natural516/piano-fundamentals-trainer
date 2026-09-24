@@ -150,8 +150,8 @@ const tests = [
   }],
   ['NAV18', 'Settings and Update share installed package metadata without fixed release copy', () => {
     assert.doesNotMatch(settings, /V\d+\.\d+\.\d+|versionCode \d+/)
-    assert.match(settings, /updater\.installed \? `V\$\{updater\.installed\.versionName\}` : '读取中'/)
-    assert.match(settings, /updater\.installed[\s\S]*?`versionCode \$\{updater\.installed\.versionCode\}`[\s\S]*?'正在读取版本信息'/)
+    assert.match(settings, /updater\.installed \? `V\$\{updater\.installed\.versionName\}` : `V\$\{__ANDROID_VERSION_NAME__\}`/)
+    assert.match(settings, /updater\.installed[\s\S]*?`versionCode \$\{updater\.installed\.versionCode\}`[\s\S]*?`versionCode \$\{__ANDROID_VERSION_CODE__\}`/)
     assert.match(updateScreen, /snapshot\.installed \? `V\$\{snapshot\.installed\.versionName\} · \$\{snapshot\.installed\.versionCode\}` : '正在读取'/)
   }]
 ]

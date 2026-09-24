@@ -14,6 +14,10 @@ import bocchiHistoryHero from '../assets/themes/bocchi/history/ChatGPT Image 202
 import bocchiHistoryTrendDecoration from '../assets/themes/bocchi/history/ChatGPT Image 2026年9月24日 02_32_25.png'
 import bocchiHistoryMemoDecoration from '../assets/themes/bocchi/history/ChatGPT Image 2026年9月24日 02_30_40.png'
 import bocchiHistoryLowerDecoration from '../assets/themes/bocchi/history/ChatGPT Image 2026年9月24日 02_34_11.png'
+import bocchiSettingsHero from '../assets/themes/bocchi/settings/ChatGPT Image 2026年9月24日 12_01_39.png'
+import bocchiSettingsMidiDecoration from '../assets/themes/bocchi/settings/ChatGPT Image 2026年9月24日 12_38_35.png'
+import bocchiSettingsThemeDecoration from '../assets/themes/bocchi/settings/ChatGPT Image 2026年9月24日 12_46_01.png'
+import bocchiSettingsAboutDecoration from '../assets/themes/bocchi/settings/ChatGPT Image 2026年9月24日 12_47_56.png'
 
 export type ThemeId = 'light' | 'dark' | 'bocchi-dev'
 export type PublicThemeId = 'light' | 'dark'
@@ -126,6 +130,23 @@ export interface DashboardHistoryVisual {
 
 export type HistoryVisual = StandardHistoryVisual | DashboardHistoryVisual
 
+export interface StandardSettingsVisual {
+  kind: 'standard'
+}
+
+export interface HeroCardsSettingsVisual {
+  kind: 'hero-cards'
+  frameClassName: string
+  assets: Readonly<{
+    hero: string
+    midi: string
+    theme: string
+    about: string
+  }>
+}
+
+export type SettingsVisual = StandardSettingsVisual | HeroCardsSettingsVisual
+
 export interface ThemeDefinition {
   id: ThemeId
   displayName: string
@@ -137,6 +158,7 @@ export interface ThemeDefinition {
     practiceVisual: PracticeVisual
     toolsVisual: ToolsVisual
     historyVisual: HistoryVisual
+    settingsVisual: SettingsVisual
   }>
 }
 
@@ -249,6 +271,7 @@ const standardHomeVisual: StandardHomeVisual = { kind: 'standard' }
 const standardPracticeVisual: StandardPracticeVisual = { kind: 'standard' }
 const standardToolsVisual: StandardToolsVisual = { kind: 'standard' }
 const standardHistoryVisual: StandardHistoryVisual = { kind: 'standard' }
+const standardSettingsVisual: StandardSettingsVisual = { kind: 'standard' }
 
 export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
   light: {
@@ -257,7 +280,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
     source: 'built-in',
     colorScheme: 'light',
     tokens: lightTokens,
-    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual }
+    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual }
   },
   dark: {
     id: 'dark',
@@ -265,7 +288,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
     source: 'built-in',
     colorScheme: 'dark',
     tokens: darkTokens,
-    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual }
+    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual }
   },
   'bocchi-dev': {
     id: 'bocchi-dev',
@@ -315,6 +338,16 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
           trend: bocchiHistoryTrendDecoration,
           memo: bocchiHistoryMemoDecoration,
           lower: bocchiHistoryLowerDecoration
+        }
+      },
+      settingsVisual: {
+        kind: 'hero-cards',
+        frameClassName: 'bocchi-settings-preview',
+        assets: {
+          hero: bocchiSettingsHero,
+          midi: bocchiSettingsMidiDecoration,
+          theme: bocchiSettingsThemeDecoration,
+          about: bocchiSettingsAboutDecoration
         }
       }
     }

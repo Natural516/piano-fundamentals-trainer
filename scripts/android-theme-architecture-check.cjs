@@ -36,7 +36,7 @@ const tests = [
     assert.doesNotMatch(home, /bocchi-dev|assets\/themes\/bocchi/)
   }],
   ['THM04', 'Light and Dark use the standard Home without themed assets', () => {
-    assert.equal((registry.match(/capabilities: \{ homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual \}/g) ?? []).length, 2)
+    assert.equal((registry.match(/capabilities: \{ homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual \}/g) ?? []).length, 2)
     assert.match(home, /!composedHome[\s\S]*?<NotationPaper/)
   }],
   ['THM05', 'Bocchi strong Home CSS is scoped to its active theme', () => {
@@ -49,10 +49,11 @@ const tests = [
     assert.doesNotMatch(home, /foreground|overlap|bridge|mask|clipPath|clip-path/)
     assert.match(registry, /hero: bocchiHomeHero/)
   }],
-  ['THM07', 'normal Settings still exposes only Light and Dark', () => {
-    assert.match(settings, /onThemeChange\('light'\)/)
-    assert.match(settings, /onThemeChange\('dark'\)/)
-    assert.doesNotMatch(settings, /bocchi-dev|导入主题|\.pttheme/)
+  ['THM07', 'Settings consumes its visual capability and development theme stays build-gated', () => {
+    assert.match(settings, /theme\.capabilities\.settingsVisual/)
+    assert.match(settings, /settingsVisual\.kind === 'hero-cards'/)
+    assert.match(main, /SHOW_DEVELOPMENT_TOOLS[\s\S]*SETTINGS_THEME_OPTIONS[\s\S]*option\.id !== 'bocchi-dev'/)
+    assert.doesNotMatch(settings, /theme\.id === 'bocchi-dev'|assets\/themes\/bocchi|导入主题|\.pttheme/)
   }],
   ['THM08', 'development activation is explicit and release defaults to Light', () => {
     assert.match(registry, /new URLSearchParams\(search\)\.get\('theme'\)/)
@@ -105,6 +106,15 @@ const tests = [
     assert.match(history, /累计完成题数/)
     assert.match(history, /练习趋势/)
     assert.doesNotMatch(history, /混合正确率|combinedAccuracy/)
+  }],
+  ['THM16', 'Settings keeps product facts shared while Bocchi artwork stays theme-owned', () => {
+    assert.match(settings, /theme\.capabilities\.settingsVisual/)
+    assert.match(settings, /presentMidiStatus\(runtime\)/)
+    assert.match(settings, /updater\.installed/)
+    assert.doesNotMatch(settings, /assets\/themes\/bocchi|theme\.id === 'bocchi-dev'/)
+    for (const asset of ['12_01_39.png', '12_38_35.png', '12_46_01.png', '12_47_56.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
+    assert.doesNotMatch(registry, /11_44_01\.png/)
+    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-settings-preview/)
   }]
 ]
 
