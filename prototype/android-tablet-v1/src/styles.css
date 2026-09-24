@@ -34,6 +34,9 @@
   --danger: #b34545;
   --danger-soft: #f6e3e1;
   --warning: #c17b2b;
+  --practice-feedback-success: #2c7b58;
+  --practice-feedback-danger: #b34545;
+  --practice-feedback-warning: #c17b2b;
   --shadow: 0 14px 40px rgba(37, 48, 42, 0.08);
   --shadow-soft: 0 6px 20px rgba(37, 48, 42, 0.06);
   /* Compatibility aliases keep the migration intentionally small. */
@@ -3136,15 +3139,15 @@ button.tool-card {
 }
 
 .focus-frame.is-correct .focus-prompt strong {
-  color: var(--success);
+  color: var(--practice-feedback-success);
 }
 
 .focus-frame.is-wrong .focus-prompt strong {
-  color: var(--danger);
+  color: var(--practice-feedback-danger);
 }
 
 .focus-frame.is-timeout .focus-prompt strong {
-  color: var(--warning);
+  color: var(--practice-feedback-warning);
 }
 
 .focus-stage {
@@ -3197,13 +3200,18 @@ button.tool-card {
 }
 
 .focus-stage .notation-paper.has-correct {
-  border-color: color-mix(in srgb, var(--success) 65%, white);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--success) 10%, transparent), var(--shadow);
+  border-color: color-mix(in srgb, var(--practice-feedback-success) 65%, white);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--practice-feedback-success) 10%, transparent), var(--shadow);
 }
 
 .focus-stage .notation-paper.has-wrong_note {
-  border-color: color-mix(in srgb, var(--danger) 65%, white);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--danger) 10%, transparent), var(--shadow);
+  border-color: color-mix(in srgb, var(--practice-feedback-danger) 65%, white);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--practice-feedback-danger) 10%, transparent), var(--shadow);
+}
+
+.focus-stage .notation-paper.has-timeout {
+  border-color: color-mix(in srgb, var(--practice-feedback-warning) 65%, white);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--practice-feedback-warning) 10%, transparent), var(--shadow);
 }
 
 .focus-footer {
@@ -3247,6 +3255,156 @@ button.tool-card {
 
 .focus-metric.is-warning strong {
   color: var(--warning);
+}
+
+/* Decorated ACTIVE practice is selected only through practiceActiveVisual.
+   The notation-paper rectangle and MusicStaffRenderer geometry stay untouched. */
+.bocchi-sight-active {
+  background:
+    radial-gradient(circle at 9% 29%, rgba(255, 176, 204, .17) 0 2px, transparent 2.5px) 0 0 / 24px 24px,
+    linear-gradient(135deg, #fffaf2 0%, #fff7f8 52%, #fffaf0 100%);
+}
+
+.bocchi-sight-active .focus-header {
+  border-bottom-color: rgba(235, 188, 204, .7);
+  background: color-mix(in srgb, #fffdf8 94%, transparent);
+  box-shadow: 0 5px 18px rgba(117, 68, 86, .06);
+}
+
+.bocchi-sight-active .focus-back,
+.bocchi-sight-active .focus-actions .outline-action {
+  border-color: #efd9e1;
+  background: rgba(255, 255, 255, .72);
+}
+
+.bocchi-sight-active .focus-time-track {
+  background: #f6e9eb;
+}
+
+.bocchi-sight-active .focus-content {
+  background:
+    linear-gradient(90deg, rgba(245, 108, 158, .055) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(rgba(245, 108, 158, .04) 1px, transparent 1px) 0 0 / 28px 28px;
+}
+
+.bocchi-sight-active .focus-prompt {
+  position: relative;
+  justify-self: center;
+  min-width: min(560px, 70vw);
+  padding: 6px 28px;
+  border: 1px solid rgba(238, 192, 207, .58);
+  border-radius: 999px;
+  background: rgba(255, 253, 250, .9);
+  box-shadow: 0 4px 14px rgba(96, 54, 70, .045);
+}
+
+.bocchi-sight-active .focus-prompt::before,
+.bocchi-sight-active .focus-prompt::after {
+  width: 16px;
+  height: 3px;
+  border-radius: 999px;
+  background: #f58aaf;
+  content: '';
+  transform: rotate(42deg);
+}
+
+.bocchi-sight-active .focus-prompt::after {
+  transform: rotate(-42deg);
+}
+
+.bocchi-sight-active .focus-stage {
+  overflow: hidden;
+  border: 1px solid rgba(238, 192, 207, .58);
+  background: linear-gradient(135deg, #fff8f1, #fffafb 54%, #fff9ef);
+  box-shadow: 0 12px 32px rgba(92, 57, 70, .07);
+}
+
+.bocchi-sight-active .focus-stage .notation-paper {
+  z-index: 1;
+  border-color: #efc8d6;
+  background: #fff;
+  box-shadow: 0 11px 30px rgba(100, 56, 74, .09);
+}
+
+.bocchi-sight-active .focus-stage .notation-paper::before {
+  display: none;
+}
+
+.focus-active-character,
+.focus-active-decoration {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  user-select: none;
+}
+
+.focus-active-character {
+  top: -2px;
+  right: 36px;
+  width: auto;
+  height: clamp(62px, 8.6vh, 82px);
+  object-fit: contain;
+  object-position: right top;
+}
+
+.focus-active-decoration {
+  overflow: hidden;
+}
+
+.focus-active-decoration img {
+  position: absolute;
+  max-width: none;
+  user-select: none;
+}
+
+.focus-active-decoration--tape {
+  top: -8px;
+  left: 31px;
+  width: 126px;
+  height: 48px;
+  transform: rotate(-4deg);
+}
+
+.focus-active-decoration--tape img {
+  top: -17px;
+  left: -4px;
+  width: 520px;
+}
+
+.focus-active-decoration--sparkles {
+  right: 29px;
+  bottom: 7px;
+  width: 72px;
+  height: 54px;
+  transform: rotate(3deg);
+}
+
+.focus-active-decoration--sparkles img {
+  top: -180px;
+  left: -387px;
+  width: 500px;
+}
+
+.bocchi-sight-active .focus-footer {
+  border-color: #edd8df;
+  background: rgba(255, 253, 249, .96);
+  box-shadow: 0 7px 22px rgba(104, 62, 78, .065);
+}
+
+.bocchi-sight-active .focus-metric {
+  border-right-color: #f0dde3;
+}
+
+.bocchi-sight-active .focus-paused-state {
+  z-index: 4;
+  border: 1px solid rgba(237, 189, 206, .72);
+  background: color-mix(in srgb, #fffaf6 82%, transparent);
+}
+
+.bocchi-sight-active .early-end-dialog {
+  border: 1px solid #edcbd7;
+  background: #fffdf9;
+  box-shadow: 0 24px 70px rgba(80, 44, 58, .2);
 }
 
 .chord-focus-frame {

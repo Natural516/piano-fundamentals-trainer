@@ -18,6 +18,8 @@ import bocchiSettingsHero from '../assets/themes/bocchi/settings/ChatGPT Image 2
 import bocchiSettingsMidiDecoration from '../assets/themes/bocchi/settings/ChatGPT Image 2026年9月24日 12_38_35.png'
 import bocchiSettingsThemeDecoration from '../assets/themes/bocchi/settings/ChatGPT Image 2026年9月24日 12_46_01.png'
 import bocchiSettingsAboutDecoration from '../assets/themes/bocchi/settings/ChatGPT Image 2026年9月24日 12_47_56.png'
+import bocchiSightActiveCharacter from '../assets/themes/bocchi/sight-active/ChatGPT Image 2026年9月24日 23_35_12.png'
+import bocchiSightActiveDecorations from '../assets/themes/bocchi/sight-active/ChatGPT Image 2026年9月24日 23_49_27.png'
 
 export type ThemeId = 'light' | 'dark' | 'bocchi-dev'
 export type PublicThemeId = 'light' | 'dark'
@@ -56,6 +58,9 @@ export type ThemeTokenName =
   | '--danger'
   | '--danger-soft'
   | '--warning'
+  | '--practice-feedback-success'
+  | '--practice-feedback-danger'
+  | '--practice-feedback-warning'
 
 export type ThemeTokens = Readonly<Record<ThemeTokenName, string>>
 
@@ -147,6 +152,21 @@ export interface HeroCardsSettingsVisual {
 
 export type SettingsVisual = StandardSettingsVisual | HeroCardsSettingsVisual
 
+export interface StandardPracticeActiveVisual {
+  kind: 'standard'
+}
+
+export interface DecoratedFocusPracticeActiveVisual {
+  kind: 'decorated-focus'
+  frameClassName: string
+  assets: Readonly<{
+    cornerCharacter: string
+    decorations: string
+  }>
+}
+
+export type PracticeActiveVisual = StandardPracticeActiveVisual | DecoratedFocusPracticeActiveVisual
+
 export interface ThemeDefinition {
   id: ThemeId
   displayName: string
@@ -159,6 +179,7 @@ export interface ThemeDefinition {
     toolsVisual: ToolsVisual
     historyVisual: HistoryVisual
     settingsVisual: SettingsVisual
+    practiceActiveVisual: PracticeActiveVisual
   }>
 }
 
@@ -194,7 +215,10 @@ const lightTokens: ThemeTokens = {
   '--success-soft': '#e2f1e8',
   '--danger': '#b34545',
   '--danger-soft': '#f6e3e1',
-  '--warning': '#c17b2b'
+  '--warning': '#c17b2b',
+  '--practice-feedback-success': '#2c7b58',
+  '--practice-feedback-danger': '#b34545',
+  '--practice-feedback-warning': '#c17b2b'
 }
 
 const darkTokens: ThemeTokens = {
@@ -229,7 +253,10 @@ const darkTokens: ThemeTokens = {
   '--success-soft': '#214132',
   '--danger': '#ec8b86',
   '--danger-soft': '#4a2929',
-  '--warning': '#e3ae67'
+  '--warning': '#e3ae67',
+  '--practice-feedback-success': '#2c7b58',
+  '--practice-feedback-danger': '#b34545',
+  '--practice-feedback-warning': '#c17b2b'
 }
 
 const bocchiTokens: ThemeTokens = {
@@ -264,7 +291,10 @@ const bocchiTokens: ThemeTokens = {
   '--success-soft': '#e2f1e8',
   '--danger': '#b34545',
   '--danger-soft': '#f6e3e1',
-  '--warning': '#c17b2b'
+  '--warning': '#c17b2b',
+  '--practice-feedback-success': '#2c7b58',
+  '--practice-feedback-danger': '#b34545',
+  '--practice-feedback-warning': '#c17b2b'
 }
 
 const standardHomeVisual: StandardHomeVisual = { kind: 'standard' }
@@ -272,6 +302,7 @@ const standardPracticeVisual: StandardPracticeVisual = { kind: 'standard' }
 const standardToolsVisual: StandardToolsVisual = { kind: 'standard' }
 const standardHistoryVisual: StandardHistoryVisual = { kind: 'standard' }
 const standardSettingsVisual: StandardSettingsVisual = { kind: 'standard' }
+const standardPracticeActiveVisual: StandardPracticeActiveVisual = { kind: 'standard' }
 
 export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
   light: {
@@ -280,7 +311,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
     source: 'built-in',
     colorScheme: 'light',
     tokens: lightTokens,
-    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual }
+    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual, practiceActiveVisual: standardPracticeActiveVisual }
   },
   dark: {
     id: 'dark',
@@ -288,7 +319,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
     source: 'built-in',
     colorScheme: 'dark',
     tokens: darkTokens,
-    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual }
+    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual, practiceActiveVisual: standardPracticeActiveVisual }
   },
   'bocchi-dev': {
     id: 'bocchi-dev',
@@ -348,6 +379,14 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
           midi: bocchiSettingsMidiDecoration,
           theme: bocchiSettingsThemeDecoration,
           about: bocchiSettingsAboutDecoration
+        }
+      },
+      practiceActiveVisual: {
+        kind: 'decorated-focus',
+        frameClassName: 'bocchi-sight-active',
+        assets: {
+          cornerCharacter: bocchiSightActiveCharacter,
+          decorations: bocchiSightActiveDecorations
         }
       }
     }

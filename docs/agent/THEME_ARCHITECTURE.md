@@ -20,13 +20,15 @@ The theme layer owns how those product surfaces look: semantic colors, typograph
 - a complete semantic token map;
 - optional page-visual capabilities.
 
-Product components receive the resolved active definition. They ask for capabilities such as `homeVisual`, `practiceVisual`, `toolsVisual`, `historyVisual`, or `settingsVisual`; they do not branch on `light`, `dark`, or `bocchi-dev` names.
+Product components receive the resolved active definition. They ask for capabilities such as `homeVisual`, `practiceVisual`, `toolsVisual`, `historyVisual`, `settingsVisual`, or `practiceActiveVisual`; they do not branch on `light`, `dark`, or `bocchi-dev` names.
 
 ## 4. Semantic tokens
 
 The registry supplies the shared shell tokens, including application and surface colors, primary/secondary/muted text, accent colors, borders/dividers, shadows, navigation states, and primary-button colors. Existing legacy variable names remain as CSS aliases during the intentionally small migration.
 
 Tokens cover shared UI foundations. They do not attempt to express every strong-theme illustration or composition as a color variable.
+
+Practice feedback shares the semantic token names `--practice-feedback-success`, `--practice-feedback-danger`, and `--practice-feedback-warning`. Light and Dark intentionally use the same standard values; every `ThemeDefinition`, including `bocchi-dev` and future themes, owns its token values independently and may provide a theme-specific palette without changing Product-layer feedback semantics.
 
 ## 5. Strong-theme assets
 
@@ -35,6 +37,8 @@ A strong theme may register optional page-specific assets and a compatible rende
 The shared History dashboard is a Product-layer surface: summary facts, local-day aggregation, ranges, filters, trend geometry, record rows, and empty/error states remain available under every theme. `historyVisual` may provide only Hero and collage artwork plus a scoped frame class; it cannot provide values or redefine metrics.
 
 Settings follows the same boundary. MIDI state and navigation, the theme-selection state, installed package metadata, QA update isolation, the production Update route, and open-source information remain Product-layer facts. `settingsVisual` may provide one Hero and decorative artwork for the Device, Theme, and About cards, but it cannot provide status, version, or action semantics.
+
+ACTIVE practice follows the same one-screen rule. `practiceActiveVisual` may select a standard focus surface or a decorated focus skin and supply inert corner artwork. Question generation, notation geometry, VexFlow, MIDI, timing, judgement, counters, persistence, and navigation remain Product-layer responsibilities shared by every theme.
 
 Theme-specific selectors must be scoped to the active theme. Bocchi Home rules therefore require `data-theme="bocchi-dev"`; Light and Dark do not render or inherit Bocchi Home artwork.
 

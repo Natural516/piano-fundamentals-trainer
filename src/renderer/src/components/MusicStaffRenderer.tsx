@@ -36,7 +36,8 @@ function readThemeColor(element: HTMLElement, variable: string, fallback: string
 function createStaveNote(
   notes: readonly MusicNotationPitch[],
   clef: MusicStaffClef,
-  style: ElementStyle
+  noteStyle: ElementStyle,
+  accidentalStyle: ElementStyle
 ): StaveNote | null {
   if (notes.length === 0) return null
 
@@ -48,11 +49,11 @@ function createStaveNote(
 
   notes.forEach((note, index) => {
     if (note.displayAccidental) {
-      staveNote.addModifier(new Accidental(note.displayAccidental).setStyle(style), index)
+      staveNote.addModifier(new Accidental(note.displayAccidental).setStyle(accidentalStyle), index)
     }
   })
 
-  staveNote.setStyle(style)
+  staveNote.setStyle(noteStyle)
   staveNote.setLedgerLineStyle({
     fillStyle: MUSIC_STAFF_INK_COLOR,
     strokeStyle: MUSIC_STAFF_INK_COLOR
@@ -103,7 +104,8 @@ function drawNote(
   color: string
 ): void {
   const style = { fillStyle: color, strokeStyle: color }
-  const note = createStaveNote(pitches, clef, style)
+  const accidentalStyle = { fillStyle: MUSIC_STAFF_INK_COLOR, strokeStyle: MUSIC_STAFF_INK_COLOR }
+  const note = createStaveNote(pitches, clef, style, accidentalStyle)
   if (!note) return
   context.save()
   setContextColor(context, color)
@@ -125,11 +127,11 @@ function drawMusicStaff(
   renderer.resize(Math.max(MIN_RENDER_WIDTH, width), height)
   const context = renderer.getContext()
   const feedbackVariable = feedback === 'correct'
-    ? '--success'
+    ? '--practice-feedback-success'
     : feedback === 'wrong_note'
-      ? '--danger'
+      ? '--practice-feedback-danger'
       : feedback === 'timeout'
-        ? '--warning'
+        ? '--practice-feedback-warning'
         : null
   const noteColor = feedbackVariable
     ? readThemeColor(container, feedbackVariable, MUSIC_STAFF_INK_COLOR)

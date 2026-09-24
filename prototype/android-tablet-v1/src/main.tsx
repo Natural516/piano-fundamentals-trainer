@@ -25,6 +25,7 @@ import {
 import { createAndroidUpdaterController } from './androidUpdater'
 import { UpdaterController, type UpdaterSnapshot, type UpdaterStatus } from './updaterCore'
 import { getSightReadingPrompt } from './sightReadingPresentation'
+import { presentSightReadingFeedback } from './sightReadingFeedbackPresentation'
 import { ChordGrandStaff } from './ChordGrandStaff'
 import {
   CHORD_MOCK_CASES,
@@ -1896,19 +1897,24 @@ function SightFocusScreen({
   runtime,
   screen,
   settings,
-  snapshot
+  snapshot,
+  theme
 }: {
   onStopAndSave: () => void
   runtime: AndroidSightReadingRuntime
   screen: ScreenId
   settings: SightReadingSettings
   snapshot: SightRuntimeSnapshot
+  theme: ThemeDefinition
 }): JSX.Element {
+  const practiceActiveVisual = theme.capabilities.practiceActiveVisual
+  const decoratedFocus = practiceActiveVisual.kind === 'decorated-focus' ? practiceActiveVisual : null
   const showEarlyEndConfirm = screen === 'sight-early-end'
-  const isCorrect = snapshot.phase === 'feedback' && snapshot.result === 'correct'
-  const isWrong = snapshot.phase === 'feedback' && snapshot.result === 'wrong_note'
-  const isTimeout = snapshot.phase === 'feedback' && snapshot.result === 'timeout'
-  const feedback: MusicNotationFeedback = isCorrect ? 'correct' : isWrong ? 'wrong_note' : isTimeout ? 'timeout' : null
+  const feedbackPresentation = presentSightReadingFeedback(snapshot.phase === 'feedback', snapshot.result)
+  const isCorrect = feedbackPresentation.semantic === 'success'
+  const isWrong = feedbackPresentation.semantic === 'danger'
+  const isTimeout = feedbackPresentation.semantic === 'warning'
+  const feedback = feedbackPresentation.noteFeedback
   const targetName = snapshot.currentTargetNotes.map((note) => note.noteName).join(' + ') || '—'
   const intervalLabel = snapshot.currentIntervalLabel
   const midiStatus = presentMidiStatus(runtime)
@@ -1931,7 +1937,11 @@ function SightFocusScreen({
   }
 
   return (
-    <div className={`focus-frame ${isCorrect ? 'is-correct' : ''} ${isWrong ? 'is-wrong' : ''} ${isTimeout ? 'is-timeout' : ''} ${snapshot.isPaused ? 'is-paused' : ''}`}>
+    <div
+      className={`focus-frame ${isCorrect ? 'is-correct' : ''} ${isWrong ? 'is-wrong' : ''} ${isTimeout ? 'is-timeout' : ''} ${snapshot.isPaused ? 'is-paused' : ''} ${decoratedFocus?.frameClassName ?? ''}`}
+      data-active-visual={practiceActiveVisual.kind}
+      data-feedback-semantic={feedbackPresentation.semantic}
+    >
       <PracticeFocusHeader
         onPauseToggle={() => snapshot.isPaused ? runtime.resume() : runtime.pause()}
         onRequestEnd={requestEnd}
@@ -1964,9 +1974,26 @@ function SightFocusScreen({
             label={settings.noteNameVisible || isCorrect || isWrong || isTimeout ? `当前题目 ${targetName}` : '当前识谱题目'}
             note={snapshot.currentNote?.notation}
             notes={snapshot.currentTargetNotes.map((note) => note.notation)}
-            noteFeedback={isWrong ? null : feedback}
+            noteFeedback={feedback}
             staffMode={settings.staffMode}
           />
+          {decoratedFocus ? (
+            <>
+              <span aria-hidden="true" className="focus-active-decoration focus-active-decoration--tape">
+                <img alt="" draggable="false" src={decoratedFocus.assets.decorations} />
+              </span>
+              <span aria-hidden="true" className="focus-active-decoration focus-active-decoration--sparkles">
+                <img alt="" draggable="false" src={decoratedFocus.assets.decorations} />
+              </span>
+              <img
+                alt=""
+                aria-hidden="true"
+                className="focus-active-character"
+                draggable="false"
+                src={decoratedFocus.assets.cornerCharacter}
+              />
+            </>
+          ) : null}
           {snapshot.isPaused ? (
             <div className="focus-paused-state">
               <Icon name="pause" size={32} />
@@ -3193,7 +3220,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       case 'sight-wrong':
       case 'sight-timeout':
       case 'sight-early-end':
-        return <SightFocusScreen onStopAndSave={endSightPractice} runtime={runtime} screen={screen} settings={settings} snapshot={snapshot} />
+        return <SightFocusScreen onStopAndSave={endSightPractice} runtime={runtime} screen={screen} settings={settings} snapshot={snapshot} theme={activeTheme} />
       case 'sight-result':
         return snapshot.report
           ? <SightResultScreen report={snapshot.report} />

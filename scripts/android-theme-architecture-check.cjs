@@ -13,6 +13,7 @@ const practice = main.slice(main.indexOf('function PracticeHubScreen'), main.ind
 const tools = main.slice(main.indexOf('const THEORY_TOOLS'), main.indexOf('function ScaleNoteToken'))
 const history = main.slice(main.indexOf('function HistoryScreen'), main.indexOf('function ChordReportDetailScreen'))
 const settings = main.slice(main.indexOf('function SettingsScreen'), main.indexOf('function MidiScreen'))
+const sightActive = main.slice(main.indexOf('function SightFocusScreen'), main.indexOf('function SightResultScreen'))
 
 const tests = [
   ['THM01', 'Light Dark and Bocchi are peer registry entries', () => {
@@ -25,7 +26,8 @@ const tests = [
       '--app-bg', '--surface', '--surface-soft', '--surface-elevated',
       '--text-primary', '--text-secondary', '--text-muted', '--accent', '--accent-soft',
       '--border', '--divider', '--shadow', '--nav-bg', '--nav-active-bg', '--nav-active-text',
-      '--button-primary-bg', '--button-primary-text'
+      '--button-primary-bg', '--button-primary-text', '--practice-feedback-success',
+      '--practice-feedback-danger', '--practice-feedback-warning'
     ]) {
       assert.ok((registry.match(new RegExp(`'${token}'`, 'g')) ?? []).length >= 4, `${token} missing from type or a theme`)
     }
@@ -36,7 +38,7 @@ const tests = [
     assert.doesNotMatch(home, /bocchi-dev|assets\/themes\/bocchi/)
   }],
   ['THM04', 'Light and Dark use the standard Home without themed assets', () => {
-    assert.equal((registry.match(/capabilities: \{ homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual \}/g) ?? []).length, 2)
+    assert.equal((registry.match(/practiceActiveVisual: standardPracticeActiveVisual/g) ?? []).length, 2)
     assert.match(home, /!composedHome[\s\S]*?<NotationPaper/)
   }],
   ['THM05', 'Bocchi strong Home CSS is scoped to its active theme', () => {
@@ -115,6 +117,18 @@ const tests = [
     for (const asset of ['12_01_39.png', '12_38_35.png', '12_46_01.png', '12_47_56.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
     assert.doesNotMatch(registry, /11_44_01\.png/)
     assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-settings-preview/)
+  }],
+  ['THM17', 'ACTIVE practice consumes one shared visual capability with isolated Bocchi decoration', () => {
+    assert.match(sightActive, /theme\.capabilities\.practiceActiveVisual/)
+    assert.match(sightActive, /practiceActiveVisual\.kind === 'decorated-focus'/)
+    assert.doesNotMatch(sightActive, /bocchi-dev|assets\/themes\/bocchi/)
+    assert.equal((registry.match(/practiceActiveVisual: standardPracticeActiveVisual/g) ?? []).length, 2)
+    assert.match(registry, /practiceActiveVisual:\s*\{\s*kind: 'decorated-focus'/)
+    assert.match(registry, /cornerCharacter: bocchiSightActiveCharacter/)
+    assert.match(registry, /decorations: bocchiSightActiveDecorations/)
+    assert.match(main, /decoratedFocus \? \([\s\S]*?focus-active-character/)
+    assert.match(css, /\.bocchi-sight-active \.focus-stage \.notation-paper/)
+    assert.doesNotMatch(css, /\.bocchi-sight-active \.music-staff-renderer/)
   }]
 ]
 

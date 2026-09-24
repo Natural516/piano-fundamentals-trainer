@@ -16,9 +16,14 @@ for (const extension of ['.ts', '.tsx']) {
 const root = path.resolve(__dirname, '..')
 const mainSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/main.tsx'), 'utf8')
 const hostSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/activePracticeSession.ts'), 'utf8')
+const rendererSource = fs.readFileSync(path.join(root, 'src/renderer/src/components/MusicStaffRenderer.tsx'), 'utf8')
+const controllerSource = fs.readFileSync(path.join(root, 'src/sightReading/controller.ts'), 'utf8')
+const registrySource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/themeRegistry.ts'), 'utf8')
+const cssSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/styles.css'), 'utf8')
 const { ActivePracticeSessionHost } = require('../prototype/android-tablet-v1/src/activePracticeSession.ts')
 const { ChordPracticeRuntime } = require('../prototype/android-tablet-v1/src/chordPractice/runtime/index.ts')
 const { AndroidSightReadingRuntime } = require('../prototype/android-tablet-v1/src/sightReadingIntegration.ts')
+const { presentSightReadingFeedback } = require('../prototype/android-tablet-v1/src/sightReadingFeedbackPresentation.ts')
 
 class FakeTime {
   constructor(now = 0) { this.value = now; this.nextId = 0; this.jobs = new Map() }
@@ -377,6 +382,38 @@ test('APS22', 'compact interactive MIDI button has a stable action-oriented acce
   const status = mainSource.slice(mainSource.indexOf('function MidiStatusButton'), mainSource.indexOf('function ProductHeader'))
   assert.match(status, /aria-label=\{compact \? '打开 MIDI 设备' : undefined\}/)
   assert.match(status, /onClick=\{\(\) => openAuxiliary\('midi'\)\}/)
+})
+
+test('APS23', 'Sight feedback presentation maps neutral correct wrong and timeout semantics deterministically', () => {
+  assert.deepEqual(presentSightReadingFeedback(false, null), { semantic: 'neutral', noteFeedback: null })
+  assert.deepEqual(presentSightReadingFeedback(true, 'correct'), { semantic: 'success', noteFeedback: 'correct' })
+  assert.deepEqual(presentSightReadingFeedback(true, 'wrong_note'), { semantic: 'danger', noteFeedback: 'wrong_note' })
+  assert.deepEqual(presentSightReadingFeedback(true, 'timeout'), { semantic: 'warning', noteFeedback: 'timeout' })
+  const sightFocus = mainSource.slice(mainSource.indexOf('function SightFocusScreen'), mainSource.indexOf('function SightResultScreen'))
+  assert.match(sightFocus, /noteFeedback=\{feedback\}/)
+  assert.doesNotMatch(sightFocus, /noteFeedback=\{isWrong \? null/)
+})
+
+test('APS24', 'standard feedback palette is shared while notation geometry and controller durations stay frozen', () => {
+  const lightPalette = registrySource.slice(registrySource.indexOf('const lightTokens'), registrySource.indexOf('const darkTokens'))
+  const darkPalette = registrySource.slice(registrySource.indexOf('const darkTokens'), registrySource.indexOf('const bocchiTokens'))
+  const bocchiPalette = registrySource.slice(registrySource.indexOf('const bocchiTokens'), registrySource.indexOf('const standardHomeVisual'))
+  for (const [token, value] of [
+    ['--practice-feedback-success', '#2c7b58'],
+    ['--practice-feedback-danger', '#b34545'],
+    ['--practice-feedback-warning', '#c17b2b']
+  ]) {
+    assert.match(lightPalette, new RegExp(`'${token}': '${value}'`))
+    assert.match(darkPalette, new RegExp(`'${token}': '${value}'`))
+    assert.match(bocchiPalette, new RegExp(`'${token}': '#[0-9a-fA-F]{6}'`))
+    assert.match(rendererSource, new RegExp(token))
+  }
+  assert.match(rendererSource, /new Accidental\(note\.displayAccidental\)\.setStyle\(accidentalStyle\)/)
+  assert.match(rendererSource, /setLedgerLineStyle\(\{[\s\S]*MUSIC_STAFF_INK_COLOR/)
+  assert.match(cssSource, /\.notation-paper\.has-timeout[\s\S]*--practice-feedback-warning/)
+  assert.match(controllerSource, /FEEDBACK_DURATION_MS = 350/)
+  assert.match(controllerSource, /DOUBLE_NOTE_CORRECT_FEEDBACK_DURATION_MS = 1200/)
+  assert.match(controllerSource, /DOUBLE_NOTE_WRONG_FEEDBACK_DURATION_MS = 1600/)
 })
 
 ;(async () => {
