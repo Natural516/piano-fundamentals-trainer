@@ -54,7 +54,7 @@ try {
   for (const token of ['今天 09:42 · 已完成', '共 18 条记录', '你已经完成 6 次练习']) {
     assert.equal(bundle.includes(token), false, `Release APK retains a former History Mock claim: ${token}`)
   }
-  assert.equal(bundle.includes('暂无真实练习记录'), true, 'Release APK is missing the real durable History empty state')
+  assert.equal(bundle.includes('暂无练习记录'), true, 'Release APK is missing the durable History empty state')
   assert.equal(bundle.includes('提前结束'), true, 'Release APK is missing the STOPPED History presentation')
 
   assert.equal(bundle.includes('Android 原生 BLE MIDI'), true, 'Release APK is missing the real Bluetooth MIDI path')

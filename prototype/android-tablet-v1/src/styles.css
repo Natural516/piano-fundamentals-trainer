@@ -5151,7 +5151,7 @@ button.tool-card {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: 128px 174px minmax(0, 1fr);
+  grid-template-rows: 177px 174px minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -5219,6 +5219,10 @@ button.tool-card {
 
 .settings-card--midi .setting-row {
   padding-right: 132px;
+}
+
+.settings-card--midi .settings-card__decoration {
+  bottom: 1px;
 }
 
 .settings-card--theme .settings-card__decoration {

@@ -292,7 +292,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
   },
   'bocchi-dev': {
     id: 'bocchi-dev',
-    displayName: 'Bocchi Dev',
+    displayName: '孤独摇滚',
     source: 'development',
     colorScheme: 'light',
     tokens: bocchiTokens,

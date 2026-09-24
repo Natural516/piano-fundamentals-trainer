@@ -161,7 +161,7 @@ test('HIS01 empty repository projects a real empty state with no Mock rows', () 
   const history = projectSightReadingHistory([])
   assert.equal(history.items.length, 0)
   assert.equal(history.summary.totalSessions, 0)
-  assert.match(historySource, /暂无真实练习记录/)
+  assert.match(historySource, /暂无练习记录/)
   assert.doesNotMatch(historySource, /今天 09:42|共 18 条记录|historyItems/)
 })
 
@@ -427,7 +427,7 @@ test('HIS38 mixed History orders newest record first', () => {
 })
 
 test('HIS39 All History has no misleading combined accuracy aggregate', () => {
-  assert.match(historySource, /不混合两种不同的成绩定义/)
+  assert.match(historySource, /展示识谱与和弦的练习次数和完成题数/)
   assert.doesNotMatch(historySource, /combinedAccuracy|mixedAccuracy/)
   assert.doesNotMatch(projectionSource, /Chord|chord/)
 })

@@ -2190,10 +2190,10 @@ function HistoryScreen({
         : `共 ${visibleItems.length} 条记录`
   const emptyTitle = filter === 'chord'
     ? '暂无和弦练习记录'
-    : filter === 'sight' ? '暂无识谱练习记录' : '暂无真实练习记录'
+    : filter === 'sight' ? '暂无识谱练习记录' : '暂无练习记录'
   const emptyDetail = filter === 'chord'
     ? '完成和弦练习后，记录会显示在这里。'
-    : filter === 'sight' ? '完成一轮识谱练习后，真实结果会显示在这里。' : '完成一轮练习后，真实结果会显示在这里。'
+    : filter === 'sight' ? '完成一轮识谱练习后，结果会显示在这里。' : '完成一轮练习后，结果会显示在这里。'
   return (
     <ProductFrame active="history" className={composedHistory?.frameClassName} title="练习记录">
       <section className={`history-screen history-dashboard${composedHistory ? ' themed-history-dashboard' : ''}`}>
@@ -2202,15 +2202,15 @@ function HistoryScreen({
           <div className="history-dashboard__hero-copy">
             <span className="eyebrow">PRACTICE JOURNAL</span>
             <h1 id="history-dashboard-title">每一次坚持，<br />都让梦想更靠近。</h1>
-            <p>{dashboard.summary.totalSessions > 0 ? `这里保存着 ${dashboard.summary.totalSessions} 次真实练习。` : '完成一次练习后，这里会留下你的进步。'}</p>
+            <p>{dashboard.summary.totalSessions > 0 ? `这里保存着 ${dashboard.summary.totalSessions} 次练习。` : '完成一次练习后，这里会留下你的进步。'}</p>
           </div>
           {composedHistory ? <img className="history-dashboard__hero-memo" src={composedHistory.assets.memo} alt="" aria-hidden="true" /> : null}
         </section>
 
         <section className="history-dashboard__summary" aria-label="练习汇总">
-          <article className="history-stat-card is-sessions"><span><Icon name="chart" /></span><div><small>已保存练习</small><strong>{dashboard.summary.totalSessions}<b>次</b></strong><p>识谱与和弦的真实记录</p></div></article>
-          <article className="history-stat-card is-streak"><span><Icon name="grid" /></span><div><small>连续练习天数</small><strong>{dashboard.summary.currentStreakDays}<b>天</b></strong><p>按当前设备本地自然日</p></div></article>
-          <article className="history-stat-card is-questions"><span><Icon name="book" /></span><div><small>累计完成题数</small><strong>{dashboard.summary.totalCompletedQuestions}<b>题</b></strong><p>包含已保存的部分练习</p></div></article>
+          <article className="history-stat-card is-sessions"><span><Icon name="chart" /></span><div><small>已保存练习</small><strong>{dashboard.summary.totalSessions}<b>次</b></strong><p>识谱与和弦练习记录</p></div></article>
+          <article className="history-stat-card is-streak"><span><Icon name="grid" /></span><div><small>连续练习天数</small><strong>{dashboard.summary.currentStreakDays}<b>天</b></strong><p>按本地日期统计</p></div></article>
+          <article className="history-stat-card is-questions"><span><Icon name="book" /></span><div><small>累计完成题数</small><strong>{dashboard.summary.totalCompletedQuestions}<b>题</b></strong><p>包含已保存的练习</p></div></article>
         </section>
 
         <div className="history-dashboard__workspace">
@@ -2248,7 +2248,7 @@ function HistoryScreen({
             </div>
             <HistoryTrendChart buckets={dashboard.trend} />
             <div className="history-trend-legend"><span className="is-line"><i />完成题数</span><span className="is-bar"><i />练习次数</span></div>
-            <p className="history-trend-note">{filter === 'all' ? '当前显示识谱与和弦的活动量，不混合两种不同的成绩定义。' : filter === 'sight' ? '当前仅显示识谱练习活动量。' : '当前仅显示和弦练习活动量。'}</p>
+            <p className="history-trend-note">{filter === 'all' ? '展示识谱与和弦的练习次数和完成题数。' : filter === 'sight' ? '当前仅显示识谱练习活动量。' : '当前仅显示和弦练习活动量。'}</p>
             {composedHistory ? <img className="history-dashboard__trend-decor" src={composedHistory.assets.trend} alt="" aria-hidden="true" /> : null}
           </section>
         </div>
@@ -2387,7 +2387,7 @@ const SETTINGS_THEME_OPTIONS: readonly {
 }[] = [
   { id: 'light', label: '浅色', description: '明亮清晰', icon: 'sun' },
   { id: 'dark', label: '深色', description: '低光舒适', icon: 'moon' },
-  { id: 'bocchi-dev', label: '个性', description: '开发预览', icon: 'grid' }
+  { id: 'bocchi-dev', label: '孤独摇滚', description: '乐队手账风格', icon: 'grid' }
 ]
 
 function SettingsThemeOption({
@@ -2453,7 +2453,7 @@ function SettingsScreen({
     <ProductFrame active="settings" className={composedSettings?.frameClassName} title="设置">
       <section className={`settings-dashboard${composedSettings ? ' has-settings-visual' : ''}`}>
         {composedSettings ? (
-          <aside className="settings-hero" aria-label="个性主题设置主视觉">
+          <aside className="settings-hero" aria-label="孤独摇滚主题设置主视觉">
             <img alt="红发吉他手主题插画" src={composedSettings.assets.hero} />
             <div className="settings-hero__caption">
               <span>MY FAVORITE SETUP</span>
@@ -2464,7 +2464,7 @@ function SettingsScreen({
         ) : null}
         <div className="settings-panels">
           <section className="settings-group settings-card settings-card--midi">
-            <div className="group-title"><span>设备</span><small>Android 原生 BLE MIDI</small></div>
+            <div className="group-title"><span>设备</span><small>蓝牙 MIDI 设备</small></div>
             <SettingRow
               description={midiStatus.detail}
               icon="bluetooth"
