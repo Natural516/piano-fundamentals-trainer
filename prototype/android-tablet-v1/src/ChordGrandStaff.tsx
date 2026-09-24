@@ -37,8 +37,8 @@ function readThemeColor(element: HTMLElement, variable: string, fallback: string
 }
 
 function colorForState(container: HTMLElement, state: ChordGroupVisualState): string {
-  if (state === 'completed') return readThemeColor(container, '--success', '#2c7b58')
-  if (state === 'wrong') return readThemeColor(container, '--danger', '#b34545')
+  if (state === 'completed') return readThemeColor(container, '--practice-feedback-success', '#2c7b58')
+  if (state === 'wrong') return readThemeColor(container, '--practice-feedback-danger', '#b34545')
   if (state === 'secondary') return SECONDARY_INK
   return STAFF_INK
 }

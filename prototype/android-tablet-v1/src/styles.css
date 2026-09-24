@@ -3408,6 +3408,17 @@ button.tool-card {
 }
 
 .chord-focus-frame {
+  color-scheme: inherit;
+  display: grid;
+  grid-template-rows: 76px minmax(0, 1fr);
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  background: var(--app-bg);
+  color: var(--ink);
+}
+
+/* Decorated ACTIVE remains on its existing Chord surface until that
+   capability receives dedicated Chord artwork in a later scoped pass. */
+.chord-focus-frame.is-decorated-focus {
   color-scheme: dark;
   --app-bg: #111713;
   --surface: #18201b;
@@ -3434,11 +3445,6 @@ button.tool-card {
   --warning: #e3ae67;
   --shadow: 0 16px 44px rgba(0, 0, 0, .26);
   --shadow-soft: 0 6px 20px rgba(0, 0, 0, .2);
-  display: grid;
-  grid-template-rows: 76px minmax(0, 1fr);
-  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
-  background: var(--app-bg);
-  color: var(--ink);
 }
 
 .chord-focus-header {
@@ -3539,6 +3545,21 @@ button.tool-card {
   content: '';
 }
 
+.chord-notation-card.has-success {
+  border-color: color-mix(in srgb, var(--practice-feedback-success) 65%, white);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--practice-feedback-success) 10%, transparent), var(--shadow);
+}
+
+.chord-notation-card.has-danger {
+  border-color: color-mix(in srgb, var(--practice-feedback-danger) 65%, white);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--practice-feedback-danger) 10%, transparent), var(--shadow);
+}
+
+.chord-notation-card.has-warning {
+  border-color: color-mix(in srgb, var(--practice-feedback-warning) 65%, white);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--practice-feedback-warning) 10%, transparent), var(--shadow);
+}
+
 .chord-group-labels {
   position: absolute;
   z-index: 2;
@@ -3584,15 +3605,15 @@ button.tool-card {
 }
 
 .chord-group-badge.is-completed {
-  border-color: color-mix(in srgb, var(--success) 42%, #d8d8d2);
-  background: color-mix(in srgb, var(--success-soft) 60%, white);
-  color: var(--success);
+  border-color: color-mix(in srgb, var(--practice-feedback-success) 42%, #d8d8d2);
+  background: color-mix(in srgb, var(--practice-feedback-success) 13%, white);
+  color: var(--practice-feedback-success);
 }
 
 .chord-group-badge.is-wrong {
-  border-color: color-mix(in srgb, var(--danger) 42%, #d8d8d2);
-  background: color-mix(in srgb, var(--danger-soft) 56%, white);
-  color: var(--danger);
+  border-color: color-mix(in srgb, var(--practice-feedback-danger) 42%, #d8d8d2);
+  background: color-mix(in srgb, var(--practice-feedback-danger) 13%, white);
+  color: var(--practice-feedback-danger);
 }
 
 .chord-group-badge.is-secondary {
@@ -3678,18 +3699,18 @@ button.tool-card {
 }
 
 .chord-stage-prompt.is-success .chord-stage-prompt__icon {
-  background: var(--success-soft);
-  color: var(--success);
+  background: color-mix(in srgb, var(--practice-feedback-success) 18%, var(--surface-raised));
+  color: var(--practice-feedback-success);
 }
 
 .chord-stage-prompt.is-danger .chord-stage-prompt__icon {
-  background: var(--danger-soft);
-  color: var(--danger);
+  background: color-mix(in srgb, var(--practice-feedback-danger) 18%, var(--surface-raised));
+  color: var(--practice-feedback-danger);
 }
 
 .chord-stage-prompt.is-warning .chord-stage-prompt__icon {
-  background: var(--amber-soft);
-  color: var(--warning);
+  background: color-mix(in srgb, var(--practice-feedback-warning) 18%, var(--surface-raised));
+  color: var(--practice-feedback-warning);
 }
 
 .chord-progress-footer {
@@ -3698,6 +3719,13 @@ button.tool-card {
   justify-content: center;
   gap: 28px;
   color: var(--ink-secondary);
+}
+
+.chord-focus-frame.is-standard[data-color-scheme='light'] .chord-progress-footer {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: var(--shadow-soft);
 }
 
 .chord-progress-footer > span {

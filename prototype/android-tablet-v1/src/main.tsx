@@ -28,12 +28,15 @@ import { getSightReadingPrompt } from './sightReadingPresentation'
 import { presentSightReadingFeedback } from './sightReadingFeedbackPresentation'
 import { ChordGrandStaff } from './ChordGrandStaff'
 import {
+  presentChordPractice,
+  type ChordPracticePresentation
+} from './chordPractice/presentation'
+import {
   CHORD_MOCK_CASES,
   CHORD_MOCK_STATES,
   DEFAULT_CHORD_MOCK_CASE_ID,
   getChordMockCase,
   getChordMockState,
-  type ChordGroupVisualState,
   type ChordWrittenPitch,
   type ChordMockStateId
 } from './chordPracticeMocks'
@@ -1539,49 +1542,6 @@ function SightSettingsDrawer({
   )
 }
 
-interface ChordPracticePresentation {
-  arpeggio: ChordGroupVisualState
-  block: ChordGroupVisualState
-  prompt: string
-  promptTone: 'active' | 'danger' | 'warning' | 'success'
-  stageLabel: '分解' | '过渡' | '柱式' | '完成'
-}
-
-function presentLiveChord(snapshot: ChordRuntimeSnapshot): ChordPracticePresentation {
-  const state = snapshot.judgement?.state
-  if (snapshot.status === 'SESSION_COMPLETE' || state?.phase === 'QUESTION_COMPLETE') {
-    return {
-      arpeggio: 'completed',
-      block: 'completed',
-      prompt: snapshot.status === 'SESSION_COMPLETE' ? '本轮练习完成' : '正确',
-      promptTone: 'success',
-      stageLabel: '完成'
-    }
-  }
-  if (state?.phase === 'ARPEGGIO_WRONG_WAIT_RELEASE') {
-    return { arpeggio: 'wrong', block: 'secondary', prompt: '松开琴键后从分解第一个音重新开始', promptTone: 'danger', stageLabel: '分解' }
-  }
-  if (state?.phase === 'WAIT_ALL_KEYS_UP_BEFORE_BLOCK') {
-    return { arpeggio: 'completed', block: 'secondary', prompt: '分解完成 · 请松开琴键', promptTone: 'warning', stageLabel: '过渡' }
-  }
-  if (state?.phase === 'BLOCK_WRONG_WAIT_RELEASE') {
-    return { arpeggio: 'completed', block: 'wrong', prompt: '柱式错误 · 松开琴键后从分解重新开始', promptTone: 'danger', stageLabel: '柱式' }
-  }
-  if (state?.phase === 'WAIT_ALL_KEYS_UP_AFTER_BLOCK') {
-    return { arpeggio: 'completed', block: 'completed', prompt: '柱式完成 · 请松开琴键', promptTone: 'warning', stageLabel: '过渡' }
-  }
-  const resumeTarget = state?.phase === 'SUSPENDED' || state?.phase === 'RESUME_WAIT_ALL_KEYS_UP'
-    ? state.resumeTarget
-    : null
-  if (state?.phase === 'BLOCK_READY' || state?.phase === 'BLOCK_CAPTURE' || resumeTarget === 'BLOCK_READY') {
-    return { arpeggio: 'completed', block: 'active', prompt: '请弹奏柱式和弦', promptTone: 'active', stageLabel: '柱式' }
-  }
-  if (resumeTarget === 'QUESTION_COMPLETE') {
-    return { arpeggio: 'completed', block: 'completed', prompt: '柱式完成 · 请松开琴键', promptTone: 'warning', stageLabel: '过渡' }
-  }
-  return { arpeggio: 'active', block: 'secondary', prompt: '请按谱面顺序弹奏分解和弦', promptTone: 'active', stageLabel: '分解' }
-}
-
 function toChordWrittenPitches(question: ChordPracticeQuestion): readonly ChordWrittenPitch[] {
   const accidental = (value: number): ChordWrittenPitch['accidental'] => {
     if (value === -2) return 'bb'
@@ -1617,7 +1577,8 @@ function ChordPracticeScreen({
   onExplicitEnd,
   onChordSettingsChange,
   onQuestionCountChange,
-  questionCount
+  questionCount,
+  theme
 }: {
   caseId: string
   chordSettings: ChordSettings
@@ -1629,21 +1590,22 @@ function ChordPracticeScreen({
   onChordSettingsChange: (changes: Partial<Pick<ChordSettings, 'sequentialKey' | 'showChordTones'>>) => void
   onQuestionCountChange: (value: ChordQuestionCount) => void
   questionCount: ChordQuestionCount
+  theme: ThemeDefinition
 }): JSX.Element {
   const snapshot = useChordPracticeRuntime(runtime)
   const initialSessionConfig = useRef({ mode, questionCount, sequentialKey: chordSettings.sequentialKey })
   const preview = previewStateId === 'live' ? null : getChordMockState(previewStateId)
   const mockChord = getChordMockCase(caseId)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const livePresentation = presentLiveChord(snapshot)
+  const livePresentation = presentChordPractice(snapshot)
   const presentation: ChordPracticePresentation = preview
     ? {
         arpeggio: preview.arpeggio,
         block: preview.block,
         prompt: preview.prompt,
-        promptTone: previewStateId === 'question-correct'
+        semantic: previewStateId === 'question-correct'
           ? 'success'
-          : previewStateId.includes('wrong') ? 'danger' : previewStateId.startsWith('wait-release') ? 'warning' : 'active',
+          : previewStateId.includes('wrong') ? 'danger' : previewStateId.startsWith('wait-release') ? 'warning' : 'neutral',
         stageLabel: previewStateId.startsWith('arpeggio')
           ? '分解'
           : previewStateId.startsWith('wait-release') ? '过渡' : previewStateId === 'question-correct' ? '完成' : '柱式'
@@ -1679,6 +1641,7 @@ function ChordPracticeScreen({
   const endActionLabel = snapshot.status === 'SESSION_COMPLETE'
     ? '完成'
     : snapshot.counters.completedQuestions > 0 ? '结束并保存' : '结束'
+  const practiceActiveVisual = theme.capabilities.practiceActiveVisual
 
   useEffect(() => {
     const status = runtime.snapshot.status
@@ -1693,7 +1656,11 @@ function ChordPracticeScreen({
   }
 
   return (
-    <div className={`chord-focus-frame ${paused ? 'is-paused' : ''}`}>
+    <div
+      className={`chord-focus-frame is-${practiceActiveVisual.kind} ${paused ? 'is-paused' : ''}`}
+      data-active-visual={practiceActiveVisual.kind}
+      data-color-scheme={theme.colorScheme}
+    >
       <header className="chord-focus-header">
         <div className="chord-focus-header__left">
           <button aria-label="返回练习" className="icon-button subtle" type="button" onClick={leavePractice}><Icon name="arrow-left" /></button>
@@ -1718,7 +1685,7 @@ function ChordPracticeScreen({
           <strong>{chord.inversion}{chordSettings.showChordTones && chordToneText ? <span> · 构成音：{chordToneText}</span> : null}</strong>
         </div>
 
-        <section className="chord-notation-card" aria-label={`${chord.symbol} ${chord.inversion}`}>
+        <section className={`chord-notation-card has-${presentation.semantic}`} data-feedback-semantic={presentation.semantic} aria-label={`${chord.symbol} ${chord.inversion}`}>
           <div className="chord-group-labels" aria-hidden="true">
             <ChordGroupBadge label="分解" state={presentation.arpeggio} />
             <ChordGroupBadge label="柱式" state={presentation.block} />
@@ -1735,9 +1702,9 @@ function ChordPracticeScreen({
           ) : null}
         </section>
 
-        <section className={`chord-stage-prompt is-${presentation.promptTone}`} aria-live="polite">
+        <section className={`chord-stage-prompt is-${presentation.semantic}`} aria-live="polite">
           <span className="chord-stage-prompt__icon">
-            <Icon name={presentation.promptTone === 'success' ? 'check' : presentation.promptTone === 'danger' ? 'close' : presentation.promptTone === 'warning' ? 'clock' : 'play'} />
+            <Icon name={presentation.semantic === 'success' ? 'check' : presentation.semantic === 'danger' ? 'close' : presentation.semantic === 'warning' ? 'clock' : 'play'} />
           </span>
           <div><small>当前阶段 · {presentation.stageLabel}</small><strong>{paused ? !snapshot.transportReady ? 'MIDI 已断开，练习已安全暂停' : resumeWaitingForRelease ? '请先松开琴键以继续' : '练习已暂停' : presentation.prompt}</strong></div>
         </section>
@@ -3237,6 +3204,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
           onChordSettingsChange={updateChordSettings}
           onQuestionCountChange={setChordQuestionCount}
           questionCount={chordQuestionCount}
+          theme={activeTheme}
         />
       )
       case 'history': return (
