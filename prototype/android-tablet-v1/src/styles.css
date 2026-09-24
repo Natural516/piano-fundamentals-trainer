@@ -3416,35 +3416,137 @@ button.tool-card {
   color: var(--ink);
 }
 
-/* Decorated ACTIVE remains on its existing Chord surface until that
-   capability receives dedicated Chord artwork in a later scoped pass. */
 .chord-focus-frame.is-decorated-focus {
-  color-scheme: dark;
-  --app-bg: #111713;
-  --surface: #18201b;
-  --surface-raised: #1d2721;
-  --surface-soft: #253029;
-  --surface-tint: #20372c;
-  --ink: #edf3ee;
-  --ink-secondary: #bac6bd;
-  --ink-muted: #86948a;
-  --line: #303c34;
-  --line-strong: #445248;
-  --accent: #7cc2a1;
-  --accent-strong: #98d5b8;
-  --accent-soft: #254637;
-  --accent-ink: #b9ead1;
-  --blue: #8ebbd3;
-  --blue-soft: #233c49;
-  --amber: #e1ad69;
-  --amber-soft: #45351f;
-  --success: #6fc69a;
-  --success-soft: #214132;
-  --danger: #ec8b86;
-  --danger-soft: #4a2929;
-  --warning: #e3ae67;
-  --shadow: 0 16px 44px rgba(0, 0, 0, .26);
-  --shadow-soft: 0 6px 20px rgba(0, 0, 0, .2);
+  color-scheme: inherit;
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active {
+  background:
+    radial-gradient(circle at 12% 26%, rgba(248, 132, 174, .16) 0 2px, transparent 2.5px) 0 0 / 25px 25px,
+    linear-gradient(135deg, #fff9ef 0%, #fff4f7 53%, #fffaf1 100%);
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-focus-header {
+  border-bottom-color: #efcbd8;
+  background:
+    linear-gradient(100deg, rgba(255, 255, 255, .84), rgba(255, 239, 245, .92)),
+    var(--surface);
+  box-shadow: 0 5px 20px rgba(113, 65, 82, .07);
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-focus-header .icon-button,
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-focus-header .outline-action {
+  border-color: #efd8e1;
+  background: rgba(255, 255, 255, .76);
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-focus-content {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(90deg, rgba(246, 118, 166, .052) 1px, transparent 1px) 0 0 / 30px 30px,
+    linear-gradient(rgba(246, 118, 166, .042) 1px, transparent 1px) 0 0 / 30px 30px;
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-focus-content > :not(.chord-theme-artwork) {
+  position: relative;
+  z-index: 2;
+}
+
+.chord-theme-artwork {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+.chord-theme-character,
+.chord-theme-polaroid,
+.chord-theme-decoration,
+.chord-theme-reward {
+  position: absolute;
+  display: block;
+}
+
+.chord-theme-character {
+  top: 2px;
+  left: 22px;
+  width: clamp(230px, 20vw, 280px);
+  height: auto;
+}
+
+.chord-theme-polaroid {
+  bottom: 20px;
+  left: 18px;
+  width: clamp(116px, 9.5vw, 132px);
+  height: auto;
+  filter: drop-shadow(0 7px 12px rgba(96, 54, 70, .11));
+  transform: rotate(-4deg);
+}
+
+.chord-theme-decoration,
+.chord-theme-reward i {
+  background-repeat: no-repeat;
+  background-size: 724px 241px;
+}
+
+.chord-theme-decoration--identity {
+  top: 11px;
+  right: 38px;
+  width: 118px;
+  height: 36px;
+  background-position: -17px -54px;
+  opacity: .7;
+  transform: rotate(2deg);
+}
+
+.chord-theme-decoration--prompt {
+  right: 42px;
+  bottom: 72px;
+  width: 42px;
+  height: 42px;
+  background-position: -91px -108px;
+  opacity: .78;
+  transform: rotate(7deg);
+}
+
+.chord-theme-decoration--footer {
+  right: 30px;
+  bottom: 56px;
+  width: 126px;
+  height: 76px;
+  background-position: -482px -136px;
+  opacity: .8;
+}
+
+.chord-theme-reward {
+  top: 47px;
+  right: 178px;
+  width: 90px;
+  height: 40px;
+}
+
+.chord-theme-reward i {
+  position: absolute;
+  display: block;
+  width: 34px;
+  height: 34px;
+}
+
+.chord-theme-reward i:first-child {
+  top: 0;
+  left: 0;
+  background-position: -16px -8px;
+  transform: rotate(-9deg);
+}
+
+.chord-theme-reward i:last-child {
+  right: 0;
+  bottom: 0;
+  background-position: -79px -11px;
+  transform: rotate(8deg);
 }
 
 .chord-focus-header {
@@ -3750,6 +3852,62 @@ button.tool-card {
   width: 1px;
   height: 24px;
   background: var(--line-strong);
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-identity {
+  text-shadow: 0 1px rgba(255, 255, 255, .8);
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-notation-card {
+  border-color: #edcad7;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(103, 57, 74, .09);
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-notation-card::before {
+  opacity: .42;
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-stage-prompt {
+  position: relative;
+  border-color: #efd3de;
+  background: linear-gradient(100deg, rgba(255, 252, 247, .98), rgba(255, 239, 245, .94));
+  box-shadow: 0 5px 17px rgba(102, 56, 72, .055);
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-stage-prompt.is-danger::after,
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-stage-prompt.is-warning::after {
+  position: absolute;
+  right: 24px;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  opacity: .54;
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-stage-prompt.is-danger::after {
+  color: var(--practice-feedback-danger);
+  content: '×';
+  transform: rotate(-7deg);
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-stage-prompt.is-warning::after {
+  color: var(--practice-feedback-warning);
+  content: '↝';
+  transform: rotate(4deg);
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-progress-footer {
+  border: 1px solid #edd5df;
+  border-radius: 18px;
+  background: rgba(255, 253, 249, .95);
+  box-shadow: 0 6px 20px rgba(102, 58, 74, .06);
+}
+
+:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-pause-overlay {
+  border: 1px solid rgba(237, 189, 206, .72);
+  background: color-mix(in srgb, #fff8f5 84%, transparent);
+  color: var(--accent-strong);
 }
 
 .chord-drawer-backdrop {

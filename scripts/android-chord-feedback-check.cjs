@@ -131,11 +131,28 @@ test('CF11', 'Standard Chord ACTIVE surface follows Light and Dark theme tokens'
   assert.match(darkPalette, /'--text-primary': '#edf3ee'/)
 })
 
-test('CF12', 'Notation stays white and decorated Chord ACTIVE keeps its existing dark shell', () => {
+test('CF12', 'Notation stays white while Bocchi Chord ACTIVE owns a distinct semantic palette and light shell', () => {
   assert.match(cssSource, /\.chord-notation-card\s*\{[\s\S]*?background:\s*var\(--paper\)/)
   assert.match(registrySource, /'--paper': '#ffffff'/)
-  assert.match(cssSource, /\.chord-focus-frame\.is-decorated-focus\s*\{[\s\S]*?--app-bg:\s*#111713/)
-  assert.match(cssSource, /\.chord-focus-frame\.is-decorated-focus\s*\{[\s\S]*?--surface:\s*#18201b/)
+  const bocchiPalette = registrySource.slice(registrySource.indexOf('const bocchiTokens'), registrySource.indexOf('const standardHomeVisual'))
+  for (const [token, value] of [
+    ['--practice-feedback-success', '#3B8F6B'],
+    ['--practice-feedback-danger', '#D65A6F'],
+    ['--practice-feedback-warning', '#C88A2D']
+  ]) assert.match(bocchiPalette, new RegExp(`'${token}': '${value}'`))
+  assert.match(cssSource, /\.chord-focus-frame\.is-decorated-focus\s*\{[\s\S]*?color-scheme:\s*inherit/)
+  assert.doesNotMatch(cssSource, /\.chord-focus-frame\.is-decorated-focus\s*\{[\s\S]*?--app-bg:\s*#111713/)
+  assert.match(cssSource, /:root\[data-theme='bocchi-dev'\] \.bocchi-chord-active\s*\{/)
+  assert.match(cssSource, /:root\[data-theme='bocchi-dev'\] \.bocchi-chord-active \.chord-notation-card\s*\{[\s\S]*?background:\s*#fff/)
+})
+
+test('CF13', 'Bocchi reward and wrong transition accents remain presentation-only', () => {
+  const mainSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/main.tsx'), 'utf8')
+  const chordActive = mainSource.slice(mainSource.indexOf('function ChordPracticeScreen'), mainSource.indexOf('function SightReadyScreen'))
+  assert.match(chordActive, /presentation\.semantic === 'success'[\s\S]*chord-theme-reward/)
+  assert.match(cssSource, /\.bocchi-chord-active \.chord-stage-prompt\.is-danger::after/)
+  assert.match(cssSource, /\.bocchi-chord-active \.chord-stage-prompt\.is-warning::after/)
+  assert.doesNotMatch(chordActive, /setTimeout|setInterval|requestAnimationFrame/)
 })
 
 let failed = 0

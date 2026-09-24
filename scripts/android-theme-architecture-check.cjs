@@ -13,6 +13,7 @@ const practice = main.slice(main.indexOf('function PracticeHubScreen'), main.ind
 const tools = main.slice(main.indexOf('const THEORY_TOOLS'), main.indexOf('function ScaleNoteToken'))
 const history = main.slice(main.indexOf('function HistoryScreen'), main.indexOf('function ChordReportDetailScreen'))
 const settings = main.slice(main.indexOf('function SettingsScreen'), main.indexOf('function MidiScreen'))
+const chordActive = main.slice(main.indexOf('function ChordPracticeScreen'), main.indexOf('function SightReadyScreen'))
 const sightActive = main.slice(main.indexOf('function SightFocusScreen'), main.indexOf('function SightResultScreen'))
 
 const tests = [
@@ -129,6 +130,21 @@ const tests = [
     assert.match(main, /decoratedFocus \? \([\s\S]*?focus-active-character/)
     assert.match(css, /\.bocchi-sight-active \.focus-stage \.notation-paper/)
     assert.doesNotMatch(css, /\.bocchi-sight-active \.music-staff-renderer/)
+  }],
+  ['THM18', 'Chord ACTIVE uses optional capability-owned artwork without theme-name coupling', () => {
+    assert.match(chordActive, /theme\.capabilities\.practiceActiveVisual/)
+    assert.match(chordActive, /practiceActiveVisual\.kind === 'decorated-focus'/)
+    assert.match(chordActive, /practiceActiveVisual\.chordArtwork/)
+    assert.doesNotMatch(chordActive, /bocchi-dev|assets\/themes\/bocchi/)
+    assert.equal((registry.match(/practiceActiveVisual: standardPracticeActiveVisual/g) ?? []).length, 2)
+    for (const asset of ['02_53_43.png', '03_00_49.png', '03_04_22.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
+    assert.doesNotMatch(registry, /02_50_28\.png/)
+    assert.match(registry, /chordArtwork:\s*\{[\s\S]*frameClassName: 'bocchi-chord-active'/)
+    assert.match(chordActive, /chordArtwork \? \([\s\S]*data-chord-theme-asset="character"[\s\S]*data-chord-theme-asset="polaroid"/)
+    assert.equal((chordActive.match(/data-chord-theme-asset="decoration"/g) ?? []).length, 3)
+    assert.match(chordActive, /presentation\.semantic === 'success'[\s\S]*data-chord-theme-reward="success"/)
+    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-chord-active \.chord-notation-card/)
+    assert.doesNotMatch(css, /\.bocchi-chord-active \.chord-grand-staff/)
   }]
 ]
 

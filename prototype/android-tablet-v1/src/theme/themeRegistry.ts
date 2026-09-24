@@ -20,6 +20,9 @@ import bocchiSettingsThemeDecoration from '../assets/themes/bocchi/settings/Chat
 import bocchiSettingsAboutDecoration from '../assets/themes/bocchi/settings/ChatGPT Image 2026年9月24日 12_47_56.png'
 import bocchiSightActiveCharacter from '../assets/themes/bocchi/sight-active/ChatGPT Image 2026年9月24日 23_35_12.png'
 import bocchiSightActiveDecorations from '../assets/themes/bocchi/sight-active/ChatGPT Image 2026年9月24日 23_49_27.png'
+import bocchiChordActiveCharacter from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 02_53_43.png'
+import bocchiChordActiveDecorations from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 03_00_49.png'
+import bocchiChordActivePolaroid from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 03_04_22.png'
 
 export type ThemeId = 'light' | 'dark' | 'bocchi-dev'
 export type PublicThemeId = 'light' | 'dark'
@@ -163,6 +166,12 @@ export interface DecoratedFocusPracticeActiveVisual {
     cornerCharacter: string
     decorations: string
   }>
+  chordArtwork?: Readonly<{
+    frameClassName: string
+    cornerCharacter: string
+    decorations: string
+    polaroid: string
+  }>
 }
 
 export type PracticeActiveVisual = StandardPracticeActiveVisual | DecoratedFocusPracticeActiveVisual
@@ -292,9 +301,9 @@ const bocchiTokens: ThemeTokens = {
   '--danger': '#b34545',
   '--danger-soft': '#f6e3e1',
   '--warning': '#c17b2b',
-  '--practice-feedback-success': '#2c7b58',
-  '--practice-feedback-danger': '#b34545',
-  '--practice-feedback-warning': '#c17b2b'
+  '--practice-feedback-success': '#3B8F6B',
+  '--practice-feedback-danger': '#D65A6F',
+  '--practice-feedback-warning': '#C88A2D'
 }
 
 const standardHomeVisual: StandardHomeVisual = { kind: 'standard' }
@@ -387,6 +396,12 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
         assets: {
           cornerCharacter: bocchiSightActiveCharacter,
           decorations: bocchiSightActiveDecorations
+        },
+        chordArtwork: {
+          frameClassName: 'bocchi-chord-active',
+          cornerCharacter: bocchiChordActiveCharacter,
+          decorations: bocchiChordActiveDecorations,
+          polaroid: bocchiChordActivePolaroid
         }
       }
     }

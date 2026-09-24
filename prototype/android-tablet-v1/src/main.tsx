@@ -1642,6 +1642,9 @@ function ChordPracticeScreen({
     ? '完成'
     : snapshot.counters.completedQuestions > 0 ? '结束并保存' : '结束'
   const practiceActiveVisual = theme.capabilities.practiceActiveVisual
+  const chordArtwork = practiceActiveVisual.kind === 'decorated-focus'
+    ? practiceActiveVisual.chordArtwork ?? null
+    : null
 
   useEffect(() => {
     const status = runtime.snapshot.status
@@ -1657,8 +1660,9 @@ function ChordPracticeScreen({
 
   return (
     <div
-      className={`chord-focus-frame is-${practiceActiveVisual.kind} ${paused ? 'is-paused' : ''}`}
+      className={`chord-focus-frame is-${practiceActiveVisual.kind} ${chordArtwork?.frameClassName ?? ''} ${paused ? 'is-paused' : ''}`}
       data-active-visual={practiceActiveVisual.kind}
+      data-chord-artwork={chordArtwork ? 'enabled' : 'none'}
       data-color-scheme={theme.colorScheme}
     >
       <header className="chord-focus-header">
@@ -1679,6 +1683,21 @@ function ChordPracticeScreen({
       </header>
 
       <main className="chord-focus-content">
+        {chordArtwork ? (
+          <div className="chord-theme-artwork" aria-hidden="true">
+            <img className="chord-theme-character" data-chord-theme-asset="character" src={chordArtwork.cornerCharacter} alt="" />
+            <img className="chord-theme-polaroid" data-chord-theme-asset="polaroid" src={chordArtwork.polaroid} alt="" />
+            <span className="chord-theme-decoration chord-theme-decoration--identity" data-chord-theme-asset="decoration" style={{ backgroundImage: `url("${chordArtwork.decorations}")` }} />
+            <span className="chord-theme-decoration chord-theme-decoration--prompt" data-chord-theme-asset="decoration" style={{ backgroundImage: `url("${chordArtwork.decorations}")` }} />
+            <span className="chord-theme-decoration chord-theme-decoration--footer" data-chord-theme-asset="decoration" style={{ backgroundImage: `url("${chordArtwork.decorations}")` }} />
+            {presentation.semantic === 'success' ? (
+              <span className="chord-theme-reward" data-chord-theme-reward="success">
+                <i style={{ backgroundImage: `url("${chordArtwork.decorations}")` }} />
+                <i style={{ backgroundImage: `url("${chordArtwork.decorations}")` }} />
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="chord-identity">
           <span>当前和弦</span>
           <h1>{chord.symbol}</h1>
