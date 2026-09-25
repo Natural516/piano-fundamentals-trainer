@@ -1000,6 +1000,7 @@ function ToolDetailShell({
   heading,
   headingClassName,
   heroArtwork,
+  heroKind = 'chord-query',
   notation,
   primaryResult,
   query,
@@ -1011,6 +1012,7 @@ function ToolDetailShell({
   heading: ReactNode
   headingClassName?: string
   heroArtwork?: string
+  heroKind?: 'chord-query' | 'scale-key-signature'
   notation?: ReactNode
   primaryResult: ReactNode
   query: ReactNode
@@ -1040,12 +1042,21 @@ function ToolDetailShell({
           />
           <div aria-hidden="true" className="tool-detail-artwork">
             {heroArtwork ? (
-              <img
-                alt=""
-                className="tool-detail-artwork__chord-query-hero"
-                data-tool-detail-asset="chord-query-hero"
-                src={heroArtwork}
-              />
+              heroKind === 'scale-key-signature' ? (
+                <img
+                  alt=""
+                  className="tool-detail-artwork__scale-hero"
+                  data-tool-detail-asset="scale-hero"
+                  src={heroArtwork}
+                />
+              ) : (
+                <img
+                  alt=""
+                  className="tool-detail-artwork__chord-query-hero"
+                  data-tool-detail-asset="chord-query-hero"
+                  src={heroArtwork}
+                />
+              )
             ) : null}
             <span className="tool-detail-decoration is-tape" data-tool-detail-asset="decoration" style={decorationStyle} />
             <span className="tool-detail-decoration is-stars" data-tool-detail-asset="decoration" style={decorationStyle} />
@@ -1166,20 +1177,30 @@ function ChordQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Elemen
   )
 }
 
-function ScaleKeySignatureToolScreen(): JSX.Element {
+function ScaleKeySignatureToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
   const [root, setRoot] = useState<MajorKeyId>('C')
   const [scaleType, setScaleType] = useState<ScaleTypeId>('naturalMajor')
   const result = useMemo(() => getNaturalMajorToolResult(root), [root])
+  const toolDetailVisual = theme.capabilities.toolDetailVisual
+  const decoratedReference = toolDetailVisual.kind === 'decorated-reference' ? toolDetailVisual : null
 
   return (
-    <ProductFrame active="tools" onBack={() => navigate('tools')} title="音阶与调号">
-      <section className="scale-tool-layout" aria-labelledby="scale-tool-title">
-        <header className="scale-tool-query">
+    <ProductFrame active="tools" className={decoratedReference?.frameClassName} onBack={() => navigate('tools')} title="音阶与调号">
+      <ToolDetailShell
+        ariaLabelledby="scale-tool-title"
+        className="scale-tool-layout"
+        headingClassName="scale-tool-header"
+        heroArtwork={decoratedReference?.artwork.scaleHero}
+        heroKind="scale-key-signature"
+        visual={toolDetailVisual}
+        heading={(
           <div>
-            <span className="eyebrow">SCALE REFERENCE</span>
+            <span className="eyebrow">SCALE / KEY SIGNATURE REFERENCE</span>
             <h1 id="scale-tool-title">音阶与调号</h1>
             <p>选择主音，查看自然大调的规范音名与五线谱调号。</p>
           </div>
+        )}
+        query={(
           <div className="scale-tool-selectors" aria-label="音阶查询条件">
             <label>
               <span>主音</span>
@@ -1204,9 +1225,9 @@ function ScaleKeySignatureToolScreen(): JSX.Element {
               </span>
             </label>
           </div>
-        </header>
-
-        <div className="scale-tool-results">
+        )}
+        primaryResult={(
+          <div className="scale-tool-results">
           <article className="scale-tool-card scale-tool-scale-card">
             <div className="scale-tool-scale-content">
               <h2><ScaleNoteToken value={result.tonicLabel} /> <span>自然大调</span></h2>
@@ -1242,8 +1263,9 @@ function ScaleKeySignatureToolScreen(): JSX.Element {
               />
             </div>
           </article>
-        </div>
-      </section>
+          </div>
+        )}
+      />
     </ProductFrame>
   )
 }
@@ -3286,7 +3308,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       case 'practice': return <PracticeHubScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
       case 'tools': return <ToolsHubScreen theme={activeTheme} />
       case 'chord-query-tool': return <ChordQueryToolScreen theme={activeTheme} />
-      case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen />
+      case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen theme={activeTheme} />
       case 'interval-query-tool': return <IntervalQueryToolScreen />
       case 'chord-mode-select': return <ChordModeSelectScreen settingsReady={chordSettingsReady} onSelectMode={(mode) => { activeSessionHost.begin('chord', 'chord-practice'); setChordPracticeMode(mode); navigate('chord-practice') }} />
       case 'sight-ready': return <SightReadyScreen onSettingsChange={(changes) => { void runtime.updateSettings(changes) }} onStart={startPractice} settings={settings} />

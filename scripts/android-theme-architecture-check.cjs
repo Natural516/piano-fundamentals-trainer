@@ -16,6 +16,7 @@ const settings = main.slice(main.indexOf('function SettingsScreen'), main.indexO
 const chordActive = main.slice(main.indexOf('function ChordPracticeScreen'), main.indexOf('function SightReadyScreen'))
 const sightActive = main.slice(main.indexOf('function SightFocusScreen'), main.indexOf('function SightResultScreen'))
 const chordQuery = main.slice(main.indexOf('function ToolDetailShell'), main.indexOf('function ScaleKeySignatureToolScreen'))
+const scaleKeySignature = main.slice(main.indexOf('function ScaleKeySignatureToolScreen'), main.indexOf('function IntervalPitchToken'))
 
 const tests = [
   ['THM01', 'Light Dark and Bocchi are peer registry entries', () => {
@@ -156,7 +157,9 @@ const tests = [
     assert.match(registry, /toolDetailVisual:\s*\{\s*kind: 'decorated-reference'/)
     assert.match(registry, /background: bocchiToolDetailBackground/)
     assert.match(registry, /artwork:\s*\{[\s\S]*chordQueryHero: bocchiChordQueryRyo/)
+    assert.match(registry, /scaleHero: bocchiScaleKeySignatureRyo/)
     assert.match(registry, /tool-detail\/chord-query\/ryo-reference-sticker\.png/)
+    assert.match(registry, /tool-detail\/scale-key-signature\/scale-key-signature-hero\.png/)
     assert.doesNotMatch(registry, /tool-detail\/shared\/ryo-reference-sticker\.png/)
     assert.match(registry, /decorations: bocchiToolDetailDecorations/)
     assert.equal((chordQuery.match(/data-tool-detail-asset="background"/g) ?? []).length, 1)
@@ -172,6 +175,21 @@ const tests = [
     assert.doesNotMatch(css, /bocchi-tool-detail-preview \.chord-query-selectors\s*\{[\s\S]*?grid-template-columns:/)
     assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-tool-detail-preview/)
     assert.doesNotMatch(registry, /照片-1|chord-query-reference/)
+  }],
+  ['THM20', 'Scale Key Signature consumes shared Tool Detail capability with isolated page artwork', () => {
+    assert.match(scaleKeySignature, /theme\.capabilities\.toolDetailVisual/)
+    assert.match(scaleKeySignature, /toolDetailVisual\.kind === 'decorated-reference'/)
+    assert.match(scaleKeySignature, /<ToolDetailShell/)
+    assert.match(scaleKeySignature, /heroArtwork=\{decoratedReference\?\.artwork\.scaleHero\}/)
+    assert.match(scaleKeySignature, /heroKind="scale-key-signature"/)
+    assert.doesNotMatch(scaleKeySignature, /bocchi-dev|assets\/themes\/bocchi/)
+    assert.equal((chordQuery.match(/data-tool-detail-asset="scale-hero"/g) ?? []).length, 1)
+    assert.match(css, /\.tool-detail-top\.scale-tool-header\s*\{[\s\S]*?grid-template-rows: 210px 108px;/)
+    assert.match(css, /\.scale-tool-selectors\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);/)
+    assert.match(css, /\.scale-tool-results\s*\{[\s\S]*?grid-template-columns: minmax\(0, 44fr\) minmax\(0, 56fr\);/)
+    assert.match(css, /\.tool-detail-artwork__scale-hero\s*\{[\s\S]*?width: 315px;/)
+    assert.match(css, /\.scale-key-signature-paper\s*\{[\s\S]*?background: #fff;/)
+    assert.doesNotMatch(registry, /18_23_57|scale-key-signature-reference/)
   }]
 ]
 

@@ -36,7 +36,7 @@ test('SK03 separate Scale Query card is removed', () => assert.doesNotMatch(tool
 test('SK04 separate Key Signature Reference card is removed', () => assert.doesNotMatch(toolsSource, /title: '调号参考'/))
 test('SK05 Chord Query card remains alongside Scale and opens its own screen', () => {
   assert.match(toolsSource, /title: '和弦查询'[\s\S]*?screen: 'chord-query-tool'/)
-  assert.match(mainSource, /case 'chord-query-tool': return <ChordQueryToolScreen \/>/)
+  assert.match(mainSource, /case 'chord-query-tool': return <ChordQueryToolScreen theme=\{activeTheme\} \/>/)
 })
 test('SK06 Interval Query remains a distinct implemented sibling tool', () => assert.match(toolsSource, /title: '音程查询'[\s\S]*?screen: 'interval-query-tool'/))
 test('SK07 available scale types expose only Natural Major', () => assert.deepEqual(AVAILABLE_SCALE_TYPE_OPTIONS.map((item) => [item.id, item.label]), [['naturalMajor', '自然大调']]))
@@ -92,7 +92,7 @@ test('SK29 tool has no History write or report creation', () => assert.doesNotMa
 test('SK30 tool has no MIDI subscription or Runtime', () => assert.doesNotMatch(toolSource + screenSource, /Midi|MIDI|Runtime|subscribe\(/))
 test('SK31 tool never acquires practice keep-awake', () => assert.doesNotMatch(toolSource + screenSource, /PracticeKeepAwake|setEnabled|keepPracticeAwake/))
 test('SK32 Back returns to Tools and bottom Tools navigation remains active', () => {
-  assert.match(screenSource, /<ProductFrame active="tools" onBack=\{\(\) => navigate\('tools'\)\}/)
+  assert.match(screenSource, /<ProductFrame active="tools"[\s\S]*?onBack=\{\(\) => navigate\('tools'\)\}/)
   assert.match(mainSource, /'scale-key-signature-tool': 'tools'/)
 })
 test('SK33 Relative Key is no longer a standalone sibling card', () => {
@@ -162,6 +162,29 @@ test('SK45 all 15 Natural Major note and relative-minor facts remain exact', () 
     const result = getNaturalMajorToolResult(keyId)
     assert.deepEqual([result.notes.ascending, result.relativeMinorLabel], expected[keyId])
   }
+})
+test('SK46 Scale uses the shared Tool Detail shell without changing query semantics', () => {
+  assert.match(screenSource, /<ToolDetailShell/)
+  assert.match(screenSource, /className="scale-tool-layout"/)
+  assert.match(screenSource, /headingClassName="scale-tool-header"/)
+  assert.match(screenSource, /className="scale-tool-selectors"/)
+  assert.equal((screenSource.match(/<select className="setting-select"/g) ?? []).length >= 2, true)
+})
+test('SK47 Scale theme artwork is capability-owned and page-specific', () => {
+  assert.match(screenSource, /theme\.capabilities\.toolDetailVisual/)
+  assert.match(screenSource, /heroArtwork=\{decoratedReference\?\.artwork\.scaleHero\}/)
+  assert.match(screenSource, /heroKind="scale-key-signature"/)
+  assert.doesNotMatch(screenSource, /bocchi-dev|chordQueryHero|assets\/themes\/bocchi/)
+})
+test('SK48 Scale result remains a real two-column Product structure', () => {
+  assert.match(screenSource, /className="scale-tool-results"/)
+  assert.match(screenSource, /scale-tool-card scale-tool-scale-card/)
+  assert.match(screenSource, /scale-tool-card scale-tool-signature-card/)
+  assert.match(stylesSource, /\.scale-tool-results[\s\S]*?grid-template-columns: minmax\(0, 44fr\) minmax\(0, 56fr\)/)
+})
+test('SK49 Scale notation paper stays neutral and decoration-free', () => {
+  assert.match(stylesSource, /\.scale-key-signature-paper[\s\S]*?background: #fff;/)
+  assert.match(stylesSource, /\.scale-key-signature-paper::before[\s\S]*?content: none;/)
 })
 
 let passed = 0

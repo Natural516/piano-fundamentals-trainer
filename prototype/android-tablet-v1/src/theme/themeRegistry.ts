@@ -24,6 +24,7 @@ import bocchiChordActiveCharacter from '../assets/themes/bocchi/chord-active/Cha
 import bocchiChordActiveDecorations from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 03_00_49.png'
 import bocchiChordActivePolaroid from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 03_04_22.png'
 import bocchiChordQueryRyo from '../assets/themes/bocchi/tool-detail/chord-query/ryo-reference-sticker.png'
+import bocchiScaleKeySignatureRyo from '../assets/themes/bocchi/tool-detail/scale-key-signature/scale-key-signature-hero.png'
 import bocchiToolDetailDecorations from '../assets/themes/bocchi/tool-detail/shared/tool-detail-decoration-sheet.png'
 import bocchiToolDetailBackground from '../assets/themes/bocchi/tool-detail/shared/music-studio-background.png'
 
@@ -192,6 +193,7 @@ export interface DecoratedReferenceToolDetailVisual {
   }>
   artwork: Readonly<{
     chordQueryHero: string
+    scaleHero: string
   }>
 }
 
@@ -435,7 +437,8 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
           decorations: bocchiToolDetailDecorations
         },
         artwork: {
-          chordQueryHero: bocchiChordQueryRyo
+          chordQueryHero: bocchiChordQueryRyo,
+          scaleHero: bocchiScaleKeySignatureRyo
         }
       }
     }
