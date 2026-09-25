@@ -23,7 +23,7 @@ import bocchiSightActiveDecorations from '../assets/themes/bocchi/sight-active/C
 import bocchiChordActiveCharacter from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 02_53_43.png'
 import bocchiChordActiveDecorations from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 03_00_49.png'
 import bocchiChordActivePolaroid from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 03_04_22.png'
-import bocchiToolDetailRyo from '../assets/themes/bocchi/tool-detail/shared/ryo-reference-sticker.png'
+import bocchiChordQueryRyo from '../assets/themes/bocchi/tool-detail/chord-query/ryo-reference-sticker.png'
 import bocchiToolDetailDecorations from '../assets/themes/bocchi/tool-detail/shared/tool-detail-decoration-sheet.png'
 import bocchiToolDetailBackground from '../assets/themes/bocchi/tool-detail/shared/music-studio-background.png'
 
@@ -188,8 +188,10 @@ export interface DecoratedReferenceToolDetailVisual {
   frameClassName: string
   assets: Readonly<{
     background: string
-    character: string
     decorations: string
+  }>
+  artwork: Readonly<{
+    chordQueryHero: string
   }>
 }
 
@@ -430,8 +432,10 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
         frameClassName: 'bocchi-tool-detail-preview',
         assets: {
           background: bocchiToolDetailBackground,
-          character: bocchiToolDetailRyo,
           decorations: bocchiToolDetailDecorations
+        },
+        artwork: {
+          chordQueryHero: bocchiChordQueryRyo
         }
       }
     }

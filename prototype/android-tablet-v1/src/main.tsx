@@ -999,6 +999,7 @@ function ToolDetailShell({
   details,
   heading,
   headingClassName,
+  heroArtwork,
   notation,
   primaryResult,
   query,
@@ -1009,6 +1010,7 @@ function ToolDetailShell({
   details?: ReactNode
   heading: ReactNode
   headingClassName?: string
+  heroArtwork?: string
   notation?: ReactNode
   primaryResult: ReactNode
   query: ReactNode
@@ -1037,12 +1039,14 @@ function ToolDetailShell({
             style={environmentStyle}
           />
           <div aria-hidden="true" className="tool-detail-artwork">
-            <img
-              alt=""
-              className="tool-detail-artwork__character"
-              data-tool-detail-asset="character"
-              src={decoratedReference.assets.character}
-            />
+            {heroArtwork ? (
+              <img
+                alt=""
+                className="tool-detail-artwork__chord-query-hero"
+                data-tool-detail-asset="chord-query-hero"
+                src={heroArtwork}
+              />
+            ) : null}
             <span className="tool-detail-decoration is-tape" data-tool-detail-asset="decoration" style={decorationStyle} />
             <span className="tool-detail-decoration is-stars" data-tool-detail-asset="decoration" style={decorationStyle} />
             <span className="tool-detail-decoration is-note" data-tool-detail-asset="decoration" style={decorationStyle} />
@@ -1083,6 +1087,7 @@ function ChordQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Elemen
         ariaLabelledby="chord-query-title"
         className="chord-query-layout"
         headingClassName="chord-query-header"
+        heroArtwork={decoratedReference?.artwork.chordQueryHero}
         visual={toolDetailVisual}
         heading={(
           <div>

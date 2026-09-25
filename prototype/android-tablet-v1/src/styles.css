@@ -2491,7 +2491,7 @@ button.tool-card {
   color: #ef8db5;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__character {
+:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
   position: absolute;
   top: -8px;
   right: 56px;
@@ -2549,7 +2549,7 @@ button.tool-card {
     padding-right: 150px;
   }
 
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__character {
+  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
     right: 30px;
     width: 142px;
   }
@@ -2612,7 +2612,7 @@ button.tool-card {
 }
 
 :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-top {
-  z-index: 2;
+  z-index: auto;
 }
 
 :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-heading-band {
@@ -2843,8 +2843,8 @@ button.tool-card {
   font-size: .82em;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__character {
-  top: -22px;
+:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
+  top: 4px;
   right: 38px;
   width: 328px;
   opacity: 1;
@@ -2929,7 +2929,7 @@ button.tool-card {
     padding-left: 44px;
   }
 
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__character {
+  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
     right: 18px;
     width: 270px;
   }
