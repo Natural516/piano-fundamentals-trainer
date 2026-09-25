@@ -993,22 +993,105 @@ function ChordTheoreticalNoteToken({ letter, accidental, label }: { letter: stri
   )
 }
 
-function ChordQueryToolScreen(): JSX.Element {
+function ToolDetailShell({
+  ariaLabelledby,
+  className,
+  details,
+  heading,
+  headingClassName,
+  notation,
+  primaryResult,
+  query,
+  visual
+}: {
+  ariaLabelledby: string
+  className?: string
+  details?: ReactNode
+  heading: ReactNode
+  headingClassName?: string
+  notation?: ReactNode
+  primaryResult: ReactNode
+  query: ReactNode
+  visual: ThemeDefinition['capabilities']['toolDetailVisual']
+}): JSX.Element {
+  const decoratedReference = visual.kind === 'decorated-reference' ? visual : null
+  const decorationStyle = decoratedReference
+    ? { backgroundImage: `url("${decoratedReference.assets.decorations}")` }
+    : undefined
+  const environmentStyle = decoratedReference
+    ? { backgroundImage: `url("${decoratedReference.assets.background}")` }
+    : undefined
+
+  return (
+    <section
+      aria-labelledby={ariaLabelledby}
+      className={`tool-detail-shell is-${visual.kind}${className ? ` ${className}` : ''}`}
+      data-tool-detail-visual={visual.kind}
+    >
+      {decoratedReference ? (
+        <>
+          <div
+            aria-hidden="true"
+            className="tool-detail-environment"
+            data-tool-detail-asset="background"
+            style={environmentStyle}
+          />
+          <div aria-hidden="true" className="tool-detail-artwork">
+            <img
+              alt=""
+              className="tool-detail-artwork__character"
+              data-tool-detail-asset="character"
+              src={decoratedReference.assets.character}
+            />
+            <span className="tool-detail-decoration is-tape" data-tool-detail-asset="decoration" style={decorationStyle} />
+            <span className="tool-detail-decoration is-stars" data-tool-detail-asset="decoration" style={decorationStyle} />
+            <span className="tool-detail-decoration is-note" data-tool-detail-asset="decoration" style={decorationStyle} />
+            <span className="tool-detail-decoration is-bass" data-tool-detail-asset="decoration" style={decorationStyle} />
+            <span className="tool-detail-decoration is-cat" data-tool-detail-asset="decoration" style={decorationStyle} />
+            <span className="tool-detail-decoration is-arrow" data-tool-detail-asset="decoration" style={decorationStyle} />
+            <span className="tool-detail-decoration is-result-tape" data-tool-detail-asset="decoration" style={decorationStyle} />
+          </div>
+        </>
+      ) : null}
+      <div className={`tool-detail-top${headingClassName ? ` ${headingClassName}` : ''}`}>
+        <header className="tool-detail-heading-band">
+          <div className="tool-detail-heading">{heading}</div>
+        </header>
+        <div className="tool-detail-query-panel">
+          <div className="tool-detail-query">{query}</div>
+        </div>
+      </div>
+      <div className="tool-detail-primary-result">{primaryResult}</div>
+      {notation ? <div className="tool-detail-notation">{notation}</div> : null}
+      {details ? <div className="tool-detail-details">{details}</div> : null}
+    </section>
+  )
+}
+
+function ChordQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
   const [noteLetter, setNoteLetter] = useState<ChordQueryNoteLetter>('C')
   const [accidental, setAccidental] = useState<ChordQueryInputAccidental>(0)
   const [chordType, setChordType] = useState<ChordQueryTypeId>('major')
   const root = useMemo(() => ({ letter: noteLetter, accidental }), [noteLetter, accidental])
   const result = useMemo(() => getChordQueryResult(root, chordType), [root, chordType])
+  const toolDetailVisual = theme.capabilities.toolDetailVisual
+  const decoratedReference = toolDetailVisual.kind === 'decorated-reference' ? toolDetailVisual : null
 
   return (
-    <ProductFrame active="tools" onBack={() => navigate('tools')} title="和弦查询">
-      <section className="chord-query-layout" aria-labelledby="chord-query-title">
-        <header className="chord-query-header">
+    <ProductFrame active="tools" className={decoratedReference?.frameClassName} onBack={() => navigate('tools')} title="和弦查询">
+      <ToolDetailShell
+        ariaLabelledby="chord-query-title"
+        className="chord-query-layout"
+        headingClassName="chord-query-header"
+        visual={toolDetailVisual}
+        heading={(
           <div>
             <span className="eyebrow">CHORD REFERENCE</span>
             <h1 id="chord-query-title">和弦查询</h1>
             <p>选择根音和和弦类型，查看规范名称与完整理论构成音。</p>
           </div>
+        )}
+        query={(
           <div className="chord-query-selectors" aria-label="和弦查询条件">
             <label>
               <span>音名</span>
@@ -1042,9 +1125,9 @@ function ChordQueryToolScreen(): JSX.Element {
               </span>
             </label>
           </div>
-        </header>
-
-        <article className="chord-query-card chord-query-answer" aria-label={`${result.symbol} 查询结果`}>
+        )}
+        primaryResult={(
+          <article className="chord-query-card chord-query-answer" aria-label={`${result.symbol} 查询结果`}>
           <div className="chord-query-identity">
             <span className="eyebrow">CHORD SYMBOL</span>
             <h2>
@@ -1071,8 +1154,9 @@ function ChordQueryToolScreen(): JSX.Element {
               ))}
             </p>
           </div>
-        </article>
-      </section>
+          </article>
+        )}
+      />
     </ProductFrame>
   )
 }
@@ -3196,7 +3280,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
       case 'practice': return <PracticeHubScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
       case 'tools': return <ToolsHubScreen theme={activeTheme} />
-      case 'chord-query-tool': return <ChordQueryToolScreen />
+      case 'chord-query-tool': return <ChordQueryToolScreen theme={activeTheme} />
       case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen />
       case 'interval-query-tool': return <IntervalQueryToolScreen />
       case 'chord-mode-select': return <ChordModeSelectScreen settingsReady={chordSettingsReady} onSelectMode={(mode) => { activeSessionHost.begin('chord', 'chord-practice'); setChordPracticeMode(mode); navigate('chord-practice') }} />

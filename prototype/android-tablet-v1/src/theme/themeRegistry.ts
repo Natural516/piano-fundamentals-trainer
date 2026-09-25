@@ -23,6 +23,9 @@ import bocchiSightActiveDecorations from '../assets/themes/bocchi/sight-active/C
 import bocchiChordActiveCharacter from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 02_53_43.png'
 import bocchiChordActiveDecorations from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 03_00_49.png'
 import bocchiChordActivePolaroid from '../assets/themes/bocchi/chord-active/ChatGPT Image 2026年9月25日 03_04_22.png'
+import bocchiToolDetailRyo from '../assets/themes/bocchi/tool-detail/shared/ryo-reference-sticker.png'
+import bocchiToolDetailDecorations from '../assets/themes/bocchi/tool-detail/shared/tool-detail-decoration-sheet.png'
+import bocchiToolDetailBackground from '../assets/themes/bocchi/tool-detail/shared/music-studio-background.png'
 
 export type ThemeId = 'light' | 'dark' | 'bocchi-dev'
 export type PublicThemeId = 'light' | 'dark'
@@ -176,6 +179,22 @@ export interface DecoratedFocusPracticeActiveVisual {
 
 export type PracticeActiveVisual = StandardPracticeActiveVisual | DecoratedFocusPracticeActiveVisual
 
+export interface StandardToolDetailVisual {
+  kind: 'standard'
+}
+
+export interface DecoratedReferenceToolDetailVisual {
+  kind: 'decorated-reference'
+  frameClassName: string
+  assets: Readonly<{
+    background: string
+    character: string
+    decorations: string
+  }>
+}
+
+export type ToolDetailVisual = StandardToolDetailVisual | DecoratedReferenceToolDetailVisual
+
 export interface ThemeDefinition {
   id: ThemeId
   displayName: string
@@ -189,6 +208,7 @@ export interface ThemeDefinition {
     historyVisual: HistoryVisual
     settingsVisual: SettingsVisual
     practiceActiveVisual: PracticeActiveVisual
+    toolDetailVisual: ToolDetailVisual
   }>
 }
 
@@ -312,6 +332,7 @@ const standardToolsVisual: StandardToolsVisual = { kind: 'standard' }
 const standardHistoryVisual: StandardHistoryVisual = { kind: 'standard' }
 const standardSettingsVisual: StandardSettingsVisual = { kind: 'standard' }
 const standardPracticeActiveVisual: StandardPracticeActiveVisual = { kind: 'standard' }
+const standardToolDetailVisual: StandardToolDetailVisual = { kind: 'standard' }
 
 export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
   light: {
@@ -320,7 +341,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
     source: 'built-in',
     colorScheme: 'light',
     tokens: lightTokens,
-    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual, practiceActiveVisual: standardPracticeActiveVisual }
+    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual, practiceActiveVisual: standardPracticeActiveVisual, toolDetailVisual: standardToolDetailVisual }
   },
   dark: {
     id: 'dark',
@@ -328,7 +349,7 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
     source: 'built-in',
     colorScheme: 'dark',
     tokens: darkTokens,
-    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual, practiceActiveVisual: standardPracticeActiveVisual }
+    capabilities: { homeVisual: standardHomeVisual, practiceVisual: standardPracticeVisual, toolsVisual: standardToolsVisual, historyVisual: standardHistoryVisual, settingsVisual: standardSettingsVisual, practiceActiveVisual: standardPracticeActiveVisual, toolDetailVisual: standardToolDetailVisual }
   },
   'bocchi-dev': {
     id: 'bocchi-dev',
@@ -402,6 +423,15 @@ export const THEME_REGISTRY: Readonly<Record<ThemeId, ThemeDefinition>> = {
           cornerCharacter: bocchiChordActiveCharacter,
           decorations: bocchiChordActiveDecorations,
           polaroid: bocchiChordActivePolaroid
+        }
+      },
+      toolDetailVisual: {
+        kind: 'decorated-reference',
+        frameClassName: 'bocchi-tool-detail-preview',
+        assets: {
+          background: bocchiToolDetailBackground,
+          character: bocchiToolDetailRyo,
+          decorations: bocchiToolDetailDecorations
         }
       }
     }

@@ -20,7 +20,7 @@ The theme layer owns how those product surfaces look: semantic colors, typograph
 - a complete semantic token map;
 - optional page-visual capabilities.
 
-Product components receive the resolved active definition. They ask for capabilities such as `homeVisual`, `practiceVisual`, `toolsVisual`, `historyVisual`, `settingsVisual`, or `practiceActiveVisual`; they do not branch on `light`, `dark`, or `bocchi-dev` names.
+Product components receive the resolved active definition. They ask for capabilities such as `homeVisual`, `practiceVisual`, `toolsVisual`, `historyVisual`, `settingsVisual`, `practiceActiveVisual`, or `toolDetailVisual`; they do not branch on `light`, `dark`, or `bocchi-dev` names.
 
 ## 4. Semantic tokens
 
@@ -39,6 +39,8 @@ The shared History dashboard is a Product-layer surface: summary facts, local-da
 Settings follows the same boundary. MIDI state and navigation, the theme-selection state, installed package metadata, QA update isolation, the production Update route, and open-source information remain Product-layer facts. `settingsVisual` may provide one Hero and decorative artwork for the Device, Theme, and About cards, but it cannot provide status, version, or action semantics.
 
 ACTIVE practice follows the same one-screen rule. `practiceActiveVisual` may select a standard focus surface or a decorated focus skin and supply inert corner artwork. Question generation, notation geometry, VexFlow, MIDI, timing, judgement, counters, persistence, and navigation remain Product-layer responsibilities shared by every theme.
+
+Tool Detail pages use the slot-based `ToolDetailShell` inside the existing `ProductFrame`. The shell can host heading, query, primary result, optional notation, and optional details without assuming any tool's selectors or result shape. `toolDetailVisual` may select standard surfaces or a decorated reference-notebook skin and provide inert shared artwork; query state, music-theory calculations, spelling, native-control semantics, MIDI, routes, and Bottom Navigation remain Product-layer responsibilities.
 
 Theme-specific selectors must be scoped to the active theme. Bocchi Home rules therefore require `data-theme="bocchi-dev"`; Light and Dark do not render or inherit Bocchi Home artwork.
 

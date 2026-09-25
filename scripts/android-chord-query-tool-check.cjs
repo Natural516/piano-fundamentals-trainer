@@ -208,9 +208,9 @@ test('CQ20', 'B13 uses the specified ascending concrete realization', () => {
 test('CQ21', 'Tools navigation opens the dedicated Chord Query screen and returns to Tools', () => {
   assert.match(mainSource, /\| 'chord-query-tool'/)
   assert.match(toolsSource, /title: '和弦查询'[\s\S]*?screen: 'chord-query-tool'/)
-  assert.match(mainSource, /case 'chord-query-tool': return <ChordQueryToolScreen \/>/)
+  assert.match(mainSource, /case 'chord-query-tool': return <ChordQueryToolScreen theme=\{activeTheme\} \/>/)
   assert.match(mainSource, /'chord-query-tool': 'tools'/)
-  assert.match(screenSource, /<ProductFrame active="tools" onBack=\{\(\) => navigate\('tools'\)\}/)
+  assert.match(screenSource, /<ProductFrame active="tools"[\s\S]*?onBack=\{\(\) => navigate\('tools'\)\}/)
 })
 
 test('CQ22', 'one grouped selector contains the nine approved non-selectable categories', () => {
@@ -228,11 +228,12 @@ test('CQ23', 'visible result contains only symbol Chinese name and theoretical n
 })
 
 test('CQ24', 'one full-width result card remains after virtual piano deferral', () => {
+  const layoutStyle = stylesSource.match(/\.chord-query-layout\s*\{([^}]*)\}/)?.[1] ?? ''
   assert.match(screenSource, /chord-query-card chord-query-answer/)
   assert.equal((screenSource.match(/<article/g) ?? []).length, 1)
   assert.doesNotMatch(screenSource, /chord-query-keyboard-card/)
-  assert.match(stylesSource, /\.chord-query-layout[\s\S]*?grid-template-rows:/)
-  assert.doesNotMatch(stylesSource, /\.chord-query-layout[\s\S]{0,300}grid-template-columns:/)
+  assert.match(layoutStyle, /grid-template-rows:/)
+  assert.doesNotMatch(layoutStyle, /grid-template-columns:/)
 })
 
 test('CQ25', 'chord symbols use one structured nowrap root accidental suffix unit', () => {
@@ -284,6 +285,27 @@ test('CQ29', 'double and triple accidentals remain atomic controlled visual grou
   assert.match(stylesSource, /\.chord-accidental-glyph \+ \.chord-accidental-glyph[\s\S]*?margin-left: -\.09em;/)
   assert.equal(getChordQueryResult({ letter: 'C', accidental: -1 }, 'diminished7').pitches.at(-1).accidental, '𝄫♭')
   assert.equal(getChordQueryResult({ letter: 'B', accidental: 1 }, 'augmented').pitches.at(-1).accidental, '𝄪♯')
+})
+
+test('CQ30', 'Chord Query consumes the shared Tool Detail shell without theme-name coupling', () => {
+  assert.match(mainSource, /function ToolDetailShell/)
+  assert.match(screenSource, /theme\.capabilities\.toolDetailVisual/)
+  assert.match(screenSource, /<ToolDetailShell/)
+  assert.match(screenSource, /heading=\{\(/)
+  assert.match(screenSource, /query=\{\(/)
+  assert.match(screenSource, /primaryResult=\{\(/)
+  assert.doesNotMatch(screenSource, /bocchi-dev|assets\/themes\/bocchi/)
+  assert.equal((screenSource.match(/<select/g) ?? []).length, 3)
+  assert.equal((screenSource.match(/<article/g) ?? []).length, 1)
+})
+
+test('CQ31', 'shared Chord Query geometry stacks heading full-width query and full-width result for every theme', () => {
+  assert.match(stylesSource, /\.chord-query-layout\s*\{[\s\S]*?grid-template-rows: 318px minmax\(0, 1fr\);[\s\S]*?gap: 14px;/)
+  assert.match(stylesSource, /\.tool-detail-top\.chord-query-header\s*\{[\s\S]*?grid-template-rows: 210px 108px;/)
+  assert.match(stylesSource, /\.tool-detail-query-panel\s*\{[\s\S]*?margin: 0 28px;[\s\S]*?padding: 14px 26px 15px;/)
+  assert.match(stylesSource, /\.tool-detail-primary-result\s*\{[\s\S]*?padding: 0 28px;/)
+  assert.match(stylesSource, /\.chord-query-selectors\s*\{[\s\S]*?grid-template-columns: minmax\(0, 24fr\) minmax\(0, 24fr\) minmax\(0, 47fr\);/)
+  assert.doesNotMatch(stylesSource, /bocchi-tool-detail-preview \.chord-query-selectors\s*\{[\s\S]*?grid-template-columns:/)
 })
 
 let failed = 0

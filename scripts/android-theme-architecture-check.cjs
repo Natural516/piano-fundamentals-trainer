@@ -15,6 +15,7 @@ const history = main.slice(main.indexOf('function HistoryScreen'), main.indexOf(
 const settings = main.slice(main.indexOf('function SettingsScreen'), main.indexOf('function MidiScreen'))
 const chordActive = main.slice(main.indexOf('function ChordPracticeScreen'), main.indexOf('function SightReadyScreen'))
 const sightActive = main.slice(main.indexOf('function SightFocusScreen'), main.indexOf('function SightResultScreen'))
+const chordQuery = main.slice(main.indexOf('function ToolDetailShell'), main.indexOf('function ScaleKeySignatureToolScreen'))
 
 const tests = [
   ['THM01', 'Light Dark and Bocchi are peer registry entries', () => {
@@ -145,6 +146,26 @@ const tests = [
     assert.match(chordActive, /presentation\.semantic === 'success'[\s\S]*data-chord-theme-reward="success"/)
     assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-chord-active \.chord-notation-card/)
     assert.doesNotMatch(css, /\.bocchi-chord-active \.chord-grand-staff/)
+  }],
+  ['THM19', 'Tool Detail uses a shared capability with isolated Chord Query artwork', () => {
+    assert.match(chordQuery, /function ToolDetailShell/)
+    assert.match(chordQuery, /theme\.capabilities\.toolDetailVisual/)
+    assert.match(chordQuery, /toolDetailVisual\.kind === 'decorated-reference'/)
+    assert.doesNotMatch(chordQuery, /bocchi-dev|assets\/themes\/bocchi/)
+    assert.equal((registry.match(/toolDetailVisual: standardToolDetailVisual/g) ?? []).length, 2)
+    assert.match(registry, /toolDetailVisual:\s*\{\s*kind: 'decorated-reference'/)
+    assert.match(registry, /background: bocchiToolDetailBackground/)
+    assert.match(registry, /character: bocchiToolDetailRyo/)
+    assert.match(registry, /decorations: bocchiToolDetailDecorations/)
+    assert.equal((chordQuery.match(/data-tool-detail-asset="background"/g) ?? []).length, 1)
+    assert.equal((chordQuery.match(/data-tool-detail-asset="character"/g) ?? []).length, 1)
+    assert.equal((chordQuery.match(/data-tool-detail-asset="decoration"/g) ?? []).length, 7)
+    assert.match(chordQuery, /decoratedReference \? \([\s\S]*?tool-detail-artwork/)
+    assert.match(css, /\.tool-detail-top\.chord-query-header\s*\{[\s\S]*?grid-template-rows: 210px 108px;/)
+    assert.match(css, /\.tool-detail-query-panel\s*\{[\s\S]*?margin: 0 28px;/)
+    assert.doesNotMatch(css, /bocchi-tool-detail-preview \.chord-query-selectors\s*\{[\s\S]*?grid-template-columns:/)
+    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-tool-detail-preview/)
+    assert.doesNotMatch(registry, /照片-1|chord-query-reference/)
   }]
 ]
 
