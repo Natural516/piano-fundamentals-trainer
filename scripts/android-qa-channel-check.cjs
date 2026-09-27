@@ -21,9 +21,9 @@ const checks = [
     assert.match(gradle, /qa\s*\{[\s\S]*?initWith debug[\s\S]*?applicationIdSuffix\s+["']\.qa["']/)
     assert.match(gradle, /qa\s*\{[\s\S]*?buildConfigField\s+["']String["'],\s*["']UPDATE_MANIFEST_URL["'],\s*'""'/)
   }],
-  ['Production version is 12 / 1.5.2', () => {
-    assert.match(version, /^versionCode=12$/m)
-    assert.match(version, /^versionName=1\.5\.2$/m)
+  ['Production version is 13 / 1.5.3', () => {
+    assert.match(version, /^versionCode=13$/m)
+    assert.match(version, /^versionName=1\.5\.3$/m)
   }],
   ['QA launcher name and package resources are distinct', () => {
     assert.match(qaStrings, />钢琴基本功训练器 QA</)

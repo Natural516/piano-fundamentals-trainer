@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AndroidBluetoothMidiPlugin.class);
         registerPlugin(AndroidUpdaterPlugin.class);
+        registerPlugin(ExternalUrlPlugin.class);
         registerPlugin(PracticeKeepAwakePlugin.class);
         registerPlugin(ThemePackagePlugin.class);
         super.onCreate(savedInstanceState);

@@ -8,6 +8,8 @@ const registry = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/sr
 const css = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/styles.css'), 'utf8')
 const version = fs.readFileSync(path.join(root, 'android/version.properties'), 'utf8')
 const externalTheme = fs.readFileSync(path.join(root, 'theme-packages/bocchi/theme.json'), 'utf8')
+const externalLinks = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/externalLinks.ts'), 'utf8')
+const externalUrlPlugin = fs.readFileSync(path.join(root, 'android/app/src/main/java/com/pianofundamentals/trainer/ExternalUrlPlugin.kt'), 'utf8')
 
 const settings = main.slice(main.indexOf('const SETTINGS_THEME_OPTIONS'), main.indexOf('function MidiScreen'))
 
@@ -34,6 +36,14 @@ const tests = [
     assert.match(settings, /__QA_BUILD__ \? \(/)
     assert.match(settings, /正式更新通道已关闭/)
     assert.match(settings, /openAuxiliary\('update'\)/)
+  }],
+  ['SET04B', 'Open Source uses one app-owned canonical HTTPS URL and Android external ACTION_VIEW', () => {
+    assert.match(settings, /onClick=\{\(\) => \{ void openSourceRepository\(\) \}\}/)
+    assert.match(externalLinks, /APP_SOURCE_REPOSITORY_URL = 'https:\/\/github\.com\/Natural516\/piano-fundamentals-trainer'/)
+    assert.match(externalLinks, /NativeExternalUrl\.openSourceRepository\(\)/)
+    assert.match(externalUrlPlugin, /Intent\(Intent\.ACTION_VIEW, Uri\.parse\(SOURCE_REPOSITORY_URL\)\)/)
+    assert.match(externalUrlPlugin, /Intent\.CATEGORY_BROWSABLE/)
+    assert.doesNotMatch(externalLinks, /javascript:|file:|content:/)
   }],
   ['SET05', 'Theme selector binds built-in ids and renders installed external themes separately', () => {
     for (const id of ["id: 'light'", "id: 'dark'"]) assert.match(settings, new RegExp(id))
@@ -74,8 +84,8 @@ const tests = [
     assert.equal((registry.match(/settingsVisual: standardSettingsVisual/g) ?? []).length, 2)
   }],
   ['SET12', 'Android release identity remains frozen', () => {
-    assert.match(version, /^versionCode=12$/m)
-    assert.match(version, /^versionName=1\.5\.2$/m)
+    assert.match(version, /^versionCode=13$/m)
+    assert.match(version, /^versionName=1\.5\.3$/m)
   }]
 ]
 

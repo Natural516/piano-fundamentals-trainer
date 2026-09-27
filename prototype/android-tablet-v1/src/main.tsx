@@ -23,6 +23,7 @@ import {
   projectSightReadingHistory
 } from './historyProjection'
 import { createAndroidUpdaterController } from './androidUpdater'
+import { openSourceRepository } from './externalLinks'
 import { UpdaterController, type UpdaterSnapshot, type UpdaterStatus } from './updaterCore'
 import { getSightReadingPrompt } from './sightReadingPresentation'
 import { presentSightReadingFeedback } from './sightReadingFeedbackPresentation'
@@ -2740,7 +2741,13 @@ function SettingsScreen({
             ) : (
               <SettingRow description="查看版本与更新状态" icon="refresh" onClick={() => openAuxiliary('update')} title="检查更新" action={<strong>{updaterLabel}</strong>} />
             )}
-            <SettingRow description="Natural516 / Apache-2.0" icon="book" title="开源项目" action={<strong>GitHub</strong>} />
+            <SettingRow
+              description="Natural516 / Apache-2.0"
+              icon="book"
+              onClick={() => { void openSourceRepository() }}
+              title="开源项目"
+              action={<><strong>GitHub</strong><Icon name="chevron" size={18} /></>}
+            />
             {composedSettings ? <img alt="" aria-hidden="true" className="settings-card__decoration" src={composedSettings.assets.about} /> : null}
           </section>
         </div>
