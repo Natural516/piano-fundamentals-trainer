@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "colorScheme": "light",
+  "tokens": {
+    "colors": {
+      "--app-bg": "#fff9f2", "--surface": "#fffdf9", "--surface-soft": "#fff2f6", "--surface-elevated": "#ffffff", "--surface-tint": "#fff4e9",
+      "--text-primary": "#24242d", "--text-secondary": "#586776", "--text-muted": "#7a8795", "--accent": "#f33b81", "--accent-strong": "#dc286c", "--accent-soft": "#ffe2ed", "--accent-ink": "#d72267",
+      "--border": "#ebdfd8", "--divider": "#ebdfd8", "--line-strong": "#ddcfc8", "--nav-bg": "#ffffff", "--nav-active-bg": "#ffe2ed", "--nav-active-text": "#d72267",
+      "--button-primary-bg": "#f33b81", "--button-primary-text": "#ffffff", "--paper": "#ffffff", "--blue": "#278bd7", "--blue-soft": "#dff2ff", "--amber": "#b67b08", "--amber-soft": "#fff0be",
+      "--success": "#2c7b58", "--success-soft": "#e2f1e8", "--danger": "#b34545", "--danger-soft": "#f6e3e1", "--warning": "#c17b2b",
+      "--practice-feedback-success": "#3B8F6B", "--practice-feedback-danger": "#D65A6F", "--practice-feedback-warning": "#C88A2D"
+    },
+    "shadows": { "shadow": "raised", "shadowSoft": "soft" }
+  },
+  "capabilities": {
+    "homeVisual": { "recipeId": "home-scrapbook-single-hero-v1", "assets": { "hero": "assets/home/hero.png", "headline": "assets/home/headline.png", "recentPractice": "assets/home/recent-practice.png", "midi": "assets/home/midi.png", "tools": "assets/home/tools.png" }, "parameters": {} },
+    "practiceVisual": { "recipeId": "practice-hero-cards-v1", "assets": { "hero": "assets/practice/hero.png", "sight": "assets/practice/sight.png", "chord": "assets/practice/chord.png" }, "parameters": {} },
+    "toolsVisual": { "recipeId": "tools-studio-cards-v1", "assets": { "hero": "assets/tools/hero.png", "chord": "assets/tools/chord.png", "interval": "assets/tools/interval.png", "scale": "assets/tools/scale.png" }, "parameters": {} },
+    "historyVisual": { "recipeId": "history-journal-dashboard-v1", "assets": { "hero": "assets/history/hero.png", "trend": "assets/history/trend.png", "memo": "assets/history/memo.png", "lower": "assets/history/lower.png" }, "parameters": {} },
+    "settingsVisual": { "recipeId": "settings-hero-cards-v1", "assets": { "hero": "assets/settings/hero.png", "midi": "assets/settings/midi.png", "theme": "assets/settings/theme.png", "about": "assets/settings/about.png" }, "parameters": {} },
+    "practiceActiveVisual": { "recipeId": "practice-decorated-focus-v1", "assets": { "cornerCharacter": "assets/practice-active/sight-character.png", "decorations": "assets/practice-active/sight-decorations.png", "chordCornerCharacter": "assets/practice-active/chord-character.png", "chordDecorations": "assets/practice-active/chord-decorations.png", "chordPolaroid": "assets/practice-active/chord-polaroid.png" }, "parameters": {} },
+    "toolDetailVisual": { "recipeId": "tool-reference-notebook-v1", "assets": { "background": "assets/tool-detail/background.png", "decorations": "assets/tool-detail/decorations.png", "chordQueryHero": "assets/tool-detail/chord-query-hero.png", "sharedCompleteRyo": "assets/tool-detail/shared-ryo.png" }, "parameters": {} }
+  }
+}

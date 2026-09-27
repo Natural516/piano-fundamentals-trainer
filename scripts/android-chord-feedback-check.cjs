@@ -21,6 +21,7 @@ for (const extension of ['.ts', '.tsx']) {
 const root = path.resolve(__dirname, '..')
 const { presentChordPractice } = require('../prototype/android-tablet-v1/src/chordPractice/presentation.ts')
 const registrySource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/themeRegistry.ts'), 'utf8')
+const externalBocchiTheme = JSON.parse(fs.readFileSync(path.join(root, 'theme-packages/bocchi/theme.json'), 'utf8'))
 const presentationSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/chordPractice/presentation.ts'), 'utf8')
 const rendererSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/ChordGrandStaff.tsx'), 'utf8')
 const cssSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/styles.css'), 'utf8')
@@ -40,7 +41,7 @@ function snapshot(phase, status = 'RUNNING') {
 
 test('CF01', 'Light and Dark expose the same standard shared Practice feedback tokens', () => {
   const lightPalette = registrySource.slice(registrySource.indexOf('const lightTokens'), registrySource.indexOf('const darkTokens'))
-  const darkPalette = registrySource.slice(registrySource.indexOf('const darkTokens'), registrySource.indexOf('const bocchiTokens'))
+  const darkPalette = registrySource.slice(registrySource.indexOf('const darkTokens'), registrySource.indexOf('const standardHomeVisual'))
   for (const [token, value] of [
     ['--practice-feedback-success', '#2c7b58'],
     ['--practice-feedback-danger', '#b34545'],
@@ -134,16 +135,15 @@ test('CF11', 'Standard Chord ACTIVE surface follows Light and Dark theme tokens'
 test('CF12', 'Notation stays white while Bocchi Chord ACTIVE owns a distinct semantic palette and light shell', () => {
   assert.match(cssSource, /\.chord-notation-card\s*\{[\s\S]*?background:\s*var\(--paper\)/)
   assert.match(registrySource, /'--paper': '#ffffff'/)
-  const bocchiPalette = registrySource.slice(registrySource.indexOf('const bocchiTokens'), registrySource.indexOf('const standardHomeVisual'))
   for (const [token, value] of [
     ['--practice-feedback-success', '#3B8F6B'],
     ['--practice-feedback-danger', '#D65A6F'],
     ['--practice-feedback-warning', '#C88A2D']
-  ]) assert.match(bocchiPalette, new RegExp(`'${token}': '${value}'`))
+  ]) assert.equal(externalBocchiTheme.tokens.colors[token], value)
   assert.match(cssSource, /\.chord-focus-frame\.is-decorated-focus\s*\{[\s\S]*?color-scheme:\s*inherit/)
   assert.doesNotMatch(cssSource, /\.chord-focus-frame\.is-decorated-focus\s*\{[\s\S]*?--app-bg:\s*#111713/)
-  assert.match(cssSource, /:root\[data-theme='bocchi-dev'\] \.bocchi-chord-active\s*\{/)
-  assert.match(cssSource, /:root\[data-theme='bocchi-dev'\] \.bocchi-chord-active \.chord-notation-card\s*\{[\s\S]*?background:\s*#fff/)
+  assert.match(cssSource, /:root\[data-theme-recipe-practice-active='practice-decorated-focus-v1'\] \.bocchi-chord-active\s*\{/)
+  assert.match(cssSource, /:root\[data-theme-recipe-practice-active='practice-decorated-focus-v1'\] \.bocchi-chord-active \.chord-notation-card\s*\{[\s\S]*?background:\s*#fff/)
 })
 
 test('CF13', 'Bocchi reward and wrong transition accents remain presentation-only', () => {

@@ -1,4 +1,4 @@
-import { StrictMode, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Component, StrictMode, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ErrorInfo, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
@@ -113,6 +113,7 @@ import {
   type ThemeDefinition,
   type ThemeId
 } from './theme/themeRegistry'
+import { THEME_PACKAGE_ERRORS, ThemeRuntimeManager, type InstalledThemeRecord, type ThemeRuntimeSnapshot } from './theme/themePackageRuntime'
 import './styles.css'
 
 declare const __QA_BUILD__: boolean
@@ -658,10 +659,12 @@ function HomeScreen({
             <em>{recentPracticeDetail}</em>
           </span>
           {composedHome ? (
-            <span className="themed-glance-art is-history" aria-hidden="true">
-              <img src={composedHome.assets.recentPractice} alt="" />
-              <i><Icon name="chevron" size={20} /></i>
-            </span>
+            <>
+              <span className="themed-glance-art is-history" aria-hidden="true">
+                <img src={composedHome.assets.recentPractice} alt="" />
+              </span>
+              <span className="themed-glance-chevron" aria-hidden="true"><Icon name="chevron" size={20} /></span>
+            </>
           ) : <Icon name="chevron" size={20} />}
         </button>
         <button className={`glance-item${composedHome ? ' is-midi' : ''}`} type="button" onClick={() => openAuxiliary('midi')}>
@@ -678,10 +681,12 @@ function HomeScreen({
           <span className="glance-icon is-amber"><Icon name="tools" /></span>
           <span><small>乐理工具</small><strong>基础知识查询</strong><em>和弦、音阶、音程与调号</em></span>
           {composedHome ? (
-            <span className="themed-glance-art is-tools" aria-hidden="true">
-              <img src={composedHome.assets.tools} alt="" />
-              <i><Icon name="chevron" size={20} /></i>
-            </span>
+            <>
+              <span className="themed-glance-art is-tools" aria-hidden="true">
+                <img src={composedHome.assets.tools} alt="" />
+              </span>
+              <span className="themed-glance-chevron" aria-hidden="true"><Icon name="chevron" size={20} /></span>
+            </>
           ) : <Icon name="chevron" size={20} />}
         </button>
       </section>
@@ -1012,7 +1017,7 @@ function ToolDetailShell({
   heading: ReactNode
   headingClassName?: string
   heroArtwork?: string
-  heroKind?: 'chord-query' | 'scale-key-signature'
+  heroKind?: 'chord-query' | 'complete-ryo'
   notation?: ReactNode
   primaryResult: ReactNode
   query: ReactNode
@@ -1042,11 +1047,11 @@ function ToolDetailShell({
           />
           <div aria-hidden="true" className="tool-detail-artwork">
             {heroArtwork ? (
-              heroKind === 'scale-key-signature' ? (
+              heroKind === 'complete-ryo' ? (
                 <img
                   alt=""
-                  className="tool-detail-artwork__scale-hero"
-                  data-tool-detail-asset="scale-hero"
+                  className="tool-detail-artwork__complete-ryo"
+                  data-tool-detail-asset="complete-ryo"
                   src={heroArtwork}
                 />
               ) : (
@@ -1190,8 +1195,8 @@ function ScaleKeySignatureToolScreen({ theme }: { theme: ThemeDefinition }): JSX
         ariaLabelledby="scale-tool-title"
         className="scale-tool-layout"
         headingClassName="scale-tool-header"
-        heroArtwork={decoratedReference?.artwork.scaleHero}
-        heroKind="scale-key-signature"
+        heroArtwork={decoratedReference?.artwork.sharedCompleteRyo}
+        heroKind="complete-ryo"
         visual={toolDetailVisual}
         heading={(
           <div>
@@ -1329,7 +1334,7 @@ function IntervalPitchSelector({
   )
 }
 
-function IntervalQueryToolScreen(): JSX.Element {
+function IntervalQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
   const [startLetter, setStartLetter] = useState<IntervalQueryLetter>('C')
   const [startAccidental, setStartAccidental] = useState<IntervalQueryVisibleAccidental>(0)
   const [startOctave, setStartOctave] = useState<IntervalQueryOctave>(4)
@@ -1339,19 +1344,29 @@ function IntervalQueryToolScreen(): JSX.Element {
   const start = useMemo(() => ({ letter: startLetter, accidental: startAccidental, octave: startOctave }), [startAccidental, startLetter, startOctave])
   const target = useMemo(() => ({ letter: targetLetter, accidental: targetAccidental, octave: targetOctave }), [targetAccidental, targetLetter, targetOctave])
   const result = useMemo(() => getIntervalQueryResult(start, target), [start, target])
+  const toolDetailVisual = theme.capabilities.toolDetailVisual
+  const decoratedReference = toolDetailVisual.kind === 'decorated-reference' ? toolDetailVisual : null
 
   return (
-    <ProductFrame active="tools" onBack={() => navigate('tools')} title="音程查询">
-      <section className="interval-query-layout" aria-labelledby="interval-query-title">
-        <header className="interval-query-header">
+    <ProductFrame active="tools" className={decoratedReference?.frameClassName} onBack={() => navigate('tools')} title="音程查询">
+      <ToolDetailShell
+        ariaLabelledby="interval-query-title"
+        className="interval-query-layout"
+        headingClassName="interval-query-header"
+        heroArtwork={decoratedReference?.artwork.sharedCompleteRyo}
+        heroKind="complete-ryo"
+        visual={toolDetailVisual}
+        heading={(
           <div className="interval-query-heading">
             <span className="eyebrow">INTERVAL REFERENCE</span>
             <h1 id="interval-query-title">音程查询</h1>
             <p>选择起始音与目标音，查看音程名称、方向与等音程参考。</p>
           </div>
+        )}
+        query={(
           <div className="interval-query-selectors" aria-label="音程查询条件">
             <IntervalPitchSelector
-              label="START"
+              label="起始音"
               onAccidentalChange={setStartAccidental}
               onLetterChange={setStartLetter}
               onOctaveChange={setStartOctave}
@@ -1359,56 +1374,59 @@ function IntervalQueryToolScreen(): JSX.Element {
             />
             <span aria-hidden="true" className="interval-query-selector-arrow">→</span>
             <IntervalPitchSelector
-              label="TARGET"
+              label="目标音"
               onAccidentalChange={setTargetAccidental}
               onLetterChange={setTargetLetter}
               onOctaveChange={setTargetOctave}
               pitch={target}
             />
           </div>
-        </header>
-
-        <article className="interval-query-card interval-query-answer" aria-label={`${result.displayName}查询结果`}>
-          <div className="interval-query-identity">
-            <span className="eyebrow">INTERVAL RESULT</span>
-            <h2>{result.displayName}</h2>
-            <div className="interval-query-pitch-pair">
-              <IntervalPitchToken pitch={result.start} />
-              <span aria-hidden="true" className="interval-query-pitch-arrow">→</span>
-              <IntervalPitchToken pitch={result.target} />
-              {result.soundingRelationshipLabel ? <em>{result.soundingRelationshipLabel}</em> : null}
-            </div>
-          </div>
-          <div className="interval-query-facts">
-            <span className="eyebrow">结果信息</span>
-            <dl>
-              <div><dt>方向</dt><dd>{result.directionLabel}</dd></div>
-              <div><dt>度数</dt><dd>{result.intervalNumberLabel}</dd></div>
-              <div><dt>性质</dt><dd>{result.quality}</dd></div>
-              <div><dt>半音数</dt><dd>{result.semitoneDistance}</dd></div>
-            </dl>
-          </div>
-        </article>
-
-        <article className="interval-query-card interval-query-references">
-          <header>
-            <div>
-              <span className="eyebrow">ENHARMONIC INTERVALS</span>
-              <h2>等音程参考</h2>
-            </div>
-            <p>保持 {result.semitoneDistance} 个半音不变，比较相邻级数的理论命名。</p>
-          </header>
-          <div className="interval-query-reference-list">
-            {result.enharmonicReferences.map((reference) => (
-              <div className={reference.isCurrent ? 'is-current' : ''} key={reference.intervalNumber}>
-                <span>{reference.intervalName}</span>
-                <small>{reference.semitoneDistance} 个半音</small>
-                {reference.isCurrent ? <em>当前</em> : <i aria-hidden="true" />}
+        )}
+        primaryResult={(
+          <div className="interval-query-results">
+            <article className="interval-query-card interval-query-answer" aria-label={`${result.displayName}查询结果`}>
+              <div className="interval-query-identity">
+                <span className="eyebrow">INTERVAL RESULT</span>
+                <h2>{result.displayName}</h2>
+                <div className="interval-query-pitch-pair">
+                  <IntervalPitchToken pitch={result.start} />
+                  <span aria-hidden="true" className="interval-query-pitch-arrow">→</span>
+                  <IntervalPitchToken pitch={result.target} />
+                  {result.soundingRelationshipLabel ? <em>{result.soundingRelationshipLabel}</em> : null}
+                </div>
               </div>
-            ))}
+              <div className="interval-query-facts">
+                <span className="eyebrow">结果信息</span>
+                <dl>
+                  <div><dt>方向</dt><dd>{result.directionLabel}</dd></div>
+                  <div><dt>度数</dt><dd>{result.intervalNumberLabel}</dd></div>
+                  <div><dt>性质</dt><dd>{result.quality}</dd></div>
+                  <div><dt>半音数</dt><dd>{result.semitoneDistance}</dd></div>
+                </dl>
+              </div>
+            </article>
+
+            <article className="interval-query-card interval-query-references">
+              <header>
+                <div>
+                  <span className="eyebrow">ENHARMONIC INTERVALS</span>
+                  <h2>等音程参考</h2>
+                </div>
+                <p>保持 {result.semitoneDistance} 个半音不变，比较相邻级数的理论命名。</p>
+              </header>
+              <div className="interval-query-reference-list">
+                {result.enharmonicReferences.map((reference) => (
+                  <div className={reference.isCurrent ? 'is-current' : ''} key={reference.intervalNumber}>
+                    <span>{reference.intervalName}</span>
+                    <small>{reference.semitoneDistance} 个半音</small>
+                    {reference.isCurrent ? <em>当前</em> : <i aria-hidden="true" />}
+                  </div>
+                ))}
+              </div>
+            </article>
           </div>
-        </article>
-      </section>
+        )}
+      />
     </ProductFrame>
   )
 }
@@ -2509,8 +2527,7 @@ const SETTINGS_THEME_OPTIONS: readonly {
   icon: IconName
 }[] = [
   { id: 'light', label: '浅色', description: '明亮清晰', icon: 'sun' },
-  { id: 'dark', label: '深色', description: '低光舒适', icon: 'moon' },
-  { id: 'bocchi-dev', label: '孤独摇滚', description: '乐队手账风格', icon: 'grid' }
+  { id: 'dark', label: '深色', description: '低光舒适', icon: 'moon' }
 ]
 
 function SettingsThemeOption({
@@ -2545,21 +2562,101 @@ function SettingsThemeOption({
   )
 }
 
+const THEME_PACKAGE_STAGE_LABELS: Readonly<Record<string, string>> = {
+  READING: '正在读取', VALIDATING: '正在验证', CHECKING_SIGNATURE: '正在检查签名',
+  CHECKING_ASSETS: '正在检查素材', READY_TO_INSTALL: '等待安装确认', INSTALLING: '正在安装', INSTALLED: '安装完成'
+}
+
+function useThemeRuntime(manager: ThemeRuntimeManager): ThemeRuntimeSnapshot {
+  return useSyncExternalStore(manager.subscribe, () => manager.snapshot, () => manager.snapshot)
+}
+
+function ExternalThemeCard({ active, record, onActivate, onInfo }: {
+  active: boolean
+  record: InstalledThemeRecord
+  onActivate: () => void
+  onInfo: () => void
+}): JSX.Element {
+  return (
+    <article className={`settings-external-theme${active ? ' is-active' : ''}`}>
+      <button className="settings-external-theme__main" type="button" onClick={onActivate}>
+        <span className="settings-external-theme__mark" aria-hidden="true"><Icon name="grid" size={20} /></span>
+        <span><strong>{record.name}</strong><small>{record.subtitle} · {record.version} · 已验证</small></span>
+        {active ? <span className="settings-theme-option__check"><Icon name="check" size={16} /></span> : null}
+      </button>
+      <button className="settings-external-theme__info" type="button" onClick={onInfo}>主题信息</button>
+    </article>
+  )
+}
+
+function ThemePackageDialog({ manager, onClose }: { manager: ThemeRuntimeManager; onClose: () => void }): JSX.Element {
+  const snapshot = useThemeRuntime(manager)
+  const inspection = snapshot.inspection
+  const stageLabel = snapshot.progressStage ? THEME_PACKAGE_STAGE_LABELS[snapshot.progressStage] ?? snapshot.progressStage : null
+  return (
+    <div className="theme-manager-modal" role="dialog" aria-modal="true" aria-label="导入主题包">
+      <div className="theme-manager-modal__card">
+        <header><span><strong>{inspection ? '安装主题' : '导入主题包'}</strong><small>{stageLabel ?? '使用 Android 系统文件选择器选择 .pftheme'}</small></span><button type="button" onClick={onClose} aria-label="关闭">×</button></header>
+        {snapshot.errorCode ? <p className="theme-manager-error" role="alert">{THEME_PACKAGE_ERRORS[snapshot.errorCode] ?? `主题处理失败（${snapshot.errorCode}）`}</p> : null}
+        {inspection ? (
+          <section className="theme-package-inspection">
+            <div className="theme-package-inspection__preview"><Icon name="grid" size={34} /></div>
+            <dl>
+              <div><dt>主题</dt><dd>{inspection.name}</dd></div><div><dt>副标题</dt><dd>{inspection.subtitle}</dd></div>
+              <div><dt>版本</dt><dd>{inspection.version}</dd></div><div><dt>签名</dt><dd>{inspection.signatureStatus === 'VERIFIED' ? '已验证' : inspection.signatureStatus}</dd></div>
+              <div><dt>兼容范围</dt><dd>{inspection.minAppVersion} – &lt; {inspection.maxAppVersionExclusive}</dd></div>
+            </dl>
+            <button className="primary-action" type="button" disabled={snapshot.progressStage === 'INSTALLING'} onClick={() => { void manager.installInspected() }}>{snapshot.installed.some((item) => item.themeId === inspection.themeId) ? '更新主题' : '安装'}</button>
+          </section>
+        ) : (
+          <button className="primary-action" type="button" onClick={() => { void manager.inspectPackage().catch(() => {}) }}>选择主题包</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ThemeInfoDialog({ active, manager, record, onClose }: { active: boolean; manager: ThemeRuntimeManager; record: InstalledThemeRecord; onClose: () => void }): JSX.Element {
+  const [status, setStatus] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  return (
+    <div className="theme-manager-modal" role="dialog" aria-modal="true" aria-label="主题信息">
+      <div className="theme-manager-modal__card theme-manager-modal__card--info">
+        <header><span><strong>主题信息</strong><small>{record.name}</small></span><button type="button" onClick={onClose} aria-label="关闭">×</button></header>
+        <dl className="theme-info-list">
+          <div><dt>名称</dt><dd>{record.name}</dd></div><div><dt>版本</dt><dd>{record.version}</dd></div>
+          <div><dt>themeId</dt><dd>{record.themeId}</dd></div><div><dt>Theme API</dt><dd>{record.themeApiVersion}</dd></div>
+          <div><dt>签名状态</dt><dd>已验证</dd></div><div><dt>签名 keyId</dt><dd>{record.trustKeyId ?? '未签名调试包'}</dd></div>
+          <div><dt>安装日期</dt><dd>{new Date(record.installedAt).toLocaleString()}</dd></div><div><dt>兼容范围</dt><dd>{record.minAppVersion} – &lt; {record.maxAppVersionExclusive}</dd></div>
+        </dl>
+        {status ? <p className="theme-manager-status" aria-live="polite">{status}</p> : null}
+        <footer>
+          <button type="button" onClick={() => { setStatus('正在验证主题…'); void manager.verify(record).then(() => setStatus('主题完整')).catch((error) => { setStatus(THEME_PACKAGE_ERRORS[String((error as Error).message)] ?? '主题验证失败'); if (active) void manager.recoverExternal('VERIFY_FAILED') }) }}>验证主题</button>
+          {confirmDelete
+            ? <><span>确认删除{active ? '（将先切换浅色）' : ''}？</span><button className="danger-action" type="button" onClick={() => { void manager.remove(record).then(onClose) }}>确认删除</button></>
+            : <button className="danger-action" type="button" onClick={() => setConfirmDelete(true)}>删除主题</button>}
+        </footer>
+      </div>
+    </div>
+  )
+}
+
 function SettingsScreen({
   theme,
-  onThemeChange
+  themeManager
 }: {
   theme: ThemeDefinition
-  onThemeChange: (theme: ThemeId) => void
+  themeManager: ThemeRuntimeManager
 }): JSX.Element {
   const { runtime } = useMidiUi()
   const { snapshot: updater } = useUpdaterUi()
   const { openAuxiliary } = useAppNavigation()
   const settingsVisual = theme.capabilities.settingsVisual
+  const themeRuntime = useThemeRuntime(themeManager)
+  const [showImporter, setShowImporter] = useState(false)
+  const [infoRecord, setInfoRecord] = useState<InstalledThemeRecord | null>(null)
   const composedSettings = settingsVisual.kind === 'hero-cards' ? settingsVisual : null
-  const visibleThemeOptions = SHOW_DEVELOPMENT_TOOLS
-    ? SETTINGS_THEME_OPTIONS
-    : SETTINGS_THEME_OPTIONS.filter((option) => option.id !== 'bocchi-dev')
+  const visibleThemeOptions = SETTINGS_THEME_OPTIONS
   const midiStatus = presentMidiStatus(runtime)
   const updaterLabel = updater.status === 'updateAvailable'
     ? '发现新版本'
@@ -2573,7 +2670,11 @@ function SettingsScreen({
     ? `versionCode ${updater.installed.versionCode}`
     : `versionCode ${__ANDROID_VERSION_CODE__}`
   return (
-    <ProductFrame active="settings" className={composedSettings?.frameClassName} title="设置">
+    <ProductFrame
+      active="settings"
+      className={[composedSettings?.frameClassName, Capacitor.isNativePlatform() ? 'has-external-theme-manager' : ''].filter(Boolean).join(' ')}
+      title="设置"
+    >
       <section className={`settings-dashboard${composedSettings ? ' has-settings-visual' : ''}`}>
         {composedSettings ? (
           <aside className="settings-hero" aria-label="孤独摇滚主题设置主视觉">
@@ -2612,11 +2713,21 @@ function SettingsScreen({
                     icon={option.icon}
                     key={option.id}
                     label={option.label}
-                    onSelect={() => onThemeChange(option.id)}
+                    onSelect={() => { void themeManager.selectThemeId(String(option.id)) }}
                     preview={option.id}
                   />
                 ))}
               </div>
+              {themeRuntime.installed.length ? <div className="settings-external-themes">{themeRuntime.installed.map((record) => (
+                <ExternalThemeCard
+                  active={theme.source === 'external' && String(theme.id) === record.themeId && theme.version === record.version}
+                  key={`${record.themeId}@${record.version}`}
+                  onActivate={() => { void themeManager.activateExternal(record).catch(() => {}) }}
+                  onInfo={() => setInfoRecord(record)}
+                  record={record}
+                />
+              ))}</div> : <p className="settings-theme-empty">尚未安装外部主题</p>}
+              {Capacitor.isNativePlatform() ? <button className="settings-import-theme" type="button" onClick={() => setShowImporter(true)}><Icon name="grid" size={18} />导入主题包</button> : null}
             </div>
             {composedSettings ? <img alt="" aria-hidden="true" className="settings-card__decoration" src={composedSettings.assets.theme} /> : null}
           </section>
@@ -2634,6 +2745,8 @@ function SettingsScreen({
           </section>
         </div>
       </section>
+      {showImporter ? <ThemePackageDialog manager={themeManager} onClose={() => { void themeManager.cancelInspection(); setShowImporter(false) }} /> : null}
+      {infoRecord ? <ThemeInfoDialog active={theme.source === 'external' && String(theme.id) === infoRecord.themeId && theme.version === infoRecord.version} manager={themeManager} onClose={() => setInfoRecord(null)} record={infoRecord} /> : null}
     </ProductFrame>
   )
 }
@@ -2997,7 +3110,23 @@ function ChordPersistenceErrorNotice({ persistence }: { persistence: ChordPersis
   )
 }
 
-function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element {
+class ThemeRecoveryBoundary extends Component<{ children: ReactNode; manager: ThemeRuntimeManager; theme: ThemeDefinition }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null }
+  static getDerivedStateFromError(error: Error): { error: Error } { return { error } }
+  componentDidCatch(error: Error, _info: ErrorInfo): void {
+    const isThemeFailure = this.props.theme.source === 'external' && /(THEME|ASSET|RECIPE|CAPABILITY|TOKEN|PARAMETER)/i.test(error.message)
+    if (isThemeFailure) void this.props.manager.recoverExternal('THEME_RUNTIME_EXCEPTION', error.message)
+  }
+  render(): ReactNode {
+    if (!this.state.error) return this.props.children
+    const isThemeFailure = this.props.theme.source === 'external' && /(THEME|ASSET|RECIPE|CAPABILITY|TOKEN|PARAMETER)/i.test(this.state.error.message)
+    if (!isThemeFailure) throw this.state.error
+    return <main className="persistence-loading" role="alert"><span className="eyebrow">主题恢复</span><h1>主题加载失败，正在恢复浅色主题…</h1></main>
+  }
+}
+
+function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; themeManager: ThemeRuntimeManager }): JSX.Element {
+  const themeRuntime = useThemeRuntime(themeManager)
   const snapshot = useSightReadingRuntime(runtime)
   const activeSessionHost = useMemo(() => new ActivePracticeSessionHost(), [])
   const chordRuntime = useMemo(() => new ChordPracticeRuntime({
@@ -3020,8 +3149,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   const [screen, setScreen] = useState<ScreenId>(() => readScreen())
   const [appForeground, setAppForeground] = useState(true)
   const screenRef = useRef<ScreenId>(screen)
-  const [themeId, setThemeId] = useState<ThemeId>(() => resolveInitialThemeId(window.location.search, SHOW_DEVELOPMENT_TOOLS))
-  const activeTheme = resolveTheme(themeId)
+  const activeTheme = themeRuntime.activeTheme ?? resolveTheme('light')
   const [chordCaseId, setChordCaseId] = useState(DEFAULT_CHORD_MOCK_CASE_ID)
   const [chordMockStateId, setChordMockStateId] = useState<ChordPreviewStateId>('live')
   const [chordQuestionCount, setChordQuestionCount] = useState<ChordQuestionCount>(20)
@@ -3287,6 +3415,16 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
   }, [activeTheme])
 
   useEffect(() => {
+    if (activeTheme.source !== 'external') return
+    const handleAssetError = (event: Event): void => {
+      const target = event.target
+      if (target instanceof HTMLImageElement && target.src.includes('_capacitor_file_')) void themeManager.recoverExternal('ASSET_RUNTIME_LOAD_FAILED', target.src)
+    }
+    document.addEventListener('error', handleAssetError, true)
+    return () => document.removeEventListener('error', handleAssetError, true)
+  }, [activeTheme, themeManager])
+
+  useEffect(() => {
     const dynamicScreens: ScreenId[] = [
       'sight-active', 'sight-correct', 'sight-wrong',
       'sight-timeout', 'sight-early-end', 'sight-result'
@@ -3309,7 +3447,7 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       case 'tools': return <ToolsHubScreen theme={activeTheme} />
       case 'chord-query-tool': return <ChordQueryToolScreen theme={activeTheme} />
       case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen theme={activeTheme} />
-      case 'interval-query-tool': return <IntervalQueryToolScreen />
+      case 'interval-query-tool': return <IntervalQueryToolScreen theme={activeTheme} />
       case 'chord-mode-select': return <ChordModeSelectScreen settingsReady={chordSettingsReady} onSelectMode={(mode) => { activeSessionHost.begin('chord', 'chord-practice'); setChordPracticeMode(mode); navigate('chord-practice') }} />
       case 'sight-ready': return <SightReadyScreen onSettingsChange={(changes) => { void runtime.updateSettings(changes) }} onStart={startPractice} settings={settings} />
       case 'sight-active':
@@ -3356,8 +3494,8 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
       )
       case 'settings': return (
         <SettingsScreen
-          onThemeChange={setThemeId}
           theme={activeTheme}
+          themeManager={themeManager}
         />
       )
       case 'midi': return <MidiScreen />
@@ -3369,7 +3507,9 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
     <UpdaterUiContext.Provider value={{ controller: updater, snapshot: updaterSnapshot }}>
       <MidiUiContext.Provider value={{ runtime }}>
         <AppNavigationContext.Provider value={{ openAuxiliary, returnFromAuxiliary }}>
-          <div className="tablet-app">{content}</div>
+          <ThemeRecoveryBoundary key={`${activeTheme.id}@${activeTheme.version}`} manager={themeManager} theme={activeTheme}>
+            <div className="tablet-app" data-runtime-theme-source={activeTheme.source} data-runtime-theme-version={activeTheme.version}>{content}</div>
+          </ThemeRecoveryBoundary>
           <PersistenceErrorNotice runtime={runtime} />
           <ChordPersistenceErrorNotice persistence={chordPersistenceSnapshot} />
           {SHOW_DEVELOPMENT_TOOLS ? (
@@ -3392,10 +3532,16 @@ function App({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element 
 
 function AndroidAppBootstrap(): JSX.Element {
   const [runtime, setRuntime] = useState<AndroidSightReadingRuntime | null>(null)
+  const [themeManager] = useState(() => {
+    const initialId = resolveInitialThemeId(window.location.search, SHOW_DEVELOPMENT_TOOLS)
+    return new ThemeRuntimeManager(resolveTheme(Capacitor.isNativePlatform() ? 'light' : initialId), (id) => resolveTheme(id as ThemeId))
+  })
+  const themeRuntime = useThemeRuntime(themeManager)
   const [initializationError, setInitializationError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
+    void themeManager.initialize()
     void createBrowserAndroidSightReadingRuntime({
       nativeBluetooth: Capacitor.isNativePlatform()
     }).then((createdRuntime) => {
@@ -3404,8 +3550,8 @@ function AndroidAppBootstrap(): JSX.Element {
     }).catch((error) => {
       if (active) setInitializationError(String(error))
     })
-    return () => { active = false }
-  }, [])
+    return () => { active = false; void themeManager.dispose() }
+  }, [themeManager])
 
   if (initializationError) {
     return (
@@ -3417,10 +3563,10 @@ function AndroidAppBootstrap(): JSX.Element {
       </main>
     )
   }
-  if (!runtime) {
+  if (!runtime || !themeRuntime.ready) {
     return <main className="persistence-loading" aria-live="polite"><span className="eyebrow">本地数据</span><h1>正在载入练习设置…</h1></main>
   }
-  return <App runtime={runtime} />
+  return <App runtime={runtime} themeManager={themeManager} />
 }
 
 createRoot(document.getElementById('root')!).render(

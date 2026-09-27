@@ -7,6 +7,7 @@ const main = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/ma
 const registry = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/themeRegistry.ts'), 'utf8')
 const css = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/styles.css'), 'utf8')
 const version = fs.readFileSync(path.join(root, 'android/version.properties'), 'utf8')
+const externalTheme = fs.readFileSync(path.join(root, 'theme-packages/bocchi/theme.json'), 'utf8')
 
 const settings = main.slice(main.indexOf('const SETTINGS_THEME_OPTIONS'), main.indexOf('function MidiScreen'))
 
@@ -34,11 +35,12 @@ const tests = [
     assert.match(settings, /正式更新通道已关闭/)
     assert.match(settings, /openAuxiliary\('update'\)/)
   }],
-  ['SET05', 'Theme selector binds real registry ids and limits development theme to development tools', () => {
-    for (const id of ["id: 'light'", "id: 'dark'", "id: 'bocchi-dev'"]) assert.match(settings, new RegExp(id))
-    assert.match(settings, /SHOW_DEVELOPMENT_TOOLS[\s\S]*SETTINGS_THEME_OPTIONS[\s\S]*option\.id !== 'bocchi-dev'/)
+  ['SET05', 'Theme selector binds built-in ids and renders installed external themes separately', () => {
+    for (const id of ["id: 'light'", "id: 'dark'"]) assert.match(settings, new RegExp(id))
+    assert.doesNotMatch(settings.slice(0, settings.indexOf('function SettingsThemeOption')), /bocchi-dev/)
     assert.match(settings, /active=\{theme\.id === option\.id\}/)
-    assert.match(settings, /onSelect=\{\(\) => onThemeChange\(option\.id\)\}/)
+    assert.match(settings, /onSelect=\{\(\) => \{ void themeManager\.selectThemeId\(String\(option\.id\)\) \}\}/)
+    assert.match(settings, /themeRuntime\.installed\.map/)
   }],
   ['SET06', 'Settings consumes a theme capability rather than importing themed assets', () => {
     assert.match(settings, /theme\.capabilities\.settingsVisual/)
@@ -46,11 +48,11 @@ const tests = [
     assert.doesNotMatch(settings, /assets\/themes\/bocchi/)
     assert.doesNotMatch(settings, /theme\.id === 'bocchi-dev'/)
   }],
-  ['SET07', 'Bocchi Settings registers one Hero and three decoration assets', () => {
-    for (const asset of ['12_01_39.png', '12_38_35.png', '12_46_01.png', '12_47_56.png']) {
-      assert.match(registry, new RegExp(asset.replace('.', '\\.')))
+  ['SET07', 'External Bocchi package owns one Settings Hero and three decorations', () => {
+    for (const asset of ['assets/settings/hero.png', 'assets/settings/midi.png', 'assets/settings/theme.png', 'assets/settings/about.png']) {
+      assert.match(externalTheme, new RegExp(asset.replaceAll('/', '\\/').replace('.', '\\.')))
     }
-    assert.doesNotMatch(registry, /11_44_01\.png/)
+    assert.doesNotMatch(registry, /assets\/settings|createBocchiExternalDefinition|bocchiTokens/)
   }],
   ['SET08', 'Hero remains one single source without foreground reconstruction', () => {
     assert.equal((settings.match(/assets\.hero/g) ?? []).length, 1)
@@ -62,8 +64,9 @@ const tests = [
     assert.match(settings, /显示主题/)
     assert.match(settings, /connected-label/)
   }],
-  ['SET10', 'Bocchi Settings CSS is scoped to the active theme', () => {
-    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-settings-preview/)
+  ['SET10', 'Bocchi Settings CSS is scoped to the active visual recipe', () => {
+    assert.match(css, /:root\[data-theme-recipe-settings='settings-hero-cards-v1'\] \.bocchi-settings-preview/)
+    assert.doesNotMatch(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-settings-preview/)
     const unscoped = css.split(/\r?\n/).filter((line) => line.trim().startsWith('.bocchi-settings'))
     assert.deepEqual(unscoped, [], `unscoped selectors:\n${unscoped.join('\n')}`)
   }],

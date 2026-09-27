@@ -19,6 +19,7 @@ const hostSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/
 const rendererSource = fs.readFileSync(path.join(root, 'src/renderer/src/components/MusicStaffRenderer.tsx'), 'utf8')
 const controllerSource = fs.readFileSync(path.join(root, 'src/sightReading/controller.ts'), 'utf8')
 const registrySource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/themeRegistry.ts'), 'utf8')
+const externalBocchiTheme = JSON.parse(fs.readFileSync(path.join(root, 'theme-packages/bocchi/theme.json'), 'utf8'))
 const cssSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/styles.css'), 'utf8')
 const { ActivePracticeSessionHost } = require('../prototype/android-tablet-v1/src/activePracticeSession.ts')
 const { ChordPracticeRuntime } = require('../prototype/android-tablet-v1/src/chordPractice/runtime/index.ts')
@@ -396,8 +397,7 @@ test('APS23', 'Sight feedback presentation maps neutral correct wrong and timeou
 
 test('APS24', 'standard feedback palette is shared while notation geometry and controller durations stay frozen', () => {
   const lightPalette = registrySource.slice(registrySource.indexOf('const lightTokens'), registrySource.indexOf('const darkTokens'))
-  const darkPalette = registrySource.slice(registrySource.indexOf('const darkTokens'), registrySource.indexOf('const bocchiTokens'))
-  const bocchiPalette = registrySource.slice(registrySource.indexOf('const bocchiTokens'), registrySource.indexOf('const standardHomeVisual'))
+  const darkPalette = registrySource.slice(registrySource.indexOf('const darkTokens'), registrySource.indexOf('const standardHomeVisual'))
   for (const [token, value] of [
     ['--practice-feedback-success', '#2c7b58'],
     ['--practice-feedback-danger', '#b34545'],
@@ -405,7 +405,7 @@ test('APS24', 'standard feedback palette is shared while notation geometry and c
   ]) {
     assert.match(lightPalette, new RegExp(`'${token}': '${value}'`))
     assert.match(darkPalette, new RegExp(`'${token}': '${value}'`))
-    assert.match(bocchiPalette, new RegExp(`'${token}': '#[0-9a-fA-F]{6}'`))
+    assert.match(externalBocchiTheme.tokens.colors[token], /^#[0-9a-fA-F]{6}$/)
     assert.match(rendererSource, new RegExp(token))
   }
   assert.match(rendererSource, /new Accidental\(note\.displayAccidental\)\.setStyle\(accidentalStyle\)/)

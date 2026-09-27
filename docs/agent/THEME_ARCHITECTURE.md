@@ -1,71 +1,82 @@
 # Android Theme Architecture
 
-## 1. Product layer and theme layer
+## 1. 当前运行时模型
 
-The product layer owns what the application does: page information architecture, routes, real practice and history data, MIDI status, empty states, controls, and interaction behavior. Home, Practice, Tools, History, and Settings remain product components.
+应用只内置 `light` 与 `dark`。其他完整主题通过 Android 外部主题包安装，并在校验后适配为 `RuntimeThemeDefinition`。`natural516.bocchi` 已迁移为外部主题；`bocchi-dev` 只保留为旧 DEV/QA preference 与 URL 的迁移别名，未安装外部主题时安全回退 Light。
 
-The theme layer owns how those product surfaces look: semantic colors, typography treatment, backgrounds, Hero artwork, paper and sticker treatments, shadows, textures, and decorative composition. A theme cannot add, remove, or reinterpret product facts or actions.
+Product UI 只消费运行时定义，不按具体主题 ID 分支。主题切换不得改变页面信息架构、路由、MIDI、练习判定、计时、持久化、History、Updater 或包身份。
 
-## 2. Peer themes
+## 2. Product layer 与 Theme layer
 
-`light`, `dark`, and the development-only `bocchi-dev` theme are peer `ThemeDefinition` entries. Bocchi is not a Light subclass and does not depend on Light selectors or Light assets. Shared product styles form the base; each theme supplies a complete semantic token set and optional visual capabilities.
+Product Layer 拥有：
 
-## 3. Registry and resolver
+- 页面结构、真实数据、状态、控件与交互；
+- Sight / Chord 练习、谱面与反馈语义；
+- 工具查询与乐理计算；
+- History 聚合、筛选与详情；
+- Settings 中的设备、主题管理、版本与更新语义。
 
-`prototype/android-tablet-v1/src/theme/themeRegistry.ts` is the current runtime registry. A definition contains:
+Theme Layer 只能拥有：
 
-- stable `id` and display name;
-- source (`built-in`, `development`, or future `external`);
-- preferred color scheme;
-- a complete semantic token map;
-- optional page-visual capabilities.
+- 语义 token、色彩、表面、边框与阴影；
+- Hero、纸张、胶带、贴纸等非交互图片；
+- App 允许的 Visual Recipe、素材 slot 与受限参数。
 
-Product components receive the resolved active definition. They ask for capabilities such as `homeVisual`, `practiceVisual`, `toolsVisual`, `historyVisual`, `settingsVisual`, `practiceActiveVisual`, or `toolDetailVisual`; they do not branch on `light`, `dark`, or `bocchi-dev` names.
+架构契约关键词保持如下：
 
-## 4. Semantic tokens
+- **Product layer** 拥有产品结构、数据和行为。
+- **Peer themes** 共享同一套 Product UI，主题之间不存在功能层级差异。
+- **Single visual source** 要求同一构图不通过重复人物图或补偿切片重建。
+- **Future external-theme compatibility** 由受限 schema、Visual Recipe 与素材 slot 提供。
+- **Themes cannot alter business logic**，主题不能改变业务逻辑、判定、计时或持久化语义。
 
-The registry supplies the shared shell tokens, including application and surface colors, primary/secondary/muted text, accent colors, borders/dividers, shadows, navigation states, and primary-button colors. Existing legacy variable names remain as CSS aliases during the intentionally small migration.
+## 3. Registry、Adapter 与 Asset Resolver
 
-Tokens cover shared UI foundations. They do not attempt to express every strong-theme illustration or composition as a color variable.
+`themeRegistry.ts` 的 built-in registry 只有 Light / Dark。外部 `manifest.json` 与 `theme.json` 先经过 schema、recipe、slot、参数、checksum、签名和素材校验，再由 `runtimeThemeAdapter.ts` 适配。`themeAssetResolver.ts` 将已安装包的相对素材路径解析到 Android 私有目录对应的 Capacitor file URL。
 
-Practice feedback shares the semantic token names `--practice-feedback-success`, `--practice-feedback-danger`, and `--practice-feedback-warning`. Light and Dark intentionally use the same standard values; every `ThemeDefinition`, including `bocchi-dev` and future themes, owns its token values independently and may provide a theme-specific palette without changing Product-layer feedback semantics.
+Settings 将内置主题与已安装外部主题分开渲染。外部主题的导入、验证、安装、更新、激活和删除由主题管理器处理，不会写回 built-in registry。
 
-## 5. Strong-theme assets
+## 4. App-owned Visual Recipe
 
-A strong theme may register optional page-specific assets and a compatible rendering capability. The current `single-image-hero` Home capability supplies one composed Hero, a decorative headline, and card illustrations. The Home product still owns all real copy, data, routes, button semantics, and MIDI/history state.
+当前 App 内置七类视觉配方：
 
-The shared History dashboard is a Product-layer surface: summary facts, local-day aggregation, ranges, filters, trend geometry, record rows, and empty/error states remain available under every theme. `historyVisual` may provide only Hero and collage artwork plus a scoped frame class; it cannot provide values or redefine metrics.
+1. `home-scrapbook-single-hero-v1`
+2. `practice-hero-cards-v1`
+3. `tools-studio-cards-v1`
+4. `history-journal-dashboard-v1`
+5. `settings-hero-cards-v1`
+6. `practice-decorated-focus-v1`
+7. `tool-reference-notebook-v1`
 
-Settings follows the same boundary. MIDI state and navigation, the theme-selection state, installed package metadata, QA update isolation, the production Update route, and open-source information remain Product-layer facts. `settingsVisual` may provide one Hero and decorative artwork for the Device, Theme, and About cards, but it cannot provide status, version, or action semantics.
+外部包只能引用已知 recipeId，并提供允许的素材 slot 与 token；不能提供 React、HTML、CSS、脚本、selector 或任意布局代码。CSS 通过 `data-theme-recipe-*` 激活配方。历史 `.bocchi-*` class 仅是已批准配方的内部实现名，不代表 themeId 分支。
 
-ACTIVE practice follows the same one-screen rule. `practiceActiveVisual` may select a standard focus surface or a decorated focus skin and supply inert corner artwork. Question generation, notation geometry, VexFlow, MIDI, timing, judgement, counters, persistence, and navigation remain Product-layer responsibilities shared by every theme.
+## 5. 语义 token 与反馈
 
-Tool Detail pages use the slot-based `ToolDetailShell` inside the existing `ProductFrame`. The shell can host heading, query, primary result, optional notation, and optional details without assuming any tool's selectors or result shape. `toolDetailVisual` may select standard surfaces or a decorated reference-notebook skin and provide inert shared artwork; query state, music-theory calculations, spelling, native-control semantics, MIDI, routes, and Bottom Navigation remain Product-layer responsibilities.
+运行时定义提供应用表面、文本、强调色、边框、导航、按钮与练习反馈 token。`--practice-feedback-success`、`--practice-feedback-danger`、`--practice-feedback-warning` 是共享语义名，但具体值由每个主题独立提供。
 
-Theme-specific selectors must be scoped to the active theme. Bocchi Home rules therefore require `data-theme="bocchi-dev"`; Light and Dark do not render or inherit Bocchi Home artwork.
+Theme Layer 只能改变反馈外观，不能改变 Correct / Wrong / Timeout / Transition 的业务语义、持续时间或判定行为。
 
-## 6. Single visual source
+## 6. 页面能力边界
 
-When an approved image already contains the correct characters, paper, instruments, background, decoration, and occlusion, that image is the only visual source for that region. Dynamic HTML may overlay transparent real content, but the implementation must not recreate the paper, extract characters, duplicate the Hero, or add compensating masks and clipped foreground copies.
+- `homeVisual`：单一 Hero、标题与三张卡片装饰；真实数据与跳转仍属 Product。
+- `practiceVisual` / `toolsVisual`：顶层页 Hero 与卡片装饰。
+- `historyVisual`：Hero 与拼贴；统计、趋势、筛选和记录均属 Product。
+- `settingsVisual`：Hero 与卡片装饰；设备状态、主题包管理和版本均属 Product。
+- `practiceActiveVisual`：Focus shell 与角落装饰；谱面几何、VexFlow、MIDI、计时和判定不受主题影响。
+- `toolDetailVisual`：Reference Notebook skin 与装饰；查询、拼写、结果语义和 native controls 均属 Product。
 
-The approved Bocchi Home continues to use exactly one `home-hero.png` layer.
+## 7. 外部素材所有权
 
-## 7. Future external-theme compatibility
+`theme-packages/bocchi` 是 `natural516.bocchi` 的唯一素材源。Vite 源码与 APK public assets 不再包含 Bocchi runtime PNG。安装后素材从 App 私有主题目录加载；主题目录缺失、安装完成标记缺失或必要素材损坏时，运行时 fail closed 并回退 Light。
 
-Future external packages should be validated and converted into the same runtime `ThemeDefinition` representation before activation. Product pages should continue to consume semantic tokens and declared capabilities, so registering a compatible theme does not require changes to the business structure of Home, Practice, Tools, History, or Settings.
+## 8. Light / Dark 隔离
 
-The `external` source value is reserved only as an architectural boundary in this phase.
+Light / Dark 使用相同 Product DOM 与共享结构，但不会创建或加载外部主题 artwork。未安装任何外部主题时应用必须完整启动到 Light，所有核心产品功能保持可用。
 
-## 8. Explicit non-goals for this phase
+## 9. 视觉单源原则
 
-This phase does not implement `.pttheme`, file picking, ZIP handling, a manifest parser, package validation, encryption, external-theme persistence, import/deletion UI, or a hidden theme entry. It also does not design an Original theme.
+当批准图片已经包含正确人物、纸张、乐器、背景和遮挡关系时，该图片是对应区域的唯一视觉源。真实 HTML 可以覆盖其上，但不得再通过第二人物图、矩形切片或补偿 mask 重建同一构图。
 
-`bocchi-dev` is activated only in development/QA. Development and QA Settings may expose it as a registry-backed preview choice; ordinary production Settings remains limited to the built-in Light and Dark choices.
+## 10. 安全与发布边界
 
-## 9. Product features must exist across themes
-
-Future product features such as a practice trend chart, Tools search, statistics, filters, or new real states belong to the product layer. If a feature is added, it must exist under Light, Dark, Original, Bocchi, and compatible external themes. Themes may change its presentation but cannot make the feature theme-exclusive.
-
-## 10. Themes cannot alter business logic
-
-Theme selection must not change MIDI parsing or deduplication, Sight or Chord judgement, practice timing, persistence/history schemas, updater trust, signing, package identity, routing behavior, or real data. Theme changes are presentation changes only.
+Debug 可按 compile gate 接受开发 unsigned 包；QA 只信任 developer key 且拒绝 unsigned；Release 只信任 production key 且拒绝 developer key 与 unsigned。签名私密材料始终位于仓库外，仓库和 APK 只包含相应构建渠道允许的公开信任材料。

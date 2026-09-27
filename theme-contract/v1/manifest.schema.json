@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pianofundamentals.local/theme/manifest-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "packageFormatVersion", "themeApiVersion", "themeId", "name", "subtitle", "version", "minAppVersion", "maxAppVersionExclusive", "themeType", "entry", "checksums", "signature", "preview"],
+  "properties": {
+    "format": { "const": "piano-fundamentals-theme" },
+    "packageFormatVersion": { "const": 1 },
+    "themeApiVersion": { "const": 1 },
+    "themeId": { "type": "string", "minLength": 3, "maxLength": 64, "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$" },
+    "name": { "$ref": "#/$defs/plainText" },
+    "subtitle": { "$ref": "#/$defs/plainText" },
+    "version": { "$ref": "#/$defs/semver" },
+    "minAppVersion": { "$ref": "#/$defs/semver" },
+    "maxAppVersionExclusive": { "$ref": "#/$defs/semver" },
+    "themeType": { "const": "full" },
+    "entry": { "const": "theme.json" },
+    "checksums": { "const": "checksums.json" },
+    "signature": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["algorithm", "keyId", "file"],
+          "properties": {
+            "algorithm": { "const": "Ed25519" },
+            "keyId": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9-]+$" },
+            "file": { "const": "signature.ed25519" }
+          }
+        }
+      ]
+    },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cover", "gallery"],
+      "properties": {
+        "cover": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/assetPath" }] },
+        "gallery": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/assetPath" } }
+      }
+    }
+  },
+  "$defs": {
+    "semver": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$" },
+    "plainText": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[^<>]*$" },
+    "assetPath": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._~ /-]+$" }
+  }
+}

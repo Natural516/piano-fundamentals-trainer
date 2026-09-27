@@ -172,15 +172,15 @@ test('IQ19', 'natural signs remain selector-only and are omitted from result pit
 test('IQ20', 'Tools navigation opens and returns from the Interval Query route', () => {
   assert.match(mainSource, /\| 'interval-query-tool'/)
   assert.match(toolsSource, /title: '音程查询'[\s\S]*?screen: 'interval-query-tool'/)
-  assert.match(mainSource, /case 'interval-query-tool': return <IntervalQueryToolScreen \/>/)
+  assert.match(mainSource, /case 'interval-query-tool': return <IntervalQueryToolScreen theme=\{activeTheme\} \/>/)
   assert.match(mainSource, /'interval-query-tool': 'tools'/)
-  assert.match(screenSource, /<ProductFrame active="tools" onBack=\{\(\) => navigate\('tools'\)\}/)
+  assert.match(screenSource, /<ProductFrame active="tools" className=\{decoratedReference\?\.frameClassName\} onBack=\{\(\) => navigate\('tools'\)\}/)
 })
 
 test('IQ21', 'visible UI has two grouped pitch selectors and approved default C4 to G4', () => {
   assert.equal((screenSource.match(/<IntervalPitchSelector/g) ?? []).length, 2)
-  assert.match(screenSource, /label="START"/)
-  assert.match(screenSource, /label="TARGET"/)
+  assert.match(screenSource, /label="起始音"/)
+  assert.match(screenSource, /label="目标音"/)
   assert.match(screenSource, /useState<IntervalQueryLetter>\('C'\)/)
   assert.match(screenSource, /useState<IntervalQueryLetter>\('G'\)/)
   assert.equal((screenSource.match(/useState<IntervalQueryOctave>\(4\)/g) ?? []).length, 2)
@@ -211,11 +211,33 @@ test('IQ25', 'query UI contains no keyboard staff playback or practice affordanc
   assert.doesNotMatch(screenSource, /VirtualPianoKeyboard|MusicStaffRenderer|播放|试听|开始练习|保存|收藏|最近查询|推荐|自动分析/)
 })
 
-test('IQ26', 'one full-width answer card and one compact reference card avoid desktop empty-canvas layout', () => {
+test('IQ26', 'shared shell uses a full-width grouped query and 64 to 36 result hierarchy', () => {
+  assert.match(screenSource, /<ToolDetailShell/)
+  assert.match(screenSource, /className="interval-query-layout"/)
+  assert.match(screenSource, /headingClassName="interval-query-header"/)
+  assert.match(screenSource, /className="interval-query-selectors"/)
+  assert.match(screenSource, /className="interval-query-selector-arrow"/)
   assert.match(screenSource, /interval-query-card interval-query-answer/)
   assert.match(screenSource, /interval-query-card interval-query-references/)
-  assert.match(stylesSource, /\.interval-query-layout[\s\S]*?grid-template-rows:/)
-  assert.doesNotMatch(stylesSource, /\.interval-query-layout[\s\S]{0,300}grid-template-columns:/)
+  assert.match(stylesSource, /\.tool-detail-top\.interval-query-header[\s\S]*?grid-template-rows: 210px 108px;/)
+  assert.match(stylesSource, /\.interval-query-selectors[\s\S]*?grid-template-columns: minmax\(0, 46fr\) 62px minmax\(0, 46fr\);/)
+  assert.match(stylesSource, /\.interval-query-selector-group[\s\S]*?grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\) minmax\(0, \.8fr\);/)
+  assert.match(stylesSource, /\.interval-query-results[\s\S]*?grid-template-columns: minmax\(0, 64fr\) minmax\(320px, 36fr\);/)
+})
+
+test('IQ27', 'Interval theme presentation is capability-owned with no concrete theme branch', () => {
+  assert.match(screenSource, /theme\.capabilities\.toolDetailVisual/)
+  assert.match(screenSource, /toolDetailVisual\.kind === 'decorated-reference'/)
+  assert.match(screenSource, /heroArtwork=\{decoratedReference\?\.artwork\.sharedCompleteRyo\}/)
+  assert.match(screenSource, /heroKind="complete-ryo"/)
+  assert.doesNotMatch(screenSource, /bocchi-dev|assets\/themes\/bocchi|scale-key-signature\//)
+})
+
+test('IQ28', 'Interval Query keeps the exact six native select structure', () => {
+  const selectorSource = mainSource.slice(mainSource.indexOf('function IntervalPitchSelector'), mainSource.indexOf('function IntervalQueryToolScreen'))
+  assert.equal((selectorSource.match(/<select /g) ?? []).length, 3)
+  assert.equal((screenSource.match(/<IntervalPitchSelector/g) ?? []).length, 2)
+  assert.doesNotMatch(screenSource, /<button|<input|MusicStaffRenderer|VirtualPianoKeyboard/)
 })
 
 let failed = 0

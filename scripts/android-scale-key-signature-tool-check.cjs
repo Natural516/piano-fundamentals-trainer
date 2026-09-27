@@ -170,10 +170,10 @@ test('SK46 Scale uses the shared Tool Detail shell without changing query semant
   assert.match(screenSource, /className="scale-tool-selectors"/)
   assert.equal((screenSource.match(/<select className="setting-select"/g) ?? []).length >= 2, true)
 })
-test('SK47 Scale theme artwork is capability-owned and page-specific', () => {
+test('SK47 Scale theme artwork is capability-owned and shared with Interval by asset only', () => {
   assert.match(screenSource, /theme\.capabilities\.toolDetailVisual/)
-  assert.match(screenSource, /heroArtwork=\{decoratedReference\?\.artwork\.scaleHero\}/)
-  assert.match(screenSource, /heroKind="scale-key-signature"/)
+  assert.match(screenSource, /heroArtwork=\{decoratedReference\?\.artwork\.sharedCompleteRyo\}/)
+  assert.match(screenSource, /heroKind="complete-ryo"/)
   assert.doesNotMatch(screenSource, /bocchi-dev|chordQueryHero|assets\/themes\/bocchi/)
 })
 test('SK48 Scale result remains a real two-column Product structure', () => {

@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AndroidBluetoothMidiPlugin.class);
         registerPlugin(AndroidUpdaterPlugin.class);
         registerPlugin(PracticeKeepAwakePlugin.class);
+        registerPlugin(ThemePackagePlugin.class);
         super.onCreate(savedInstanceState);
         applyImmersiveWindowPolicy();
     }

@@ -47,13 +47,16 @@ const tests = [
     assert.doesNotMatch(tools, /title: '音阶查询'|title: '调号参考'/)
     assert.doesNotMatch(tools, /开发中/)
     assert.match(tools, /navigate\(tool\.screen\)/)
-    assert.match(ui, /case 'chord-query-tool': return <ChordQueryToolScreen \/>/)
+    assert.match(ui, /case 'chord-query-tool': return <ChordQueryToolScreen theme=\{activeTheme\} \/>/)
     assert.match(ui, /'chord-query-tool': 'tools'/)
-    assert.match(ui, /case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen \/>/)
+    assert.match(ui, /case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen theme=\{activeTheme\} \/>/)
     assert.match(ui, /'scale-key-signature-tool': 'tools'/)
-    assert.match(ui, /case 'interval-query-tool': return <IntervalQueryToolScreen \/>/)
+    assert.match(ui, /case 'interval-query-tool': return <IntervalQueryToolScreen theme=\{activeTheme\} \/>/)
     assert.match(ui, /'interval-query-tool': 'tools'/)
-    assert.match(tools, /<ProductFrame active="tools" onBack=\{\(\) => navigate\('tools'\)\}/)
+    assert.equal(
+      (tools.match(/<ProductFrame active="tools" className=\{decoratedReference\?\.frameClassName\} onBack=\{\(\) => navigate\('tools'\)\}/g) ?? []).length,
+      3
+    )
   }],
   ['NAV04', 'Home glance cards are Last Practice MIDI Input and Theory Tools', () => {
     for (const label of ['上次练习', 'MIDI 输入', '乐理工具']) assert.match(home, new RegExp(label))

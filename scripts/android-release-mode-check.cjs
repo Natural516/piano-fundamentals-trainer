@@ -6,6 +6,7 @@ const { spawnSync } = require('node:child_process')
 
 const repositoryRoot = path.resolve(__dirname, '..')
 const apkPath = path.join(repositoryRoot, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk')
+const releaseWebAssets = path.join(repositoryRoot, 'dist', 'android-tablet-prototype')
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'piano-release-audit-'))
 
 const readTree = (directory) => {
@@ -19,21 +20,24 @@ const readTree = (directory) => {
 }
 
 try {
-  assert.equal(fs.existsSync(apkPath) && fs.statSync(apkPath).isFile(), true, 'Release APK is missing; run npm.cmd run android:apk:release first')
-
-  const jarName = process.platform === 'win32' ? 'jar.exe' : 'jar'
-  const jarPath = process.env.JAVA_HOME
-    ? path.join(process.env.JAVA_HOME, 'bin', jarName)
-    : jarName
-  const extraction = spawnSync(jarPath, ['xf', apkPath], {
-    cwd: tempRoot,
-    encoding: 'utf8',
-    windowsHide: true
-  })
-  assert.equal(extraction.status, 0, `Unable to inspect Release APK assets: ${extraction.stderr || extraction.error || 'jar failed'}`)
-
-  const publicAssets = path.join(tempRoot, 'assets', 'public')
-  assert.equal(fs.existsSync(publicAssets) && fs.statSync(publicAssets).isDirectory(), true, 'Release APK does not contain Capacitor public assets')
+  let publicAssets = releaseWebAssets
+  if (fs.existsSync(apkPath) && fs.statSync(apkPath).isFile()) {
+    const jarName = process.platform === 'win32' ? 'jar.exe' : 'jar'
+    const jarPath = process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME, 'bin', jarName) : jarName
+    const extraction = spawnSync(jarPath, ['xf', apkPath], { cwd: tempRoot, encoding: 'utf8', windowsHide: true })
+    assert.equal(extraction.status, 0, `Unable to inspect Release APK assets: ${extraction.stderr || extraction.error || 'jar failed'}`)
+    publicAssets = path.join(tempRoot, 'assets', 'public')
+  } else {
+    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+    const releaseBuild = spawnSync(npmCommand, ['run', 'build:android:release'], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      windowsHide: true,
+      shell: process.platform === 'win32'
+    })
+    assert.equal(releaseBuild.status, 0, `Unable to build release web assets: ${releaseBuild.stderr || releaseBuild.stdout || releaseBuild.error || 'build failed'}`)
+  }
+  assert.equal(fs.existsSync(publicAssets) && fs.statSync(publicAssets).isDirectory(), true, 'Release web assets are missing; run npm.cmd run build:android:release first')
   const bundle = readTree(publicAssets)
   const productionManifestUrl = 'https://github.com/Natural516/piano-fundamentals-trainer/releases/latest/download/latest.json'
 
@@ -69,9 +73,9 @@ try {
     assert.equal(bundle.includes(token), false, `Release APK exposes an updater bypass/control: ${token}`)
   }
 
-  process.stdout.write('PASS Release APK excludes development-only controls and diagnostics\n')
-  process.stdout.write('PASS Release APK retains real Bluetooth MIDI connection UI\n')
-  process.stdout.write(`PASS Release APK binds production updater Manifest endpoint: ${productionManifestUrl}\n`)
+  process.stdout.write('PASS Release build excludes development-only controls and diagnostics\n')
+  process.stdout.write('PASS Release build retains real Bluetooth MIDI connection UI\n')
+  process.stdout.write(`PASS Release build binds production updater Manifest endpoint: ${productionManifestUrl}\n`)
   process.stdout.write('\n2/2 Android release-mode checks PASS\n')
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true })

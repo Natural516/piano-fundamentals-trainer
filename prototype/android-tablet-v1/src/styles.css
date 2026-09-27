@@ -51,11 +51,45 @@
   font-family: Inter, "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif;
 }
 
+/* External theme management is Product UI shared by every visual theme. */
+.settings-external-themes { display: grid; grid-column: 1 / -1; width: 100%; min-width: 0; gap: 8px; margin-top: 10px; }
+.settings-external-theme { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: color-mix(in srgb, var(--surface-elevated) 94%, transparent); }
+.settings-external-theme.is-active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent); }
+.settings-external-theme__main { min-width: 0; display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text-primary); border: 0; background: transparent; text-align: left; }
+.settings-external-theme__main > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
+.settings-external-theme__main strong, .settings-external-theme__main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-external-theme__main small { color: var(--text-secondary); }
+.settings-external-theme__mark { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; color: var(--accent-ink); border-radius: 11px; background: var(--accent-soft); }
+.settings-external-theme__info { padding: 0 14px; color: var(--text-secondary); border: 0; border-left: 1px solid var(--divider); background: transparent; }
+.settings-theme-empty { grid-column: 1 / -1; margin: 10px 0 0; color: var(--text-muted); font-size: 13px; }
+.settings-import-theme { display: inline-flex; grid-column: 1 / -1; width: 100%; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; min-height: 38px; padding: 0 16px; color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 13px; background: var(--surface-elevated); font-weight: 700; }
+.theme-manager-modal { position: fixed; z-index: 3000; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(22, 25, 32, .42); backdrop-filter: blur(8px); }
+.theme-manager-modal__card { width: min(620px, calc(100vw - 48px)); max-height: calc(100vh - 48px); overflow: auto; padding: 22px; color: var(--text-primary); border: 1px solid var(--border); border-radius: 24px; background: var(--surface-elevated); box-shadow: var(--shadow); }
+.theme-manager-modal__card > header { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+.theme-manager-modal__card > header > span { display: grid; gap: 3px; }
+.theme-manager-modal__card > header strong { font-size: 22px; }
+.theme-manager-modal__card > header small { color: var(--text-secondary); }
+.theme-manager-modal__card > header button { width: 38px; height: 38px; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 50%; background: var(--surface-soft); font-size: 24px; }
+.theme-package-inspection { display: grid; grid-template-columns: 112px 1fr; gap: 18px; align-items: start; }
+.theme-package-inspection__preview { display: grid; place-items: center; aspect-ratio: 1; color: var(--accent-ink); border-radius: 20px; background: var(--accent-soft); }
+.theme-package-inspection dl, .theme-info-list { display: grid; gap: 8px; margin: 0; }
+.theme-package-inspection dl > div, .theme-info-list > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; padding-bottom: 7px; border-bottom: 1px solid var(--divider); }
+.theme-package-inspection dt, .theme-info-list dt { color: var(--text-muted); }
+.theme-package-inspection dd, .theme-info-list dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.theme-package-inspection .primary-action { grid-column: 1 / -1; }
+.theme-manager-error { padding: 12px 14px; color: var(--danger); border-radius: 12px; background: var(--danger-soft); }
+.theme-manager-status { color: var(--text-secondary); }
+.theme-manager-modal__card > footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.theme-manager-modal__card > footer button { min-height: 38px; padding: 0 15px; color: var(--text-primary); border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft); font-weight: 700; }
+.theme-manager-modal__card > footer .danger-action { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 42%, var(--border)); }
+@media (max-width: 900px) { .theme-package-inspection { grid-template-columns: 80px 1fr; } }
+
 :root[data-theme='dark'] {
   color-scheme: dark;
 }
 
-:root[data-theme='bocchi-dev'] {
+:root[data-theme-source='development'],
+:root[data-theme-source='external'] {
   color-scheme: light;
 }
 
@@ -543,7 +577,7 @@ button:focus-visible {
 
 /* V1.5.3 home-only visual preview. Keep these tokens and selectors scoped so
    the approved practice, tools, history and settings surfaces remain intact. */
-:root[data-theme='bocchi-dev'] .bocchi-home-preview {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview {
   position: relative;
   isolation: isolate;
   background:
@@ -552,15 +586,15 @@ button:focus-visible {
   color: var(--ink);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview::before,
-:root[data-theme='bocchi-dev'] .bocchi-home-preview::after {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview::before,
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview::after {
   position: absolute;
   z-index: -1;
   content: '';
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview::before {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview::before {
   top: 86px;
   right: -32px;
   width: 170px;
@@ -570,7 +604,7 @@ button:focus-visible {
   opacity: .64;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview::after {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview::after {
   right: 18px;
   bottom: 82px;
   width: 118px;
@@ -580,7 +614,7 @@ button:focus-visible {
   transform: rotate(-12deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .product-header {
   position: relative;
   z-index: 5;
   isolation: isolate;
@@ -593,15 +627,15 @@ button:focus-visible {
   backdrop-filter: blur(12px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header::before,
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header::after {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .product-header::before,
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .product-header::after {
   position: absolute;
   z-index: -1;
   content: '';
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header::before {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .product-header::before {
   top: -22px;
   bottom: -20px;
   left: 29%;
@@ -613,7 +647,7 @@ button:focus-visible {
   transform: rotate(-1deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header::after {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .product-header::after {
   top: 12px;
   left: 58%;
   width: 64px;
@@ -624,25 +658,25 @@ button:focus-visible {
   transform: rotate(-7deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header > * {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .product-header > * {
   position: relative;
   z-index: 1;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .brand-mark {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .brand-mark {
   background: linear-gradient(145deg, #f85291, #ed2470);
   box-shadow: 0 8px 18px rgba(235, 42, 110, .24);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-header__left small {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .product-header__left small {
   color: #ef397d;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .product-content {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .product-content {
   padding: 16px 24px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-hero {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-hero {
   position: relative;
   display: block;
   height: calc(100% - 126px);
@@ -654,18 +688,26 @@ button:focus-visible {
   box-shadow: 0 18px 42px rgba(67, 41, 52, .17);
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-hero__art {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-hero__art {
   position: absolute;
   z-index: 0;
   inset: -1.2% -1.1%;
   width: 102.2%;
   height: 102.4%;
   object-fit: cover;
-  object-position: 53% 47.5%;
+  object-position:
+    calc(var(--theme-recipe-homeVisual-hero-object-position-x, 53) * 1%)
+    calc(var(--theme-recipe-homeVisual-hero-object-position-y, 47.5) * 1%);
+  transform:
+    translate(
+      calc(var(--theme-recipe-homeVisual-hero-offset-x-percent, 0) * 1%),
+      calc(var(--theme-recipe-homeVisual-hero-offset-y-percent, 0) * 1%)
+    )
+    scale(var(--theme-recipe-homeVisual-hero-scale, 1));
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-hero__copy {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .home-hero__copy {
   position: absolute;
   z-index: 2;
   top: 10%;
@@ -677,17 +719,17 @@ button:focus-visible {
   padding: 18px 12px 20px 14px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-hero__copy .eyebrow {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .home-hero__copy .eyebrow {
   color: #ef3479;
   font-size: 13px;
   letter-spacing: .04em;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-hero__copy h1 {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .home-hero__copy h1 {
   margin: 10px -11px 7px -12px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-hero__headline img {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-hero__headline img {
   display: block;
   width: min(100%, 408px);
   height: auto;
@@ -695,7 +737,7 @@ button:focus-visible {
   transform: rotate(-.55deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-sr-only {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -706,35 +748,35 @@ button:focus-visible {
   border: 0;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-hero__copy p {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .home-hero__copy p {
   margin: 0 0 22px;
   color: #596b7b;
   font-size: 14px;
   font-weight: 580;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-practice-actions {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .home-practice-actions {
   gap: 10px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-practice-actions button {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .home-practice-actions button {
   min-height: 50px;
   border-radius: 15px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-practice-actions .primary-action {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .home-practice-actions .primary-action {
   border-color: #f33b81;
   background: linear-gradient(135deg, #fa4f91, #ed2874);
   color: white;
   box-shadow: 0 10px 22px rgba(239, 45, 118, .25);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .home-practice-actions .secondary-action {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .home-practice-actions .secondary-action {
   border-color: #d9cfc9;
   background: rgba(255, 255, 255, .88);
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-hero__memo {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-hero__memo {
   position: relative;
   margin-top: 21px;
   color: #3e424a;
@@ -744,7 +786,7 @@ button:focus-visible {
   transform: rotate(-2deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-hero__memo::after {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-hero__memo::after {
   position: absolute;
   right: -16px;
   bottom: -7px;
@@ -756,14 +798,14 @@ button:focus-visible {
   transform: rotate(-1deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance {
   position: relative;
   height: 126px;
   gap: 13px;
   padding-top: 13px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance::after {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance::after {
   position: absolute;
   z-index: 2;
   top: -3px;
@@ -776,7 +818,7 @@ button:focus-visible {
   transform: rotate(9deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-item {
   position: relative;
   overflow: hidden;
   grid-template-columns: 46px minmax(0, 1fr);
@@ -787,25 +829,25 @@ button:focus-visible {
   box-shadow: 0 8px 22px rgba(83, 57, 63, .07);
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item.is-history {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-item.is-history {
   background:
     radial-gradient(circle at 91% 52%, rgba(255, 188, 216, .42), transparent 31%),
     linear-gradient(120deg, #fff7fa, #fff1f6);
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item.is-midi {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-item.is-midi {
   background:
     radial-gradient(circle at 91% 52%, rgba(160, 215, 255, .42), transparent 32%),
     linear-gradient(120deg, #f7fcff, #eaf7ff);
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item.is-tools {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-item.is-tools {
   background:
     radial-gradient(circle at 91% 52%, rgba(255, 219, 113, .45), transparent 32%),
     linear-gradient(120deg, #fffdf7, #fff6d9);
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-icon {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-icon {
   width: 46px;
   height: 46px;
   border-radius: 15px;
@@ -813,26 +855,26 @@ button:focus-visible {
   color: #ee337a;
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-icon.is-blue {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-icon.is-blue {
   background: #dcefff;
   color: #207fc7;
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-icon.is-amber {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-icon.is-amber {
   background: #ffedb5;
   color: #a76e00;
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item strong {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-item strong {
   font-size: 16px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item small,
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item em {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-item small,
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-item em {
   font-size: 11px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-glance-art {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-glance-art {
   position: absolute;
   z-index: 0;
   top: 0;
@@ -842,7 +884,7 @@ button:focus-visible {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .themed-glance-art::before {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-glance-art::before {
   position: absolute;
   z-index: -1;
   inset: 20px 2px 12px 12px;
@@ -852,7 +894,7 @@ button:focus-visible {
   filter: blur(5px);
 }
 
-:root[data-theme='bocchi-dev'] .themed-glance-art > img {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-glance-art > img {
   position: absolute;
   z-index: 0;
   display: block;
@@ -860,61 +902,74 @@ button:focus-visible {
   filter: drop-shadow(0 5px 7px rgba(60, 45, 52, .14));
 }
 
-:root[data-theme='bocchi-dev'] .themed-glance-art.is-history > img {
-  right: -11px;
-  bottom: -18px;
-  width: 130px;
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-glance-art.is-history > img {
+  right: 2px;
+  bottom: -15px;
+  width: 118px;
   transform: rotate(-1.4deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-glance-art.is-midi > img {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-glance-art.is-midi > img {
   right: -12px;
   bottom: -9px;
   width: 176px;
   transform: rotate(-1deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-glance-art.is-tools > img {
-  right: -7px;
-  bottom: -13px;
-  width: 148px;
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-glance-art.is-tools > img {
+  right: -2px;
+  bottom: -10px;
+  width: 132px;
   transform: rotate(1.4deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-glance-art > i {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  z-index: 1;
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, .86);
-  color: #3d4650;
-  font-style: normal;
-  box-shadow: 0 3px 10px rgba(33, 37, 43, .1);
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-glance-art.is-history,
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-glance-art.is-tools {
+  right: 48px;
+  width: 120px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item > .glance-icon,
-:root[data-theme='bocchi-dev'] .themed-home-glance .glance-item > span:nth-child(2) {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-glance-chevron {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  z-index: 4;
+  display: grid;
+  width: 20px;
+  height: 32px;
+  place-items: center;
+  background: transparent;
+  color: rgba(20, 29, 39, .96);
+  font-style: normal;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, .98));
+  transform: translateY(-50%);
+}
+
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-item > .glance-icon,
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-glance .glance-item > span:nth-child(2) {
   position: relative;
   z-index: 1;
 }
 
-:root[data-theme='bocchi-dev'] .themed-glance-art > i.status-dot {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-glance-art > i.status-dot {
+  position: absolute;
+  z-index: 4;
+  display: grid;
   top: auto;
   right: 9px;
   bottom: 9px;
   width: 12px;
   height: 12px;
+  place-items: center;
   border: 3px solid rgba(255, 255, 255, .92);
+  border-radius: 50%;
   background: currentColor;
+  filter: none;
   box-shadow: 0 0 0 2px rgba(35, 112, 165, .13);
+  transform: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .bottom-navigation {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .bottom-navigation {
   align-self: center;
   width: min(920px, calc(100% - 88px));
   height: 62px;
@@ -926,21 +981,21 @@ button:focus-visible {
   backdrop-filter: blur(10px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .bottom-navigation button {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .bottom-navigation button {
   min-width: 132px;
   height: 50px;
   border-radius: 17px;
   color: #607080;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-home-preview .bottom-navigation button.is-active {
+:root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .bottom-navigation button.is-active {
   background: linear-gradient(135deg, #ffe7f0, #ffdce9);
   color: #e92f75;
 }
 
 /* Bocchi practice is selected through the registry's practiceVisual capability.
    The shared Practice routes and card actions remain product-owned. */
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview {
   position: relative;
   isolation: isolate;
   background:
@@ -949,15 +1004,15 @@ button:focus-visible {
   color: var(--ink);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview::before,
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview::after {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview::before,
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview::after {
   position: absolute;
   z-index: -1;
   content: '';
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview::before {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview::before {
   top: 100px;
   right: -38px;
   width: 180px;
@@ -967,7 +1022,7 @@ button:focus-visible {
   opacity: .64;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview::after {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview::after {
   right: 26px;
   bottom: 80px;
   width: 112px;
@@ -977,7 +1032,7 @@ button:focus-visible {
   transform: rotate(-12deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .product-header {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .product-header {
   position: relative;
   z-index: 5;
   isolation: isolate;
@@ -990,15 +1045,15 @@ button:focus-visible {
   backdrop-filter: blur(12px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .product-header::before,
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .product-header::after {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .product-header::before,
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .product-header::after {
   position: absolute;
   z-index: -1;
   content: '';
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .product-header::before {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .product-header::before {
   top: -22px;
   bottom: -20px;
   left: 29%;
@@ -1010,7 +1065,7 @@ button:focus-visible {
   transform: rotate(-1deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .product-header::after {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .product-header::after {
   top: 12px;
   left: 58%;
   width: 64px;
@@ -1021,25 +1076,25 @@ button:focus-visible {
   transform: rotate(-7deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .product-header > * {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .product-header > * {
   position: relative;
   z-index: 1;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .brand-mark {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .brand-mark {
   background: linear-gradient(145deg, #f85291, #ed2470);
   box-shadow: 0 8px 18px rgba(235, 42, 110, .24);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .product-header__left small {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .product-header__left small {
   color: #ef397d;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .product-content {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .product-content {
   padding: 14px 24px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-hub {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-hub {
   height: 100%;
   align-content: stretch;
   grid-template-rows: minmax(0, 1.35fr) minmax(224px, .85fr);
@@ -1047,7 +1102,7 @@ button:focus-visible {
   padding: 0;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-hero {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-hero {
   position: relative;
   min-height: 0;
   overflow: hidden;
@@ -1057,18 +1112,18 @@ button:focus-visible {
   box-shadow: 0 16px 38px rgba(67, 41, 52, .15);
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-hero__art {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-hero__art {
   position: absolute;
   z-index: 0;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 48%;
+  object-position: 50% 50%;
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-hero__copy {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-hero__copy {
   position: absolute;
   z-index: 1;
   top: 10%;
@@ -1081,14 +1136,14 @@ button:focus-visible {
   color: #23232a;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-hero__copy .eyebrow {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-hero__copy .eyebrow {
   color: #ef3479;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: .08em;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-hero__copy h1 {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-hero__copy h1 {
   margin: 10px 0 12px;
   font-family: "KaiTi", "STKaiti", "Noto Serif SC", serif;
   font-size: clamp(28px, 2.4vw, 37px);
@@ -1098,7 +1153,7 @@ button:focus-visible {
   transform: rotate(-.55deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-hero__copy h1::after {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-hero__copy h1::after {
   display: block;
   width: 76%;
   height: 9px;
@@ -1109,7 +1164,7 @@ button:focus-visible {
   transform: rotate(-1deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-hero__copy p {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-hero__copy p {
   max-width: 360px;
   margin: 0;
   color: #596b7b;
@@ -1118,7 +1173,7 @@ button:focus-visible {
   line-height: 1.55;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-hero__copy small {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-hero__copy small {
   align-self: flex-start;
   margin-top: 14px;
   padding: 5px 11px;
@@ -1131,12 +1186,12 @@ button:focus-visible {
   transform: rotate(-2deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-module-grid {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-module-grid {
   min-height: 0;
   gap: 14px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card {
   position: relative;
   isolation: isolate;
   min-height: 0;
@@ -1151,7 +1206,7 @@ button:focus-visible {
   box-shadow: 0 10px 26px rgba(76, 53, 61, .09);
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card::before {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card::before {
   position: absolute;
   z-index: -1;
   inset: 0;
@@ -1159,19 +1214,19 @@ button:focus-visible {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card.is-sight::before {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card.is-sight::before {
   background:
     linear-gradient(90deg, rgba(255, 249, 251, .98) 0 44%, rgba(251, 244, 247, .76) 59%, rgba(236, 250, 246, .62) 100%),
     radial-gradient(circle at 96% 8%, rgba(245, 61, 132, .14) 0 2px, transparent 2.5px) 0 0 / 14px 14px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card.is-chord::before {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card.is-chord::before {
   background:
     linear-gradient(90deg, rgba(255, 252, 246, .98) 0 44%, rgba(255, 247, 224, .74) 61%, rgba(247, 240, 255, .64) 100%),
     radial-gradient(circle at 96% 8%, rgba(244, 184, 45, .16) 0 2px, transparent 2.5px) 0 0 / 14px 14px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card .module-card__icon {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card .module-card__icon {
   position: relative;
   z-index: 2;
   width: 54px;
@@ -1181,32 +1236,32 @@ button:focus-visible {
   color: #ee337a;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card .module-card__icon.is-amber {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card .module-card__icon.is-amber {
   background: #ffedb8;
   color: #a76e00;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card .module-card__copy {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card .module-card__copy {
   position: relative;
   z-index: 2;
   align-self: center;
   gap: 3px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card .module-card__copy small {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card .module-card__copy small {
   color: #ed3478;
   font-size: 10px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card.is-chord .module-card__copy small {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card.is-chord .module-card__copy small {
   color: #a46a00;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card .module-card__copy strong {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card .module-card__copy strong {
   font-size: 24px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card .module-card__copy em {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card .module-card__copy em {
   overflow: hidden;
   color: #61707d;
   font-size: 11px;
@@ -1214,7 +1269,7 @@ button:focus-visible {
   white-space: nowrap;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card .module-card__recent {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card .module-card__recent {
   width: fit-content;
   margin-top: 4px;
   padding: 4px 9px;
@@ -1226,12 +1281,12 @@ button:focus-visible {
   font-weight: 720;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card.is-chord .module-card__recent {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card.is-chord .module-card__recent {
   border-color: rgba(174, 116, 7, .16);
   color: #74603d;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card__art {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card__art {
   position: absolute;
   z-index: 0;
   inset: 0;
@@ -1239,7 +1294,7 @@ button:focus-visible {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card__art::after {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card__art::after {
   position: absolute;
   z-index: 1;
   top: 0;
@@ -1250,7 +1305,7 @@ button:focus-visible {
   content: '';
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card__art img {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card__art img {
   position: absolute;
   top: 54%;
   right: -6%;
@@ -1261,7 +1316,7 @@ button:focus-visible {
   transform: translateY(-50%);
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card__action {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card__action {
   position: relative;
   z-index: 2;
   display: flex;
@@ -1280,12 +1335,12 @@ button:focus-visible {
   box-shadow: 0 9px 18px rgba(239, 45, 118, .21);
 }
 
-:root[data-theme='bocchi-dev'] .themed-practice-card.is-chord .themed-practice-card__action {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .themed-practice-card.is-chord .themed-practice-card__action {
   background: linear-gradient(135deg, #f7b83d, #e99a20);
   box-shadow: 0 9px 18px rgba(205, 139, 18, .2);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .bottom-navigation {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .bottom-navigation {
   align-self: center;
   width: min(920px, calc(100% - 88px));
   height: 62px;
@@ -1297,21 +1352,21 @@ button:focus-visible {
   backdrop-filter: blur(10px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .bottom-navigation button {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .bottom-navigation button {
   min-width: 132px;
   height: 50px;
   border-radius: 17px;
   color: #607080;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-practice-preview .bottom-navigation button.is-active {
+:root[data-theme-recipe-practice='practice-hero-cards-v1'] .bocchi-practice-preview .bottom-navigation button.is-active {
   background: linear-gradient(135deg, #ffe7f0, #ffdce9);
   color: #e92f75;
 }
 
 /* Bocchi Tools is selected through the registry's toolsVisual capability.
    The three tool definitions, routes, labels and MIDI state remain product-owned. */
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview {
   position: relative;
   isolation: isolate;
   background:
@@ -1320,15 +1375,15 @@ button:focus-visible {
   color: var(--ink);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview::before,
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview::after {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview::before,
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview::after {
   position: absolute;
   z-index: -1;
   content: '';
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview::before {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview::before {
   top: 92px;
   right: -34px;
   width: 178px;
@@ -1337,7 +1392,7 @@ button:focus-visible {
   clip-path: polygon(24% 0, 100% 12%, 82% 100%, 0 79%);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview::after {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview::after {
   right: 40px;
   bottom: 90px;
   width: 92px;
@@ -1347,7 +1402,7 @@ button:focus-visible {
   transform: rotate(-12deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview .product-header {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview .product-header {
   position: relative;
   z-index: 5;
   isolation: isolate;
@@ -1360,7 +1415,7 @@ button:focus-visible {
   backdrop-filter: blur(12px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview .product-header::before {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview .product-header::before {
   position: absolute;
   z-index: -1;
   top: -25px;
@@ -1375,25 +1430,25 @@ button:focus-visible {
   transform: rotate(-1deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview .product-header > * {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview .product-header > * {
   position: relative;
   z-index: 1;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview .brand-mark {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview .brand-mark {
   background: linear-gradient(145deg, #3b98e8, #176fc4);
   box-shadow: 0 8px 18px rgba(31, 116, 194, .24);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview .product-header__left small {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview .product-header__left small {
   color: #247dca;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview .product-content {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview .product-content {
   padding: 14px 24px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-hub {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-hub {
   height: 100%;
   min-height: 0;
   align-content: stretch;
@@ -1403,7 +1458,7 @@ button:focus-visible {
   padding: 0;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-hero {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-hero {
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -1414,7 +1469,7 @@ button:focus-visible {
   box-shadow: 0 16px 38px rgba(31, 67, 104, .16);
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-hero::before {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-hero::before {
   position: absolute;
   z-index: 1;
   top: 18px;
@@ -1440,7 +1495,7 @@ button:focus-visible {
   transform: rotate(-4deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-hero::after {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-hero::after {
   position: absolute;
   z-index: 1;
   top: 11px;
@@ -1452,7 +1507,7 @@ button:focus-visible {
   transform: rotate(-6deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-hero img {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-hero img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1461,7 +1516,7 @@ button:focus-visible {
   object-position: 51% 50%;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-hero span {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-hero span {
   position: absolute;
   z-index: 2;
   right: 18px;
@@ -1479,7 +1534,7 @@ button:focus-visible {
   transform: rotate(-2deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-panel {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-panel {
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -1487,13 +1542,13 @@ button:focus-visible {
   gap: 7px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-heading {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-heading {
   position: relative;
   min-width: 0;
   padding: 0 8px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-heading::after {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-heading::after {
   position: absolute;
   right: 9px;
   bottom: 0;
@@ -1505,28 +1560,28 @@ button:focus-visible {
   transform: rotate(-5deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-heading .eyebrow {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-heading .eyebrow {
   color: #267dc8;
   font-size: 9px;
   font-weight: 820;
   letter-spacing: .11em;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-heading h1 {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-heading h1 {
   margin: 1px 0;
   font-family: "Noto Serif SC", Georgia, serif;
   font-size: 23px;
   letter-spacing: -.035em;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tools-heading p {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tools-heading p {
   margin: 0;
   color: #60758a;
   font-size: 12px;
   line-height: 1.3;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card-grid {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card-grid {
   min-height: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
@@ -1536,7 +1591,7 @@ button:focus-visible {
   gap: 14px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card {
   position: relative;
   isolation: isolate;
   min-height: 0;
@@ -1552,7 +1607,7 @@ button:focus-visible {
   box-shadow: 0 10px 26px rgba(42, 78, 110, .1);
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card::before {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card::before {
   position: absolute;
   z-index: -1;
   inset: 0;
@@ -1560,45 +1615,45 @@ button:focus-visible {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-chord {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-chord {
   grid-area: chord;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-interval {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-interval {
   grid-area: interval;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-scale {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-scale {
   grid-area: scale;
   padding-right: 53%;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-chord::before {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-chord::before {
   background:
     radial-gradient(circle at 8% 12%, rgba(244, 69, 136, .11) 0 2px, transparent 2.5px) 0 0 / 15px 15px,
     linear-gradient(115deg, #fff7fa 0%, #fffafd 50%, #edf7ff 100%);
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-interval::before {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-interval::before {
   background:
     radial-gradient(circle at 92% 14%, rgba(55, 139, 224, .12) 0 2px, transparent 2.5px) 0 0 / 15px 15px,
     linear-gradient(115deg, #f6fbff 0%, #eff8ff 58%, #f7fbff 100%);
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-scale::before {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-scale::before {
   background:
     radial-gradient(circle at 6% 83%, rgba(73, 168, 151, .11) 0 2px, transparent 2.5px) 0 0 / 17px 17px,
     linear-gradient(112deg, #f5fffb 0%, #edf9f7 52%, #eef7ff 100%);
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card .tool-card__icon,
-:root[data-theme='bocchi-dev'] .themed-tool-card .tool-card__copy,
-:root[data-theme='bocchi-dev'] .themed-tool-card em {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card .tool-card__icon,
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card .tool-card__copy,
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card em {
   position: relative;
   z-index: 2;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card .tool-card__icon {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card .tool-card__icon {
   display: grid;
   width: 48px;
   height: 48px;
@@ -1608,32 +1663,32 @@ button:focus-visible {
   color: #247dc8;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-chord .tool-card__icon {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-chord .tool-card__icon {
   background: #ffe2ed;
   color: #ea3478;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-scale .tool-card__icon {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-scale .tool-card__icon {
   background: #dff3ec;
   color: #28856f;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card .tool-card__copy {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card .tool-card__copy {
   align-self: center;
   gap: 4px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card strong {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card strong {
   font-size: 20px;
   letter-spacing: -.02em;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card small {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card small {
   color: #66788a;
   font-size: 11px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card em {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card em {
   align-self: end;
   justify-self: start;
   grid-column: 1 / 3;
@@ -1646,19 +1701,19 @@ button:focus-visible {
   box-shadow: 0 4px 10px rgba(36, 87, 132, .08);
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-chord em {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-chord em {
   border-color: rgba(224, 51, 118, .22);
   background: rgba(255, 224, 237, .94);
   color: #be2f68;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-scale em {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-scale em {
   border-color: rgba(40, 133, 111, .22);
   background: rgba(218, 243, 235, .94);
   color: #277762;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card__art {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card__art {
   position: absolute;
   z-index: 0;
   inset: 0;
@@ -1666,7 +1721,7 @@ button:focus-visible {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card__art::after {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card__art::after {
   position: absolute;
   z-index: 1;
   inset: 0;
@@ -1674,33 +1729,33 @@ button:focus-visible {
   content: '';
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card__art img {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card__art img {
   position: absolute;
   max-width: none;
   height: auto;
   filter: drop-shadow(0 7px 11px rgba(32, 62, 91, .13));
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-chord .themed-tool-card__art img {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-chord .themed-tool-card__art img {
   right: -18%;
   bottom: -36%;
   width: 92%;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-interval .themed-tool-card__art img {
-  right: -21%;
-  bottom: -7%;
-  width: 108%;
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-interval .themed-tool-card__art img {
+  right: -12%;
+  bottom: -14%;
+  width: 88%;
 }
 
-:root[data-theme='bocchi-dev'] .themed-tool-card.is-scale .themed-tool-card__art img {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .themed-tool-card.is-scale .themed-tool-card__art img {
   top: 50%;
-  right: -3%;
-  width: 61%;
+  right: -2%;
+  width: 58%;
   transform: translateY(-50%);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview .bottom-navigation {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview .bottom-navigation {
   align-self: center;
   width: min(920px, calc(100% - 88px));
   height: 62px;
@@ -1712,14 +1767,14 @@ button:focus-visible {
   backdrop-filter: blur(10px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview .bottom-navigation button {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview .bottom-navigation button {
   min-width: 132px;
   height: 50px;
   border-radius: 17px;
   color: #60758a;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tools-preview .bottom-navigation button.is-active {
+:root[data-theme-recipe-tools='tools-studio-cards-v1'] .bocchi-tools-preview .bottom-navigation button.is-active {
   background: linear-gradient(135deg, #e2f2ff, #d5ebff);
   color: #1974c5;
 }
@@ -2357,35 +2412,35 @@ button.tool-card {
 
 /* Tool Detail theme visuals are selected by capability. Product query data,
    result semantics, native controls, and navigation remain shared. */
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview {
   background:
     radial-gradient(circle at 8% 18%, rgba(108, 173, 225, .10) 0 2px, transparent 3px),
     linear-gradient(145deg, #f5f9fb 0%, #fffaf1 58%, #f7fbf8 100%);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .product-header {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .product-header {
   border-bottom-color: rgba(104, 145, 180, .22);
   background: rgba(249, 252, 253, .94);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .product-content {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .product-content {
   background:
     linear-gradient(rgba(112, 164, 207, .045) 1px, transparent 1px),
     linear-gradient(90deg, rgba(112, 164, 207, .045) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .bottom-navigation {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .bottom-navigation {
   border-top-color: rgba(104, 145, 180, .20);
   background: rgba(252, 253, 252, .96);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .bottom-navigation button.is-active {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .bottom-navigation button.is-active {
   background: #e2f1fb;
   color: #245f94;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-heading-band {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-heading-band {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 11px;
@@ -2401,7 +2456,7 @@ button.tool-card {
   box-shadow: 0 12px 30px rgba(67, 99, 124, .10);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-heading {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-heading {
   position: relative;
   z-index: 4;
   display: flex;
@@ -2410,34 +2465,34 @@ button.tool-card {
   padding-right: 214px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-heading > div {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-heading > div {
   max-width: 650px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-header h1 {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-header h1 {
   color: #193d66;
   font-size: clamp(34px, 2.65vw, 42px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-header .eyebrow {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-header .eyebrow {
   color: #377cad;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-header p {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-header p {
   color: #5e7182;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-query {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-query {
   position: relative;
   z-index: 4;
   min-width: 0;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-selectors label > span:first-child {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-selectors label > span:first-child {
   color: #5a7186;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-selectors .setting-select {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-selectors .setting-select {
   min-height: 47px;
   border-color: rgba(73, 128, 173, .22);
   background: rgba(247, 251, 254, .96);
@@ -2445,7 +2500,7 @@ button.tool-card {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-answer {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-answer {
   border-color: rgba(86, 143, 187, .28);
   background:
     linear-gradient(rgba(93, 154, 204, .045) 1px, transparent 1px),
@@ -2455,27 +2510,27 @@ button.tool-card {
   box-shadow: 0 15px 36px rgba(55, 93, 124, .12);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-identity {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-identity {
   border-right-color: rgba(83, 137, 180, .24);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-identity h2 {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-identity h2 {
   color: #173d68;
   font-size: clamp(46px, 4.1vw, 64px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-identity .eyebrow,
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition > .eyebrow {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-identity .eyebrow,
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition > .eyebrow {
   color: #3d7dab;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition > p {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition > p {
   gap: 4px 0;
   color: #24445f;
   font-size: clamp(22px, 2vw, 31px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition .chord-theoretical-note-token {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition .chord-theoretical-note-token {
   min-width: 58px;
   min-height: 58px;
   justify-content: center;
@@ -2486,12 +2541,12 @@ button.tool-card {
   box-shadow: 0 6px 14px rgba(72, 110, 140, .08);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-note-separator {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-note-separator {
   margin: 0 .18em;
   color: #ef8db5;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
   position: absolute;
   top: -8px;
   right: 56px;
@@ -2500,7 +2555,7 @@ button.tool-card {
   opacity: .94;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration {
   position: absolute;
   display: block;
   background-repeat: no-repeat;
@@ -2509,7 +2564,7 @@ button.tool-card {
   mix-blend-mode: multiply;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-tape {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-tape {
   top: 2px;
   left: 36%;
   width: 96px;
@@ -2518,7 +2573,7 @@ button.tool-card {
   transform: rotate(2deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-stars {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-stars {
   top: 42px;
   left: 52%;
   width: 91px;
@@ -2526,7 +2581,7 @@ button.tool-card {
   background-position: -273px -29px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-note {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-note {
   top: 277px;
   right: 30px;
   width: 74px;
@@ -2535,7 +2590,7 @@ button.tool-card {
   opacity: .34;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-bass {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-bass {
   right: 4px;
   bottom: 7px;
   width: 92px;
@@ -2545,28 +2600,28 @@ button.tool-card {
 }
 
 @media (max-width: 980px) {
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-heading {
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-heading {
     padding-right: 150px;
   }
 
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
     right: 30px;
     width: 142px;
   }
 
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-stars,
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-bass {
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-stars,
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-bass {
     display: none;
   }
 }
 
 /* Strong Reference Notebook composition. C is the environment plate; A and B
    remain inert capability-owned artwork above the shared Product UI. */
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview {
   background: #dcebf8;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .product-header {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .product-header {
   position: relative;
   z-index: 8;
   border-bottom: 1px solid rgba(74, 126, 174, .34);
@@ -2575,12 +2630,12 @@ button.tool-card {
   backdrop-filter: blur(15px) saturate(1.05);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .product-content {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .product-content {
   position: relative;
   background: transparent;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .bottom-navigation {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .bottom-navigation {
   position: relative;
   z-index: 8;
   border-top: 1px solid rgba(74, 126, 174, .28);
@@ -2589,33 +2644,37 @@ button.tool-card {
   backdrop-filter: blur(15px) saturate(1.05);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-environment {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-environment {
   inset: -24px -34px;
-  background-position: center 49%;
+  background-position:
+    calc(var(--theme-recipe-toolDetailVisual-background-position-x, 50) * 1%)
+    calc(var(--theme-recipe-toolDetailVisual-background-position-y, 49) * 1%);
   background-size: cover;
   filter: saturate(.82) contrast(.92) brightness(1.04);
+  transform: scale(var(--theme-recipe-toolDetailVisual-background-scale, 1));
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-environment::after {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-environment::after {
   position: absolute;
   content: '';
   inset: 0;
+  opacity: var(--theme-recipe-toolDetailVisual-wash-opacity, 1);
   background:
     linear-gradient(180deg, rgba(234, 246, 255, .25), rgba(247, 251, 255, .37) 55%, rgba(234, 243, 251, .30)),
     radial-gradient(ellipse at 43% 18%, rgba(255, 255, 255, .20), transparent 48%);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-artwork {
   z-index: 4;
   overflow: visible;
   mix-blend-mode: normal;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-top {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-top {
   z-index: auto;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-heading-band {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-heading-band {
   display: block;
   width: min(780px, 63%);
   height: 190px;
@@ -2634,7 +2693,7 @@ button.tool-card {
   clip-path: polygon(1% 3%, 98% 0, 100% 7%, 99% 93%, 96% 98%, 3% 100%, 0 95%, .8% 7%);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-heading-band::before {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-heading-band::before {
   position: absolute;
   content: '';
   top: -8px;
@@ -2646,18 +2705,18 @@ button.tool-card {
   transform: rotate(-2deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-heading {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-heading {
   position: relative;
   z-index: 2;
   display: block;
   padding: 0;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-heading > div {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-heading > div {
   max-width: 610px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-header h1 {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-header h1 {
   position: relative;
   display: inline-block;
   margin-top: 8px;
@@ -2667,7 +2726,7 @@ button.tool-card {
   line-height: 1.05;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-header h1::after {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-header h1::after {
   position: absolute;
   content: '';
   right: -44px;
@@ -2680,20 +2739,20 @@ button.tool-card {
   transform: rotate(-1.7deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-header .eyebrow {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-header .eyebrow {
   color: #3e82bd;
   font-size: 12px;
   letter-spacing: .18em;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-header p {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-header p {
   margin-top: 18px;
   color: #385a78;
   font-size: 14px;
   font-weight: 560;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-query-panel {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-query-panel {
   z-index: 6;
   border: 1px solid rgba(74, 135, 185, .34);
   background: rgba(248, 252, 255, .95);
@@ -2701,13 +2760,13 @@ button.tool-card {
   backdrop-filter: blur(14px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-selectors label > span:first-child {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-selectors label > span:first-child {
   color: #315b81;
   font-size: 12px;
   font-weight: 760;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-selectors .setting-select {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-selectors .setting-select {
   min-height: 52px;
   border-color: rgba(65, 125, 176, .32);
   border-radius: 15px;
@@ -2717,11 +2776,11 @@ button.tool-card {
   box-shadow: 0 5px 14px rgba(53, 101, 142, .08), inset 0 1px 0 #fff;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-primary-result {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-primary-result {
   z-index: 3;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-answer {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-answer {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(69, 128, 178, .35);
@@ -2735,7 +2794,7 @@ button.tool-card {
   box-shadow: 0 20px 42px rgba(30, 71, 109, .22), inset 0 1px 0 rgba(255, 255, 255, .9);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-answer::after {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-answer::after {
   position: absolute;
   content: '';
   top: 0;
@@ -2747,18 +2806,18 @@ button.tool-card {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-identity,
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-identity,
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition {
   position: relative;
   z-index: 2;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-identity {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-identity {
   padding: 8px 38px 8px 4px;
   border-right: 1px dashed rgba(64, 125, 177, .35);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-identity::after {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-identity::after {
   position: absolute;
   content: '';
   right: 40px;
@@ -2770,14 +2829,14 @@ button.tool-card {
   transform: rotate(-1.8deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-identity h2 {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-identity h2 {
   margin-top: 11px;
   color: #123865;
   font-size: clamp(70px, 6.1vw, 92px);
   line-height: .98;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-identity p {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-identity p {
   position: relative;
   z-index: 2;
   margin-top: 12px;
@@ -2786,18 +2845,18 @@ button.tool-card {
   font-weight: 690;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-identity .eyebrow,
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition > .eyebrow {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-identity .eyebrow,
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition > .eyebrow {
   color: #397eb6;
   font-size: 13px;
   letter-spacing: .14em;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition {
   padding: 8px 22px 8px 0;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition > .eyebrow {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition > .eyebrow {
   position: relative;
   display: inline-block;
   width: max-content;
@@ -2806,7 +2865,7 @@ button.tool-card {
   letter-spacing: .04em;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition > .eyebrow::after {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition > .eyebrow::after {
   position: absolute;
   content: '';
   right: -26px;
@@ -2818,7 +2877,7 @@ button.tool-card {
   transform: rotate(-1.5deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition > p {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition > p {
   gap: 8px 0;
   margin-top: 24px;
   color: #183b60;
@@ -2826,7 +2885,7 @@ button.tool-card {
   line-height: 1.25;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition .chord-theoretical-note-token {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition .chord-theoretical-note-token {
   min-width: 68px;
   min-height: 70px;
   justify-content: center;
@@ -2837,13 +2896,13 @@ button.tool-card {
   box-shadow: 0 9px 18px rgba(49, 96, 136, .11), inset 0 1px 0 #fff;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-note-separator {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-note-separator {
   margin: 0 .17em;
   color: #ef86b3;
   font-size: .82em;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
   top: 4px;
   right: 38px;
   width: 328px;
@@ -2851,14 +2910,14 @@ button.tool-card {
   filter: drop-shadow(0 15px 18px rgba(23, 55, 88, .24));
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration {
   background-size: 836px 471px;
   opacity: .78;
   mix-blend-mode: normal;
   filter: drop-shadow(0 4px 5px rgba(44, 92, 132, .10));
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-tape {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-tape {
   top: 2px;
   left: 37%;
   width: 142px;
@@ -2867,7 +2926,7 @@ button.tool-card {
   transform: rotate(2deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-stars {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-stars {
   top: 78px;
   left: 48%;
   width: 148px;
@@ -2876,7 +2935,7 @@ button.tool-card {
   opacity: .62;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-note {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-note {
   top: 229px;
   right: 42px;
   width: 116px;
@@ -2885,7 +2944,7 @@ button.tool-card {
   opacity: .68;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-bass {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-bass {
   right: 18px;
   bottom: 22px;
   width: 118px;
@@ -2894,7 +2953,7 @@ button.tool-card {
   opacity: .48;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-cat {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-cat {
   right: 151px;
   bottom: 4px;
   width: 102px;
@@ -2903,7 +2962,7 @@ button.tool-card {
   opacity: .50;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-arrow {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-arrow {
   right: 265px;
   bottom: 9px;
   width: 125px;
@@ -2912,7 +2971,7 @@ button.tool-card {
   opacity: .38;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-result-tape {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-result-tape {
   top: 321px;
   right: 88px;
   width: 156px;
@@ -2923,25 +2982,25 @@ button.tool-card {
 }
 
 @media (max-width: 1100px) {
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-heading-band {
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-heading-band {
     width: 68%;
     margin-left: 32px;
     padding-left: 44px;
   }
 
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-artwork__chord-query-hero {
     right: 18px;
     width: 270px;
   }
 
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .chord-query-composition .chord-theoretical-note-token {
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .chord-query-composition .chord-theoretical-note-token {
     min-width: 58px;
     min-height: 62px;
     padding: 7px 9px;
   }
 
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-stars,
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-decoration.is-arrow {
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-stars,
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .tool-detail-decoration.is-arrow {
     display: none;
   }
 }
@@ -2950,22 +3009,23 @@ button.tool-card {
   display: grid;
   height: 100%;
   min-height: 0;
-  grid-template-rows: auto minmax(196px, 228px) auto;
+  grid-template-rows: 318px minmax(0, 1fr);
   align-content: start;
-  gap: 16px;
-  padding: 0 2%;
+  gap: 14px;
+  padding: 0;
 }
 
-.interval-query-header {
-  display: flex;
+.tool-detail-top.interval-query-header {
+  position: relative;
+  z-index: 2;
+  display: grid;
   min-width: 0;
-  align-items: end;
-  justify-content: space-between;
-  gap: 28px;
+  grid-template-rows: 210px 108px;
+  gap: 0;
 }
 
 .interval-query-heading {
-  min-width: 300px;
+  min-width: 0;
 }
 
 .interval-query-header h1,
@@ -2991,29 +3051,31 @@ button.tool-card {
 
 .interval-query-selectors {
   display: grid;
-  flex: 0 0 auto;
-  grid-template-columns: auto 24px auto;
-  align-items: end;
-  gap: 10px;
+  width: 100%;
+  grid-template-columns: minmax(0, 46fr) 62px minmax(0, 46fr);
+  align-items: stretch;
+  gap: 16px;
 }
 
 .interval-query-selector-group {
   display: grid;
   min-width: 0;
-  grid-template-columns: 72px 76px 72px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, .8fr);
+  gap: 12px;
   margin: 0;
-  padding: 0;
-  border: 0;
+  padding: 6px 14px 10px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
 }
 
 .interval-query-selector-group legend {
-  margin: 0 0 5px;
-  padding: 0;
+  margin: 0;
+  padding: 0 8px;
   color: var(--ink-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 780;
-  letter-spacing: .14em;
+  letter-spacing: .08em;
 }
 
 .interval-query-selector-group label {
@@ -3024,7 +3086,7 @@ button.tool-card {
 
 .interval-query-selector-group label > span:first-child {
   color: var(--ink-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -3034,10 +3096,10 @@ button.tool-card {
 }
 
 .interval-query-selector-group .setting-select {
-  min-height: 44px;
-  border-radius: 13px;
+  min-height: 45px;
+  border-radius: 14px;
   font-family: Georgia, "Times New Roman", "Noto Serif SC", serif;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .interval-query-selector-group > label:nth-of-type(2) .setting-select {
@@ -3051,11 +3113,20 @@ button.tool-card {
 
 .interval-query-selector-arrow {
   display: grid;
-  height: 44px;
+  align-self: stretch;
   place-items: center;
   color: var(--accent);
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 22px;
+  font-size: 30px;
+  font-weight: 580;
+}
+
+.interval-query-results {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 64fr) minmax(320px, 36fr);
+  gap: 14px;
 }
 
 .interval-query-card {
@@ -3069,9 +3140,10 @@ button.tool-card {
 
 .interval-query-answer {
   display: grid;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
   align-items: stretch;
-  grid-template-columns: minmax(340px, 1.05fr) minmax(420px, 1fr);
-  padding: 24px 30px;
+  padding: 24px 30px 22px;
 }
 
 .interval-query-identity,
@@ -3082,16 +3154,16 @@ button.tool-card {
 }
 
 .interval-query-identity {
-  padding-right: 34px;
-  border-right: 1px solid var(--line);
+  padding: 4px 8px 17px;
+  border-bottom: 1px solid var(--line);
 }
 
 .interval-query-identity h2 {
-  margin-top: 7px;
+  margin-top: 9px;
   font-family: "Noto Serif SC", Georgia, serif;
-  font-size: clamp(32px, 2.65vw, 42px);
+  font-size: clamp(42px, 3.35vw, 54px);
   letter-spacing: -.035em;
-  line-height: 1.15;
+  line-height: 1.08;
 }
 
 .interval-query-pitch-pair {
@@ -3099,9 +3171,9 @@ button.tool-card {
   min-width: 0;
   align-items: center;
   gap: 13px;
-  margin-top: 12px;
+  margin-top: 14px;
   font-family: Georgia, "Times New Roman", "Noto Serif SC", serif;
-  font-size: clamp(19px, 1.65vw, 25px);
+  font-size: clamp(22px, 1.8vw, 28px);
   font-weight: 650;
 }
 
@@ -3149,11 +3221,11 @@ button.tool-card {
 }
 
 .interval-query-facts {
-  padding-left: 34px;
+  padding: 16px 8px 0;
 }
 
 .interval-query-facts > .eyebrow {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .interval-query-facts dl {
@@ -3167,7 +3239,7 @@ button.tool-card {
 
 .interval-query-facts dl > div {
   display: grid;
-  min-height: 72px;
+  min-height: 62px;
   align-content: center;
   gap: 5px;
   padding: 10px 12px;
@@ -3187,17 +3259,18 @@ button.tool-card {
 .interval-query-facts dd {
   margin: 0;
   color: var(--ink);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 730;
   white-space: nowrap;
 }
 
 .interval-query-references {
   display: grid;
-  grid-template-columns: minmax(270px, .72fr) minmax(0, 1.7fr);
-  align-items: center;
-  gap: 26px;
-  padding: 20px 30px;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 14px;
+  padding: 24px 22px 20px;
 }
 
 .interval-query-references header h2 {
@@ -3216,18 +3289,21 @@ button.tool-card {
 
 .interval-query-reference-list {
   display: grid;
+  min-height: 0;
   grid-template-columns: minmax(0, 1fr);
-  gap: 6px;
+  align-content: start;
+  gap: 8px;
 }
 
 .interval-query-reference-list > div {
   display: grid;
   min-width: 0;
-  min-height: 42px;
-  grid-template-columns: minmax(0, 1fr) 86px 54px;
+  min-height: 52px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
   align-items: center;
   gap: 8px;
-  padding: 7px 12px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface-soft);
@@ -3248,14 +3324,16 @@ button.tool-card {
 }
 
 .interval-query-reference-list small {
-  grid-column: 2;
+  grid-column: 1;
+  grid-row: 2;
   color: var(--ink-muted);
   font-size: 10px;
   white-space: nowrap;
 }
 
 .interval-query-reference-list em {
-  grid-column: 3;
+  grid-column: 2;
+  grid-row: 1 / span 2;
   justify-self: end;
   padding: 4px 8px;
   border-radius: 999px;
@@ -3264,6 +3342,34 @@ button.tool-card {
   font-size: 10px;
   font-style: normal;
   font-weight: 760;
+}
+
+@media (max-width: 1100px) {
+  .interval-query-layout .tool-detail-query-panel {
+    margin-right: 8px;
+    margin-left: 8px;
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .interval-query-layout .tool-detail-primary-result {
+    padding: 0;
+  }
+
+  .interval-query-selectors {
+    grid-template-columns: minmax(0, 46fr) 42px minmax(0, 46fr);
+    gap: 8px;
+  }
+
+  .interval-query-selector-group {
+    gap: 7px;
+    padding-right: 9px;
+    padding-left: 9px;
+  }
+
+  .interval-query-results {
+    grid-template-columns: minmax(0, 62fr) minmax(280px, 38fr);
+  }
 }
 
 .scale-tool-layout {
@@ -3505,9 +3611,267 @@ button.tool-card {
   max-width: 100%;
 }
 
+/* Interval Query uses the shared Tool Detail shell with its own blue/lavender
+   reference-notebook hierarchy. Its Product data and six native selects remain
+   independent of the decorated-reference capability. */
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-header .tool-detail-heading-band {
+  width: min(780px, 63%);
+  background:
+    radial-gradient(circle at 17px 24px, #c5d8ef 0 6px, rgba(249, 250, 255, .96) 7px 10px, transparent 11px) 0 0 / 34px 36px repeat-y,
+    linear-gradient(rgba(112, 121, 205, .068) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(112, 121, 205, .068) 1px, transparent 1px),
+    rgba(255, 254, 250, .965);
+  background-size: 34px 36px, 22px 22px, 22px 22px, auto;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-header h1 {
+  position: relative;
+  display: inline-block;
+  margin-top: 8px;
+  color: #173d74;
+  font-size: clamp(42px, 3.42vw, 54px);
+  font-weight: 760;
+  line-height: 1.05;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-header h1::after {
+  position: absolute;
+  content: '';
+  right: -46px;
+  bottom: -7px;
+  left: 0;
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #78b4e8 0 58%, #ada1df 58% 88%, #f0bf61 88% 100%);
+  opacity: .76;
+  transform: rotate(-1.4deg);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-header .eyebrow {
+  color: #477fba;
+  font-size: 12px;
+  letter-spacing: .15em;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-header p {
+  margin-top: 18px;
+  color: #425c7a;
+  font-size: 14px;
+  font-weight: 560;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-artwork__complete-ryo {
+  position: absolute;
+  top: -18px;
+  right: 44px;
+  width: 312px;
+  height: auto;
+  opacity: 1;
+  filter: drop-shadow(0 15px 18px rgba(23, 55, 88, .24));
+  pointer-events: none;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-query-panel {
+  border-color: rgba(84, 119, 181, .36);
+  background: rgba(249, 251, 255, .96);
+  box-shadow: 0 18px 34px rgba(43, 70, 123, .20), inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-selector-group {
+  border-color: rgba(72, 139, 190, .27);
+  background: linear-gradient(145deg, rgba(235, 247, 255, .97), rgba(244, 250, 255, .96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-selector-group:last-child {
+  border-color: rgba(137, 120, 191, .28);
+  background: linear-gradient(145deg, rgba(244, 241, 255, .97), rgba(250, 247, 255, .96));
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-selector-group legend {
+  color: #316b9d;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-selector-group:last-child legend {
+  color: #7666ad;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-selector-group label > span:first-child {
+  color: #526a86;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-selector-group .setting-select {
+  border-color: rgba(69, 124, 175, .28);
+  background: rgba(255, 255, 255, .94);
+  color: #203d61;
+  box-shadow: 0 5px 12px rgba(48, 82, 124, .07), inset 0 1px 0 #fff;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-selector-group:last-child .setting-select {
+  border-color: rgba(126, 108, 176, .28);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-selector-arrow {
+  color: #7988c7;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, .9);
+  transform: rotate(-2deg);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-results {
+  position: relative;
+  z-index: 3;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-card {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(84, 122, 181, .34);
+  border-radius: 27px;
+  background:
+    radial-gradient(circle at 17px 23px, #c1d7ec 0 6px, rgba(255, 255, 255, .98) 7px 10px, transparent 11px) 0 0 / 34px 36px repeat-y,
+    linear-gradient(rgba(101, 128, 198, .06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(101, 128, 198, .06) 1px, transparent 1px),
+    rgba(255, 255, 253, .97);
+  background-size: 34px 36px, 23px 23px, 23px 23px, auto;
+  box-shadow: 0 20px 42px rgba(33, 63, 110, .20), inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-card::after {
+  position: absolute;
+  z-index: 0;
+  content: '';
+  top: 0;
+  right: 0;
+  width: 72px;
+  height: 72px;
+  border-left: 1px solid rgba(118, 116, 184, .13);
+  background: linear-gradient(135deg, transparent 49%, rgba(227, 222, 248, .50) 50%);
+  pointer-events: none;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-identity {
+  border-bottom-color: rgba(90, 117, 178, .28);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-identity h2 {
+  color: #183d73;
+  font-size: clamp(50px, 4vw, 64px);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-identity .eyebrow,
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-facts > .eyebrow,
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-references .eyebrow {
+  color: #4a79b2;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-pitch-pair {
+  color: #294b75;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-pitch-arrow {
+  color: #8c79c6;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-pitch-pair em {
+  background: rgba(231, 226, 249, .86);
+  color: #695896;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-facts dl {
+  border-color: rgba(91, 123, 181, .24);
+  background: rgba(239, 246, 253, .84);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-facts dl > div {
+  border-right-color: rgba(91, 123, 181, .20);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-references {
+  padding-left: 38px;
+  border-color: rgba(130, 111, 181, .34);
+  background:
+    radial-gradient(circle at 10px 23px, #d4c9ec 0 6px, rgba(255, 255, 255, .98) 7px 10px, transparent 11px) 0 0 / 34px 36px repeat-y,
+    linear-gradient(rgba(139, 119, 188, .06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 119, 188, .06) 1px, transparent 1px),
+    rgba(255, 254, 253, .97);
+  background-size: 34px 36px, 23px 23px, 23px 23px, auto;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-references header h2 {
+  color: #51457d;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-reference-list > div {
+  border-color: rgba(130, 111, 181, .20);
+  background: rgba(247, 244, 253, .86);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-reference-list > div.is-current {
+  border-color: rgba(105, 88, 162, .48);
+  background: rgba(231, 224, 249, .92);
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-decoration.is-tape {
+  top: 0;
+  left: 36%;
+  opacity: .70;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-decoration.is-stars {
+  top: 80px;
+  left: 49%;
+  opacity: .52;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-decoration.is-note {
+  top: 224px;
+  right: 48px;
+  opacity: .56;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-decoration.is-bass {
+  display: none;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-decoration.is-cat {
+  right: 30%;
+  bottom: 7px;
+  opacity: .34;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-decoration.is-arrow {
+  right: 35%;
+  bottom: 8px;
+  opacity: .28;
+}
+
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-decoration.is-result-tape {
+  top: 326px;
+  right: 44px;
+  opacity: .58;
+}
+
+@media (max-width: 1100px) {
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-artwork__complete-ryo {
+    top: 4px;
+    right: 16px;
+    width: 268px;
+  }
+
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-decoration.is-stars,
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .interval-query-layout .tool-detail-decoration.is-arrow {
+    display: none;
+  }
+}
+
 /* Scale / Key Signature uses the shared Tool Detail geometry while keeping its
    two-column Product result and protected white notation rectangle. */
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-header .tool-detail-heading-band {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-header .tool-detail-heading-band {
   width: min(780px, 63%);
   background:
     radial-gradient(circle at 17px 24px, #b6d1e9 0 6px, rgba(247, 252, 255, .95) 7px 10px, transparent 11px) 0 0 / 34px 36px repeat-y,
@@ -3517,7 +3881,7 @@ button.tool-card {
   background-size: 34px 36px, 22px 22px, 22px 22px, auto;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-header h1 {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-header h1 {
   position: relative;
   display: inline-block;
   margin-top: 8px;
@@ -3527,7 +3891,7 @@ button.tool-card {
   line-height: 1.05;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-header .tool-detail-heading > div {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-header .tool-detail-heading > div {
   display: grid;
   max-width: 650px;
   grid-template-columns: auto minmax(0, 1fr);
@@ -3535,19 +3899,19 @@ button.tool-card {
   column-gap: 18px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-header .tool-detail-heading > div > .eyebrow {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-header .tool-detail-heading > div > .eyebrow {
   grid-column: 1;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-header .tool-detail-heading > div > h1 {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-header .tool-detail-heading > div > h1 {
   grid-column: 2;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-header .tool-detail-heading > div > p {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-header .tool-detail-heading > div > p {
   grid-column: 1 / -1;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-header h1::after {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-header h1::after {
   position: absolute;
   content: '';
   right: -46px;
@@ -3560,26 +3924,26 @@ button.tool-card {
   transform: rotate(-1.4deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-header .eyebrow {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-header .eyebrow {
   color: #3688ba;
   font-size: 12px;
   letter-spacing: .15em;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-header p {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-header p {
   margin-top: 18px;
   color: #385a78;
   font-size: 14px;
   font-weight: 560;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-selectors label > span:first-child {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-selectors label > span:first-child {
   color: #315f82;
   font-size: 12px;
   font-weight: 760;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-selectors .setting-select {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-selectors .setting-select {
   min-height: 52px;
   border-color: rgba(65, 138, 169, .32);
   border-radius: 15px;
@@ -3589,12 +3953,12 @@ button.tool-card {
   box-shadow: 0 5px 14px rgba(53, 116, 142, .08), inset 0 1px 0 #fff;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-results {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-results {
   position: relative;
   z-index: 3;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-card {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-card {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(69, 139, 169, .34);
@@ -3608,7 +3972,7 @@ button.tool-card {
   box-shadow: 0 20px 42px rgba(30, 78, 109, .21), inset 0 1px 0 rgba(255, 255, 255, .9);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-card::after {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-card::after {
   position: absolute;
   z-index: 0;
   content: '';
@@ -3621,26 +3985,26 @@ button.tool-card {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-card > * {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-card > * {
   position: relative;
   z-index: 1;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-scale-card h2,
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-card-heading h2 {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-scale-card h2,
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-card-heading h2 {
   color: #153d70;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-section-label,
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-card-heading .eyebrow {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-section-label,
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-card-heading .eyebrow {
   color: #3585ac;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-note-sequence {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-note-sequence {
   color: #173e65;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-note-sequence .scale-note-token {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-note-sequence .scale-note-token {
   min-width: 39px;
   min-height: 44px;
   justify-content: center;
@@ -3651,21 +4015,21 @@ button.tool-card {
   box-shadow: 0 7px 14px rgba(49, 105, 136, .09), inset 0 1px 0 #fff;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-note-separator {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-note-separator {
   color: #58b8aa;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-relative-section {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-relative-section {
   border-top-color: rgba(71, 158, 171, .28);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-key-signature-paper {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-key-signature-paper {
   border-color: rgba(55, 105, 135, .26);
   background: #fff;
   box-shadow: 0 10px 24px rgba(40, 91, 119, .11);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__scale-hero {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-artwork__complete-ryo {
   position: absolute;
   top: -22px;
   right: 42px;
@@ -3676,50 +4040,50 @@ button.tool-card {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-tape {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-tape {
   top: 0;
   left: 36%;
   opacity: .72;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-stars {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-stars {
   top: 82px;
   left: 49%;
   opacity: .54;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-note {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-note {
   top: 220px;
   right: 54px;
   opacity: .58;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-bass {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-bass {
   display: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-cat {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-cat {
   right: auto;
   bottom: 7px;
   left: 34%;
   opacity: .40;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-arrow {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-arrow {
   right: auto;
   bottom: 6px;
   left: 48%;
   opacity: .30;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-result-tape {
+:root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-result-tape {
   top: 326px;
   right: 66px;
   opacity: .62;
 }
 
 @media (max-width: 1100px) {
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .tool-detail-artwork__scale-hero {
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-artwork__complete-ryo {
     top: 6px;
     right: 18px;
     width: 270px;
@@ -3729,8 +4093,8 @@ button.tool-card {
     font-size: 19px;
   }
 
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-stars,
-  :root[data-theme='bocchi-dev'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-arrow {
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-stars,
+  :root[data-theme-recipe-tool-detail='tool-reference-notebook-v1'] .bocchi-tool-detail-preview .scale-tool-layout .tool-detail-decoration.is-arrow {
     display: none;
   }
 }
@@ -4156,35 +4520,35 @@ button.tool-card {
 
 /* Decorated ACTIVE practice is selected only through practiceActiveVisual.
    The notation-paper rectangle and MusicStaffRenderer geometry stay untouched. */
-.bocchi-sight-active {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active {
   background:
     radial-gradient(circle at 9% 29%, rgba(255, 176, 204, .17) 0 2px, transparent 2.5px) 0 0 / 24px 24px,
     linear-gradient(135deg, #fffaf2 0%, #fff7f8 52%, #fffaf0 100%);
 }
 
-.bocchi-sight-active .focus-header {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-header {
   border-bottom-color: rgba(235, 188, 204, .7);
   background: color-mix(in srgb, #fffdf8 94%, transparent);
   box-shadow: 0 5px 18px rgba(117, 68, 86, .06);
 }
 
-.bocchi-sight-active .focus-back,
-.bocchi-sight-active .focus-actions .outline-action {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-back,
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-actions .outline-action {
   border-color: #efd9e1;
   background: rgba(255, 255, 255, .72);
 }
 
-.bocchi-sight-active .focus-time-track {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-time-track {
   background: #f6e9eb;
 }
 
-.bocchi-sight-active .focus-content {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-content {
   background:
     linear-gradient(90deg, rgba(245, 108, 158, .055) 1px, transparent 1px) 0 0 / 28px 28px,
     linear-gradient(rgba(245, 108, 158, .04) 1px, transparent 1px) 0 0 / 28px 28px;
 }
 
-.bocchi-sight-active .focus-prompt {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-prompt {
   position: relative;
   justify-self: center;
   min-width: min(560px, 70vw);
@@ -4195,8 +4559,8 @@ button.tool-card {
   box-shadow: 0 4px 14px rgba(96, 54, 70, .045);
 }
 
-.bocchi-sight-active .focus-prompt::before,
-.bocchi-sight-active .focus-prompt::after {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-prompt::before,
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-prompt::after {
   width: 16px;
   height: 3px;
   border-radius: 999px;
@@ -4205,25 +4569,25 @@ button.tool-card {
   transform: rotate(42deg);
 }
 
-.bocchi-sight-active .focus-prompt::after {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-prompt::after {
   transform: rotate(-42deg);
 }
 
-.bocchi-sight-active .focus-stage {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-stage {
   overflow: hidden;
   border: 1px solid rgba(238, 192, 207, .58);
   background: linear-gradient(135deg, #fff8f1, #fffafb 54%, #fff9ef);
   box-shadow: 0 12px 32px rgba(92, 57, 70, .07);
 }
 
-.bocchi-sight-active .focus-stage .notation-paper {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-stage .notation-paper {
   z-index: 1;
   border-color: #efc8d6;
   background: #fff;
   box-shadow: 0 11px 30px rgba(100, 56, 74, .09);
 }
 
-.bocchi-sight-active .focus-stage .notation-paper::before {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-stage .notation-paper::before {
   display: none;
 }
 
@@ -4282,23 +4646,23 @@ button.tool-card {
   width: 500px;
 }
 
-.bocchi-sight-active .focus-footer {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-footer {
   border-color: #edd8df;
   background: rgba(255, 253, 249, .96);
   box-shadow: 0 7px 22px rgba(104, 62, 78, .065);
 }
 
-.bocchi-sight-active .focus-metric {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-metric {
   border-right-color: #f0dde3;
 }
 
-.bocchi-sight-active .focus-paused-state {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .focus-paused-state {
   z-index: 4;
   border: 1px solid rgba(237, 189, 206, .72);
   background: color-mix(in srgb, #fffaf6 82%, transparent);
 }
 
-.bocchi-sight-active .early-end-dialog {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-sight-active .early-end-dialog {
   border: 1px solid #edcbd7;
   background: #fffdf9;
   box-shadow: 0 24px 70px rgba(80, 44, 58, .2);
@@ -4317,13 +4681,13 @@ button.tool-card {
   color-scheme: inherit;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active {
   background:
     radial-gradient(circle at 12% 26%, rgba(248, 132, 174, .16) 0 2px, transparent 2.5px) 0 0 / 25px 25px,
     linear-gradient(135deg, #fff9ef 0%, #fff4f7 53%, #fffaf1 100%);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-focus-header {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-focus-header {
   border-bottom-color: #efcbd8;
   background:
     linear-gradient(100deg, rgba(255, 255, 255, .84), rgba(255, 239, 245, .92)),
@@ -4331,13 +4695,13 @@ button.tool-card {
   box-shadow: 0 5px 20px rgba(113, 65, 82, .07);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-focus-header .icon-button,
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-focus-header .outline-action {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-focus-header .icon-button,
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-focus-header .outline-action {
   border-color: #efd8e1;
   background: rgba(255, 255, 255, .76);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-focus-content {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-focus-content {
   position: relative;
   isolation: isolate;
   background:
@@ -4345,7 +4709,7 @@ button.tool-card {
     linear-gradient(rgba(246, 118, 166, .042) 1px, transparent 1px) 0 0 / 30px 30px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-focus-content > :not(.chord-theme-artwork) {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-focus-content > :not(.chord-theme-artwork) {
   position: relative;
   z-index: 2;
 }
@@ -4751,29 +5115,29 @@ button.tool-card {
   background: var(--line-strong);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-identity {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-identity {
   text-shadow: 0 1px rgba(255, 255, 255, .8);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-notation-card {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-notation-card {
   border-color: #edcad7;
   background: #fff;
   box-shadow: 0 12px 34px rgba(103, 57, 74, .09);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-notation-card::before {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-notation-card::before {
   opacity: .42;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-stage-prompt {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-stage-prompt {
   position: relative;
   border-color: #efd3de;
   background: linear-gradient(100deg, rgba(255, 252, 247, .98), rgba(255, 239, 245, .94));
   box-shadow: 0 5px 17px rgba(102, 56, 72, .055);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-stage-prompt.is-danger::after,
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-stage-prompt.is-warning::after {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-stage-prompt.is-danger::after,
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-stage-prompt.is-warning::after {
   position: absolute;
   right: 24px;
   font-size: 24px;
@@ -4782,26 +5146,26 @@ button.tool-card {
   opacity: .54;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-stage-prompt.is-danger::after {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-stage-prompt.is-danger::after {
   color: var(--practice-feedback-danger);
   content: '×';
   transform: rotate(-7deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-stage-prompt.is-warning::after {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-stage-prompt.is-warning::after {
   color: var(--practice-feedback-warning);
   content: '↝';
   transform: rotate(4deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-progress-footer {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-progress-footer {
   border: 1px solid #edd5df;
   border-radius: 18px;
   background: rgba(255, 253, 249, .95);
   box-shadow: 0 6px 20px rgba(102, 58, 74, .06);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-chord-active .chord-pause-overlay {
+:root[data-theme-recipe-practice-active='practice-decorated-focus-v1'] .bocchi-chord-active .chord-pause-overlay {
   border: 1px solid rgba(237, 189, 206, .72);
   background: color-mix(in srgb, #fff8f5 84%, transparent);
   color: var(--accent-strong);
@@ -5858,14 +6222,14 @@ button.tool-card {
   white-space: nowrap;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-history-preview {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .bocchi-history-preview {
   background:
     radial-gradient(circle at 4% 72%, rgba(255, 207, 223, .36), transparent 19%),
     radial-gradient(circle at 96% 42%, rgba(255, 226, 132, .32), transparent 20%),
     #fffaf3;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-history-preview .product-header {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .bocchi-history-preview .product-header {
   position: relative;
   z-index: 2;
   background:
@@ -5873,31 +6237,31 @@ button.tool-card {
     repeating-linear-gradient(18deg, transparent 0 16px, rgba(247, 197, 77, .08) 16px 18px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-history-preview .product-content {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .bocchi-history-preview .product-content {
   padding-top: 16px;
   padding-bottom: 16px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard {
   grid-template-rows: 206px 84px minmax(0, 1fr);
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__hero {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__hero {
   border-color: rgba(239, 191, 167, .8);
   background: #fff8eb;
   box-shadow: 0 10px 28px rgba(97, 60, 45, .13);
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__hero::after {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__hero::after {
   background: linear-gradient(90deg, rgba(255, 252, 243, .99) 0 31%, rgba(255, 251, 239, .84) 42%, rgba(255, 248, 232, .18) 62%, transparent 76%);
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__hero-copy {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__hero-copy {
   width: 43%;
   padding-left: 31px;
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__hero-copy::before {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__hero-copy::before {
   position: absolute;
   inset: 15px 8px 15px 16px;
   z-index: -1;
@@ -5912,13 +6276,13 @@ button.tool-card {
   transform: rotate(-.45deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__hero-copy h1 {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__hero-copy h1 {
   font-family: "Kaiti SC", "STKaiti", "Noto Serif SC", serif;
   font-size: 30px;
   font-weight: 850;
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__hero-copy h1::after {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__hero-copy h1::after {
   display: block;
   width: 228px;
   height: 8px;
@@ -5930,7 +6294,7 @@ button.tool-card {
   transform: rotate(-2deg);
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__hero-memo {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__hero-memo {
   position: absolute;
   z-index: 3;
   top: 12px;
@@ -5943,32 +6307,32 @@ button.tool-card {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-stat-card {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-stat-card {
   border-color: rgba(237, 207, 191, .9);
   background: rgba(255, 255, 255, .92);
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-stat-card.is-sessions {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-stat-card.is-sessions {
   background: linear-gradient(108deg, rgba(255, 240, 246, .97), rgba(255, 255, 255, .95));
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-stat-card.is-streak {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-stat-card.is-streak {
   background: linear-gradient(108deg, rgba(242, 255, 246, .97), rgba(255, 255, 255, .95));
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-stat-card.is-questions {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-stat-card.is-questions {
   background: linear-gradient(108deg, rgba(255, 248, 220, .97), rgba(255, 255, 255, .95));
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__recent,
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__trend {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__recent,
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__trend {
   border-color: rgba(235, 211, 192, .95);
   background: rgba(255, 254, 249, .96);
   box-shadow: 0 8px 22px rgba(90, 58, 42, .09);
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__recent::before,
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__trend::before {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__recent::before,
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__trend::before {
   position: absolute;
   inset: 0;
   background-image: radial-gradient(rgba(242, 176, 120, .16) .8px, transparent .8px);
@@ -5978,7 +6342,7 @@ button.tool-card {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__lower-decor {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__lower-decor {
   position: absolute;
   z-index: 1;
   bottom: -22px;
@@ -5992,7 +6356,7 @@ button.tool-card {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .themed-history-dashboard .history-dashboard__trend-decor {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .themed-history-dashboard .history-dashboard__trend-decor {
   position: absolute;
   z-index: 1;
   right: -16px;
@@ -6006,14 +6370,14 @@ button.tool-card {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-history-preview .bottom-navigation {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .bocchi-history-preview .bottom-navigation {
   position: relative;
   z-index: 2;
   border-top-color: rgba(236, 207, 191, .75);
   background: rgba(255, 255, 255, .96);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-history-preview .bottom-navigation button.is-active {
+:root[data-theme-recipe-history='history-journal-dashboard-v1'] .bocchi-history-preview .bottom-navigation button.is-active {
   background: linear-gradient(135deg, #ffe1ec, #fff0d7);
   color: #e52f75;
 }
@@ -6328,6 +6692,19 @@ button.tool-card {
 .settings-dashboard.has-settings-visual {
   grid-template-columns: minmax(330px, .56fr) minmax(0, 1fr);
   gap: 20px;
+}
+
+.product-frame.has-external-theme-manager .product-content {
+  overflow-y: auto;
+}
+
+.has-external-theme-manager .settings-dashboard.has-settings-visual {
+  height: auto;
+  min-height: 100%;
+}
+
+.has-external-theme-manager .settings-dashboard.has-settings-visual .settings-panels {
+  grid-template-rows: 177px auto minmax(287px, 1fr);
 }
 
 .settings-hero {
@@ -6677,14 +7054,6 @@ button.setting-row {
 .settings-theme-option.is-dark .settings-theme-option__preview i { background: #32483c; }
 .settings-theme-option.is-dark .settings-theme-option__preview svg { color: #98d5b8; }
 
-.settings-theme-option.is-bocchi-dev .settings-theme-option__preview {
-  border-color: #f1b7ca;
-  background: linear-gradient(145deg, #fffaf5, #ffe5ef);
-}
-
-.settings-theme-option.is-bocchi-dev .settings-theme-option__preview i { background: #f7b3cb; }
-.settings-theme-option.is-bocchi-dev .settings-theme-option__preview svg { color: #e72f75; }
-
 .settings-theme-option__check {
   position: absolute;
   top: 5px;
@@ -6838,14 +7207,14 @@ button.setting-row {
   box-shadow: var(--shadow-soft);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview {
   background:
     radial-gradient(circle at 8% 16%, rgba(255, 196, 215, .32), transparent 24%),
     radial-gradient(circle at 91% 82%, rgba(255, 219, 130, .26), transparent 21%),
     #fff8f4;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .product-header {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .product-header {
   position: relative;
   z-index: 2;
   border-bottom-color: rgba(238, 183, 199, .72);
@@ -6854,17 +7223,17 @@ button.setting-row {
     repeating-linear-gradient(-12deg, transparent 0 18px, rgba(244, 70, 128, .04) 18px 20px);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .product-content {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .product-content {
   padding-top: 16px;
   padding-bottom: 16px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-dashboard {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-dashboard {
   position: relative;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-dashboard::before,
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-dashboard::after {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-dashboard::before,
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-dashboard::after {
   position: absolute;
   z-index: 0;
   width: 54px;
@@ -6875,26 +7244,26 @@ button.setting-row {
   pointer-events: none;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-dashboard::before {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-dashboard::before {
   top: -6px;
   left: 28%;
   transform: rotate(-5deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-dashboard::after {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-dashboard::after {
   right: 13%;
   bottom: -5px;
   background: rgba(255, 200, 74, .31);
   transform: rotate(4deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-hero,
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-panels {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-hero,
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-panels {
   position: relative;
   z-index: 1;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-hero {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-hero {
   border-color: rgba(236, 165, 188, .86);
   border-radius: 27px 21px 28px 19px;
   background: #f9d7df;
@@ -6902,7 +7271,7 @@ button.setting-row {
   transform: rotate(-.25deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-hero::before {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-hero::before {
   position: absolute;
   z-index: 2;
   top: 11px;
@@ -6914,7 +7283,7 @@ button.setting-row {
   transform: translateX(-50%) rotate(2deg);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-hero__caption {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-hero__caption {
   right: 16px;
   bottom: 16px;
   left: 16px;
@@ -6926,42 +7295,42 @@ button.setting-row {
   background-size: 14px 14px;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-card {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-card {
   border-color: rgba(235, 187, 201, .82);
   background: rgba(255, 253, 250, .97);
   box-shadow: 0 8px 21px rgba(96, 52, 64, .09);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-card--midi {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-card--midi {
   background: linear-gradient(110deg, rgba(255, 246, 249, .98), rgba(255, 237, 243, .95));
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-card--theme {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-card--theme {
   background: linear-gradient(110deg, rgba(255, 252, 248, .98), rgba(255, 241, 246, .95));
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .settings-card--about {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .settings-card--about {
   background: linear-gradient(110deg, rgba(255, 252, 247, .98), rgba(255, 244, 238, .96));
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .group-title {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .group-title {
   border-bottom-color: rgba(237, 201, 211, .8);
   background: rgba(255, 236, 243, .72);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .setting-row__icon {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .setting-row__icon {
   background: rgba(255, 220, 232, .8);
   color: #e82f73;
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .bottom-navigation {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .bottom-navigation {
   position: relative;
   z-index: 2;
   border-top-color: rgba(236, 185, 201, .76);
   background: rgba(255, 255, 255, .97);
 }
 
-:root[data-theme='bocchi-dev'] .bocchi-settings-preview .bottom-navigation button.is-active {
+:root[data-theme-recipe-settings='settings-hero-cards-v1'] .bocchi-settings-preview .bottom-navigation button.is-active {
   background: linear-gradient(135deg, #ffdce9, #fff0d8);
   color: #e42e72;
 }

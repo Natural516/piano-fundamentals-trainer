@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pianofundamentals.local/theme/theme-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "colorScheme", "tokens", "capabilities"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "colorScheme": { "enum": ["light", "dark"] },
+    "tokens": { "$ref": "#/$defs/tokens" },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["homeVisual", "practiceVisual", "toolsVisual", "historyVisual", "settingsVisual", "practiceActiveVisual", "toolDetailVisual"],
+      "properties": {
+        "homeVisual": { "$ref": "#/$defs/homeVisual" },
+        "practiceVisual": { "$ref": "#/$defs/practiceVisual" },
+        "toolsVisual": { "$ref": "#/$defs/toolsVisual" },
+        "historyVisual": { "$ref": "#/$defs/historyVisual" },
+        "settingsVisual": { "$ref": "#/$defs/settingsVisual" },
+        "practiceActiveVisual": { "$ref": "#/$defs/practiceActiveVisual" },
+        "toolDetailVisual": { "$ref": "#/$defs/toolDetailVisual" }
+      }
+    }
+  },
+  "$defs": {
+    "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$" },
+    "shadow": { "enum": ["none", "soft", "raised", "focus"] },
+    "assetPath": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._~ /-]+$" },
+    "emptyParameters": { "type": "object", "additionalProperties": false },
+    "borderParameters": {
+      "borderWidthPx": { "type": "number", "minimum": 0, "maximum": 3 },
+      "borderRadiusPx": { "type": "number", "minimum": 0, "maximum": 32 }
+    },
+    "tokens": {
+      "type": "object", "additionalProperties": false, "required": ["colors", "shadows"],
+      "properties": {
+        "colors": {
+          "type": "object", "additionalProperties": false,
+          "required": ["--app-bg", "--surface", "--surface-soft", "--surface-elevated", "--surface-tint", "--text-primary", "--text-secondary", "--text-muted", "--accent", "--accent-strong", "--accent-soft", "--accent-ink", "--border", "--divider", "--line-strong", "--nav-bg", "--nav-active-bg", "--nav-active-text", "--button-primary-bg", "--button-primary-text", "--paper", "--blue", "--blue-soft", "--amber", "--amber-soft", "--success", "--success-soft", "--danger", "--danger-soft", "--warning", "--practice-feedback-success", "--practice-feedback-danger", "--practice-feedback-warning"],
+          "properties": {
+            "--app-bg": { "$ref": "#/$defs/color" }, "--surface": { "$ref": "#/$defs/color" }, "--surface-soft": { "$ref": "#/$defs/color" }, "--surface-elevated": { "$ref": "#/$defs/color" }, "--surface-tint": { "$ref": "#/$defs/color" },
+            "--text-primary": { "$ref": "#/$defs/color" }, "--text-secondary": { "$ref": "#/$defs/color" }, "--text-muted": { "$ref": "#/$defs/color" }, "--accent": { "$ref": "#/$defs/color" }, "--accent-strong": { "$ref": "#/$defs/color" }, "--accent-soft": { "$ref": "#/$defs/color" }, "--accent-ink": { "$ref": "#/$defs/color" },
+            "--border": { "$ref": "#/$defs/color" }, "--divider": { "$ref": "#/$defs/color" }, "--line-strong": { "$ref": "#/$defs/color" }, "--nav-bg": { "$ref": "#/$defs/color" }, "--nav-active-bg": { "$ref": "#/$defs/color" }, "--nav-active-text": { "$ref": "#/$defs/color" },
+            "--button-primary-bg": { "$ref": "#/$defs/color" }, "--button-primary-text": { "$ref": "#/$defs/color" }, "--paper": { "$ref": "#/$defs/color" }, "--blue": { "$ref": "#/$defs/color" }, "--blue-soft": { "$ref": "#/$defs/color" }, "--amber": { "$ref": "#/$defs/color" }, "--amber-soft": { "$ref": "#/$defs/color" },
+            "--success": { "$ref": "#/$defs/color" }, "--success-soft": { "$ref": "#/$defs/color" }, "--danger": { "$ref": "#/$defs/color" }, "--danger-soft": { "$ref": "#/$defs/color" }, "--warning": { "$ref": "#/$defs/color" },
+            "--practice-feedback-success": { "$ref": "#/$defs/color" }, "--practice-feedback-danger": { "$ref": "#/$defs/color" }, "--practice-feedback-warning": { "$ref": "#/$defs/color" }
+          }
+        },
+        "shadows": { "type": "object", "additionalProperties": false, "required": ["shadow", "shadowSoft"], "properties": { "shadow": { "$ref": "#/$defs/shadow" }, "shadowSoft": { "$ref": "#/$defs/shadow" } } }
+      }
+    },
+    "homeVisual": {
+      "type": "object", "additionalProperties": false, "required": ["recipeId", "assets", "parameters"],
+      "properties": {
+        "recipeId": { "const": "home-scrapbook-single-hero-v1" },
+        "assets": { "type": "object", "additionalProperties": false, "required": ["hero", "headline", "recentPractice", "midi", "tools"], "properties": { "hero": { "$ref": "#/$defs/assetPath" }, "headline": { "$ref": "#/$defs/assetPath" }, "recentPractice": { "$ref": "#/$defs/assetPath" }, "midi": { "$ref": "#/$defs/assetPath" }, "tools": { "$ref": "#/$defs/assetPath" } } },
+        "parameters": { "type": "object", "additionalProperties": false, "properties": { "heroScale": { "type": "number", "minimum": 0.6, "maximum": 1.4 }, "heroOffsetXPercent": { "type": "number", "minimum": -20, "maximum": 20 }, "heroOffsetYPercent": { "type": "number", "minimum": -20, "maximum": 20 }, "heroObjectPositionX": { "type": "number", "minimum": 0, "maximum": 100 }, "heroObjectPositionY": { "type": "number", "minimum": 0, "maximum": 100 }, "decorationOpacity": { "type": "number", "minimum": 0, "maximum": 0.65 }, "borderWidthPx": { "type": "number", "minimum": 0, "maximum": 3 }, "borderRadiusPx": { "type": "number", "minimum": 0, "maximum": 32 } } }
+      }
+    },
+    "practiceVisual": {
+      "type": "object", "additionalProperties": false, "required": ["recipeId", "assets", "parameters"],
+      "properties": {
+        "recipeId": { "const": "practice-hero-cards-v1" },
+        "assets": { "type": "object", "additionalProperties": false, "required": ["hero", "sight", "chord"], "properties": { "hero": { "$ref": "#/$defs/assetPath" }, "sight": { "$ref": "#/$defs/assetPath" }, "chord": { "$ref": "#/$defs/assetPath" } } },
+        "parameters": { "type": "object", "additionalProperties": false, "properties": { "heroScale": { "type": "number", "minimum": 0.6, "maximum": 1.4 }, "heroObjectPositionX": { "type": "number", "minimum": 0, "maximum": 100 }, "heroObjectPositionY": { "type": "number", "minimum": 0, "maximum": 100 }, "decorationOpacity": { "type": "number", "minimum": 0, "maximum": 0.65 }, "borderWidthPx": { "type": "number", "minimum": 0, "maximum": 3 }, "borderRadiusPx": { "type": "number", "minimum": 0, "maximum": 32 } } }
+      }
+    },
+    "toolsVisual": {
+      "type": "object", "additionalProperties": false, "required": ["recipeId", "assets", "parameters"],
+      "properties": {
+        "recipeId": { "const": "tools-studio-cards-v1" },
+        "assets": { "type": "object", "additionalProperties": false, "required": ["hero", "chord", "interval", "scale"], "properties": { "hero": { "$ref": "#/$defs/assetPath" }, "chord": { "$ref": "#/$defs/assetPath" }, "interval": { "$ref": "#/$defs/assetPath" }, "scale": { "$ref": "#/$defs/assetPath" } } },
+        "parameters": { "type": "object", "additionalProperties": false, "properties": { "heroScale": { "type": "number", "minimum": 0.6, "maximum": 1.4 }, "heroOffsetXPercent": { "type": "number", "minimum": -20, "maximum": 20 }, "heroOffsetYPercent": { "type": "number", "minimum": -20, "maximum": 20 }, "decorationOpacity": { "type": "number", "minimum": 0, "maximum": 0.65 }, "borderWidthPx": { "type": "number", "minimum": 0, "maximum": 3 }, "borderRadiusPx": { "type": "number", "minimum": 0, "maximum": 32 } } }
+      }
+    },
+    "historyVisual": {
+      "type": "object", "additionalProperties": false, "required": ["recipeId", "assets", "parameters"],
+      "properties": {
+        "recipeId": { "const": "history-journal-dashboard-v1" },
+        "assets": { "type": "object", "additionalProperties": false, "required": ["hero", "trend", "memo", "lower"], "properties": { "hero": { "$ref": "#/$defs/assetPath" }, "trend": { "$ref": "#/$defs/assetPath" }, "memo": { "$ref": "#/$defs/assetPath" }, "lower": { "$ref": "#/$defs/assetPath" } } },
+        "parameters": { "type": "object", "additionalProperties": false, "properties": { "heroScale": { "type": "number", "minimum": 0.6, "maximum": 1.4 }, "heroObjectPositionX": { "type": "number", "minimum": 0, "maximum": 100 }, "heroObjectPositionY": { "type": "number", "minimum": 0, "maximum": 100 }, "decorationOpacity": { "type": "number", "minimum": 0, "maximum": 0.65 }, "borderWidthPx": { "type": "number", "minimum": 0, "maximum": 3 }, "borderRadiusPx": { "type": "number", "minimum": 0, "maximum": 32 } } }
+      }
+    },
+    "settingsVisual": {
+      "type": "object", "additionalProperties": false, "required": ["recipeId", "assets", "parameters"],
+      "properties": {
+        "recipeId": { "const": "settings-hero-cards-v1" },
+        "assets": { "type": "object", "additionalProperties": false, "required": ["hero", "midi", "theme", "about"], "properties": { "hero": { "$ref": "#/$defs/assetPath" }, "midi": { "$ref": "#/$defs/assetPath" }, "theme": { "$ref": "#/$defs/assetPath" }, "about": { "$ref": "#/$defs/assetPath" } } },
+        "parameters": { "type": "object", "additionalProperties": false, "properties": { "heroScale": { "type": "number", "minimum": 0.6, "maximum": 1.4 }, "heroObjectPositionX": { "type": "number", "minimum": 0, "maximum": 100 }, "heroObjectPositionY": { "type": "number", "minimum": 0, "maximum": 100 }, "decorationOpacity": { "type": "number", "minimum": 0, "maximum": 0.65 }, "borderWidthPx": { "type": "number", "minimum": 0, "maximum": 3 }, "borderRadiusPx": { "type": "number", "minimum": 0, "maximum": 32 } } }
+      }
+    },
+    "practiceActiveVisual": {
+      "type": "object", "additionalProperties": false, "required": ["recipeId", "assets", "parameters"],
+      "properties": {
+        "recipeId": { "const": "practice-decorated-focus-v1" },
+        "assets": { "type": "object", "additionalProperties": false, "required": ["cornerCharacter", "decorations", "chordCornerCharacter", "chordDecorations", "chordPolaroid"], "properties": { "cornerCharacter": { "$ref": "#/$defs/assetPath" }, "decorations": { "$ref": "#/$defs/assetPath" }, "chordCornerCharacter": { "$ref": "#/$defs/assetPath" }, "chordDecorations": { "$ref": "#/$defs/assetPath" }, "chordPolaroid": { "$ref": "#/$defs/assetPath" } } },
+        "parameters": { "type": "object", "additionalProperties": false, "properties": { "decorationOpacity": { "type": "number", "minimum": 0, "maximum": 0.65 }, "decorationScale": { "type": "number", "minimum": 0.5, "maximum": 1.25 }, "decorationOffsetXPercent": { "type": "number", "minimum": -15, "maximum": 15 }, "decorationOffsetYPercent": { "type": "number", "minimum": -15, "maximum": 15 }, "decorationRotateDeg": { "type": "number", "minimum": -12, "maximum": 12 }, "borderWidthPx": { "type": "number", "minimum": 0, "maximum": 3 }, "borderRadiusPx": { "type": "number", "minimum": 0, "maximum": 32 } } }
+      }
+    },
+    "toolDetailVisual": {
+      "type": "object", "additionalProperties": false, "required": ["recipeId", "assets", "parameters"],
+      "properties": {
+        "recipeId": { "const": "tool-reference-notebook-v1" },
+        "assets": { "type": "object", "additionalProperties": false, "required": ["background", "decorations", "chordQueryHero", "sharedCompleteRyo"], "properties": { "background": { "$ref": "#/$defs/assetPath" }, "decorations": { "$ref": "#/$defs/assetPath" }, "chordQueryHero": { "$ref": "#/$defs/assetPath" }, "sharedCompleteRyo": { "$ref": "#/$defs/assetPath" } } },
+        "parameters": { "type": "object", "additionalProperties": false, "properties": { "backgroundPositionX": { "type": "number", "minimum": 0, "maximum": 100 }, "backgroundPositionY": { "type": "number", "minimum": 0, "maximum": 100 }, "backgroundScale": { "type": "number", "minimum": 1, "maximum": 1.25 }, "decorationOpacity": { "type": "number", "minimum": 0, "maximum": 0.65 }, "washOpacity": { "type": "number", "minimum": 0.15, "maximum": 0.85 }, "borderWidthPx": { "type": "number", "minimum": 0, "maximum": 3 }, "borderRadiusPx": { "type": "number", "minimum": 0, "maximum": 32 } } }
+      }
+    }
+  }
+}

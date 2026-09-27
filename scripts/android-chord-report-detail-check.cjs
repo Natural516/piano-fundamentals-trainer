@@ -16,6 +16,7 @@ for (const extension of ['.ts', '.tsx']) {
 const root = path.resolve(__dirname, '..')
 const mainSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/main.tsx'), 'utf8')
 const projectionSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/chordPractice/reportDetailProjection.ts'), 'utf8')
+const dashboardProjectionSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/historyDashboardProjection.ts'), 'utf8')
 const reportSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/chordPractice/report.ts'), 'utf8')
 const policySource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/practiceKeepAwake.ts'), 'utf8')
 const detailSource = mainSource.slice(mainSource.indexOf('function ChordReportDetailScreen'), mainSource.indexOf('function SettingRow'))
@@ -173,7 +174,9 @@ test('CRD22 All filter is retained across open and Back navigation', () => {
 })
 
 test('CRD23 Chord filter is retained by the same app-owned filter contract', () => {
-  assert.match(mainSource, /type HistoryFilter = 'all' \| 'sight' \| 'chord'/)
+  assert.match(mainSource, /type HistoryFilter = HistoryDashboardFilter/)
+  assert.match(mainSource, /type HistoryDashboardFilter,/)
+  assert.match(dashboardProjectionSource, /export type HistoryDashboardFilter = 'all' \| 'sight' \| 'chord'/)
   assert.match(mainSource, /onOpenChordReport\(recordId, filter\)/)
 })
 

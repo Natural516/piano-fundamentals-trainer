@@ -5,8 +5,13 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '..')
 const main = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/main.tsx'), 'utf8')
 const registry = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/themeRegistry.ts'), 'utf8')
+const themeTypes = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/themeTypes.ts'), 'utf8')
+const recipes = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/visualRecipeRegistry.ts'), 'utf8')
+const adapter = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/runtimeThemeAdapter.ts'), 'utf8')
+const packageRuntime = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/themePackageRuntime.ts'), 'utf8')
 const css = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/styles.css'), 'utf8')
 const architecture = fs.readFileSync(path.join(root, 'docs/agent/THEME_ARCHITECTURE.md'), 'utf8')
+const externalTheme = fs.readFileSync(path.join(root, 'theme-packages/bocchi/theme.json'), 'utf8')
 
 const home = main.slice(main.indexOf('function HomeScreen'), main.indexOf('function PracticeHubScreen'))
 const practice = main.slice(main.indexOf('function PracticeHubScreen'), main.indexOf('function ChordModeSelectScreen'))
@@ -17,12 +22,15 @@ const chordActive = main.slice(main.indexOf('function ChordPracticeScreen'), mai
 const sightActive = main.slice(main.indexOf('function SightFocusScreen'), main.indexOf('function SightResultScreen'))
 const chordQuery = main.slice(main.indexOf('function ToolDetailShell'), main.indexOf('function ScaleKeySignatureToolScreen'))
 const scaleKeySignature = main.slice(main.indexOf('function ScaleKeySignatureToolScreen'), main.indexOf('function IntervalPitchToken'))
+const intervalQuery = main.slice(main.indexOf('function IntervalQueryToolScreen'), main.indexOf('function ChordGroupBadge'))
 
 const tests = [
-  ['THM01', 'Light Dark and Bocchi are peer registry entries', () => {
-    for (const id of ["light: {", "dark: {", "'bocchi-dev': {"]) assert.match(registry, new RegExp(id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-    assert.match(registry, /source: 'development'/)
-    assert.match(registry, /source: 'built-in'/)
+  ['THM01', 'built-in registry contains only Light and Dark while external themes use the runtime manager', () => {
+    for (const id of ["light: {", "dark: {"]) assert.match(registry, new RegExp(id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    assert.match(registry, /BuiltInThemeRegistry/)
+    assert.match(registry, /UnifiedRuntimeThemeRegistry/)
+    assert.doesNotMatch(registry, /simulatedExternalBocchiTheme|createBocchiExternalDefinition|bocchiTokens/)
+    assert.match(themeTypes, /ThemeSource = 'built-in' \| 'development' \| 'external'/)
   }],
   ['THM02', 'all registry themes provide the shared semantic token contract', () => {
     for (const token of [
@@ -32,7 +40,7 @@ const tests = [
       '--button-primary-bg', '--button-primary-text', '--practice-feedback-success',
       '--practice-feedback-danger', '--practice-feedback-warning'
     ]) {
-      assert.ok((registry.match(new RegExp(`'${token}'`, 'g')) ?? []).length >= 4, `${token} missing from type or a theme`)
+      assert.ok(((registry + themeTypes + externalTheme).match(new RegExp(`['"]${token}['"]`, 'g')) ?? []).length >= 4, `${token} missing from type or a theme`)
     }
   }],
   ['THM03', 'Home consumes a visual capability instead of theme names', () => {
@@ -47,26 +55,35 @@ const tests = [
   ['THM05', 'Bocchi strong Home CSS is scoped to its active theme', () => {
     const selectors = css.split(/\r?\n/).filter((line) => line.trim().startsWith('.') && line.includes('bocchi-home'))
     assert.deepEqual(selectors, [], `unscoped Bocchi selectors:\n${selectors.join('\n')}`)
-    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-home-preview/)
+    assert.match(css, /:root\[data-theme-recipe-home='home-scrapbook-single-hero-v1'\] \.bocchi-home-preview/)
+    assert.doesNotMatch(css, /data-theme='bocchi-dev'/)
   }],
   ['THM06', 'approved Home keeps one composed Hero image and no foreground reconstruction', () => {
     assert.equal((home.match(/assets\.hero/g) ?? []).length, 1)
     assert.doesNotMatch(home, /foreground|overlap|bridge|mask|clipPath|clip-path/)
-    assert.match(registry, /hero: bocchiHomeHero/)
+    assert.match(externalTheme, /"hero": "assets\/home\/hero\.png"/)
   }],
-  ['THM07', 'Settings consumes its visual capability and development theme stays build-gated', () => {
+  ['THM07', 'Settings consumes its visual capability and delegates external packages to the runtime manager', () => {
     assert.match(settings, /theme\.capabilities\.settingsVisual/)
     assert.match(settings, /settingsVisual\.kind === 'hero-cards'/)
-    assert.match(main, /SHOW_DEVELOPMENT_TOOLS[\s\S]*SETTINGS_THEME_OPTIONS[\s\S]*option\.id !== 'bocchi-dev'/)
-    assert.doesNotMatch(settings, /theme\.id === 'bocchi-dev'|assets\/themes\/bocchi|导入主题|\.pttheme/)
+    assert.match(settings, /const visibleThemeOptions = SETTINGS_THEME_OPTIONS/)
+    assert.match(settings, /themeManager\.selectThemeId\(String\(option\.id\)\)/)
+    assert.match(settings, /themeRuntime\.installed/)
+    assert.match(settings, /导入主题包/)
+    assert.doesNotMatch(settings, /theme\.id === 'bocchi-dev'|assets\/themes\/bocchi|FileReader|JSZip|showOpenFilePicker/)
   }],
   ['THM08', 'development activation is explicit and release defaults to Light', () => {
     assert.match(registry, /new URLSearchParams\(search\)\.get\('theme'\)/)
-    assert.match(registry, /if \(allowDevelopmentTheme\)[\s\S]*return 'bocchi-dev'[\s\S]*return 'light'/)
+    assert.match(registry, /allowDevelopmentTheme && \(requested === 'natural516\.bocchi' \|\| requested === 'bocchi-dev'\)[\s\S]*return 'light'/)
   }],
-  ['THM09', 'external source is reserved without implementing an importer', () => {
-    assert.match(registry, /ThemeSource = 'built-in' \| 'development' \| 'external'/)
-    assert.doesNotMatch(main + registry, /FileReader|JSZip|\.pttheme|showOpenFilePicker/)
+  ['THM09', 'external runtime uses the native Android package boundary and runtime adapter', () => {
+    assert.match(themeTypes, /ExternalThemeDefinitionV1/)
+    assert.match(adapter, /adaptExternalTheme/)
+    assert.match(main, /ThemeRuntimeManager/)
+    assert.match(packageRuntime, /registerPlugin<ThemePackagePluginApi>\('ThemePackage'\)/)
+    assert.match(packageRuntime, /NativeThemePackage\.pickThemePackage\(\)/)
+    assert.match(packageRuntime, /NativeThemePackage\.installThemePackage/)
+    assert.doesNotMatch(main + registry + packageRuntime, /FileReader|JSZip|showOpenFilePicker/)
   }],
   ['THM10', 'architecture document freezes product and theme boundaries', () => {
     for (const phrase of ['Product layer', 'Peer themes', 'Single visual source', 'Future external-theme compatibility', 'Themes cannot alter business logic']) {
@@ -81,9 +98,8 @@ const tests = [
     assert.match(practice, /navigate\('chord-mode-select'\)/)
   }],
   ['THM12', 'Bocchi Practice uses A B and C while D remains reference-only', () => {
-    for (const asset of ['20_53_32.png', '20_56_06.png', '20_57_50.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
-    assert.doesNotMatch(registry, /21_03_05\.png/)
-    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-practice-preview/)
+    for (const asset of ['assets/practice/hero.png', 'assets/practice/sight.png', 'assets/practice/chord.png']) assert.match(externalTheme, new RegExp(asset.replaceAll('/', '\\/').replace('.', '\\.')))
+    assert.match(css, /:root\[data-theme-recipe-practice='practice-hero-cards-v1'\] \.bocchi-practice-preview/)
     assert.equal((practice.match(/className=\{`module-card/g) ?? []).length, 2)
     assert.doesNotMatch(practice, /自由练习|节拍器/)
   }],
@@ -94,9 +110,8 @@ const tests = [
     for (const route of ['chord-query-tool', 'interval-query-tool', 'scale-key-signature-tool']) assert.match(tools, new RegExp(route))
   }],
   ['THM14', 'Bocchi Tools uses one hero and three decorations while reference D stays inert', () => {
-    for (const asset of ['00_05_48.png', '00_25_10.png', '00_27_04.png', '00_30_34.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
-    assert.doesNotMatch(registry, /00_38_00\.png/)
-    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-tools-preview/)
+    for (const asset of ['assets/tools/hero.png', 'assets/tools/chord.png', 'assets/tools/interval.png', 'assets/tools/scale.png']) assert.match(externalTheme, new RegExp(asset.replaceAll('/', '\\/').replace('.', '\\.')))
+    assert.match(css, /:root\[data-theme-recipe-tools='tools-studio-cards-v1'\] \.bocchi-tools-preview/)
     assert.equal((tools.match(/screen: '/g) ?? []).length, 3)
     assert.doesNotMatch(tools, /搜索工具|最近使用|基础乐理|节拍器/)
   }],
@@ -104,9 +119,8 @@ const tests = [
     assert.match(history, /theme\.capabilities\.historyVisual/)
     assert.match(history, /historyVisual\.kind === 'dashboard'/)
     assert.doesNotMatch(history, /bocchi-dev|assets\/themes\/bocchi/)
-    for (const asset of ['02_27_13.png', '02_32_25.png', '02_30_40.png', '02_34_11.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
-    assert.doesNotMatch(registry, /02_47_09\.png/)
-    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-history-preview/)
+    for (const asset of ['assets/history/hero.png', 'assets/history/trend.png', 'assets/history/memo.png', 'assets/history/lower.png']) assert.match(externalTheme, new RegExp(asset.replaceAll('/', '\\/').replace('.', '\\.')))
+    assert.match(css, /:root\[data-theme-recipe-history='history-journal-dashboard-v1'\] \.bocchi-history-preview/)
     assert.match(history, /已保存练习/)
     assert.match(history, /累计完成题数/)
     assert.match(history, /练习趋势/)
@@ -117,18 +131,17 @@ const tests = [
     assert.match(settings, /presentMidiStatus\(runtime\)/)
     assert.match(settings, /updater\.installed/)
     assert.doesNotMatch(settings, /assets\/themes\/bocchi|theme\.id === 'bocchi-dev'/)
-    for (const asset of ['12_01_39.png', '12_38_35.png', '12_46_01.png', '12_47_56.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
-    assert.doesNotMatch(registry, /11_44_01\.png/)
-    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-settings-preview/)
+    for (const asset of ['assets/settings/hero.png', 'assets/settings/midi.png', 'assets/settings/theme.png', 'assets/settings/about.png']) assert.match(externalTheme, new RegExp(asset.replaceAll('/', '\\/').replace('.', '\\.')))
+    assert.match(css, /:root\[data-theme-recipe-settings='settings-hero-cards-v1'\] \.bocchi-settings-preview/)
   }],
   ['THM17', 'ACTIVE practice consumes one shared visual capability with isolated Bocchi decoration', () => {
     assert.match(sightActive, /theme\.capabilities\.practiceActiveVisual/)
     assert.match(sightActive, /practiceActiveVisual\.kind === 'decorated-focus'/)
     assert.doesNotMatch(sightActive, /bocchi-dev|assets\/themes\/bocchi/)
     assert.equal((registry.match(/practiceActiveVisual: standardPracticeActiveVisual/g) ?? []).length, 2)
-    assert.match(registry, /practiceActiveVisual:\s*\{\s*kind: 'decorated-focus'/)
-    assert.match(registry, /cornerCharacter: bocchiSightActiveCharacter/)
-    assert.match(registry, /decorations: bocchiSightActiveDecorations/)
+    assert.match(externalTheme, /"practiceActiveVisual"[\s\S]*"recipeId": "practice-decorated-focus-v1"/)
+    assert.match(externalTheme, /"cornerCharacter": "assets\/practice-active\/sight-character\.png"/)
+    assert.match(externalTheme, /"decorations": "assets\/practice-active\/sight-decorations\.png"/)
     assert.match(main, /decoratedFocus \? \([\s\S]*?focus-active-character/)
     assert.match(css, /\.bocchi-sight-active \.focus-stage \.notation-paper/)
     assert.doesNotMatch(css, /\.bocchi-sight-active \.music-staff-renderer/)
@@ -139,13 +152,12 @@ const tests = [
     assert.match(chordActive, /practiceActiveVisual\.chordArtwork/)
     assert.doesNotMatch(chordActive, /bocchi-dev|assets\/themes\/bocchi/)
     assert.equal((registry.match(/practiceActiveVisual: standardPracticeActiveVisual/g) ?? []).length, 2)
-    for (const asset of ['02_53_43.png', '03_00_49.png', '03_04_22.png']) assert.match(registry, new RegExp(asset.replace('.', '\\.')))
-    assert.doesNotMatch(registry, /02_50_28\.png/)
-    assert.match(registry, /chordArtwork:\s*\{[\s\S]*frameClassName: 'bocchi-chord-active'/)
+    for (const asset of ['assets/practice-active/chord-character.png', 'assets/practice-active/chord-decorations.png', 'assets/practice-active/chord-polaroid.png']) assert.match(externalTheme, new RegExp(asset.replaceAll('/', '\\/').replace('.', '\\.')))
+    assert.match(adapter, /chordArtwork:\s*\{[\s\S]*frameClassName: 'bocchi-chord-active'/)
     assert.match(chordActive, /chordArtwork \? \([\s\S]*data-chord-theme-asset="character"[\s\S]*data-chord-theme-asset="polaroid"/)
     assert.equal((chordActive.match(/data-chord-theme-asset="decoration"/g) ?? []).length, 3)
     assert.match(chordActive, /presentation\.semantic === 'success'[\s\S]*data-chord-theme-reward="success"/)
-    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-chord-active \.chord-notation-card/)
+    assert.match(css, /:root\[data-theme-recipe-practice-active='practice-decorated-focus-v1'\] \.bocchi-chord-active \.chord-notation-card/)
     assert.doesNotMatch(css, /\.bocchi-chord-active \.chord-grand-staff/)
   }],
   ['THM19', 'Tool Detail uses a shared capability with isolated Chord Query artwork', () => {
@@ -154,14 +166,11 @@ const tests = [
     assert.match(chordQuery, /toolDetailVisual\.kind === 'decorated-reference'/)
     assert.doesNotMatch(chordQuery, /bocchi-dev|assets\/themes\/bocchi/)
     assert.equal((registry.match(/toolDetailVisual: standardToolDetailVisual/g) ?? []).length, 2)
-    assert.match(registry, /toolDetailVisual:\s*\{\s*kind: 'decorated-reference'/)
-    assert.match(registry, /background: bocchiToolDetailBackground/)
-    assert.match(registry, /artwork:\s*\{[\s\S]*chordQueryHero: bocchiChordQueryRyo/)
-    assert.match(registry, /scaleHero: bocchiScaleKeySignatureRyo/)
-    assert.match(registry, /tool-detail\/chord-query\/ryo-reference-sticker\.png/)
-    assert.match(registry, /tool-detail\/scale-key-signature\/scale-key-signature-hero\.png/)
-    assert.doesNotMatch(registry, /tool-detail\/shared\/ryo-reference-sticker\.png/)
-    assert.match(registry, /decorations: bocchiToolDetailDecorations/)
+    assert.match(externalTheme, /"toolDetailVisual"[\s\S]*"recipeId": "tool-reference-notebook-v1"/)
+    assert.match(externalTheme, /"background": "assets\/tool-detail\/background\.png"/)
+    assert.match(externalTheme, /"chordQueryHero": "assets\/tool-detail\/chord-query-hero\.png"/)
+    assert.match(externalTheme, /"sharedCompleteRyo": "assets\/tool-detail\/shared-ryo\.png"/)
+    assert.match(externalTheme, /"decorations": "assets\/tool-detail\/decorations\.png"/)
     assert.equal((chordQuery.match(/data-tool-detail-asset="background"/g) ?? []).length, 1)
     assert.equal((chordQuery.match(/data-tool-detail-asset="chord-query-hero"/g) ?? []).length, 1)
     assert.equal((chordQuery.match(/data-tool-detail-asset="decoration"/g) ?? []).length, 7)
@@ -173,23 +182,37 @@ const tests = [
     assert.match(css, /\.tool-detail-top\.chord-query-header\s*\{[\s\S]*?grid-template-rows: 210px 108px;/)
     assert.match(css, /\.tool-detail-query-panel\s*\{[\s\S]*?margin: 0 28px;/)
     assert.doesNotMatch(css, /bocchi-tool-detail-preview \.chord-query-selectors\s*\{[\s\S]*?grid-template-columns:/)
-    assert.match(css, /:root\[data-theme='bocchi-dev'\] \.bocchi-tool-detail-preview/)
+    assert.match(css, /:root\[data-theme-recipe-tool-detail='tool-reference-notebook-v1'\] \.bocchi-tool-detail-preview/)
+    assert.match(recipes, /'tool-reference-notebook-v1'/)
     assert.doesNotMatch(registry, /照片-1|chord-query-reference/)
   }],
   ['THM20', 'Scale Key Signature consumes shared Tool Detail capability with isolated page artwork', () => {
     assert.match(scaleKeySignature, /theme\.capabilities\.toolDetailVisual/)
     assert.match(scaleKeySignature, /toolDetailVisual\.kind === 'decorated-reference'/)
     assert.match(scaleKeySignature, /<ToolDetailShell/)
-    assert.match(scaleKeySignature, /heroArtwork=\{decoratedReference\?\.artwork\.scaleHero\}/)
-    assert.match(scaleKeySignature, /heroKind="scale-key-signature"/)
+    assert.match(scaleKeySignature, /heroArtwork=\{decoratedReference\?\.artwork\.sharedCompleteRyo\}/)
+    assert.match(scaleKeySignature, /heroKind="complete-ryo"/)
     assert.doesNotMatch(scaleKeySignature, /bocchi-dev|assets\/themes\/bocchi/)
-    assert.equal((chordQuery.match(/data-tool-detail-asset="scale-hero"/g) ?? []).length, 1)
+    assert.equal((chordQuery.match(/data-tool-detail-asset="complete-ryo"/g) ?? []).length, 1)
     assert.match(css, /\.tool-detail-top\.scale-tool-header\s*\{[\s\S]*?grid-template-rows: 210px 108px;/)
     assert.match(css, /\.scale-tool-selectors\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);/)
     assert.match(css, /\.scale-tool-results\s*\{[\s\S]*?grid-template-columns: minmax\(0, 44fr\) minmax\(0, 56fr\);/)
-    assert.match(css, /\.tool-detail-artwork__scale-hero\s*\{[\s\S]*?width: 315px;/)
+    assert.match(css, /\.scale-tool-layout \.tool-detail-artwork__complete-ryo\s*\{[\s\S]*?width: 315px;/)
     assert.match(css, /\.scale-key-signature-paper\s*\{[\s\S]*?background: #fff;/)
     assert.doesNotMatch(registry, /18_23_57|scale-key-signature-reference/)
+  }],
+  ['THM21', 'Interval Query consumes shared Tool Detail capability with page-specific geometry', () => {
+    assert.match(intervalQuery, /theme\.capabilities\.toolDetailVisual/)
+    assert.match(intervalQuery, /toolDetailVisual\.kind === 'decorated-reference'/)
+    assert.match(intervalQuery, /<ToolDetailShell/)
+    assert.match(intervalQuery, /heroArtwork=\{decoratedReference\?\.artwork\.sharedCompleteRyo\}/)
+    assert.match(intervalQuery, /heroKind="complete-ryo"/)
+    assert.doesNotMatch(intervalQuery, /bocchi-dev|assets\/themes\/bocchi|scale-key-signature\//)
+    assert.match(css, /\.tool-detail-top\.interval-query-header\s*\{[\s\S]*?grid-template-rows: 210px 108px;/)
+    assert.match(css, /\.interval-query-selectors\s*\{[\s\S]*?grid-template-columns: minmax\(0, 46fr\) 62px minmax\(0, 46fr\);/)
+    assert.match(css, /\.interval-query-results\s*\{[\s\S]*?grid-template-columns: minmax\(0, 64fr\) minmax\(320px, 36fr\);/)
+    assert.match(css, /\.interval-query-layout \.tool-detail-artwork__complete-ryo\s*\{[\s\S]*?width: 312px;/)
+    assert.match(main, /case 'interval-query-tool': return <IntervalQueryToolScreen theme=\{activeTheme\} \/>/)
   }]
 ]
 

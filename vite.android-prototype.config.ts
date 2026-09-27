@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { createReadStream, readFileSync, statSync } from 'node:fs'
+import { extname, resolve, sep } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
@@ -30,7 +30,28 @@ export default defineConfig(({ mode }) => {
       __ANDROID_VERSION_NAME__: JSON.stringify(androidVersionName),
       __UPDATE_MANIFEST_URL__: JSON.stringify(updateManifestUrl)
     },
-    plugins: [react()],
+    plugins: [
+      react(),
+      {
+        name: 'external-theme-source-test-server',
+        apply: 'serve',
+        configureServer(server) {
+          const sourceRoot = resolve('theme-packages/bocchi')
+          server.middlewares.use('/__theme_source__/bocchi', (request, response, next) => {
+            try {
+              const relative = decodeURIComponent((request.url ?? '/').split('?')[0]).replace(/^\/+/, '')
+              const absolute = resolve(sourceRoot, relative)
+              if (absolute !== sourceRoot && !absolute.startsWith(`${sourceRoot}${sep}`)) { response.statusCode = 403; response.end(); return }
+              if (!statSync(absolute).isFile()) { next(); return }
+              const mime = { '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' }[extname(absolute).toLowerCase()]
+              if (mime) response.setHeader('Content-Type', mime)
+              response.setHeader('Cache-Control', 'no-store')
+              createReadStream(absolute).pipe(response)
+            } catch { next() }
+          })
+        }
+      }
+    ],
     build: {
       outDir: resolve('dist/android-tablet-prototype'),
       emptyOutDir: true

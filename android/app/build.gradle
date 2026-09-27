@@ -81,6 +81,9 @@ android {
         versionCode appVersionCode
         versionName appVersionName
         buildConfigField "String", "UPDATE_MANIFEST_URL", "\"${escapedProductionManifestUrl}\""
+        buildConfigField "String", "THEME_CHANNEL", '"release"'
+        buildConfigField "String", "THEME_HOST_COMPAT_VERSION", '"1.5.3"'
+        buildConfigField "boolean", "ALLOW_UNSIGNED_THEME_PACKAGES", "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -99,11 +102,17 @@ android {
         }
     }
     buildTypes {
+        debug {
+            buildConfigField "String", "THEME_CHANNEL", '"debug"'
+            buildConfigField "boolean", "ALLOW_UNSIGNED_THEME_PACKAGES", "true"
+        }
         qa {
             initWith debug
             applicationIdSuffix ".qa"
             debuggable true
             buildConfigField "String", "UPDATE_MANIFEST_URL", '""'
+            buildConfigField "String", "THEME_CHANNEL", '"qa"'
+            buildConfigField "boolean", "ALLOW_UNSIGNED_THEME_PACKAGES", "false"
             matchingFallbacks = ['debug']
         }
         release {
@@ -158,7 +167,11 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    implementation "org.apache.commons:commons-compress:1.28.0"
+    implementation "com.google.crypto.tink:tink-android:1.16.0"
+    implementation "com.fasterxml.jackson.core:jackson-core:2.18.3"
     testImplementation "junit:junit:$junitVersion"
+    testImplementation "org.json:json:20240303"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
