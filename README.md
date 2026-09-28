@@ -1,77 +1,81 @@
 # Piano Fundamentals Trainer
 
-钢琴基本功训练器是一个基于 Electron、React 和 TypeScript 的 Windows 桌面练习软件。
+钢琴基本功训练器是一款面向 Android 平板的 MIDI 钢琴练习应用。
 
-当前测试版本：`0.9.1-beta`
+当前正式版本：Android `1.5.3`（V1.5.3，`versionCode 13`）
+平台：Android Tablet
 
-## 已实现功能
+## 当前功能
 
-- Web MIDI 输入设备枚举、选择、连接状态和事件日志。
-- 88 键虚拟钢琴键盘、复音高亮与 CC64 延音踏板事件显示。
-- 可独立开关和调节音量的本地监听。
-- 节拍器、预备拍、强弱拍声音和三档判定宽容度。
-- 识谱练习：高音谱号、低音谱号、双谱号随机和三档音域。
-- 节奏与切分练习：四个基础节奏模板。
-- 十二大调音阶练习。
-- 自然三和弦、转位与柱式和弦练习。
-- 左右手协调练习。
-- 本地练习记录、历史报告、今日统计和最近练习记录。
+### 练习
 
-外部使用 Garritan CFX、ARIA Player、Pianoteq、Kontakt 或 DAW 时，可让外部音源与本软件直接读取同一个 MIDI 键盘，并关闭本软件的本地监听以避免双重声音。本软件不包含 MIDI 转发、VST 宿主或 SoundFont。
+- 识谱练习
+- 和弦练习
 
-## 开发环境
+### 乐理工具
 
-```bash
-npm install
-npm run dev
-```
+- 基础知识与和弦查询
+- 自然大调音阶与调号
+- 音程查询
 
-Windows PowerShell 如果拦截 `npm.ps1`，可使用 `npm.cmd`：
+### MIDI、记录与外观
+
+- MIDI 钢琴输入与设备状态
+- 本地练习历史记录
+- 浅色、深色主题
+- 外部 `.pftheme` 个性化主题
+- 主题包签名验证、安装、更新、删除与故障回退
+
+应用的练习、乐理计算、统计和历史记录均由真实 UI 与本地数据驱动，不依赖截图或主题素材提供功能信息。
+
+## 产品截图
+
+以下截图来自已经完成 Release Candidate 验收的 V1.5.3 Production 应用。
+
+### 首页
+
+![Android V1.5.3 首页](docs/screenshots/android-v1.5.3-home.png)
+
+### 设置与主题管理
+
+![Android V1.5.3 设置页](docs/screenshots/android-v1.5.3-settings.png)
+
+## 下载与安装
+
+正式 APK 通过本仓库的 [GitHub Releases](https://github.com/Natural516/piano-fundamentals-trainer/releases) 提供。
+
+已有 V1.5.2（`versionCode 12`）用户可以直接覆盖安装 V1.5.3，无需先卸载。覆盖升级可保留兼容的本地 History 与主要练习设置。
+
+应用内提供由用户主动触发的正式更新检查。下载与安装前会校验包名、版本、文件大小、SHA-256 和正式签名身份。
+
+## 个性化主题
+
+V1.5.3 起支持外部 `.pftheme` 个性化主题。主题包与应用版本分离，并经过 Theme API、最低应用版本、内容完整性和 Production 签名验证。
+
+个性化主题通过独立仓库提供：
+
+- [piano-fundamentals-trainer-themes](https://github.com/Natural516/piano-fundamentals-trainer-themes)
+
+首个主题包为“孤独摇滚”（主题 ID：`natural516.bocchi`）。
+
+## 构建与验证
+
+公开仓库包含 Android 应用运行、构建、测试及必要共享核心所需的源码。常用公开验证入口：
 
 ```powershell
-npm.cmd install
-npm.cmd run dev
+npm.cmd ci
+npm.cmd run test:public
+npm.cmd run android:apk:debug
+npm.cmd run test:android-shell
+npm.cmd run android:verify:debug
 ```
 
-## 检查与构建
+官方永久签名私钥不进入公开仓库。普通贡献者应构建 Debug APK；正式 Release 由维护者使用独立保管的签名身份生成。
 
-```bash
-npm run test:regression
-npm run typecheck
-npm run build
-```
+## 项目与许可证
 
-- `test:regression`：检查核心题库、判定工具和本地记录边界。
-- `typecheck`：检查 Electron 主进程和 React 渲染进程的 TypeScript 类型。
-- `build`：执行类型检查并生成 `out/` 生产构建。
+- 公开仓库：[Natural516/piano-fundamentals-trainer](https://github.com/Natural516/piano-fundamentals-trainer)
+- 源代码许可证：[Apache License 2.0](LICENSE)
+- 第三方材料说明：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
-## Windows 打包
-
-请先运行 `npm run build`，再执行：
-
-```bash
-npm run pack
-npm run dist
-```
-
-- `pack`：生成 `release/win-unpacked/` 免安装目录。
-- `dist`：生成 NSIS 安装包和单文件便携版。
-
-输出目录：
-
-```text
-release/
-├─ 钢琴基本功训练器-Setup-0.9.1-beta.exe
-├─ 钢琴基本功训练器-Portable-0.9.1-beta.exe
-└─ win-unpacked/
-```
-
-安装版支持选择安装路径，并创建桌面和开始菜单快捷方式。便携版是可直接双击运行的单个 EXE。两者都不需要 Node.js、npm、命令行或开发服务器。
-
-## 数据保存
-
-练习记录保存在 Electron 的本地应用数据目录中。安装升级和正常卸载不会主动删除这些记录。便携版同样使用 Windows 用户应用数据目录，因此移动便携 EXE 不会把记录嵌入或带走。
-
-## 临时程序图标
-
-当前 `build/icon.ico` 是用于 `0.9.1-beta` 构建的临时程序图标，生成脚本为 `scripts/generate-app-icon.py`。它与首页六个练习模块图标无关，后续可直接替换正式 ICO。
+官方品牌、主题图稿与第三方素材不因源代码许可证而自动获得同等授权；具体边界以仓库内对应说明为准。
