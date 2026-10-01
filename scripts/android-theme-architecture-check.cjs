@@ -14,7 +14,7 @@ const architecture = fs.readFileSync(path.join(root, 'docs/agent/THEME_ARCHITECT
 const externalTheme = fs.readFileSync(path.join(root, 'theme-packages/bocchi/theme.json'), 'utf8')
 
 const home = main.slice(main.indexOf('function HomeScreen'), main.indexOf('function PracticeHubScreen'))
-const practice = main.slice(main.indexOf('function PracticeHubScreen'), main.indexOf('function ChordModeSelectScreen'))
+const practice = main.slice(main.indexOf('function PracticeHubScreen'), main.indexOf('type IntervalPracticeSettingChanges'))
 const tools = main.slice(main.indexOf('const THEORY_TOOLS'), main.indexOf('function ScaleNoteToken'))
 const history = main.slice(main.indexOf('function HistoryScreen'), main.indexOf('function ChordReportDetailScreen'))
 const settings = main.slice(main.indexOf('function SettingsScreen'), main.indexOf('function MidiScreen'))
@@ -100,8 +100,18 @@ const tests = [
   ['THM12', 'Bocchi Practice uses A B and C while D remains reference-only', () => {
     for (const asset of ['assets/practice/hero.png', 'assets/practice/sight.png', 'assets/practice/chord.png']) assert.match(externalTheme, new RegExp(asset.replaceAll('/', '\\/').replace('.', '\\.')))
     assert.match(css, /:root\[data-theme-recipe-practice='practice-hero-cards-v1'\] \.bocchi-practice-preview/)
-    assert.equal((practice.match(/className=\{`module-card/g) ?? []).length, 2)
+    assert.equal((practice.match(/<button className=\{`module-card/g) ?? []).length, 3)
+    assert.equal((practice.match(/themed-practice-card is-/g) ?? []).length, 2)
+    assert.match(practice, /interval-notebook-card/)
     assert.doesNotMatch(practice, /自由练习|节拍器/)
+    assert.doesNotMatch(practice, /module-card__recent|sightRecentSummary|chordRecentSummary|暂无练习记录|MIDI 自动判题/)
+    assert.doesNotMatch(css, /module-card__recent/)
+    assert.equal((practice.match(/<span className="module-card__copy">/g) ?? []).length, 3)
+    assert.equal((practice.match(/__action"><Icon name="play"/g) ?? []).length, 3)
+    assert.match(practice, /指定低音构造 · 26 种音程/)
+    assert.doesNotMatch(practice, /复现 \/ 构造/)
+    assert.match(practice, /runtime\.refreshHistory\(\)/)
+    assert.match(practice, /chordPersistence\.refresh\(\)/)
   }],
   ['THM13', 'Tools consumes a visual capability without theme-name coupling', () => {
     assert.match(tools, /theme\.capabilities\.toolsVisual/)

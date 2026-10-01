@@ -1,8 +1,9 @@
 import type { DurableSightReadingReport } from './androidPersistenceCore'
 import type { ChordPracticeReportV1 } from './chordPractice/report'
+import type { IntervalPracticeReportV1 } from './intervalPractice/report'
 
 export type HistoryDashboardRange = '7d' | '30d' | 'all'
-export type HistoryDashboardFilter = 'all' | 'sight' | 'chord'
+export type HistoryDashboardFilter = 'all' | 'sight' | 'chord' | 'interval'
 
 export interface HistoryDashboardSummary {
   totalSessions: number
@@ -23,7 +24,7 @@ export interface HistoryDashboardProjection {
 }
 
 interface ActivityFact {
-  module: 'sight' | 'chord'
+  module: 'sight' | 'chord' | 'interval'
   recordId: string
   endedAt: number
   completedQuestions: number
@@ -54,7 +55,8 @@ function dateLabel(date: Date): string {
 
 function collectFacts(
   sightReports: readonly DurableSightReadingReport[],
-  chordReports: readonly ChordPracticeReportV1[]
+  chordReports: readonly ChordPracticeReportV1[],
+  intervalReports: readonly IntervalPracticeReportV1[] = []
 ): readonly ActivityFact[] {
   const facts = new Map<string, ActivityFact>()
   for (const report of sightReports) {
@@ -70,6 +72,14 @@ function collectFacts(
       module: 'chord',
       recordId: report.recordId,
       endedAt: report.endedAtEpochMs,
+      completedQuestions: report.completedQuestions
+    })
+  }
+  for (const report of intervalReports) {
+    facts.set(`interval:${report.recordId}`, {
+      module: 'interval',
+      recordId: report.recordId,
+      endedAt: report.finishedAtEpochMs,
       completedQuestions: report.completedQuestions
     })
   }
@@ -102,16 +112,21 @@ function getRangeStart(facts: readonly ActivityFact[], range: HistoryDashboardRa
 export function projectHistoryDashboard(
   sightReports: readonly DurableSightReadingReport[],
   chordReports: readonly ChordPracticeReportV1[],
-  options: Readonly<{
+  intervalReportsOrOptions: readonly IntervalPracticeReportV1[] | Readonly<{
     filter?: HistoryDashboardFilter
     now?: number
     range?: HistoryDashboardRange
-  }> = {}
+  }> = [],
+  maybeOptions: Readonly<{ filter?: HistoryDashboardFilter; now?: number; range?: HistoryDashboardRange }> = {}
 ): HistoryDashboardProjection {
+  const intervalReports = Array.isArray(intervalReportsOrOptions) ? intervalReportsOrOptions : []
+  const options: Readonly<{ filter?: HistoryDashboardFilter; now?: number; range?: HistoryDashboardRange }> = Array.isArray(intervalReportsOrOptions)
+    ? maybeOptions
+    : intervalReportsOrOptions as Readonly<{ filter?: HistoryDashboardFilter; now?: number; range?: HistoryDashboardRange }>
   const now = options.now ?? Date.now()
   const range = options.range ?? '7d'
   const filter = options.filter ?? 'all'
-  const facts = collectFacts(sightReports, chordReports)
+  const facts = collectFacts(sightReports, chordReports, intervalReports)
   const filteredFacts = filter === 'all' ? facts : facts.filter((fact) => fact.module === filter)
   const today = startOfLocalDay(now)
   const start = getRangeStart(filteredFacts, range, today)

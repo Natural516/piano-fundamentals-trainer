@@ -295,10 +295,14 @@ test('APS13', 'Sight explicit Stop after temporary navigation persists exactly o
   assert.equal(reports.saveCalls, 1)
 })
 
-test('APS14', 'App owns one persistent MIDI observer and Chord page unmount never stops Runtime', () => {
-  assert.equal((mainSource.match(/midiRouter\.subscribe\(/g) ?? []).length, 1)
+test('APS14', 'Chord keeps one persistent observer while Interval owns one page-scoped observer with cleanup', () => {
+  assert.equal((mainSource.match(/midiRouter\.subscribe\(/g) ?? []).length, 2)
   const chordUi = mainSource.slice(mainSource.indexOf('function ChordPracticeScreen'), mainSource.indexOf('function SightReadyScreen'))
   assert.doesNotMatch(chordUi, /return \(\) => \{ runtime\.stop\(\) \}/)
+  const intervalUi = mainSource.slice(mainSource.indexOf('function IntervalPracticeActiveScreen'), mainSource.indexOf('function ChordModeSelectScreen'))
+  assert.match(intervalUi, /const unsubscribe = midiRuntime\.midiRouter\.subscribe/)
+  assert.match(intervalUi, /return unsubscribe/)
+  assert.match(intervalUi, /runtime\.pause\(\)/)
   assert.match(mainSource, /useMemo\(\(\) => new ChordPracticeRuntime/)
   assert.match(mainSource, /chordRuntime\.pause\('manual-pause'\)/)
 })
@@ -414,6 +418,16 @@ test('APS24', 'standard feedback palette is shared while notation geometry and c
   assert.match(controllerSource, /FEEDBACK_DURATION_MS = 350/)
   assert.match(controllerSource, /DOUBLE_NOTE_CORRECT_FEEDBACK_DURATION_MS = 1200/)
   assert.match(controllerSource, /DOUBLE_NOTE_WRONG_FEEDBACK_DURATION_MS = 1600/)
+})
+
+test('APS25', 'Interval uses the common active-session identity and explicit end contract', () => {
+  const host = new ActivePracticeSessionHost()
+  const session = host.begin('interval', 'interval-active')
+  assert.deepEqual([session.module, session.practiceScreen], ['interval', 'interval-active'])
+  assert.equal(host.end(session.id), true)
+  assert.equal(host.current, null)
+  assert.match(mainSource, /activeSessionHost\.begin\('interval', 'interval-active'\)/)
+  assert.match(mainSource, /active\?\.module === 'interval'/)
 })
 
 ;(async () => {

@@ -1,4 +1,4 @@
-export type ActivePracticeModule = 'sight' | 'chord'
+export type ActivePracticeModule = 'sight' | 'chord' | 'interval'
 
 export interface ActivePracticeSession {
   readonly id: string

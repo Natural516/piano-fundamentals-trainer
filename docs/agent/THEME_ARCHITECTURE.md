@@ -38,7 +38,7 @@ Settings 将内置主题与已安装外部主题分开渲染。外部主题的�
 
 ## 4. App-owned Visual Recipe
 
-当前 App 内置七类视觉配方：
+当前 App 内置八类视觉配方：
 
 1. `home-scrapbook-single-hero-v1`
 2. `practice-hero-cards-v1`
@@ -47,6 +47,7 @@ Settings 将内置主题与已安装外部主题分开渲染。外部主题的�
 5. `settings-hero-cards-v1`
 6. `practice-decorated-focus-v1`
 7. `tool-reference-notebook-v1`
+8. `interval-blue-notebook-v1`（可选；仅 Practice Hub 音程卡、Interval ACTIVE 外围）
 
 外部包只能引用已知 recipeId，并提供允许的素材 slot 与 token；不能提供 React、HTML、CSS、脚本、selector 或任意布局代码。CSS 通过 `data-theme-recipe-*` 激活配方。历史 `.bocchi-*` class 仅是已批准配方的内部实现名，不代表 themeId 分支。
 
@@ -64,6 +65,7 @@ Theme Layer 只能改变反馈外观，不能改变 Correct / Wrong / Timeout / 
 - `settingsVisual`：Hero 与卡片装饰；设备状态、主题包管理和版本均属 Product。
 - `practiceActiveVisual`：Focus shell 与角落装饰；谱面几何、VexFlow、MIDI、计时和判定不受主题影响。
 - `toolDetailVisual`：Reference Notebook skin 与装饰；查询、拼写、结果语义和 native controls 均属 Product。
+- `intervalPracticeVisual`：optional capability；`hubCardCollage` / `activeBorder` 为各自独立的 optional slot，参数只能为 `{}`。旧七能力主题仍合法；缺失 slot 对应页面不建 img、不留占位，保持 standard fallback。Preparation / Result / History Detail 不消费该能力；Pause/MIDI 断连仅复用 ACTIVE shell 与现有 Product 状态层。ACTIVE 边框通过 App-owned ResizeObserver 测量裁切排除整个谱面 stage 加 8px 安全间距，不改变 notation 几何。
 
 ## 7. 外部素材所有权
 

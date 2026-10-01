@@ -28,6 +28,7 @@ const LIMITS = Object.freeze({
 const ALLOWED_EXTENSIONS = new Set(['.json', '.png', '.jpg', '.jpeg', '.webp', '.ed25519'])
 const REQUIRED_CAPABILITIES = ['homeVisual', 'practiceVisual', 'toolsVisual', 'historyVisual', 'settingsVisual', 'practiceActiveVisual', 'toolDetailVisual']
 const RECIPE_CONTRACT = Object.freeze({
+  intervalPracticeVisual: { recipeId: 'interval-blue-notebook-v1', slots: [], optional: true, optionalSlots: ['hubCardCollage', 'activeBorder'] },
   homeVisual: { recipeId: 'home-scrapbook-single-hero-v1', slots: ['hero', 'headline', 'recentPractice', 'midi', 'tools'] },
   practiceVisual: { recipeId: 'practice-hero-cards-v1', slots: ['hero', 'sight', 'chord'] },
   toolsVisual: { recipeId: 'tools-studio-cards-v1', slots: ['hero', 'chord', 'interval', 'scale'] },
@@ -96,14 +97,14 @@ function imageDimensions(buffer, extension) {
 
 function collectThemeAssetPaths(theme, manifest) {
   const paths = []
-  for (const capability of REQUIRED_CAPABILITIES) {
+  for (const [capability, contract] of Object.entries(RECIPE_CONTRACT)) {
     const value = theme.capabilities[capability]
+    if (!value && contract.optional) continue
     if (!value) throw new ThemePackageError('MISSING_CAPABILITY', capability)
-    const contract = RECIPE_CONTRACT[capability]
     if (value.recipeId !== contract.recipeId) throw new ThemePackageError('UNSUPPORTED_RECIPE', `${capability}: ${value.recipeId}`)
     const slots = Object.keys(value.assets).sort()
-    const expected = [...contract.slots].sort()
-    if (JSON.stringify(slots) !== JSON.stringify(expected)) throw new ThemePackageError('INVALID_ASSET_SLOT', capability)
+    const allowed = [...contract.slots, ...(contract.optionalSlots || [])]
+    if (contract.slots.some((slot) => !slots.includes(slot)) || slots.some((slot) => !allowed.includes(slot))) throw new ThemePackageError('INVALID_ASSET_SLOT', capability)
     for (const assetPath of Object.values(value.assets)) paths.push(normalizePackagePath(assetPath))
   }
   if (manifest.preview.cover) paths.push(normalizePackagePath(manifest.preview.cover))

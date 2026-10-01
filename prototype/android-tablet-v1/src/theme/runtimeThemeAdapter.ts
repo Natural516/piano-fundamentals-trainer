@@ -77,11 +77,12 @@ function resolveAssets(
   resolver: ThemeAssetResolver
 ): Record<string, string> {
   const source = definition.capabilities[capability]
+  if (!source) throw new ThemeContractError('MISSING_CAPABILITY', capability)
   const recipe = resolveVisualRecipe(source.recipeId)
   if (recipe.capability !== capability) throw new ThemeContractError('UNSUPPORTED_RECIPE', `${source.recipeId} 不能用于 ${capability}`)
   const suppliedSlots = Object.keys(source.assets).sort()
-  const expectedSlots = [...recipe.assetSlots].sort()
-  if (JSON.stringify(suppliedSlots) !== JSON.stringify(expectedSlots)) {
+  const allowedSlots = [...recipe.assetSlots, ...(recipe.optionalAssetSlots ?? [])]
+  if (recipe.assetSlots.some((slot) => !suppliedSlots.includes(slot)) || suppliedSlots.some((slot) => !allowedSlots.includes(slot))) {
     throw new ThemeContractError('INVALID_ASSET_SLOT', `${capability} asset slots 不完整或包含未知项`)
   }
   return Object.fromEntries(Object.entries(source.assets).map(([slot, assetPath]) => [slot, resolver.resolveAsset(themeId, version, assetPath)]))
@@ -89,6 +90,7 @@ function resolveAssets(
 
 function normalizeParameters(capability: ThemeCapabilityName, definition: ExternalThemeDefinitionV1): SafeGeometryParameters {
   const source = definition.capabilities[capability]
+  if (!source) throw new ThemeContractError('MISSING_CAPABILITY', capability)
   const recipe = resolveVisualRecipe(source.recipeId)
   const normalized: Record<string, number> = {}
   for (const [name, value] of Object.entries(source.parameters)) {
@@ -120,43 +122,46 @@ export function adaptExternalTheme(
   const assetSets = Object.fromEntries((Object.keys(definition.capabilities) as ThemeCapabilityName[]).map((capability) => [
     capability,
     resolveAssets(manifest.themeId, manifest.version, capability, definition, resolver)
-  ])) as Record<ThemeCapabilityName, Record<string, string>>
+  ])) as Partial<Record<ThemeCapabilityName, Record<string, string>>>
   const parameters = Object.fromEntries((Object.keys(definition.capabilities) as ThemeCapabilityName[]).map((capability) => [
     capability,
     normalizeParameters(capability, definition)
-  ])) as Record<ThemeCapabilityName, SafeGeometryParameters>
+  ])) as Partial<Record<ThemeCapabilityName, SafeGeometryParameters>>
 
   const capabilities: RuntimeThemeCapabilities = {
+    intervalPracticeVisual: assetSets.intervalPracticeVisual
+      ? { kind: 'blue-notebook', recipeId: 'interval-blue-notebook-v1', assets: assetSets.intervalPracticeVisual }
+      : { kind: 'standard' },
     homeVisual: {
       kind: 'single-image-hero', recipeId: 'home-scrapbook-single-hero-v1', frameClassName: resolveVisualRecipe('home-scrapbook-single-hero-v1').frameClassName,
-      heroClassName: 'bocchi-home-hero', assets: assetSets.homeVisual as { hero: string; headline: string; recentPractice: string; midi: string; tools: string }, parameters: parameters.homeVisual,
+      heroClassName: 'bocchi-home-hero', assets: assetSets.homeVisual as { hero: string; headline: string; recentPractice: string; midi: string; tools: string }, parameters: parameters.homeVisual ?? {},
       memo: '一步一步，靠近喜欢的音乐。'
     },
     practiceVisual: {
       kind: 'hero-cards', recipeId: 'practice-hero-cards-v1', frameClassName: resolveVisualRecipe('practice-hero-cards-v1').frameClassName, heroClassName: 'bocchi-practice-hero',
-      assets: assetSets.practiceVisual as { hero: string; sight: string; chord: string }, parameters: parameters.practiceVisual
+      assets: assetSets.practiceVisual as { hero: string; sight: string; chord: string }, parameters: parameters.practiceVisual ?? {}
     },
     toolsVisual: {
       kind: 'hero-cards', recipeId: 'tools-studio-cards-v1', frameClassName: resolveVisualRecipe('tools-studio-cards-v1').frameClassName,
-      assets: assetSets.toolsVisual as { hero: string; chord: string; interval: string; scale: string }, parameters: parameters.toolsVisual
+      assets: assetSets.toolsVisual as { hero: string; chord: string; interval: string; scale: string }, parameters: parameters.toolsVisual ?? {}
     },
     historyVisual: {
       kind: 'dashboard', recipeId: 'history-journal-dashboard-v1', frameClassName: resolveVisualRecipe('history-journal-dashboard-v1').frameClassName,
-      assets: assetSets.historyVisual as { hero: string; trend: string; memo: string; lower: string }, parameters: parameters.historyVisual
+      assets: assetSets.historyVisual as { hero: string; trend: string; memo: string; lower: string }, parameters: parameters.historyVisual ?? {}
     },
     settingsVisual: {
       kind: 'hero-cards', recipeId: 'settings-hero-cards-v1', frameClassName: resolveVisualRecipe('settings-hero-cards-v1').frameClassName,
-      assets: assetSets.settingsVisual as { hero: string; midi: string; theme: string; about: string }, parameters: parameters.settingsVisual
+      assets: assetSets.settingsVisual as { hero: string; midi: string; theme: string; about: string }, parameters: parameters.settingsVisual ?? {}
     },
     practiceActiveVisual: {
       kind: 'decorated-focus', recipeId: 'practice-decorated-focus-v1', frameClassName: resolveVisualRecipe('practice-decorated-focus-v1').frameClassName,
-      assets: { cornerCharacter: assetSets.practiceActiveVisual.cornerCharacter, decorations: assetSets.practiceActiveVisual.decorations }, parameters: parameters.practiceActiveVisual,
-      chordArtwork: { frameClassName: 'bocchi-chord-active', cornerCharacter: assetSets.practiceActiveVisual.chordCornerCharacter, decorations: assetSets.practiceActiveVisual.chordDecorations, polaroid: assetSets.practiceActiveVisual.chordPolaroid }
+      assets: { cornerCharacter: assetSets.practiceActiveVisual!.cornerCharacter, decorations: assetSets.practiceActiveVisual!.decorations }, parameters: parameters.practiceActiveVisual ?? {},
+      chordArtwork: { frameClassName: 'bocchi-chord-active', cornerCharacter: assetSets.practiceActiveVisual!.chordCornerCharacter, decorations: assetSets.practiceActiveVisual!.chordDecorations, polaroid: assetSets.practiceActiveVisual!.chordPolaroid }
     },
     toolDetailVisual: {
       kind: 'decorated-reference', recipeId: 'tool-reference-notebook-v1', frameClassName: resolveVisualRecipe('tool-reference-notebook-v1').frameClassName,
-      assets: { background: assetSets.toolDetailVisual.background, decorations: assetSets.toolDetailVisual.decorations },
-      artwork: { chordQueryHero: assetSets.toolDetailVisual.chordQueryHero, sharedCompleteRyo: assetSets.toolDetailVisual.sharedCompleteRyo }, parameters: parameters.toolDetailVisual
+      assets: { background: assetSets.toolDetailVisual!.background, decorations: assetSets.toolDetailVisual!.decorations },
+      artwork: { chordQueryHero: assetSets.toolDetailVisual!.chordQueryHero, sharedCompleteRyo: assetSets.toolDetailVisual!.sharedCompleteRyo }, parameters: parameters.toolDetailVisual ?? {}
     }
   }
 

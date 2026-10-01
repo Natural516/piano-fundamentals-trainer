@@ -19,6 +19,35 @@ for (const extension of ['.ts', '.tsx']) {
 }
 
 const { projectPracticeHubRecentSummary } = require('../prototype/android-tablet-v1/src/practiceHubProjection.ts')
+const React = require('react')
+const { renderToStaticMarkup } = require('react-dom/server')
+const main = fs.readFileSync(path.join(__dirname, '../prototype/android-tablet-v1/src/main.tsx'), 'utf8')
+const hub = main.slice(main.indexOf('function PracticeHubScreen'), main.indexOf('type IntervalPracticeSettingChanges'))
+const css = fs.readFileSync(path.join(__dirname, '../prototype/android-tablet-v1/src/styles.css'), 'utf8')
+// Render the actual source component, not a reimplemented test-only card. Dependencies
+// are presentation fixtures; controllers/projections and persistent records stay intact.
+const hubCode = ts.transpileModule(`${hub}\nexports.Hub = PracticeHubScreen`, {
+  compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+}).outputText
+function renderHub({ themed = true, collage = true, historyStatus = 'ready', ready = true } = {}) {
+  const exports = {}
+  new Function('require', 'exports', 'useMidiUi', 'useEffect', 'STAFF_MODE_LABELS', 'ProductFrame', 'Icon', 'navigate', hubCode)(
+    require, exports,
+    () => ({ runtime: { historySnapshot: { status: historyStatus, records: [sightRecord()] }, refreshHistory() {} } }),
+    React.useEffect, { grand: '大谱表' },
+    ({ children }) => React.createElement('main', null, children),
+    ({ name }) => React.createElement('svg', { 'data-icon': name }), () => {}
+  )
+  return renderToStaticMarkup(React.createElement(exports.Hub, {
+    chordHistory: { status: historyStatus, records: [chordRecord()] }, chordPersistence: { refresh() {} },
+    intervalSettingsReady: ready, settings: { noteMode: 'single', staffMode: 'grand', questionCount: 20 },
+    theme: { capabilities: {
+      practiceVisual: themed ? { kind: 'hero-cards', assets: { hero: 'hero.png', sight: 'sight.png', chord: 'chord.png' } } : { kind: 'standard' },
+      intervalPracticeVisual: collage ? { kind: 'blue-notebook', assets: { hubCardCollage: 'hub-collage.png' } } : undefined
+    } }
+  }))
+}
+const renderedCards = (markup) => [...markup.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(m => m[0])
 
 function sightRecord({ recordId = 'sight-1', endedAt = 20_000, correct = 8, completed = 10 } = {}) {
   const wrong = completed - correct
@@ -122,6 +151,52 @@ const tests = [
     assert.equal(summary.sight.summary, '上次练习 · 70% 正确率')
     assert.equal(summary.chord.recordId, 'chord-report-1')
     assert.equal(summary.chord.summary, '上次练习 · 80% 完成率')
+  }],
+  ['HUB05', 'actual themed card DOM has only icon, category, title, primary copy, art and full CTA', () => {
+    const cards = renderedCards(renderHub())
+    assert.equal(cards.length, 3)
+    for (const card of cards) {
+      assert.doesNotMatch(card, /module-card__recent|annotation|status-pill|暂无练习记录|上次练习|正在读取记录|MIDI 自动判题/)
+      assert.match(card, /module-card__icon/)
+      assert.match(card, /<span class="module-card__copy"><small>[^<]+<\/small><strong>[^<]+<\/strong><em>[^<]+<\/em><\/span>/)
+      assert.equal((card.match(/<img /g) ?? []).length, 1)
+      assert.match(card, /class="(?:themed-practice-card|interval-notebook-card)__action"><svg data-icon="play"><\/svg>开始练习<\/span>/)
+      assert.doesNotMatch(card, /<span[^>]*><\/span>/)
+    }
+  }],
+  ['HUB06', 'loading and absent optional theme visuals do not restore status wrappers or old interval modes', () => {
+    for (const themed of [false, true]) for (const collage of [false, true]) for (const historyStatus of ['loading', 'ready']) {
+      const cards = renderedCards(renderHub({ themed, collage, historyStatus }))
+      assert.equal(cards.length, 3)
+      assert.ok(cards.every(c => !/module-card__recent|暂无练习记录|上次练习|正在读取记录|MIDI 自动判题/.test(c)))
+      assert.match(cards[2], /指定低音构造 · 26 种音程/)
+      assert.doesNotMatch(cards[2], /复现 \/ 构造/)
+      assert.equal(cards.filter(c => /__action/.test(c)).length, (themed ? 2 : 0) + (collage ? 1 : 0))
+    }
+  }],
+  ['HUB07', 'shared copy structure naturally reflows and existing equal-row/full-height CTA contracts remain', () => {
+    assert.doesNotMatch(css, /module-card__recent/)
+    for (const selector of ['.themed-practice-card', '.interval-notebook-card']) {
+      const rules = css.slice(css.indexOf(`${selector} {`), css.indexOf('}', css.indexOf(`${selector} {`)))
+      assert.match(rules, /grid-template-rows: minmax\(0, 1fr\) 44px/)
+      assert.match(rules, /gap: 11px 14px/)
+    }
+    const grid = css.slice(css.indexOf('.themed-practice-module-grid {'), css.indexOf('}', css.indexOf('.themed-practice-module-grid {')))
+    assert.match(grid, /min-height: 0/)
+    assert.match(grid, /gap: 14px/)
+    assert.match(css, /\.practice-module-grid\.has-interval \{\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
+    assert.match(css, /\.themed-practice-card__action \{[\s\S]*?height: 44px/)
+    assert.match(css, /\.interval-notebook-card__action \{[\s\S]*?height: 44px/)
+    for (const selector of ['.themed-practice-card .module-card__icon', '.interval-notebook-card .module-card__icon']) {
+      const rules = css.slice(css.indexOf(`${selector} {`), css.indexOf('}', css.indexOf(`${selector} {`)))
+      assert.match(rules, /align-self: center/)
+    }
+  }],
+  ['HUB08', 'presentation removal retains refresh, disabled readiness and exact navigation destinations', () => {
+    assert.match(hub, /void runtime\.refreshHistory\(\)/)
+    assert.match(hub, /void chordPersistence\.refresh\(\)/)
+    for (const destination of ['sight-ready', 'chord-mode-select', 'interval-practice']) assert.ok(hub.includes(`navigate('${destination}')`))
+    assert.match(renderedCards(renderHub({ ready: false }))[2], /disabled=""/)
   }]
 ]
 
