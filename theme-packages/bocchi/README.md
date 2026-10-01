@@ -2,6 +2,8 @@
 
 本目录是 `natural516.bocchi` 的唯一主题素材与数据源，包含：
 
+当前 SOURCE 发布准备版本为 `1.1.0`，兼容宿主范围为 `[1.6.0, 2.0.0)`。此目录尚未生成或发布 1.1.0 Production 签名包，source manifest 的 signature 保持 null；已发布的 1.0.0 包保持不变。
+
 - `manifest.json`：主题包元数据、兼容范围和签名声明来源。
 - `theme.json`：语义 token、App-owned Visual Recipe ID 与素材 slot 映射。
 - `assets/`：已验收页面实际使用的运行时素材，不把图片复制进 App bundle。

@@ -1,6 +1,9 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
+const { execFileSync } = require('node:child_process')
+const { publicPathAudit } = require('./android-release-preflight.cjs')
+const { validateContracts } = require('./theme-package-core.cjs')
 
 const root = path.resolve(__dirname, '..')
 const main = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/main.tsx'), 'utf8')
@@ -10,7 +13,7 @@ const recipes = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src
 const adapter = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/runtimeThemeAdapter.ts'), 'utf8')
 const packageRuntime = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/themePackageRuntime.ts'), 'utf8')
 const css = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/styles.css'), 'utf8')
-const architecture = fs.readFileSync(path.join(root, 'docs/agent/THEME_ARCHITECTURE.md'), 'utf8')
+const architecturePath = path.join(root, 'docs/agent/THEME_ARCHITECTURE.md')
 const externalTheme = fs.readFileSync(path.join(root, 'theme-packages/bocchi/theme.json'), 'utf8')
 
 const home = main.slice(main.indexOf('function HomeScreen'), main.indexOf('function PracticeHubScreen'))
@@ -85,9 +88,19 @@ const tests = [
     assert.match(packageRuntime, /NativeThemePackage\.installThemePackage/)
     assert.doesNotMatch(main + registry + packageRuntime, /FileReader|JSZip|showOpenFilePicker/)
   }],
-  ['THM10', 'architecture document freezes product and theme boundaries', () => {
-    for (const phrase of ['Product layer', 'Peer themes', 'Single visual source', 'Future external-theme compatibility', 'Themes cannot alter business logic']) {
-      assert.match(architecture, new RegExp(phrase))
+  ['THM10', 'source layout enforces the public boundary or private documentation supplement', () => {
+    if (fs.existsSync(architecturePath)) {
+      assert.ok(fs.existsSync(path.join(root, 'src/main/index.ts')), 'Internal documentation is only valid in the private source layout')
+      const architecture = fs.readFileSync(architecturePath, 'utf8')
+      for (const phrase of ['Product layer', 'Peer themes', 'Single visual source', 'Future external-theme compatibility', 'Themes cannot alter business logic']) {
+        assert.match(architecture, new RegExp(phrase))
+      }
+      process.stdout.write('PRIVATE_TREE_DOCUMENTATION_SUPPLEMENT=PASS; public source contracts also execute\n')
+    } else {
+      const paths = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
+      publicPathAudit(paths)
+      assert.equal(paths.some(file => file.startsWith('docs/agent/')), false)
+      process.stdout.write('PUBLIC_SOURCE_LAYOUT=PASS; docs/agent excluded; no architecture suite skipped\n')
     }
   }],
   ['THM11', 'Practice consumes a visual capability without theme-name coupling', () => {
@@ -223,6 +236,40 @@ const tests = [
     assert.match(css, /\.interval-query-results\s*\{[\s\S]*?grid-template-columns: minmax\(0, 64fr\) minmax\(320px, 36fr\);/)
     assert.match(css, /\.interval-query-layout \.tool-detail-artwork__complete-ryo\s*\{[\s\S]*?width: 312px;/)
     assert.match(main, /case 'interval-query-tool': return <IntervalQueryToolScreen theme=\{activeTheme\} \/>/)
+  }],
+  ['THM22', 'real schemas reject unsafe theme parameters and unknown business inputs', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'theme-packages/bocchi/manifest.json'), 'utf8'))
+    const definition = JSON.parse(externalTheme)
+    validateContracts(manifest, definition)
+    for (const mutate of [
+      theme => { theme.capabilities.intervalPracticeVisual.parameters.captureWindowMs = 300 },
+      theme => { theme.capabilities.intervalPracticeVisual.assets.resultHero = 'assets/result.png' },
+      theme => { theme.capabilities.intervalPracticeVisual.assets.activeBorder = 'https://unsafe.invalid/theme.png' },
+      theme => { theme.capabilities.intervalPracticeVisual.recipeId = 'unknown-recipe' }
+    ]) {
+      const unsafe = structuredClone(definition)
+      mutate(unsafe)
+      assert.throws(() => validateContracts(manifest, unsafe))
+    }
+    const old = structuredClone(definition)
+    delete old.capabilities.intervalPracticeVisual
+    validateContracts(manifest, old)
+    for (const slots of [[], ['hubCardCollage'], ['activeBorder']]) {
+      const optional = structuredClone(definition)
+      optional.capabilities.intervalPracticeVisual.assets = Object.fromEntries(slots.map(slot => [slot, definition.capabilities.intervalPracticeVisual.assets[slot]]))
+      validateContracts(manifest, optional)
+    }
+  }],
+  ['THM23', 'Product owns Interval state and debug tools while native signing trust remains isolated', () => {
+    const intervalActive = main.slice(main.indexOf('function IntervalPracticeActiveScreen'), main.indexOf('function ChordModeSelectScreen'))
+    assert.match(intervalActive, /theme\.capabilities\.intervalPracticeVisual/)
+    assert.match(intervalActive, /runtime/)
+    assert.doesNotMatch(intervalActive, /目标 MIDI|开发 MIDI|NOTE ON|NOTE OFF|Human UI Review/)
+    assert.match(main, /SHOW_DEVELOPMENT_TOOLS \? \([\s\S]*?<ReviewDock/)
+    assert.match(packageRuntime, /NativeThemePackage\.installThemePackage/)
+    const trust = fs.readFileSync(path.join(root, 'android/app/src/main/java/com/pianofundamentals/trainer/ThemeTrustStore.kt'), 'utf8')
+    assert.match(trust, /pft-theme-prod-2026-01/)
+    assert.match(trust, /release/)
   }]
 ]
 

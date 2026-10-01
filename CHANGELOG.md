@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.6.0 — Unreleased — versionCode 14
+
+Android versionName：1.6.0。以下内容为发布准备，尚未创建正式 tag / GitHub Release、上传 Production APK 或发布 Bocchi 1.1.0。
+
+### 新增
+
+- 音程练习 Product Core：指定低音构造音程，覆盖 26 种音程理论、准确拼写与候选生成。
+- MIDI 音程自动判定，沿用 150ms capture、800ms success feedback 与 all-keys-up release gate。
+- 固定题数 / 无限练习、低音升降号设置、答案提示 ON / OFF；Grand Staff 常驻，提示 OFF 显示 root，ON 显示 root + target。
+- 音程 Result / History / History Detail 持久化与困难音程统计，接入既有练习会话、暂停恢复和 keep-awake。
+- Practice Hub 正式音程模块卡与指定低音构造文案。
+- Bocchi 的 optional intervalPracticeVisual capability：Practice Hub 蓝色拼贴与 ACTIVE 外围蓝色手账背景 / 前景锚点，保护中性谱面安全区。
+
+### 调整
+
+- Practice Hub 识谱、和弦、音程三张模块卡统一移除摘要 / 状态胶囊，不改变 History / Report 的真实数据。
+- 音程 ACTIVE 去除底部两个常驻大信息卡；完成数量靠近题目，保留轻量正确 / 错误 / 暂停 / MIDI 断连反馈。
+- 清理用户界面的开发痕迹，维持正式界面调试产物计数为零，QA 工具继续受独立通道限制。
+- 通过普通双 parent merge 保留旧 public legacy / bridge / CHANGELOG ancestry 与冻结的音程 checkpoint；不移动旧 v1.5.3 tag。
+
+### 版本与主题兼容准备
+
+- Android 唯一版本源设为 1.6.0 / versionCode 14，包名和 QA 隔离规则不变。
+- Native theme host compatibility 从同一 Android versionName 派生，避免旧固定宿主身份与 App 版本脱节。
+- Bocchi SOURCE 1.1.0 的 minAppVersion 为 1.6.0，maxAppVersionExclusive 保持 2.0.0；生产信任密钥不变，source signature 仍为 null。
+- 旧 Bocchi 1.0.0 可在 1.6.0 宿主范围内继续使用；缺少 optional Interval capability 时使用 standard fallback。
+
 ## 1.5.3 — 2026-09-28 — versionCode 13
 
 Android versionName：1.5.3

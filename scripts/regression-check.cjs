@@ -22,6 +22,18 @@ require.extensions['.ts'] = transpileTypeScriptModule
 require.extensions['.tsx'] = transpileTypeScriptModule
 
 const tests = []
+// Default entry is public-safe. Private desktop/Golden assertions remain below,
+// but are only registered by explicit --private-source in a complete private tree.
+// The original complete private runner also remains frozen at checkpoint 6827eab.
+const privateSourceValidation = process.argv.includes('--private-source')
+const privateOnlyCases = []
+if (privateSourceValidation) {
+  for (const relative of [
+    '../src/main/pianoSampleResources.ts', '../src/main/index.ts', '../src/preload/index.ts',
+    '../resources/piano-samples/salamander/README',
+    '../fixtures/golden/case1/案例1.musicxml', '../fixtures/golden/case1/案例1.mid'
+  ]) assert.ok(fs.existsSync(path.resolve(__dirname, relative)), 'Private source prerequisite missing: ' + relative)
+}
 
 class BlockedTestError extends Error {}
 
@@ -31,6 +43,11 @@ function blocked(message) {
 
 function test(name, callback) {
   tests.push({ name, callback })
+}
+
+function privateTest(name, callback) {
+  privateOnlyCases.push(name)
+  if (privateSourceValidation) test(name, callback)
 }
 
 const midiNotes = require('../src/renderer/src/utils/midiNotes.ts')
@@ -45,7 +62,7 @@ const pianoMidiRouter = require('../src/renderer/src/audio/pianoMidiRouter.ts')
 const pianoSampler = require('../src/renderer/src/audio/pianoSampler.ts')
 const salamanderSamplePack = require('../src/renderer/src/audio/salamanderSamplePack.ts')
 const voicePolicy = require('../src/renderer/src/audio/voicePolicy.ts')
-const pianoSampleResources = require('../src/main/pianoSampleResources.ts')
+const pianoSampleResources = privateSourceValidation ? require('../src/main/pianoSampleResources.ts') : null
 const midiRecording = require('../src/renderer/src/midi/midiRecording.ts')
 const curriculumCatalog = require('../src/renderer/src/curriculum/curriculumCatalog.ts')
 const curriculumProgress = require('../src/renderer/src/curriculum/curriculumProgress.ts')
@@ -2511,6 +2528,9 @@ test('F3.1 I：挂起端口失效后旧 listener 被拒绝并按新端口重校�
     midiDevice('roland-after-resume', 'Roland Digital Piano', 'Roland')
   ], { id: 'roland-old', name: 'Roland Digital Piano', manufacturer: 'Roland' })
   assert.equal(resumed.device.id, 'roland-after-resume')
+})
+
+privateTest('F3.1 I private supplement：Electron power resume bridge', () => {
   const mainSource = fs.readFileSync(require.resolve('../src/main/index.ts'), 'utf8')
   const preloadSource = fs.readFileSync(require.resolve('../src/preload/index.ts'), 'utf8')
   assert.match(mainSource, /powerMonitor\.on\('resume'/)
@@ -2624,7 +2644,7 @@ test('钢琴低延迟稳定性：64 声部、快速重复、连续压力与 Pani
   assert.ok(stress.sources.every((source) => source.stopCalls.length >= 1))
 })
 
-test('Salamander 参考资产：30 个 OGG 原字节、锚点与 CC BY attribution 完整', () => {
+privateTest('Salamander 参考资产：30 个 OGG 原字节、锚点与 CC BY attribution 完整', () => {
   const sampleRoot = path.resolve(__dirname, '../resources/piano-samples/salamander')
   const sampleFiles = fs.readdirSync(sampleRoot)
     .filter((name) => name.endsWith('.ogg'))
@@ -2645,7 +2665,7 @@ test('Salamander 参考资产：30 个 OGG 原字节、锚点与 CC BY attributi
   assert.match(readme, /Alexander Holm/)
 })
 
-test('Electron 采样资源路径：dev/package 分离、阻止越界且缺资产显式报错', async () => {
+privateTest('Electron 采样资源路径：dev/package 分离、阻止越界且缺资产显式报错', async () => {
   const devRoot = pianoSampleResources.getPianoSampleRoot({
     isPackaged: false,
     resourcesPath: 'C:\\Program Files\\Piano\\resources',
@@ -6018,7 +6038,7 @@ function buildGrandStaffAxisDiagnostic(score, measureNumber) {
   }
 }
 
-test('Grand Staff header/time-axis：双谱表 4/4 与共享 tick X，覆盖 Case1、同时和先后 onset', () => {
+privateTest('Grand Staff header/time-axis private supplement：Golden Case1 shared tick X', () => {
   const case1 = musicXmlParser.loadMusicXmlDocument(
     fs.readFileSync(require.resolve('../fixtures/golden/case1/案例1.musicxml'), 'utf8')
   )
@@ -6043,7 +6063,9 @@ test('Grand Staff header/time-axis：双谱表 4/4 与共享 tick X，覆盖 Cas
     `Bass: clef=F timeSignature=4/4 measureContentStartX=${case1Layout.headers[1].measureContentStartX}`,
     `Target 1: F2.x=${targetX} F4.x=${targetX} A4.x=${targetX} C5.x=${targetX}`
   ].join('\n'))
+})
 
+test('Grand Staff header/time-axis：双谱表 4/4 与共享 tick X，覆盖公开同时和先后 onset', () => {
   const simultaneous = musicXmlParser.loadMusicXmlDocument(
     fs.readFileSync(require.resolve('./score-fixtures/grand-staff-shared-onset.musicxml'), 'utf8')
   )
@@ -6065,7 +6087,7 @@ test('Grand Staff header/time-axis：双谱表 4/4 与共享 tick X，覆盖 Cas
   assert.ok(bassC3.x < trebleC5.x, '不同 onset 必须保持真实先后顺序')
 })
 
-test('Golden Case1 Wait target 1：缺少 F2 的 partial chord 不推进，补齐后才推进', () => {
+privateTest('Golden Case1 Wait target 1：缺少 F2 的 partial chord 不推进，补齐后才推进', () => {
   const case1 = musicXmlParser.loadMusicXmlDocument(
     fs.readFileSync(require.resolve('../fixtures/golden/case1/案例1.musicxml'), 'utf8')
   )
@@ -6112,6 +6134,9 @@ test('Grand Staff notation bounds：Treble E6 与 Bass C1 ledger extents 均保�
     '实际 notation bottom 后仍须保留 SVG 安全边距'
   )
 
+})
+
+privateTest('Grand Staff notation bounds private supplement：Golden Case1 system extents', () => {
   const case1 = musicXmlParser.loadMusicXmlDocument(
     fs.readFileSync(require.resolve('../fixtures/golden/case1/案例1.musicxml'), 'utf8')
   )
@@ -6436,7 +6461,7 @@ test('Chord V2 非 C 根音转位候选与 all 分布', () => {
   }
 })
 
-test('Piano Training MusicXML Profile v1：已验证能力矩阵允许严格练习', () => {
+privateTest('Piano Training MusicXML Profile v1 private supplement：Golden capability matrix', () => {
   const goldenXml = fs.readFileSync(require.resolve('../fixtures/golden/case1/案例1.musicxml'), 'utf8')
   const golden = musicXmlProfile.validatePianoTrainingMusicXml(goldenXml)
   assert.equal(golden.trainingSafe, true, golden.reasons.join('；'))
@@ -6456,7 +6481,9 @@ test('Piano Training MusicXML Profile v1：已验证能力矩阵允许严格练�
   const loadedGolden = musicXmlProfile.loadTrainingSafeMusicXmlDocument(goldenXml)
   assert.equal(loadedGolden.document.trainingProfile?.trainingSafe, true)
   assert.equal(loadedGolden.validation.profileVersion, 'Piano Training MusicXML Profile v1')
+})
 
+test('Piano Training MusicXML Profile v1：已验证能力矩阵允许严格练习', () => {
   const supportedCases = [
     ['./score-fixtures/e2e-core-loop.xml', 'one-part-grand-staff'],
     ['./score-fixtures/musescore-doctype.musicxml', 'harmony'],
@@ -6560,7 +6587,7 @@ test('Tempo Map：Realtime 与 Teaching Playback 共用变速后的 score time',
   assert.deepEqual(realtime.results.map((result) => result.offsetMs), [0, 0, 0])
 })
 
-test('Golden Case1 E2E：用户原始 MusicXML + MIDI 硬断言', () => {
+privateTest('Golden Case1 E2E：用户原始 MusicXML + MIDI 硬断言', () => {
   const xmlPath = require('node:path').join(__dirname, '..', 'fixtures', 'golden', 'case1', '案例1.musicxml')
   const midiPath = require('node:path').join(__dirname, '..', 'fixtures', 'golden', 'case1', '案例1.mid')
   if (!fs.existsSync(xmlPath) || !fs.existsSync(midiPath)) blocked('用户 Golden Case1 文件当前不可用，未使用替代 fixture')
@@ -6653,6 +6680,10 @@ let failed = 0
 let blockedCount = 0
 
 async function runTests() {
+  process.stdout.write('REGRESSION_SCOPE=' + (privateSourceValidation ? 'PRIVATE_SOURCE_WITH_PUBLIC' : 'PUBLIC_SAFE') + '\n')
+  process.stdout.write('PUBLIC_SAFE_CASE_COUNT=' + (tests.length - (privateSourceValidation ? privateOnlyCases.length : 0)) + '\n')
+  process.stdout.write('PRIVATE_ONLY_CASE_COUNT=' + privateOnlyCases.length + '\n')
+  process.stdout.write('PRIVATE_ONLY_NOT_REGISTERED=' + (privateSourceValidation ? 0 : privateOnlyCases.length) + ' (not executed, not counted as PASS)\n')
   const filterIndex = process.argv.indexOf('--filter')
   const filterText = filterIndex >= 0 ? String(process.argv[filterIndex + 1] ?? '').toLowerCase() : ''
   const selectedTests = filterText
@@ -6680,7 +6711,7 @@ async function runTests() {
     }
   }
 
-  if (failed > 0) {
+  if (failed > 0 || blockedCount > 0) {
     process.stderr.write(`\n${failed} 项回归检查失败；${blockedCount} 项被外部 Golden 文件阻塞。\n`)
     process.exitCode = 1
   } else {

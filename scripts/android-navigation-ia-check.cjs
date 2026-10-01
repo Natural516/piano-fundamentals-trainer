@@ -95,8 +95,8 @@ const tests = [
     assert.match(ui, /aria-label="返回练习"/)
   }],
   ['NAV09', 'QA channel and production version identities remain frozen', () => {
-    assert.match(version, /^versionCode=13$/m)
-    assert.match(version, /^versionName=1\.5\.3$/m)
+    assert.match(version, /^versionCode=14$/m)
+    assert.match(version, /^versionName=1\.6\.0$/m)
     assert.match(ui, /if \(!__QA_BUILD__\) void updater\.initialize\(\)/)
     assert.match(settings, /正式更新通道已关闭/)
   }],

@@ -82,7 +82,7 @@ android {
         versionName appVersionName
         buildConfigField "String", "UPDATE_MANIFEST_URL", "\"${escapedProductionManifestUrl}\""
         buildConfigField "String", "THEME_CHANNEL", '"release"'
-        buildConfigField "String", "THEME_HOST_COMPAT_VERSION", '"1.5.3"'
+        buildConfigField "String", "THEME_HOST_COMPAT_VERSION", "\"${appVersionName}\""
         buildConfigField "boolean", "ALLOW_UNSIGNED_THEME_PACKAGES", "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

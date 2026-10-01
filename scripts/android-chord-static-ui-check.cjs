@@ -130,10 +130,10 @@ test('CUI09', 'development-only selectors expose every state and QA case without
   assert.match(mainSource, /SHOW_DEVELOPMENT_TOOLS \? \(/)
 })
 
-test('CUI10', 'Android release version is 1.5.3 code 13', () => {
+test('CUI10', 'Android release preparation version is 1.6.0 code 14', () => {
   const version = fs.readFileSync(path.join(root, 'android/version.properties'), 'utf8')
-  assert.match(version, /^versionCode=13$/m)
-  assert.match(version, /^versionName=1\.5\.3$/m)
+  assert.match(version, /^versionCode=14$/m)
+  assert.match(version, /^versionName=1\.6\.0$/m)
 })
 
 test('CUI11', 'Grand Staff polish enlarges and raises notation while strengthening only secondary ink', () => {

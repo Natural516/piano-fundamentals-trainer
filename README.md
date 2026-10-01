@@ -2,7 +2,8 @@
 
 钢琴基本功训练器是一款面向 Android 平板的 MIDI 钢琴练习应用。
 
-当前正式版本：Android `1.5.3`（V1.5.3，`versionCode 13`）
+当前发布准备版本：Android `1.6.0`（V1.6.0，`versionCode 14`，Unreleased）
+当前已发布版本仍为 V1.5.3；V1.6.0 尚未提供正式 APK、tag 或 GitHub Release。
 平台：Android Tablet
 
 ## 当前功能
@@ -11,6 +12,9 @@
 
 - 识谱练习
 - 和弦练习
+- 音程练习：指定低音构造音程，覆盖 26 种音程的理论拼写与候选生成
+
+音程练习始终显示 Grand Staff：答案提示 OFF 时仅显示指定低音，ON 时显示低音与目标音。支持低音升降号设置、固定题数 / 无限练习、MIDI 自动判定，以及 Result / History 和困难音程统计。
 
 ### 乐理工具
 
@@ -48,6 +52,8 @@
 
 应用内提供由用户主动触发的正式更新检查。下载与安装前会校验包名、版本、文件大小、SHA-256 和正式签名身份。
 
+V1.6.0 当前仅处于源码与发布元数据准备阶段；正式包构建、签名、更新清单和覆盖升级验证仍待下一阶段执行。
+
 ## 个性化主题
 
 V1.5.3 起支持外部 `.pftheme` 个性化主题。主题包与应用版本分离，并经过 Theme API、最低应用版本、内容完整性和 Production 签名验证。
@@ -58,13 +64,17 @@ V1.5.3 起支持外部 `.pftheme` 个性化主题。主题包与应用版本分�
 
 首个主题包为“孤独摇滚”（主题 ID：`natural516.bocchi`）。
 
+本次准备的 Bocchi SOURCE 为 `1.1.0`，最低宿主版本 `1.6.0`，最高宿主版本不含 `2.0.0`。新增音程 Practice Hub 卡片与 ACTIVE 蓝色手账视觉，Preparation / Result / History Detail 不新增专属视觉。该版本尚未签名打包或正式发布；现有正式主题仍为 `1.0.0`。
+
 ## 构建与验证
 
 公开仓库包含 Android 应用运行、构建、测试及必要共享核心所需的源码。常用公开验证入口：
 
 ```powershell
 npm.cmd ci
-npm.cmd run test:public
+npm.cmd run typecheck
+npm.cmd run test:android-release-preparation
+npm.cmd run test:android-interval-theory
 npm.cmd run android:apk:debug
 npm.cmd run test:android-shell
 npm.cmd run android:verify:debug

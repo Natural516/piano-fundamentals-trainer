@@ -32,6 +32,7 @@
     "test:android-bluetooth-midi:native": "cd android && gradlew.bat testDebugUnitTest --tests com.pianofundamentals.trainer.BluetoothMidiStatePolicyTest",
     "test:android-signing": "node scripts/android-signing-foundation-check.cjs",
     "test:android-release-mode": "node scripts/android-release-mode-check.cjs",
+    "test:android-release-preparation": "node scripts/android-release-preparation-check.cjs",
     "test:android-persistence": "node scripts/android-persistence-check.cjs",
     "test:android-history": "node scripts/android-history-check.cjs",
     "test:android-history-dashboard": "node scripts/android-history-dashboard-check.cjs",
