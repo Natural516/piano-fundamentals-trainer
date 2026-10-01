@@ -55,6 +55,7 @@ export type VisualRecipeId =
   | 'settings-hero-cards-v1'
   | 'practice-decorated-focus-v1'
   | 'tool-reference-notebook-v1'
+  | 'interval-blue-notebook-v1'
 
 export type ThemeCapabilityName =
   | 'homeVisual'
@@ -64,6 +65,7 @@ export type ThemeCapabilityName =
   | 'settingsVisual'
   | 'practiceActiveVisual'
   | 'toolDetailVisual'
+  | 'intervalPracticeVisual'
 
 export type SafeGeometryParameterName =
   | 'heroScale'
@@ -160,6 +162,13 @@ export interface DecoratedReferenceToolDetailVisual {
 }
 export type ToolDetailVisual = StandardToolDetailVisual | DecoratedReferenceToolDetailVisual
 
+// Optional, two-surface artwork only. No session or notation geometry parameters.
+export type IntervalPracticeVisual = { kind: 'standard' } | {
+  kind: 'blue-notebook'
+  recipeId: 'interval-blue-notebook-v1'
+  assets: Readonly<{ hubCardCollage?: string; activeBorder?: string }>
+}
+
 export interface RuntimeThemeCapabilities {
   homeVisual: HomeVisual
   practiceVisual: PracticeVisual
@@ -168,6 +177,7 @@ export interface RuntimeThemeCapabilities {
   settingsVisual: SettingsVisual
   practiceActiveVisual: PracticeActiveVisual
   toolDetailVisual: ToolDetailVisual
+  intervalPracticeVisual?: IntervalPracticeVisual
 }
 
 export interface RuntimeThemeDefinition {
@@ -200,7 +210,7 @@ export interface ExternalThemeDefinitionV1 {
     colors: Readonly<Record<ColorThemeTokenName, string>>
     shadows: Readonly<{ shadow: ShadowPreset; shadowSoft: ShadowPreset }>
   }>
-  capabilities: Readonly<Record<ThemeCapabilityName, ExternalThemeCapabilityV1>>
+  capabilities: Readonly<Record<Exclude<ThemeCapabilityName, 'intervalPracticeVisual'>, ExternalThemeCapabilityV1> & { intervalPracticeVisual?: ExternalThemeCapabilityV1 }>
 }
 
 export interface ThemePointer {

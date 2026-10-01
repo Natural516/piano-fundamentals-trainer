@@ -36,7 +36,8 @@ const baseline = Object.freeze({
   screen: 'home',
   sightStatus: 'idle',
   sightPaused: false,
-  chordStatus: 'IDLE'
+  chordStatus: 'IDLE',
+  intervalStatus: 'IDLE'
 })
 const policy = (changes) => shouldKeepPracticeAwake({ ...baseline, ...changes })
 
@@ -84,8 +85,8 @@ test('KA22 wake-state boundary contains no persistence or History writes', () =>
   assert.doesNotMatch(pluginSource, /Preferences|Repository|History|reportIndex/)
 })
 
-test('KA23 keep-awake adds no second MIDI subscription', () => {
-  assert.equal((mainSource.match(/midiRouter\.subscribe\(/g) ?? []).length, 1)
+test('KA23 keep-awake adds no MIDI subscription beyond Chord and page-scoped Interval', () => {
+  assert.equal((mainSource.match(/midiRouter\.subscribe\(/g) ?? []).length, 2)
   assert.doesNotMatch(policySource, /Web MIDI|Midi|midiRouter|handleMidi/)
 })
 
@@ -120,8 +121,21 @@ test('KA28 implementation preserves existing immersive policy body', () => {
   assert.match(activitySource, /controller\.hide\(WindowInsetsCompat\.Type\.systemBars\(\)\)/)
 })
 
+test('KA29 Interval running and success feedback keep the screen awake', () => {
+  assert.equal(policy({ screen: 'interval-active', intervalStatus: 'RUNNING' }), true)
+  assert.equal(policy({ screen: 'interval-active', intervalStatus: 'SUCCESS_FEEDBACK' }), true)
+})
+
+test('KA30 Interval pause completion stop and navigation release keep-awake', () => {
+  for (const intervalStatus of ['SUSPENDED', 'SESSION_COMPLETE', 'STOPPED']) {
+    assert.equal(policy({ screen: 'interval-active', intervalStatus }), false)
+  }
+  assert.equal(policy({ screen: 'interval-practice', intervalStatus: 'RUNNING' }), false)
+  assert.equal(policy({ screen: 'midi', intervalStatus: 'RUNNING' }), false)
+})
+
 setImmediate(async () => {
-  while (results.length < 28) await new Promise((resolve) => setImmediate(resolve))
+  while (results.length < 30) await new Promise((resolve) => setImmediate(resolve))
   for (const result of results) {
     if (result.ok) console.log(`PASS ${result.name}`)
     else console.error(`FAIL ${result.name}: ${result.error?.stack ?? result.error}`)

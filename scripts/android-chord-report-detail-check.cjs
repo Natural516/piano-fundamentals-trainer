@@ -220,7 +220,7 @@ test('CRD28 detail projection causes zero History mutation', () => {
 
 test('CRD29 detail creates no MIDI subscription', () => {
   assert.doesNotMatch(detailSource + projectionSource, /midiRouter|subscribe\(|handleMidi|NOTE_ON/)
-  assert.equal((mainSource.match(/midiRouter\.subscribe\(/g) ?? []).length, 1)
+  assert.equal((mainSource.match(/midiRouter\.subscribe\(/g) ?? []).length, 2)
 })
 
 test('CRD30 detail never acquires practice keep-awake', () => {

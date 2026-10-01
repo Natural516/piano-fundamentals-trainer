@@ -77,9 +77,10 @@ const tests = [
     assert.match(persistence, /sightReadingSettings: 'piano\.v1\.sightReading\.settings'/)
     assert.match(ui, /runtime\.updateSettings\(changes\)/)
   }],
-  ['NAV07', 'History presentation offers All Sight and Chord filters plus a factual Chord empty state', () => {
-    for (const label of ["['all', '全部']", "['sight', '识谱']", "['chord', '和弦']", '暂无和弦练习记录']) assert.ok(history.includes(label))
-    assert.match(history, /filter === 'sight'[\s\S]*?filter === 'chord' \? chordItems : mixedItems/)
+  ['NAV07', 'History presentation offers All Sight Chord and Interval filters with factual empty states', () => {
+    for (const label of ["['all', '全部']", "['sight', '识谱']", "['chord', '和弦']", "['interval', '音程']", '暂无和弦练习记录', '暂无音程练习记录']) assert.ok(history.includes(label))
+    assert.match(history, /filter === 'chord' \? chordItems : mixedItems/)
+    assert.match(history, /filter === 'interval' \? intervalItems : nonSightItems/)
     assert.match(history, /最近练习记录/)
     assert.match(history, /练习趋势/)
     assert.match(ui, /history-module-badge">识谱/)

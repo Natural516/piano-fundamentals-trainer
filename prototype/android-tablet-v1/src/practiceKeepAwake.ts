@@ -14,6 +14,7 @@ export interface PracticeKeepAwakePolicyInput {
   readonly sightStatus: 'idle' | 'running' | 'finished' | 'stopped'
   readonly sightPaused: boolean
   readonly chordStatus: 'IDLE' | 'RUNNING' | 'SUCCESS_FEEDBACK' | 'SUSPENDED' | 'SESSION_COMPLETE' | 'STOPPED'
+  readonly intervalStatus: 'IDLE' | 'RUNNING' | 'SUCCESS_FEEDBACK' | 'SUSPENDED' | 'SESSION_COMPLETE' | 'STOPPED'
 }
 
 export function shouldKeepPracticeAwake(input: PracticeKeepAwakePolicyInput): boolean {
@@ -27,8 +28,11 @@ export function shouldKeepPracticeAwake(input: PracticeKeepAwakePolicyInput): bo
 
   if (sightPracticeVisible && input.sightStatus === 'running' && !input.sightPaused) return true
 
-  return input.screen === 'chord-practice'
-    && (input.chordStatus === 'RUNNING' || input.chordStatus === 'SUCCESS_FEEDBACK')
+  if (input.screen === 'chord-practice'
+    && (input.chordStatus === 'RUNNING' || input.chordStatus === 'SUCCESS_FEEDBACK')) return true
+
+  return input.screen === 'interval-active'
+    && (input.intervalStatus === 'RUNNING' || input.intervalStatus === 'SUCCESS_FEEDBACK')
 }
 
 export interface PracticeKeepAwakePort {

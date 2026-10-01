@@ -19,11 +19,23 @@
         "historyVisual": { "$ref": "#/$defs/historyVisual" },
         "settingsVisual": { "$ref": "#/$defs/settingsVisual" },
         "practiceActiveVisual": { "$ref": "#/$defs/practiceActiveVisual" },
-        "toolDetailVisual": { "$ref": "#/$defs/toolDetailVisual" }
+        "toolDetailVisual": { "$ref": "#/$defs/toolDetailVisual" },
+        "intervalPracticeVisual": { "$ref": "#/$defs/intervalPracticeVisual" }
       }
     }
   },
   "$defs": {
+    "intervalPracticeVisual": {
+      "type": "object", "additionalProperties": false, "required": ["recipeId", "assets", "parameters"],
+      "properties": {
+        "recipeId": { "const": "interval-blue-notebook-v1" },
+        "assets": { "type": "object", "additionalProperties": false, "properties": {
+          "hubCardCollage": { "$ref": "#/$defs/assetPath" },
+          "activeBorder": { "$ref": "#/$defs/assetPath" }
+        } },
+        "parameters": { "$ref": "#/$defs/emptyParameters" }
+      }
+    },
     "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$" },
     "shadow": { "enum": ["none", "soft", "raised", "focus"] },
     "assetPath": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._~ /-]+$" },

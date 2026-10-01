@@ -15,6 +15,7 @@ export interface VisualRecipeDefinition {
   frameClassName: string
   variant: string
   assetSlots: readonly string[]
+  optionalAssetSlots?: readonly string[]
   parameters: Readonly<Partial<Record<SafeGeometryParameterName, ParameterRule>>>
   variants?: readonly string[]
 }
@@ -25,6 +26,10 @@ const commonBorderRules = {
 } as const
 
 export const VISUAL_RECIPE_REGISTRY: Readonly<Record<VisualRecipeId, VisualRecipeDefinition>> = {
+  'interval-blue-notebook-v1': {
+    id: 'interval-blue-notebook-v1', capability: 'intervalPracticeVisual', frameClassName: 'interval-blue-notebook', variant: 'blue-notebook',
+    assetSlots: [], optionalAssetSlots: ['hubCardCollage', 'activeBorder'], parameters: {}
+  },
   'home-scrapbook-single-hero-v1': {
     id: 'home-scrapbook-single-hero-v1', capability: 'homeVisual', frameClassName: 'bocchi-home-preview', variant: 'single-image-hero',
     assetSlots: ['hero', 'headline', 'recentPractice', 'midi', 'tools'],

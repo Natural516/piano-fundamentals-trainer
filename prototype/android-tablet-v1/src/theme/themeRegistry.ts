@@ -141,11 +141,11 @@ export function resolveInitialThemeId(search: string, allowDevelopmentTheme: boo
 
 const RECIPE_DATASET_KEYS: Readonly<Record<keyof RuntimeThemeDefinition['capabilities'], string>> = {
   homeVisual: 'themeRecipeHome', practiceVisual: 'themeRecipePractice', toolsVisual: 'themeRecipeTools', historyVisual: 'themeRecipeHistory',
-  settingsVisual: 'themeRecipeSettings', practiceActiveVisual: 'themeRecipePracticeActive', toolDetailVisual: 'themeRecipeToolDetail'
+  settingsVisual: 'themeRecipeSettings', practiceActiveVisual: 'themeRecipePracticeActive', toolDetailVisual: 'themeRecipeToolDetail', intervalPracticeVisual: 'themeRecipeIntervalPractice'
 }
 
 function recipeIdOf(visual: RuntimeThemeDefinition['capabilities'][keyof RuntimeThemeDefinition['capabilities']]): VisualRecipeId | null {
-  return 'recipeId' in visual ? visual.recipeId : null
+  return visual && 'recipeId' in visual ? visual.recipeId : null
 }
 
 export function applyThemeDefinition(root: HTMLElement, theme: ThemeDefinition): void {
@@ -162,7 +162,7 @@ export function applyThemeDefinition(root: HTMLElement, theme: ThemeDefinition):
     const recipeId = recipeIdOf(visual)
     if (recipeId) root.dataset[datasetKey] = recipeId
     else delete root.dataset[datasetKey]
-    if ('parameters' in visual) {
+    if (visual && 'parameters' in visual) {
       for (const [name, value] of Object.entries(visual.parameters)) {
         const kebabName = name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
         root.style.setProperty(`--theme-recipe-${capability}-${kebabName}`, String(value))

@@ -1,4 +1,4 @@
-import { Component, StrictMode, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ErrorInfo, type ReactNode } from 'react'
+import { Component, StrictMode, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ErrorInfo, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
@@ -57,6 +57,24 @@ import {
   type ChordSettings
 } from './chordPractice/settings'
 import { CapacitorPreferencesBackend } from './androidPersistence'
+import {
+  DEFAULT_INTERVAL_PRACTICE_SETTINGS,
+  INTERVAL_QUESTION_COUNT_OPTIONS,
+  IntervalPracticeSessionRuntime,
+  IntervalPracticeSettingsRepository,
+  IntervalReportPersistenceCoordinator,
+  IntervalReportRepository,
+  getDifficultIntervals,
+  presentIntervalPractice,
+  projectIntervalHistory,
+  resolveIntervalReportById,
+  type IntervalPersistenceSnapshot,
+  type IntervalPracticeReportDraft,
+  type IntervalPracticeReportV1,
+  type IntervalPracticeSettings,
+  type IntervalQuestionCount,
+  type IntervalSessionSnapshot
+} from './intervalPractice'
 import { ActivePracticeSessionHost } from './activePracticeSession'
 import {
   ChordReportPersistenceCoordinator,
@@ -71,7 +89,6 @@ import {
   type HistoryDashboardFilter,
   type HistoryDashboardRange
 } from './historyDashboardProjection'
-import { projectPracticeHubRecentSummary } from './practiceHubProjection'
 import {
   projectChordReportDetail,
   resolveChordReportById
@@ -137,6 +154,10 @@ type ScreenId =
   | 'sight-result'
   | 'chord-mode-select'
   | 'chord-practice'
+  | 'interval-practice'
+  | 'interval-active'
+  | 'interval-result'
+  | 'interval-report-detail'
   | 'chord-report-detail'
   | 'history'
   | 'settings'
@@ -201,6 +222,10 @@ const screens: ScreenOption[] = [
   { id: 'sight-result', label: '识谱 · 结果', shortLabel: 'RESULT' },
   { id: 'chord-mode-select', label: '和弦 · 方式选择', shortLabel: 'CHORD MODE' },
   { id: 'chord-practice', label: '和弦 · 静态练习', shortLabel: 'CHORD V1' },
+  { id: 'interval-practice', label: '音程 · 静态练习', shortLabel: 'INTERVAL V1' },
+  { id: 'interval-active', label: '音程 · 进行中', shortLabel: 'INTERVAL ACTIVE' },
+  { id: 'interval-result', label: '音程 · 结果', shortLabel: 'INTERVAL RESULT' },
+  { id: 'interval-report-detail', label: '音程 · 练习报告', shortLabel: 'INTERVAL REPORT' },
   { id: 'chord-report-detail', label: '和弦 · 练习报告', shortLabel: 'CHORD REPORT' },
   { id: 'history', label: '练习记录', shortLabel: '记录' },
   { id: 'settings', label: '设置', shortLabel: '设置' },
@@ -273,12 +298,12 @@ function useUpdaterSnapshot(controller: UpdaterController): UpdaterSnapshot {
 interface MidiStatusPresentation {
   label: string
   detail: string
-  tone: 'connected' | 'busy' | 'idle' | 'error' | 'development'
+  tone: 'connected' | 'busy' | 'idle' | 'error'
 }
 
 function presentMidiStatus(runtime: AndroidSightReadingRuntime): MidiStatusPresentation {
   if (runtime.midiSource === 'development') {
-    return { label: '开发 MIDI', detail: 'DEBUG 模拟输入', tone: 'development' }
+    return { label: 'MIDI 输入就绪', detail: '可以开始练习', tone: 'connected' }
   }
   const midi = runtime.bluetoothSnapshot
   const name = midi.connectedDeviceName ?? 'FP-30X'
@@ -315,8 +340,20 @@ function useChordPracticeRuntime(runtime: ChordPracticeRuntime): ChordRuntimeSna
   return snapshot
 }
 
+function useIntervalPracticeRuntime(runtime: IntervalPracticeSessionRuntime): IntervalSessionSnapshot {
+  const [snapshot, setSnapshot] = useState<IntervalSessionSnapshot>(() => runtime.snapshot)
+  useEffect(() => runtime.subscribe(() => setSnapshot(runtime.snapshot)), [runtime])
+  return snapshot
+}
+
 function useChordPersistence(coordinator: ChordReportPersistenceCoordinator): ChordPersistenceSnapshot {
   const [snapshot, setSnapshot] = useState<ChordPersistenceSnapshot>(() => coordinator.snapshot)
+  useEffect(() => coordinator.subscribe(() => setSnapshot(coordinator.snapshot)), [coordinator])
+  return snapshot
+}
+
+function useIntervalPersistence(coordinator: IntervalReportPersistenceCoordinator): IntervalPersistenceSnapshot {
+  const [snapshot, setSnapshot] = useState<IntervalPersistenceSnapshot>(() => coordinator.snapshot)
   useEffect(() => coordinator.subscribe(() => setSnapshot(coordinator.snapshot)), [coordinator])
   return snapshot
 }
@@ -604,10 +641,14 @@ function HomeScreen({
   }, [chordPersistence, runtime])
   const recentPracticeTitle = recentPractice?.module === 'chord'
     ? `${formatHistoryPercentage(recentPractice.firstPassCompletionRate)}% 完成率`
-    : recentPractice ? `${formatHistoryPercentage(recentPractice.accuracy)}% 正确率` : '暂无练习记录'
+    : recentPractice?.module === 'interval'
+      ? `${formatIntervalAccuracy(recentPractice.firstTryAccuracy)} 首次正确率`
+      : recentPractice ? `${formatHistoryPercentage(recentPractice.accuracy)}% 正确率` : '暂无练习记录'
   const recentPracticeDetail = recentPractice?.module === 'chord'
     ? `${formatHistoryTimestamp(recentPractice.endedAt)} · ${recentPractice.modeSummary} · 完成 ${recentPractice.completedQuestions}${recentPractice.plannedQuestionCount === null ? '' : `/${recentPractice.plannedQuestionCount}`}`
-    : recentPractice
+    : recentPractice?.module === 'interval'
+      ? `${formatHistoryTimestamp(recentPractice.endedAt)} · ${recentPractice.modeSummary} · 完成 ${recentPractice.completedQuestions}${recentPractice.configuredQuestionCount === null ? '' : `/${recentPractice.configuredQuestionCount}`}`
+      : recentPractice
       ? `${formatHistoryTimestamp(recentPractice.endedAt)} · 识谱 · 完成 ${recentPractice.completed}/${recentPractice.plannedQuestionCount}`
       : '完成一次练习后，这里会显示最近结果。'
   const homeVisual = theme.capabilities.homeVisual
@@ -696,27 +737,22 @@ function HomeScreen({
 }
 
 function PracticeHubScreen({
-  chordHistory,
   chordPersistence,
+  intervalSettingsReady,
   settings,
   theme
 }: {
   chordHistory: ChordPersistenceSnapshot
   chordPersistence: ChordReportPersistenceCoordinator
+  intervalSettingsReady: boolean
   settings: SightReadingSettings
   theme: ThemeDefinition
 }): JSX.Element {
   const { runtime } = useMidiUi()
-  const sightHistory = runtime.historySnapshot
-  const recent = projectPracticeHubRecentSummary(sightHistory.records, chordHistory.records)
   const practiceVisual = theme.capabilities.practiceVisual
   const composedPractice = practiceVisual.kind === 'hero-cards' ? practiceVisual : null
-  const sightRecentSummary = sightHistory.status === 'loading' && sightHistory.records.length === 0
-    ? '正在读取记录'
-    : recent.sight?.summary ?? '暂无练习记录'
-  const chordRecentSummary = chordHistory.status === 'loading' && chordHistory.records.length === 0
-    ? '正在读取记录'
-    : recent.chord?.summary ?? '暂无练习记录'
+  const intervalVisual = theme.capabilities.intervalPracticeVisual
+  const intervalCollage = intervalVisual?.kind === 'blue-notebook' ? intervalVisual.assets.hubCardCollage : undefined
   const sightConfigurationSummary = `${settings.noteMode === 'double' ? '双音' : '单音'} · ${STAFF_MODE_LABELS[settings.staffMode]} · ${settings.questionCount} 题`
 
   useEffect(() => {
@@ -733,7 +769,7 @@ function PracticeHubScreen({
             <div className="themed-practice-hero__copy">
               <span className="eyebrow">练习中心</span>
               <h1 id="practice-hub-title">每天一点练习，<br />让喜欢的音乐离你更近。</h1>
-              <p>选择识谱或和弦练习，把基础一步一步练扎实。</p>
+              <p>选择识谱、和弦或音程练习，把基础一步一步练扎实。</p>
               <small>今天，也弹一点。</small>
             </div>
           </div>
@@ -741,17 +777,16 @@ function PracticeHubScreen({
           <div className="hub-heading">
             <span className="eyebrow">PRACTICE</span>
             <h1 id="practice-hub-title">选择今天的练习</h1>
-            <p>从识谱或和弦开始；后续训练模块将在这里自然扩展。</p>
+            <p>从识谱、和弦或音程开始，按自己的节奏打牢基础。</p>
           </div>
         )}
-        <div className={`practice-module-grid${composedPractice ? ' themed-practice-module-grid' : ''}`}>
+        <div className={`practice-module-grid has-interval${composedPractice ? ' themed-practice-module-grid' : ''}`}>
           <button className={`module-card${composedPractice ? ' themed-practice-card is-sight' : ''}`} type="button" onClick={() => navigate('sight-ready')}>
             <span className="module-card__icon"><Icon name="book" size={30} /></span>
             <span className="module-card__copy">
               <small>识谱训练</small>
               <strong>识谱练习</strong>
               <em>{sightConfigurationSummary}</em>
-              <span className="module-card__recent">{sightRecentSummary}</span>
             </span>
             {composedPractice ? (
               <>
@@ -766,7 +801,6 @@ function PracticeHubScreen({
               <small>和弦与转位</small>
               <strong>和弦练习</strong>
               <em>三和弦 / 七和弦 · 原位与转位 · 柱式 + 分解</em>
-              <span className="module-card__recent">{chordRecentSummary}</span>
             </span>
             {composedPractice ? (
               <>
@@ -775,9 +809,262 @@ function PracticeHubScreen({
               </>
             ) : <Icon name="chevron" />}
           </button>
+          <button className={`module-card interval-practice-card${intervalCollage ? ' interval-notebook-card' : ''}`} disabled={!intervalSettingsReady} type="button" onClick={() => navigate('interval-practice')}>
+            <span className={`module-card__icon ${intervalCollage ? 'is-blue' : 'is-violet'}`}><Icon name="chart" size={30} /></span>
+            <span className="module-card__copy">
+              <small>音程辨识与构造</small>
+              <strong>音程练习</strong>
+              <em>{intervalCollage ? '指定低音构造 · 26 种音程' : '指定低音构造 · 26 种音程 · 固定大谱表'}</em>
+            </span>
+            {intervalCollage ? <>
+              <span aria-hidden="true" className="interval-notebook-card__art"><img alt="" src={intervalCollage} /></span>
+              <span className="interval-notebook-card__action"><Icon name="play" size={18} />开始练习</span>
+            </> : <Icon name="chevron" />}
+          </button>
         </div>
       </section>
     </ProductFrame>
+  )
+}
+
+type IntervalPracticeSettingChanges = Partial<Omit<IntervalPracticeSettings, 'schemaVersion'>>
+
+function IntervalPracticeSetupScreen({
+  onSettingsChange,
+  onStart,
+  settings
+}: {
+  onSettingsChange: (changes: IntervalPracticeSettingChanges) => void
+  onStart: () => void
+  settings: IntervalPracticeSettings
+}): JSX.Element {
+  const questionCountOptions = INTERVAL_QUESTION_COUNT_OPTIONS.map((value) => ({
+    label: value === 'endless' ? '无限练习' : `${value} 题`,
+    value
+  }))
+  return (
+    <ProductFrame active="practice" onBack={() => navigate('practice')} title="音程练习">
+      <section className="interval-ready-layout" aria-labelledby="interval-ready-title">
+        <div className="interval-ready-heading">
+          <span className="eyebrow">练习准备</span>
+          <h1 id="interval-ready-title">设置本轮音程练习</h1>
+          <p>覆盖 26 种向上音程，范围 F1 – G6；开始后将进入无底部导航的专注练习页。</p>
+        </div>
+        <div className="module-settings-rows settings-group--interval interval-ready-settings">
+          <SettingRow
+            action={<button aria-label={`答案提示已${settings.answerHint ? '开启' : '关闭'}`} className={`mock-switch ${settings.answerHint ? 'is-on' : ''}`} type="button" onClick={() => onSettingsChange({ answerHint: !settings.answerHint })}><small>{settings.answerHint ? 'On' : 'Off'}</small><i /></button>}
+            description="关闭时仍显示固定大谱表和根音，只隐藏目标音"
+            icon="info"
+            title="答案提示"
+          />
+          <SettingRow
+            action={<button aria-label={`低音包含升降号已${settings.includeAccidentalRoots ? '开启' : '关闭'}`} className={`mock-switch ${settings.includeAccidentalRoots ? 'is-on' : ''}`} type="button" onClick={() => onSettingsChange({ includeAccidentalRoots: !settings.includeAccidentalRoots })}><small>{settings.includeAccidentalRoots ? 'On' : 'Off'}</small><i /></button>}
+            description="关闭时低音只用自然音；目标音仍按正确拼写使用升降号"
+            icon="chart"
+            title="低音包含升降号"
+          />
+          <SettingRow
+            action={<SettingSelect<IntervalQuestionCount> ariaLabel="音程练习题数" value={settings.questionCount} options={questionCountOptions} onChange={(questionCount) => onSettingsChange({ questionCount })} />}
+            description="固定题数完成后自动结束；无限练习需主动结束"
+            icon="grid"
+            title="练习题数"
+          />
+        </div>
+        <button className="primary-action is-wide interval-start-button" type="button" onClick={onStart}><Icon name="play" />开始练习</button>
+      </section>
+    </ProductFrame>
+  )
+}
+
+function IntervalPracticeActiveScreen({
+  midiRuntime,
+  onRequestEnd,
+  onSessionComplete,
+  runtime,
+  snapshot,
+  theme
+}: {
+  midiRuntime: AndroidSightReadingRuntime
+  onRequestEnd: () => void
+  onSessionComplete: () => void
+  runtime: IntervalPracticeSessionRuntime
+  snapshot: IntervalSessionSnapshot
+  theme: ThemeDefinition
+}): JSX.Element {
+  const intervalVisual = theme.capabilities.intervalPracticeVisual
+  const activeBorder = intervalVisual?.kind === 'blue-notebook' ? intervalVisual.assets.activeBorder : undefined
+  const frameRef = useRef<HTMLDivElement>(null)
+  const stageRef = useRef<HTMLElement>(null)
+  const [borderClip, setBorderClip] = useState('inset(50%)')
+  const [foregroundLayout, setForegroundLayout] = useState({ textClip: 'inset(50%)', dockClip: 'inset(50%)', anchorStyle: {} as CSSProperties })
+  const [showEarlyEnd, setShowEarlyEnd] = useState(false)
+  const transportReady = midiRuntime.midiSource === 'development'
+    || midiRuntime.bluetoothSnapshot.connectionState === 'CONNECTED'
+  const inputBoundary = `${midiRuntime.midiSource}:${midiRuntime.bluetoothSnapshot.connectionState}:${midiRuntime.bluetoothSnapshot.connectedDeviceId ?? ''}`
+  const inputBoundaryRef = useRef(inputBoundary)
+  const practiceState = snapshot.practiceState
+
+  // App-owned exclusion geometry; theme data cannot move or shrink the paper.
+  // Hide artwork until measured, and exclude the entire stage plus a safety gap.
+  useLayoutEffect(() => {
+    if (!activeBorder || !frameRef.current || !stageRef.current) return
+    const frame = frameRef.current
+    const stage = stageRef.current
+    const textNodes = [...frame.querySelectorAll<HTMLElement>('.interval-focus-prompt__identity, .interval-focus-prompt > strong, .interval-focus-feedback')]
+    const dock = document.querySelector<HTMLElement>('.review-dock')
+    const updateClip = (): void => {
+      const outer = frame.getBoundingClientRect()
+      const paper = stage.getBoundingClientRect()
+      const left = paper.left - outer.left - 8
+      const top = paper.top - outer.top - 8
+      const right = paper.right - outer.left + 8
+      const bottom = paper.bottom - outer.top + 8
+      setBorderClip(`polygon(evenodd, 0px 0px, ${outer.width}px 0px, ${outer.width}px ${outer.height}px, 0px ${outer.height}px, 0px 0px, ${left}px ${top}px, ${right}px ${top}px, ${right}px ${bottom}px, ${left}px ${bottom}px, ${left}px ${top}px)`)
+      const exclude = (rect: { left: number; top: number; right: number; bottom: number }, gap: number): string => {
+        const l = rect.left - outer.left - gap, t = rect.top - outer.top - gap
+        const r = rect.right - outer.left + gap, b = rect.bottom - outer.top + gap
+        return `polygon(evenodd, 0px 0px, ${outer.width}px 0px, ${outer.width}px ${outer.height}px, 0px ${outer.height}px, 0px 0px, ${l}px ${t}px, ${r}px ${t}px, ${r}px ${b}px, ${l}px ${b}px, ${l}px ${t}px)`
+      }
+      const textRects = textNodes.map((node) => node.getBoundingClientRect())
+      const textRect = {
+        left: Math.min(...textRects.map((rect) => rect.left)), top: Math.min(...textRects.map((rect) => rect.top)),
+        right: Math.max(...textRects.map((rect) => rect.right)), bottom: Math.max(...textRects.map((rect) => rect.bottom))
+      }
+      const dockRect = dock?.getBoundingClientRect()
+      // Separate nested masks intersect safely even when exclusion rectangles
+      // overlap. Multiple holes in one evenodd polygon would cancel each other.
+      setForegroundLayout({
+        textClip: exclude(textRect, 10),
+        dockClip: dockRect ? exclude(dockRect, 12) : 'inset(0)',
+        anchorStyle: {
+          '--interval-stage-left': `${paper.left - outer.left}px`,
+          '--interval-stage-right': `${paper.right - outer.left}px`,
+          '--interval-stage-top': `${paper.top - outer.top}px`,
+          '--interval-stage-bottom': `${paper.bottom - outer.top}px`,
+          '--interval-anchor-right-inset': `${Math.max(outer.right - paper.right, dockRect ? outer.right - dockRect.left + 24 : 0)}px`
+        } as CSSProperties
+      })
+    }
+    updateClip()
+    const observer = new ResizeObserver(updateClip)
+    observer.observe(frame)
+    observer.observe(stage)
+    textNodes.forEach((node) => observer.observe(node))
+    if (dock) observer.observe(dock)
+    return () => observer.disconnect()
+  }, [activeBorder, Boolean(practiceState)])
+
+  useEffect(() => {
+    runtime.setTransportReady(transportReady)
+    const unsubscribe = midiRuntime.midiRouter.subscribe((event) => runtime.handleMidi(event))
+    return unsubscribe
+  }, [midiRuntime, runtime])
+
+  useEffect(() => {
+    runtime.setTransportReady(transportReady)
+  }, [runtime, transportReady])
+
+  useEffect(() => {
+    if (inputBoundaryRef.current === inputBoundary) return
+    inputBoundaryRef.current = inputBoundary
+    runtime.resetInputState()
+  }, [inputBoundary, runtime])
+
+  useEffect(() => {
+    if (snapshot.status === 'SESSION_COMPLETE') onSessionComplete()
+  }, [onSessionComplete, snapshot.status])
+
+  useEffect(() => {
+    const handleBackRequest = (): void => {
+      runtime.pause()
+      setShowEarlyEnd(true)
+    }
+    window.addEventListener('interval-request-end', handleBackRequest)
+    return () => window.removeEventListener('interval-request-end', handleBackRequest)
+  }, [runtime])
+
+  if (!practiceState) return <main className="persistence-loading"><h1>正在准备音程练习…</h1></main>
+  const page = presentIntervalPractice(practiceState)
+  const judgementState = snapshot.judgement?.state ?? { phase: 'READY' as const }
+  const judgementPhase = judgementState.phase
+  const paused = snapshot.status === 'SUSPENDED'
+  const notationFeedback: MusicNotationFeedback = judgementPhase === 'SUCCESS'
+    ? 'correct'
+    : judgementPhase === 'WRONG_WAIT_RELEASE' ? 'wrong_note' : null
+  const judgementMessage = paused
+    ? !transportReady ? 'MIDI 已断开，练习已安全暂停' : '练习已暂停'
+    : judgementPhase === 'COLLECTING'
+      ? '正在接收弹奏…'
+      : judgementPhase === 'WRONG_WAIT_RELEASE'
+        ? '错误，请松开全部按键后重试原题'
+        : judgementPhase === 'SUCCESS'
+          ? judgementState.feedbackElapsed ? '正确，请松开全部按键' : '正确'
+          : ''
+  const progressLabel = snapshot.questionCount === 'endless'
+    ? `已完成 ${snapshot.completedQuestions}`
+    : `已完成 ${snapshot.completedQuestions} / ${snapshot.questionCount}`
+  const requestEnd = (): void => {
+    runtime.pause()
+    setShowEarlyEnd(true)
+  }
+  const continuePractice = (): void => {
+    setShowEarlyEnd(false)
+    runtime.resume()
+  }
+
+  return (
+    <div
+      className={`interval-focus-frame ${paused ? 'is-paused' : ''}${activeBorder ? ' interval-blue-notebook' : ''}`}
+      ref={frameRef}
+      data-answer-hint={practiceState.settings.answerHint ? 'on' : 'off'}
+    >
+      {activeBorder ? <div aria-hidden="true" className="interval-notebook-border-clip" style={{ clipPath: borderClip }}><img alt="" className="interval-notebook-border" src={activeBorder} /></div> : null}
+      {activeBorder ? (
+        <div aria-hidden="true" className="interval-notebook-foreground-clip" style={{ ...foregroundLayout.anchorStyle, clipPath: borderClip }}>
+          <div className="interval-notebook-text-safe" style={{ clipPath: foregroundLayout.textClip }}>
+            <div className="interval-notebook-dock-safe" style={{ clipPath: foregroundLayout.dockClip }}>
+              {(['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const).map((corner) => (
+                <span className={`interval-notebook-anchor is-${corner}`} key={corner}><img alt="" src={activeBorder} /></span>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <header className="chord-focus-header interval-focus-header">
+        <div className="chord-focus-header__left">
+          <button aria-label="返回练习" className="icon-button subtle" type="button" onClick={requestEnd}><Icon name="arrow-left" /></button>
+          <div><small>PIANO FUNDAMENTALS</small><strong>音程练习</strong></div>
+        </div>
+        <div className="focus-actions">
+          <MidiStatusButton compact />
+          <button className="outline-action" disabled={paused && !transportReady} type="button" onClick={() => paused ? runtime.resume() : runtime.pause()}><Icon name={paused ? 'play' : 'pause'} /><span>{paused ? '继续' : '暂停'}</span></button>
+          <button className="outline-action" type="button" onClick={requestEnd}><Icon name="stop" /><span>提前结束</span></button>
+        </div>
+      </header>
+      <main className="interval-focus-content">
+        <div className="interval-question-copy interval-focus-prompt">
+          <div className="interval-focus-prompt__identity"><span>{page.intervalName}</span><small>{progressLabel}</small></div>
+          <strong>{page.prompt}</strong>
+          <span className={`interval-focus-feedback is-${paused ? 'paused' : judgementPhase === 'SUCCESS' ? 'success' : judgementPhase === 'WRONG_WAIT_RELEASE' ? 'danger' : 'neutral'}`} role="status" aria-live="polite">{judgementMessage}</span>
+        </div>
+        <section ref={stageRef} className={`interval-focus-stage has-${notationFeedback ?? 'neutral'}`} aria-label="音程谱面">
+          <NotationPaper keySignature="C" label={page.notation.ariaLabel} notes={page.notation.notes} staffMode="grand" feedback={notationFeedback} />
+          <div className="interval-answer-caption">
+            <span>{page.notation.answerLabel ?? page.rootLabel}</span>
+          </div>
+          {paused ? <div className="chord-pause-overlay interval-pause-overlay"><Icon name="pause" size={34} /><strong>{judgementMessage}</strong></div> : null}
+        </section>
+      </main>
+      {showEarlyEnd ? (
+        <div className="early-end-backdrop">
+          <section aria-labelledby="interval-early-end-title" aria-modal="true" className="early-end-dialog" role="dialog">
+            <span className="early-end-dialog__icon"><Icon name="stop" /></span>
+            <div><span className="eyebrow">音程练习</span><h1 id="interval-early-end-title">结束本轮？</h1><p>已完成 {snapshot.completedQuestions}{snapshot.questionCount === 'endless' ? ' 题' : ` / ${snapshot.questionCount}`}。结束后，本轮结果会保存到练习记录。</p></div>
+            <div className="early-end-dialog__actions"><button className="secondary-action" type="button" onClick={continuePractice}>继续练习</button><button className="primary-action" type="button" onClick={onRequestEnd}>结束并查看结果</button></div>
+          </section>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -1916,11 +2203,9 @@ function SightReadyScreen({
           <div>
             <span className="eyebrow">本轮设置</span>
             <h2>{settings.noteMode === 'double' ? `${settings.questionCount} 道双音题` : `${settings.questionCount} 个音符`}</h2>
-            <p>{runtime.midiSource === 'development'
-              ? '当前使用 DEBUG 模拟输入；可在开发控制中切换到真实蓝牙 MIDI。'
-              : midiStatus.tone === 'connected'
-                ? '直接在已连接的 FP-30X 上弹奏目标音。'
-                : '开始前请打开 MIDI 页面，扫描并连接 FP-30X。'}</p>
+            <p>{midiStatus.tone === 'connected'
+              ? `${midiStatus.label}，可以直接弹奏目标音。`
+              : '开始前请打开 MIDI 页面，扫描并连接 FP-30X。'}</p>
           </div>
           <div className="setting-summary">
             <div><small>谱表</small><strong>{STAFF_MODE_LABELS[settings.staffMode]}</strong></div>
@@ -2196,6 +2481,103 @@ function SightResultScreen({
   )
 }
 
+function formatIntervalAccuracy(value: number | null): string {
+  return value === null ? '—' : `${formatHistoryPercentage(value)}%`
+}
+
+function IntervalReportFacts({ report }: { report: IntervalPracticeReportDraft }): JSX.Element {
+  const difficult = getDifficultIntervals(report)
+  const settingCount = report.settings.questionCountMode === 'infinite'
+    ? '无限练习'
+    : `固定 ${report.settings.configuredQuestionCount} 题`
+  return (
+    <div className="interval-report-sections">
+      <section className="chord-report-card chord-report-overview" aria-labelledby="interval-report-overview-title">
+        <div className="chord-report-card__heading"><div><span className="eyebrow">本轮概览</span><h2 id="interval-report-overview-title">练习结果</h2></div></div>
+        <dl className="chord-report-metrics interval-report-metrics">
+          <div><dt>完成题数</dt><dd>{report.completedQuestions}</dd></div>
+          <div className="is-primary"><dt>首次正确率</dt><dd>{formatIntervalAccuracy(report.firstTryAccuracy)}</dd></div>
+          <div><dt>重试后答对</dt><dd>{report.retriedCorrectCount}</dd></div>
+          <div><dt>错误尝试</dt><dd>{report.totalWrongAttempts}</dd></div>
+        </dl>
+        <p className="chord-report-explanation">首次正确率只统计未发生完整错误尝试便答对的题目。</p>
+      </section>
+      <section className="chord-report-card" aria-labelledby="interval-report-difficult-title">
+        <div className="chord-report-card__heading"><div><span className="eyebrow">学习重点</span><h2 id="interval-report-difficult-title">易错音程</h2></div></div>
+        {report.completedQuestions === 0 ? <p className="interval-report-empty">暂无数据</p>
+          : difficult.length === 0 ? <p className="interval-report-empty">本轮没有明显易错音程</p>
+            : <ol className="interval-difficult-list">{difficult.map((entry) => (
+              <li key={entry.intervalId}><strong>{entry.intervalName}</strong><span>首次失误 {entry.presentedCount - entry.firstTryCorrectCount} 题 · 错误尝试 {entry.wrongAttemptCount} 次</span></li>
+            ))}</ol>}
+      </section>
+      <section className="chord-report-card interval-performance-card" aria-labelledby="interval-performance-title">
+        <div className="chord-report-card__heading"><div><span className="eyebrow">分类统计</span><h2 id="interval-performance-title">本轮音程表现</h2></div><small>仅显示本轮出现过的音程</small></div>
+        {report.perIntervalStats.length === 0 ? <p className="interval-report-empty">暂无数据</p> : (
+          <div className="interval-performance-list">
+            {report.perIntervalStats.map((entry) => (
+              <article key={entry.intervalId}>
+                <strong>{entry.intervalName}</strong>
+                <span>出现 {entry.presentedCount} 次</span>
+                <span>首次正确 {entry.firstTryCorrectCount}</span>
+                <span>重试后正确 {entry.retriedCorrectCount}</span>
+                <span>错误尝试 {entry.wrongAttemptCount}</span>
+                <em>{formatIntervalAccuracy(entry.firstTryAccuracy)}</em>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+      <section className="chord-report-card" aria-labelledby="interval-report-settings-title">
+        <div className="chord-report-card__heading"><div><span className="eyebrow">历史快照</span><h2 id="interval-report-settings-title">本轮设置</h2></div></div>
+        <dl className="chord-report-rows chord-report-session">
+          <div><dt>答案提示</dt><dd>{report.settings.answerHint ? '开启' : '关闭'}</dd></div>
+          <div><dt>低音包含升降号</dt><dd>{report.settings.includeAccidentalRoots ? '开启' : '关闭'}</dd></div>
+          <div><dt>练习题数</dt><dd>{settingCount}</dd></div>
+        </dl>
+      </section>
+    </div>
+  )
+}
+
+function IntervalResultScreen({ report }: { report: IntervalPracticeReportDraft }): JSX.Element {
+  const completed = report.completionStatus === 'COMPLETED'
+  return (
+    <ProductFrame active="practice" onBack={() => navigate('interval-practice')} title={completed ? '练习完成' : '本轮已结束'}>
+      <section className="chord-report-detail interval-result-page">
+        <div className="chord-report-detail__body">
+          <header className="chord-report-identity">
+            <div><span className="eyebrow">音程练习结果</span><h1>{completed ? '练习完成' : '本轮已结束'}</h1><p>{completed ? '已完成本轮设定题数。' : '已保存本轮真正完成的题目与统计。'}</p></div>
+            <span className={`chord-report-status is-${completed ? 'completed' : 'stopped'}`}>{completed ? '已完成' : '提前结束'}</span>
+          </header>
+          <IntervalReportFacts report={report} />
+          <div className="result-actions interval-result-actions">
+            <button className="secondary-action" type="button" onClick={() => navigate('interval-practice')}>再练一轮</button>
+            <button className="primary-action" type="button" onClick={() => navigate('history')}><Icon name="history" />查看练习记录</button>
+          </div>
+        </div>
+      </section>
+    </ProductFrame>
+  )
+}
+
+function IntervalReportDetailScreen({ onBack, report }: { onBack: () => void; report: IntervalPracticeReportV1 | null }): JSX.Element {
+  if (!report) return (
+    <ProductFrame active="history" onBack={onBack} title="音程练习报告">
+      <section className="chord-report-detail is-unavailable"><div className="chord-report-unavailable" role="status"><span className="history-row__mark"><Icon name="info" /></span><div><h1>记录不可用</h1><p>这条练习记录无法读取。</p></div><button className="primary-action" type="button" onClick={onBack}>返回记录</button></div></section>
+    </ProductFrame>
+  )
+  return (
+    <ProductFrame active="history" onBack={onBack} title="音程练习报告">
+      <section className="chord-report-detail">
+        <div className="chord-report-detail__body">
+          <header className="chord-report-identity"><div><span className="eyebrow">练习记录</span><h1>音程练习</h1><p>以下内容来自本轮已保存的练习事实。</p></div><span className={`chord-report-status is-${report.completionStatus === 'COMPLETED' ? 'completed' : 'stopped'}`}>{report.completionStatus === 'COMPLETED' ? '已完成' : '提前结束'}</span></header>
+          <IntervalReportFacts report={report} />
+        </div>
+      </section>
+    </ProductFrame>
+  )
+}
+
 type HistoryFilter = HistoryDashboardFilter
 
 function HistoryTrendChart({ buckets }: { buckets: readonly HistoryDailyBucket[] }): JSX.Element {
@@ -2248,10 +2630,12 @@ function HistoryTrendChart({ buckets }: { buckets: readonly HistoryDailyBucket[]
 
 function HistoryRecord({
   item,
-  onOpenChordReport
+  onOpenChordReport,
+  onOpenIntervalReport
 }: {
   item: MixedPracticeHistoryItem
   onOpenChordReport: (recordId: string) => void
+  onOpenIntervalReport: (recordId: string) => void
 }): JSX.Element {
   if (item.module === 'chord') {
     const completed = item.plannedQuestionCount === null
@@ -2274,6 +2658,18 @@ function HistoryRecord({
       </button>
     )
   }
+  if (item.module === 'interval') {
+    const completed = item.configuredQuestionCount === null
+      ? `完成 ${item.completedQuestions} 题`
+      : `完成 ${item.completedQuestions}/${item.configuredQuestionCount}`
+    return (
+      <button aria-label={`打开${item.modeSummary}练习报告`} className={`history-row is-${item.completionStatus.toLowerCase()} is-interactive`} type="button" onClick={() => onOpenIntervalReport(item.recordId)}>
+        <span className="history-row__mark"><Icon name="grid" /></span>
+        <span className="history-row__copy"><small><b className="history-module-badge is-interval">音程</b>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small><strong>{item.modeSummary}</strong><em>{completed} · 重试后答对 {item.retriedCorrectCount} · 错误尝试 {item.totalWrongAttempts}</em></span>
+        <span className="history-row__score"><strong>{formatIntervalAccuracy(item.firstTryAccuracy)}</strong><small>首次正确率 <Icon name="chevron" size={13} /></small></span>
+      </button>
+    )
+  }
   return (
     <article className={`history-row is-${item.completionState}`}>
       <span className="history-row__mark"><Icon name="book" /></span>
@@ -2291,38 +2687,47 @@ function HistoryScreen({
   chordHistory,
   chordPersistence,
   filter,
+  intervalHistory,
+  intervalPersistence,
   onFilterChange,
   onOpenChordReport,
+  onOpenIntervalReport,
   runtime,
   theme
 }: {
   chordHistory: ChordPersistenceSnapshot
   chordPersistence: ChordReportPersistenceCoordinator
   filter: HistoryFilter
+  intervalHistory: IntervalPersistenceSnapshot
+  intervalPersistence: IntervalReportPersistenceCoordinator
   onFilterChange: (filter: HistoryFilter) => void
   onOpenChordReport: (recordId: string, filter: HistoryFilter) => void
+  onOpenIntervalReport: (recordId: string, filter: HistoryFilter) => void
   runtime: AndroidSightReadingRuntime
   theme: ThemeDefinition
 }): JSX.Element {
   const history = runtime.historySnapshot
   const sightProjection = projectSightReadingHistory(history.records)
   const chordItems = projectChordHistory(chordHistory.records)
-  const mixedItems = projectMixedPracticeHistory(history.records, chordHistory.records)
+  const intervalItems = projectIntervalHistory(intervalHistory.records)
+  const mixedItems = projectMixedPracticeHistory(history.records, chordHistory.records, intervalHistory.records)
   const [trendRange, setTrendRange] = useState<HistoryDashboardRange>('7d')
-  const dashboard = projectHistoryDashboard(history.records, chordHistory.records, { filter, range: trendRange })
+  const dashboard = projectHistoryDashboard(history.records, chordHistory.records, intervalHistory.records, { filter, range: trendRange })
   const historyVisual = theme.capabilities.historyVisual
   const composedHistory = historyVisual.kind === 'dashboard' ? historyVisual : null
   useEffect(() => {
     void runtime.refreshHistory()
     void chordPersistence.refresh()
-  }, [chordPersistence, runtime])
+    void intervalPersistence.refresh()
+  }, [chordPersistence, intervalPersistence, runtime])
 
+  const nonSightItems: readonly MixedPracticeHistoryItem[] = filter === 'chord' ? chordItems : mixedItems
   const visibleItems: readonly MixedPracticeHistoryItem[] = filter === 'sight'
     ? sightProjection.items.map((item) => ({ module: 'sight' as const, ...item }))
-    : filter === 'chord' ? chordItems : mixedItems
-  const anyLoading = history.status === 'loading' || chordHistory.status === 'loading'
-  const anyError = history.status === 'error' || chordHistory.status === 'error'
-  const anyWarning = Boolean(history.warning || chordHistory.warning)
+    : filter === 'interval' ? intervalItems : nonSightItems
+  const anyLoading = history.status === 'loading' || chordHistory.status === 'loading' || intervalHistory.status === 'loading'
+  const anyError = history.status === 'error' || chordHistory.status === 'error' || intervalHistory.status === 'error'
+  const anyWarning = Boolean(history.warning || chordHistory.warning || intervalHistory.warning)
   const listStatus = anyLoading
     ? '正在同步本地记录'
     : anyError
@@ -2330,10 +2735,10 @@ function HistoryScreen({
       : anyWarning
         ? `共 ${visibleItems.length} 条 · 部分记录不可用`
         : `共 ${visibleItems.length} 条记录`
-  const emptyTitle = filter === 'chord'
+  const emptyTitle = filter === 'interval' ? '暂无音程练习记录' : filter === 'chord'
     ? '暂无和弦练习记录'
     : filter === 'sight' ? '暂无识谱练习记录' : '暂无练习记录'
-  const emptyDetail = filter === 'chord'
+  const emptyDetail = filter === 'interval' ? '完成音程练习后，结果会显示在这里。' : filter === 'chord'
     ? '完成和弦练习后，记录会显示在这里。'
     : filter === 'sight' ? '完成一轮识谱练习后，结果会显示在这里。' : '完成一轮练习后，结果会显示在这里。'
   return (
@@ -2350,7 +2755,7 @@ function HistoryScreen({
         </section>
 
         <section className="history-dashboard__summary" aria-label="练习汇总">
-          <article className="history-stat-card is-sessions"><span><Icon name="chart" /></span><div><small>已保存练习</small><strong>{dashboard.summary.totalSessions}<b>次</b></strong><p>识谱与和弦练习记录</p></div></article>
+          <article className="history-stat-card is-sessions"><span><Icon name="chart" /></span><div><small>已保存练习</small><strong>{dashboard.summary.totalSessions}<b>次</b></strong><p>识谱、和弦与音程练习记录</p></div></article>
           <article className="history-stat-card is-streak"><span><Icon name="grid" /></span><div><small>连续练习天数</small><strong>{dashboard.summary.currentStreakDays}<b>天</b></strong><p>按本地日期统计</p></div></article>
           <article className="history-stat-card is-questions"><span><Icon name="book" /></span><div><small>累计完成题数</small><strong>{dashboard.summary.totalCompletedQuestions}<b>题</b></strong><p>包含已保存的练习</p></div></article>
         </section>
@@ -2362,13 +2767,13 @@ function HistoryScreen({
               <span>{listStatus}</span>
             </div>
             <div className="history-filter" aria-label="练习模块筛选" role="group">
-              {([['all', '全部'], ['sight', '识谱'], ['chord', '和弦']] as const).map(([value, label]) => (
+              {([['all', '全部'], ['sight', '识谱'], ['chord', '和弦'], ['interval', '音程']] as const).map(([value, label]) => (
                 <button className={filter === value ? 'is-active' : ''} key={value} type="button" onClick={() => onFilterChange(value)}>{label}</button>
               ))}
             </div>
             <div className="history-list__rows">
               {visibleItems.length > 0
-                ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} />)
+                ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} onOpenIntervalReport={(recordId) => onOpenIntervalReport(recordId, filter)} />)
                 : (
                   <div className="history-empty" role={anyError ? 'alert' : 'status'}>
                     <span className="history-row__mark"><Icon name={anyError ? 'info' : 'history'} /></span>
@@ -2390,7 +2795,7 @@ function HistoryScreen({
             </div>
             <HistoryTrendChart buckets={dashboard.trend} />
             <div className="history-trend-legend"><span className="is-line"><i />完成题数</span><span className="is-bar"><i />练习次数</span></div>
-            <p className="history-trend-note">{filter === 'all' ? '展示识谱与和弦的练习次数和完成题数。' : filter === 'sight' ? '当前仅显示识谱练习活动量。' : '当前仅显示和弦练习活动量。'}</p>
+            <p className="history-trend-note">{filter === 'all' ? '展示识谱与和弦的练习次数和完成题数，并包含音程练习。' : filter === 'sight' ? '当前仅显示识谱练习活动量。' : filter === 'chord' ? '当前仅显示和弦练习活动量。' : '当前仅显示音程练习活动量。'}</p>
             {composedHistory ? <img className="history-dashboard__trend-decor" src={composedHistory.assets.trend} alt="" aria-hidden="true" /> : null}
           </section>
         </div>
@@ -2512,7 +2917,10 @@ function SettingSelect<Value extends string | number>({
         aria-label={ariaLabel}
         className="setting-select"
         value={value}
-        onChange={(event) => onChange(event.target.value as Value)}
+        onChange={(event) => {
+          const selected = options.find((option) => String(option.value) === event.target.value)
+          if (selected) onChange(selected.value)
+        }}
       >
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
@@ -2737,7 +3145,7 @@ function SettingsScreen({
             <SettingRow description="Android Tablet Personal Edition" icon="info" title="钢琴基本功训练器" action={<strong>Android</strong>} />
             <SettingRow description={installedVersionDescription} icon="info" title="当前版本" action={<strong>{installedVersionAction}</strong>} />
             {__QA_BUILD__ ? (
-              <SettingRow description="与正式版独立安装；正式更新通道已关闭" icon="refresh" title="更新通道" action={<strong>QA Debug</strong>} />
+              <SettingRow description="与正式版独立安装；正式更新通道已关闭" icon="refresh" title="应用内更新" action={<strong>不可用</strong>} />
             ) : (
               <SettingRow description="查看版本与更新状态" icon="refresh" onClick={() => openAuxiliary('update')} title="检查更新" action={<strong>{updaterLabel}</strong>} />
             )}
@@ -3117,6 +3525,24 @@ function ChordPersistenceErrorNotice({ persistence }: { persistence: ChordPersis
   )
 }
 
+function IntervalPersistenceErrorNotice({
+  coordinator,
+  persistence
+}: {
+  coordinator: IntervalReportPersistenceCoordinator
+  persistence: IntervalPersistenceSnapshot
+}): JSX.Element | null {
+  if (persistence.status !== 'error') return null
+  return (
+    <aside className="persistence-error" role="alert">
+      {persistence.errorContext === 'save'
+        ? <span><strong>练习已结束，但记录保存失败。</strong><small>音程练习结果仍保留，可重试写入此设备。</small></span>
+        : <span><strong>暂时无法读取音程练习记录。</strong><small>其他练习功能仍可正常使用。</small></span>}
+      <button type="button" onClick={() => { void coordinator.retryPending() }}>重试</button>
+    </aside>
+  )
+}
+
 class ThemeRecoveryBoundary extends Component<{ children: ReactNode; manager: ThemeRuntimeManager; theme: ThemeDefinition }, { error: Error | null }> {
   state: { error: Error | null } = { error: null }
   static getDerivedStateFromError(error: Error): { error: Error } { return { error } }
@@ -3145,12 +3571,25 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
     rng: () => Math.random()
   }), [])
   const chordKeepAwakeSnapshot = useChordPracticeRuntime(chordRuntime)
+  const intervalRuntime = useMemo(() => new IntervalPracticeSessionRuntime({
+    clock: { now: () => performance.now() },
+    scheduler: {
+      schedule: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      cancel: (id) => window.clearTimeout(id)
+    },
+    rng: () => Math.random()
+  }), [])
+  const intervalSnapshot = useIntervalPracticeRuntime(intervalRuntime)
   const practiceKeepAwake = useMemo(() => createPracticeKeepAwakeController(), [])
   const updater = useMemo(() => createAndroidUpdaterController(), [])
   const chordSettingsRepository = useMemo(() => new ChordSettingsRepository(CapacitorPreferencesBackend), [])
+  const intervalSettingsRepository = useMemo(() => new IntervalPracticeSettingsRepository(CapacitorPreferencesBackend), [])
   const chordReportRepository = useMemo(() => new ChordReportRepository(CapacitorPreferencesBackend), [])
   const chordPersistence = useMemo(() => new ChordReportPersistenceCoordinator(chordReportRepository), [chordReportRepository])
   const chordPersistenceSnapshot = useChordPersistence(chordPersistence)
+  const intervalReportRepository = useMemo(() => new IntervalReportRepository(CapacitorPreferencesBackend), [])
+  const intervalPersistence = useMemo(() => new IntervalReportPersistenceCoordinator(intervalReportRepository), [intervalReportRepository])
+  const intervalPersistenceSnapshot = useIntervalPersistence(intervalPersistence)
   const updaterSnapshot = useUpdaterSnapshot(updater)
   const settings = runtime.settings
   const [screen, setScreen] = useState<ScreenId>(() => readScreen())
@@ -3163,12 +3602,19 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
   const [chordPracticeMode, setChordPracticeMode] = useState<ChordPracticeMode>('comprehensive')
   const [chordSettings, setChordSettings] = useState<ChordSettings>(DEFAULT_CHORD_SETTINGS)
   const [chordSettingsReady, setChordSettingsReady] = useState(false)
+  const [intervalSettings, setIntervalSettings] = useState<IntervalPracticeSettings>(DEFAULT_INTERVAL_PRACTICE_SETTINGS)
+  const [intervalSettingsReady, setIntervalSettingsReady] = useState(false)
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all')
   const [selectedChordRecordId, setSelectedChordRecordId] = useState<string | null>(null)
+  const [selectedIntervalRecordId, setSelectedIntervalRecordId] = useState<string | null>(null)
 
   useEffect(() => {
     void chordPersistence.initialize()
   }, [chordPersistence])
+
+  useEffect(() => {
+    void intervalPersistence.initialize()
+  }, [intervalPersistence])
 
   useEffect(() => {
     let active = true
@@ -3186,10 +3632,34 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
     return () => { active = false }
   }, [chordSettingsRepository])
 
+  useEffect(() => {
+    let active = true
+    void intervalSettingsRepository.load().then((loaded) => {
+      if (active) {
+        setIntervalSettings(loaded)
+        setIntervalSettingsReady(true)
+      }
+    }).catch(() => {
+      if (active) {
+        setIntervalSettings(DEFAULT_INTERVAL_PRACTICE_SETTINGS)
+        setIntervalSettingsReady(true)
+      }
+    })
+    return () => { active = false }
+  }, [intervalSettingsRepository])
+
   const updateChordSettings = (changes: Partial<Pick<ChordSettings, 'sequentialKey' | 'showChordTones'>>): void => {
     setChordSettings((current) => {
       const next: ChordSettings = Object.freeze({ ...current, ...changes })
       void chordSettingsRepository.save(next).catch(() => {})
+      return next
+    })
+  }
+
+  const updateIntervalSettings = (changes: IntervalPracticeSettingChanges): void => {
+    setIntervalSettings((current) => {
+      const next: IntervalPracticeSettings = Object.freeze({ ...current, ...changes })
+      void intervalSettingsRepository.save(next).catch(() => {})
       return next
     })
   }
@@ -3234,7 +3704,8 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
     screen,
     sightStatus: snapshot.status,
     sightPaused: snapshot.isPaused,
-    chordStatus: chordKeepAwakeSnapshot.status
+    chordStatus: chordKeepAwakeSnapshot.status,
+    intervalStatus: intervalSnapshot.status
   })
 
   useEffect(() => {
@@ -3262,8 +3733,9 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
         chordRuntime.pause('manual-pause')
       }
     }
+    if (origin === 'interval-active') intervalRuntime.pause()
     navigate(destination)
-  }, [activeSessionHost, chordRuntime, runtime])
+  }, [activeSessionHost, chordRuntime, intervalRuntime, runtime])
 
   const returnFromAuxiliary = useCallback((fallback: ScreenId): void => {
     navigate(activeSessionHost.consumeAuxiliaryReturn(screenRef.current, fallback) as ScreenId)
@@ -3277,6 +3749,17 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
 
   const closeChordReportDetail = useCallback((): void => {
     setSelectedChordRecordId(null)
+    navigate('history')
+  }, [])
+
+  const openIntervalReportDetail = useCallback((recordId: string, filter: HistoryFilter): void => {
+    setHistoryFilter(filter)
+    setSelectedIntervalRecordId(recordId)
+    navigate('interval-report-detail')
+  }, [])
+
+  const closeIntervalReportDetail = useCallback((): void => {
+    setSelectedIntervalRecordId(null)
     navigate('history')
   }, [])
 
@@ -3296,6 +3779,21 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
     }
     navigate('chord-mode-select')
   }, [activeSessionHost, chordPersistence, chordRuntime])
+
+  const finalizeIntervalPractice = useCallback((completionStatus: IntervalPracticeReportDraft['completionStatus']): void => {
+    const active = activeSessionHost.current
+    if (completionStatus === 'STOPPED') intervalRuntime.stop()
+    if (active?.module === 'interval') {
+      const snapshotAtFinish = intervalRuntime.snapshot
+      const finalizedNow = activeSessionHost.end(active.id)
+      if (!finalizedNow) return
+      void intervalPersistence.finalize(active.id, snapshotAtFinish, completionStatus)
+      navigate('interval-result')
+    }
+  }, [activeSessionHost, intervalPersistence, intervalRuntime])
+
+  const endIntervalPractice = useCallback((): void => finalizeIntervalPractice('STOPPED'), [finalizeIntervalPractice])
+  const completeIntervalPractice = useCallback((): void => finalizeIntervalPractice('COMPLETED'), [finalizeIntervalPractice])
 
   useEffect(() => {
     const active = activeSessionHost.current
@@ -3339,6 +3837,11 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
         return
       }
 
+      if (currentScreen === 'interval-report-detail') {
+        closeIntervalReportDetail()
+        return
+      }
+
       if (currentScreen === 'sight-early-end' && currentSnapshot.status === 'running') {
         runtime.resume()
         navigate(getPracticeScreen(runtime))
@@ -3361,11 +3864,20 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
         return
       }
 
+      if (currentScreen === 'interval-active') {
+        window.dispatchEvent(new CustomEvent('interval-request-end'))
+        return
+      }
+
       const parentScreen: Partial<Record<ScreenId, ScreenId>> = {
         'sight-ready': 'practice',
         'sight-result': 'practice',
         'chord-mode-select': 'practice',
         'chord-practice': 'chord-mode-select',
+        'interval-practice': 'practice',
+        'interval-active': 'interval-practice',
+        'interval-result': 'interval-practice',
+        'interval-report-detail': 'history',
         'chord-report-detail': 'history',
         'chord-query-tool': 'tools',
         'scale-key-signature-tool': 'tools',
@@ -3401,6 +3913,7 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
         setAppForeground(false)
         void practiceKeepAwake.setEnabled(false)
         chordRuntime.pause('background')
+        intervalRuntime.pause()
         void runtime.suspendForAppLifecycle()
       }
     }).then((handle) => {
@@ -3415,7 +3928,7 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
       disposed = true
       for (const remove of removeListeners) void remove()
     }
-  }, [chordRuntime, closeChordReportDetail, endChordPractice, practiceKeepAwake, returnFromAuxiliary, runtime, updater])
+  }, [chordRuntime, closeChordReportDetail, closeIntervalReportDetail, endChordPractice, intervalRuntime, practiceKeepAwake, returnFromAuxiliary, runtime, updater])
 
   useLayoutEffect(() => {
     applyThemeDefinition(document.documentElement, activeTheme)
@@ -3447,14 +3960,26 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
     navigate('sight-active')
   }
 
+  const startIntervalPractice = (): void => {
+    const active = activeSessionHost.begin('interval', 'interval-active')
+    intervalPersistence.beginSession(active.id)
+    intervalRuntime.start(intervalSettings)
+    navigate('interval-active')
+  }
+
   const content = (() => {
     switch (screen) {
       case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
-      case 'practice': return <PracticeHubScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
+      case 'practice': return <PracticeHubScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} intervalSettingsReady={intervalSettingsReady} settings={settings} theme={activeTheme} />
       case 'tools': return <ToolsHubScreen theme={activeTheme} />
       case 'chord-query-tool': return <ChordQueryToolScreen theme={activeTheme} />
       case 'scale-key-signature-tool': return <ScaleKeySignatureToolScreen theme={activeTheme} />
       case 'interval-query-tool': return <IntervalQueryToolScreen theme={activeTheme} />
+      case 'interval-practice': return <IntervalPracticeSetupScreen onSettingsChange={updateIntervalSettings} onStart={startIntervalPractice} settings={intervalSettings} />
+      case 'interval-active': return <IntervalPracticeActiveScreen midiRuntime={runtime} onRequestEnd={endIntervalPractice} onSessionComplete={completeIntervalPractice} runtime={intervalRuntime} snapshot={intervalSnapshot} theme={activeTheme} />
+      case 'interval-result': return intervalPersistenceSnapshot.latestReport
+        ? <IntervalResultScreen report={intervalPersistenceSnapshot.latestReport} />
+        : <IntervalPracticeSetupScreen onSettingsChange={updateIntervalSettings} onStart={startIntervalPractice} settings={intervalSettings} />
       case 'chord-mode-select': return <ChordModeSelectScreen settingsReady={chordSettingsReady} onSelectMode={(mode) => { activeSessionHost.begin('chord', 'chord-practice'); setChordPracticeMode(mode); navigate('chord-practice') }} />
       case 'sight-ready': return <SightReadyScreen onSettingsChange={(changes) => { void runtime.updateSettings(changes) }} onStart={startPractice} settings={settings} />
       case 'sight-active':
@@ -3487,8 +4012,11 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
           chordHistory={chordPersistenceSnapshot}
           chordPersistence={chordPersistence}
           filter={historyFilter}
+          intervalHistory={intervalPersistenceSnapshot}
+          intervalPersistence={intervalPersistence}
           onFilterChange={setHistoryFilter}
           onOpenChordReport={openChordReportDetail}
+          onOpenIntervalReport={openIntervalReportDetail}
           runtime={runtime}
           theme={activeTheme}
         />
@@ -3497,6 +4025,12 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
         <ChordReportDetailScreen
           onBack={closeChordReportDetail}
           report={resolveChordReportById(chordPersistenceSnapshot.records, selectedChordRecordId)}
+        />
+      )
+      case 'interval-report-detail': return (
+        <IntervalReportDetailScreen
+          onBack={closeIntervalReportDetail}
+          report={resolveIntervalReportById(intervalPersistenceSnapshot.records, selectedIntervalRecordId)}
         />
       )
       case 'settings': return (
@@ -3519,6 +4053,7 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
           </ThemeRecoveryBoundary>
           <PersistenceErrorNotice runtime={runtime} />
           <ChordPersistenceErrorNotice persistence={chordPersistenceSnapshot} />
+          <IntervalPersistenceErrorNotice coordinator={intervalPersistence} persistence={intervalPersistenceSnapshot} />
           {SHOW_DEVELOPMENT_TOOLS ? (
             <ReviewDock
               active={screen}
