@@ -2,8 +2,8 @@
 
 钢琴基本功训练器是一款面向 Android 平板的 MIDI 钢琴练习应用。
 
-当前发布准备版本：Android `1.6.0`（V1.6.0，`versionCode 14`，Unreleased）
-当前已发布版本仍为 V1.5.3；V1.6.0 尚未提供正式 APK、tag 或 GitHub Release。
+当前正式版本：Android `1.6.0`（V1.6.0，`versionCode 14`）
+V1.6.0 已正式发布，应用内更新通道当前指向 V1.6.0。
 平台：Android Tablet
 
 ## 当前功能
@@ -48,11 +48,11 @@
 
 正式 APK 通过本仓库的 [GitHub Releases](https://github.com/Natural516/piano-fundamentals-trainer/releases) 提供。
 
-已有 V1.5.2（`versionCode 12`）用户可以直接覆盖安装 V1.5.3，无需先卸载。覆盖升级可保留兼容的本地 History 与主要练习设置。
+已有 V1.5.3（`versionCode 13`）用户可以直接覆盖安装 V1.6.0，无需先卸载。已在 Lenovo TB375FC 上验证正式客户端在线升级，并保留本地 History、主要练习设置与旧主题安装信息。
 
 应用内提供由用户主动触发的正式更新检查。下载与安装前会校验包名、版本、文件大小、SHA-256 和正式签名身份。
 
-V1.6.0 当前仅处于源码与发布元数据准备阶段；正式包构建、签名、更新清单和覆盖升级验证仍待下一阶段执行。
+V1.6.0 的 Production APK、正式 `v1.6.0` tag 与 GitHub Release 已提供；真实在线下载、系统覆盖安装和升级后的更新检查已完成验证。
 
 ## 个性化主题
 
@@ -64,7 +64,7 @@ V1.5.3 起支持外部 `.pftheme` 个性化主题。主题包与应用版本分�
 
 首个主题包为“孤独摇滚”（主题 ID：`natural516.bocchi`）。
 
-本次准备的 Bocchi SOURCE 为 `1.1.0`，最低宿主版本 `1.6.0`，最高宿主版本不含 `2.0.0`。新增音程 Practice Hub 卡片与 ACTIVE 蓝色手账视觉，Preparation / Result / History Detail 不新增专属视觉。该版本尚未签名打包或正式发布；现有正式主题仍为 `1.0.0`。
+Bocchi `1.1.0` 已正式签名打包并发布，最低宿主版本 `1.6.0`，最高宿主版本不含 `2.0.0`。新增音程 Practice Hub 卡片与 ACTIVE 蓝色手账视觉，Preparation / Result / History Detail 不新增专属视觉。旧正式主题 `1.0.0` 仍可在兼容范围内使用；升级 App 不会自动替换已选主题，音程专属视觉需导入并选用 `1.1.0`。
 
 ## 构建与验证
 

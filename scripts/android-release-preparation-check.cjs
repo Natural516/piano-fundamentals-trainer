@@ -57,7 +57,7 @@ const documents = new Map(paths.filter(p => p.endsWith('.md')).map(p => [p, read
 assert.equal(assertPublicReleaseFacts({paths, documents}, '14', '1.6.0'), 2)
 publicPathAudit(paths)
 assertNoLegacyRepositoryReferences(documents, 'integration public docs')
-assert.match(read('CHANGELOG.md'), /^## 1\.6\.0 — Unreleased — versionCode 14$/m)
+assert.match(read('CHANGELOG.md'), /^## 1\.6\.0 — 2026-10-02 — versionCode 14$/m)
 const previousChangelog = git('show', '4866e59:CHANGELOG.md')
 assert.ok(read('CHANGELOG.md').replaceAll('\r\n', '\n').includes(previousChangelog.slice(previousChangelog.indexOf('## 1.5.3')).replaceAll('\r\n', '\n').trim()))
 assert.doesNotMatch(read('README.md'), /音程复现|双模式|0\.9\.1-beta/)

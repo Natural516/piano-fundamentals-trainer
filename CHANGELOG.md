@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.6.0 — Unreleased — versionCode 14
+## 1.6.0 — 2026-10-02 — versionCode 14
 
-Android versionName：1.6.0。以下内容为发布准备，尚未创建正式 tag / GitHub Release、上传 Production APK 或发布 Bocchi 1.1.0。
+Android versionName：1.6.0。Production APK、正式 tag / GitHub Release 与 Bocchi 1.1.0 已发布，应用内更新通道已指向 V1.6.0，并完成真实设备在线覆盖升级与数据保留验证。
 
 ### 新增
 
@@ -20,7 +20,7 @@ Android versionName：1.6.0。以下内容为发布准备，尚未创建正式 t
 - 清理用户界面的开发痕迹，维持正式界面调试产物计数为零，QA 工具继续受独立通道限制。
 - 通过普通双 parent merge 保留旧 public legacy / bridge / CHANGELOG ancestry 与冻结的音程 checkpoint；不移动旧 v1.5.3 tag。
 
-### 版本与主题兼容准备
+### 版本与主题兼容
 
 - Android 唯一版本源设为 1.6.0 / versionCode 14，包名和 QA 隔离规则不变。
 - Native theme host compatibility 从同一 Android versionName 派生，避免旧固定宿主身份与 App 版本脱节。
