@@ -1,91 +1,104 @@
 # Piano Fundamentals Trainer
 
-钢琴基本功训练器是一款面向 Android 平板的 MIDI 钢琴练习应用。
+Piano Fundamentals Training with Real MIDI Feedback
 
-当前正式版本：Android `1.6.0`（V1.6.0，`versionCode 14`）
-V1.6.0 已正式发布，应用内更新通道当前指向 V1.6.0。
-平台：Android Tablet
+**连接真实 MIDI 钢琴的基本功专项训练器。** 在 Android 平板上看谱、看题，用你的电钢琴作答，练习识谱、和弦与音程，并回顾自己的练习记录。
 
-## 当前功能
+Android Tablet · Real MIDI Input · Practice History · Local Data
 
-### 练习
+[下载最新版 Android APK](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest) · [查看更新记录](CHANGELOG.md) · [个性化主题](https://github.com/Natural516/piano-fundamentals-trainer-themes)
 
-- 识谱练习
-- 和弦练习
-- 音程练习：指定低音构造音程，覆盖 26 种音程的理论拼写与候选生成
+## 它能训练什么
 
-音程练习始终显示 Grand Staff：答案提示 OFF 时仅显示指定低音，ON 时显示低音与目标音。支持低音升降号设置、固定题数 / 无限练习、MIDI 自动判定，以及 Result / History 和困难音程统计。
+### 识谱训练
+
+看到五线谱后，直接在真实键盘上弹出对应音符，训练谱面音符与键盘位置之间的快速联系。可以按自己的练习需要选择谱表、调号和题数。
+
+### 和弦训练
+
+练习三和弦、七和弦的构成、转位与键盘定位。支持柱式与分解和弦，通过循序练习逐步熟悉，或使用综合随机练习检查掌握情况。
+
+### 音程训练
+
+按指定低音构造音程，例如“请按出以 C4 为低音的纯五度音程”。覆盖 26 种音程，支持固定题数或无限练习。五线谱始终显示低音；打开答案提示后，也会显示目标音，帮助你核对音程。
 
 ### 乐理工具
 
-- 基础知识与和弦查询
-- 自然大调音阶与调号
-- 音程查询
+查询和弦、自然大调音阶、调号与音程，把遇到的理论问题带回键盘练习。
 
-### MIDI、记录与外观
+### 练习历史
 
-- MIDI 钢琴输入与设备状态
-- 本地练习历史记录
-- 浅色、深色主题
-- 外部 `.pftheme` 个性化主题
-- 主题包签名验证、安装、更新、删除与故障回退
+查看已保存的练习结果、正确与错误情况，以及练习次数和完成题数的趋势，方便回顾练习中的难点。
 
-应用的练习、乐理计算、统计和历史记录均由真实 UI 与本地数据驱动，不依赖截图或主题素材提供功能信息。
+## 实际练习是什么样
 
-## 产品截图
+以下是 Android 1.6.0 在 Lenovo 平板上的真实应用画面，使用内置浅色主题。
 
-以下截图来自已经完成 Release Candidate 验收的 V1.5.3 Production 应用。
+### 首页：选择今天要练什么
 
-### 首页
+![首页：开始识谱、和弦练习，查看最近练习与 MIDI 连接](docs/screenshots/android-v1.6.0-home.png)
 
-![Android V1.5.3 首页](docs/screenshots/android-v1.5.3-home.png)
+### 识谱：看五线谱，在钢琴上作答
 
-### 设置与主题管理
+![识谱练习运行画面：清晰的五线谱与作答状态](docs/screenshots/android-v1.6.0-sight-reading.png)
 
-![Android V1.5.3 设置页](docs/screenshots/android-v1.5.3-settings.png)
+### 和弦：把和弦知识落实到键盘
+
+![和弦练习运行画面：当前和弦、谱面与 MIDI 输入反馈](docs/screenshots/android-v1.6.0-chord-practice.png)
+
+### 记录：回看练习结果与趋势
+
+![练习记录：已保存的练习、结果摘要与练习趋势](docs/screenshots/android-v1.6.0-history.png)
+
+## 为什么使用它
+
+- **使用真实钢琴。** 通过 MIDI 电钢琴或键盘作答，不用屏幕虚拟键盘代替实际练习。
+- **即时 MIDI 反馈。** 根据收到的演奏输入判断答案，让你知道当前题目是否弹对。
+- **专注基本功。** 围绕识谱、和弦和音程做专项练习；不是钢琴课程、曲库跟弹或虚拟钢琴小游戏。
+- **数据留在本地。** 练习历史和设置保存在设备上，基本使用不依赖账号；下载和检查更新需要网络。
+
+MIDI 判定不等于完整的演奏评价：应用不声称能够判断音色、手型、触键质量或音乐表现力。
+
+## 如何开始
+
+1. 从 [GitHub Releases](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest) 下载最新版 Android APK，安装到平板。
+2. 开启钢琴与平板的蓝牙，在应用的 MIDI 页面允许必要权限、扫描并连接兼容的 Bluetooth MIDI 钢琴。确认页面显示已连接、输入端口已打开。
+3. 进入“练习”，选择识谱、和弦或音程，开始在真实钢琴上作答。
+
+当前已实测 Lenovo TB375FC 与 Roland FP-30X 的蓝牙 MIDI 组合。其它设备需确认支持兼容的 Bluetooth MIDI；能连接蓝牙音频，不代表能传输 MIDI。
 
 ## 下载与安装
 
-正式 APK 通过本仓库的 [GitHub Releases](https://github.com/Natural516/piano-fundamentals-trainer/releases) 提供。
+当前正式版本：Android `1.6.0`，主要面向横屏 Android 平板。
 
-已有 V1.5.3（`versionCode 13`）用户可以直接覆盖安装 V1.6.0，无需先卸载。已在 Lenovo TB375FC 上验证正式客户端在线升级，并保留本地 History、主要练习设置与旧主题安装信息。
+[前往 Latest Release 下载 APK](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest)
 
-应用内提供由用户主动触发的正式更新检查。下载与安装前会校验包名、版本、文件大小、SHA-256 和正式签名身份。
-
-V1.6.0 的 Production APK、正式 `v1.6.0` tag 与 GitHub Release 已提供；真实在线下载、系统覆盖安装和升级后的更新检查已完成验证。
+- 在 Release 的 Assets 中下载正式 `.apk`，按 Android 系统提示安装。
+- 正式应用也提供用户主动触发的“检查更新”，下载后由 Android 系统确认安装。
+- 兼容的正式旧版本可覆盖安装，保留兼容的历史记录与主要设置。已在 Lenovo TB375FC 验证从 1.5.3 升级到 1.6.0 的数据保留。
+- 不要为了升级先卸载或清除应用数据；其它设备的兼容性与数据保留需以实际情况为准。
 
 ## 个性化主题
 
-V1.5.3 起支持外部 `.pftheme` 个性化主题。主题包与应用版本分离，并经过 Theme API、最低应用版本、内容完整性和 Production 签名验证。
+支持导入 `.pftheme` 个性化主题，改变应用外观与练习环境。喜欢清爽界面时，可以随时使用内置浅色或深色主题。
 
-个性化主题通过独立仓库提供：
+[浏览官方主题仓库](https://github.com/Natural516/piano-fundamentals-trainer-themes)
 
-- [piano-fundamentals-trainer-themes](https://github.com/Natural516/piano-fundamentals-trainer-themes)
+Bocchi（孤独摇滚）1.1.0 已提供识谱、和弦和音程练习的主题视觉。使用 App 1.6.0 时，在“设置 → 导入主题包”选择下载的主题，然后选用它。升级应用不会自动替换你已经选择的主题；旧主题仍可在兼容范围内继续使用。
 
-首个主题包为“孤独摇滚”（主题 ID：`natural516.bocchi`）。
+## Open Source & Development
 
-Bocchi `1.1.0` 已正式签名打包并发布，最低宿主版本 `1.6.0`，最高宿主版本不含 `2.0.0`。新增音程 Practice Hub 卡片与 ACTIVE 蓝色手账视觉，Preparation / Result / History Detail 不新增专属视觉。旧正式主题 `1.0.0` 仍可在兼容范围内使用；升级 App 不会自动替换已选主题，音程专属视觉需导入并选用 `1.1.0`。
+- [Apache License 2.0](LICENSE)
+- [Building：本地验证与 Debug APK 构建](BUILDING.md)
+- [Development：工程入口与主题架构](DEVELOPMENT.md)
+- [Security：更新验证与签名安全](SECURITY.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-## 构建与验证
+<details>
+<summary>开发者发布信息</summary>
 
-公开仓库包含 Android 应用运行、构建、测试及必要共享核心所需的源码。常用公开验证入口：
+当前 Android `1.6.0`（`versionCode 14`）。Android 版本以 [android/version.properties](android/version.properties) 为单一来源。
 
-```powershell
-npm.cmd ci
-npm.cmd run typecheck
-npm.cmd run test:android-release-preparation
-npm.cmd run test:android-interval-theory
-npm.cmd run android:apk:debug
-npm.cmd run test:android-shell
-npm.cmd run android:verify:debug
-```
+源代码许可证不自动覆盖官方品牌、主题图稿或第三方素材；对应授权边界见第三方说明。贡献者通常构建 Debug APK，维护者签名流程见 [Android release signing](android/RELEASE_SIGNING.md)。
 
-官方永久签名私钥不进入公开仓库。普通贡献者应构建 Debug APK；正式 Release 由维护者使用独立保管的签名身份生成。
-
-## 项目与许可证
-
-- 公开仓库：[Natural516/piano-fundamentals-trainer](https://github.com/Natural516/piano-fundamentals-trainer)
-- 源代码许可证：[Apache License 2.0](LICENSE)
-- 第三方材料说明：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-
-官方品牌、主题图稿与第三方素材不因源代码许可证而自动获得同等授权；具体边界以仓库内对应说明为准。
+</details>
