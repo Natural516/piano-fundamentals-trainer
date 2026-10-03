@@ -1,4 +1,5 @@
-import { INTERVAL_TYPE_IDS, getIntervalType, type IntervalTypeId } from '../musicTheory/intervals'
+import { INTERVAL_TYPE_IDS, type IntervalTypeId } from '../musicTheory/intervals'
+import { getCanonicalIntervalSnapshotName } from './legacySnapshot'
 import type { IntervalSessionSnapshot } from './sessionRuntime'
 import type { IntervalPracticeSettings, IntervalQuestionAttempt } from './types'
 
@@ -15,6 +16,7 @@ export interface IntervalPracticeSettingsSnapshot {
 
 export interface IntervalTypeReportStats {
   readonly intervalId: IntervalTypeId
+  /** Canonical Chinese V1 compatibility snapshot; UI must display by intervalId instead. */
   readonly intervalName: string
   readonly presentedCount: number
   readonly firstTryCorrectCount: number
@@ -79,7 +81,7 @@ export function aggregateIntervalAttempts(attempts: readonly IntervalQuestionAtt
     if (!bucket) return []
     return [{
       intervalId,
-      intervalName: getIntervalType(intervalId).chineseName,
+      intervalName: getCanonicalIntervalSnapshotName(intervalId),
       presentedCount: bucket.presented,
       firstTryCorrectCount: bucket.firstTry,
       retriedCorrectCount: bucket.presented - bucket.firstTry,
@@ -139,7 +141,7 @@ function isSettingsSnapshot(value: unknown): value is IntervalPracticeSettingsSn
 
 function isStats(value: unknown): value is IntervalTypeReportStats {
   if (!isObject(value) || !INTERVAL_TYPE_IDS.includes(value.intervalId as IntervalTypeId)) return false
-  if (value.intervalName !== getIntervalType(value.intervalId as IntervalTypeId).chineseName) return false
+  if (value.intervalName !== getCanonicalIntervalSnapshotName(value.intervalId as IntervalTypeId)) return false
   if (!isNonNegativeInteger(value.presentedCount) || value.presentedCount < 1) return false
   if (!isNonNegativeInteger(value.firstTryCorrectCount) || value.firstTryCorrectCount > value.presentedCount) return false
   if (!isNonNegativeInteger(value.retriedCorrectCount) || value.retriedCorrectCount !== value.presentedCount - value.firstTryCorrectCount) return false

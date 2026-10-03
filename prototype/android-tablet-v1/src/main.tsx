@@ -62,6 +62,7 @@ import { AppPreferencesRepository } from './localization/appPreferences'
 import { LocalizationService } from './localization/localizationService'
 import { LocaleProvider } from './localization/LocaleProvider'
 import { LanguageSetting } from './localization/LanguageSetting'
+import { IntervalDisplayName, SightNoteValue } from './localization/LegacyDisplayValues'
 import {
   DEFAULT_INTERVAL_PRACTICE_SETTINGS,
   INTERVAL_QUESTION_COUNT_OPTIONS,
@@ -2489,9 +2490,9 @@ function SightResultScreen({
           <div className="result-note">
             <span className="result-note__icon"><Icon name="info" /></span>
             <div>{primaryError ? (
-              <><small>本轮最需留意</small><strong>{primaryError}</strong><p>这个目标音在本轮出现了 {primaryErrorCount} 次错误或超时。</p></>
+              <><small>本轮最需留意</small><strong><SightNoteValue value={primaryError} /></strong><p>这个目标音在本轮出现了 {primaryErrorCount} 次错误或超时。</p></>
             ) : (
-              <><small>本轮最需留意</small><strong>暂无</strong><p>本轮没有发现需要优先处理的目标音。</p></>
+              <><small>本轮最需留意</small><strong><SightNoteValue value={primaryError} /></strong><p>本轮没有发现需要优先处理的目标音。</p></>
             )}</div>
           </div>
           <div className="result-actions">
@@ -2530,7 +2531,7 @@ function IntervalReportFacts({ report }: { report: IntervalPracticeReportDraft }
         {report.completedQuestions === 0 ? <p className="interval-report-empty">暂无数据</p>
           : difficult.length === 0 ? <p className="interval-report-empty">本轮没有明显易错音程</p>
             : <ol className="interval-difficult-list">{difficult.map((entry) => (
-              <li key={entry.intervalId}><strong>{entry.intervalName}</strong><span>首次失误 {entry.presentedCount - entry.firstTryCorrectCount} 题 · 错误尝试 {entry.wrongAttemptCount} 次</span></li>
+              <li key={entry.intervalId}><strong><IntervalDisplayName intervalId={entry.intervalId} /></strong><span>首次失误 {entry.presentedCount - entry.firstTryCorrectCount} 题 · 错误尝试 {entry.wrongAttemptCount} 次</span></li>
             ))}</ol>}
       </section>
       <section className="chord-report-card interval-performance-card" aria-labelledby="interval-performance-title">
@@ -2539,7 +2540,7 @@ function IntervalReportFacts({ report }: { report: IntervalPracticeReportDraft }
           <div className="interval-performance-list">
             {report.perIntervalStats.map((entry) => (
               <article key={entry.intervalId}>
-                <strong>{entry.intervalName}</strong>
+                <strong><IntervalDisplayName intervalId={entry.intervalId} /></strong>
                 <span>出现 {entry.presentedCount} 次</span>
                 <span>首次正确 {entry.firstTryCorrectCount}</span>
                 <span>重试后正确 {entry.retriedCorrectCount}</span>

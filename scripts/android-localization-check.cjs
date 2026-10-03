@@ -186,7 +186,7 @@ test('LOC15', 'all migrated resource namespaces have identical nonempty key shap
   const zh = flatten(localizationResources['zh-CN'])
   const en = flatten(localizationResources.en)
   assert.deepEqual(zh.map(([key]) => key).sort(), en.map(([key]) => key).sort())
-  assert.ok(zh.length > 10 && zh.length < 40)
+  assert.equal(zh.length, 41) // B2's 14 keys + B3's 26 interval names and No data.
   for (const [, value] of [...zh, ...en]) assert.ok(value.trim())
   for (const [key] of en) {
     const [ns, ...parts] = key.split('.')
@@ -307,7 +307,7 @@ test('LOC20', 'real React provider/settings switch live without remounting runti
     global.document = oldDocument
   }
 })
-test('LOC21', 'MIDI/session/bootstrap implementations and high-risk B3 files are byte-for-byte checkpoint source', () => {
+test('LOC21', 'MIDI/session/bootstrap stay frozen; only explicit B3 compatibility boundaries may change', () => {
   const base = '5c24110604e16b098c665757a05d06e16c813498'
   const mainPath = 'prototype/android-tablet-v1/src/main.tsx'
   const main = read(mainPath)
@@ -322,9 +322,18 @@ test('LOC21', 'MIDI/session/bootstrap implementations and high-risk B3 files are
   }
   assert.equal(normalize(slice(main, 'function App(', 'function AndroidAppBootstrap')), normalize(slice(old, 'function App(', 'function AndroidAppBootstrap')))
   assert.equal(normalize(slice(main, 'function AndroidAppBootstrap', '\nconst localizationService')), normalize(slice(old, 'function AndroidAppBootstrap', '\ncreateRoot')))
-  for (const file of ['prototype/android-tablet-v1/src/androidBluetoothMidi.ts', 'prototype/android-tablet-v1/src/androidBluetoothMidiCore.ts', 'prototype/android-tablet-v1/src/intervalPractice/report.ts', 'prototype/android-tablet-v1/src/musicTheory/intervals/candidates.ts', 'src/sightReading/sightReadingNotes.ts', 'prototype/android-tablet-v1/src/sightReadingIntegration.ts', 'prototype/android-tablet-v1/src/activePracticeSession.ts', 'prototype/android-tablet-v1/src/practiceKeepAwake.ts']) {
+  for (const file of ['prototype/android-tablet-v1/src/androidBluetoothMidi.ts', 'prototype/android-tablet-v1/src/androidBluetoothMidiCore.ts', 'prototype/android-tablet-v1/src/activePracticeSession.ts', 'prototype/android-tablet-v1/src/practiceKeepAwake.ts']) {
     assert.equal(normalize(read(file)), normalize(execFileSync('git', ['show', base + ':' + file], { cwd: root, encoding: 'utf8' })), file)
   }
+  // Preserve the complete Sight implementations outside the two exact legacy-boundary substitutions.
+  for (const file of ['src/sightReading/sightReadingNotes.ts', 'prototype/android-tablet-v1/src/sightReadingIntegration.ts']) {
+    const current = normalize(read(file))
+      .replace(/^import \{ (?:LEGACY_SIGHT_EMPTY_NOTE_SENTINEL|resolveLegacySightNoteSnapshot) \} from '[^']+legacyNoteSnapshot'\n/m, '')
+      .replace('return LEGACY_SIGHT_EMPTY_NOTE_SENTINEL', "return '暂无'")
+      .replace('return resolveLegacySightNoteSnapshot(report.weakestNote)', "return report.weakestNote === '暂无' ? null : report.weakestNote")
+    assert.equal(current, normalize(execFileSync('git', ['show', base + ':' + file], { cwd: root, encoding: 'utf8' })), file)
+  }
+  // The B3 suite separately verifies canonical report bytes and candidate facts against the checkpoint.
   assert.match(main, /<LocaleProvider service=\{localizationService\}>\s*<AndroidAppBootstrap \/>/)
   assert.doesNotMatch(main, /<App key=|<AndroidAppBootstrap key=/)
 })

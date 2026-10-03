@@ -1,6 +1,16 @@
 export const localizationResources = {
   'zh-CN': {
-    common: { appTitle: '钢琴基本功训练器' },
+    common: { appTitle: '钢琴基本功训练器', noData: '暂无' },
+    music: { intervals: {
+      perfectUnison: '纯一度', augmentedUnison: '增一度',
+      diminishedSecond: '减二度', minorSecond: '小二度', majorSecond: '大二度', augmentedSecond: '增二度',
+      diminishedThird: '减三度', minorThird: '小三度', majorThird: '大三度', augmentedThird: '增三度',
+      diminishedFourth: '减四度', perfectFourth: '纯四度', augmentedFourth: '增四度',
+      diminishedFifth: '减五度', perfectFifth: '纯五度', augmentedFifth: '增五度',
+      diminishedSixth: '减六度', minorSixth: '小六度', majorSixth: '大六度', augmentedSixth: '增六度',
+      diminishedSeventh: '减七度', minorSeventh: '小七度', majorSeventh: '大七度', augmentedSeventh: '增七度',
+      diminishedOctave: '减八度', perfectOctave: '纯八度'
+    } },
     settings: {
       title: '设置',
       language: '语言',
@@ -20,7 +30,17 @@ export const localizationResources = {
     }
   },
   en: {
-    common: { appTitle: 'Piano Fundamentals Trainer' },
+    common: { appTitle: 'Piano Fundamentals Trainer', noData: 'No data' },
+    music: { intervals: {
+      perfectUnison: 'Perfect unison', augmentedUnison: 'Augmented unison',
+      diminishedSecond: 'Diminished second', minorSecond: 'Minor second', majorSecond: 'Major second', augmentedSecond: 'Augmented second',
+      diminishedThird: 'Diminished third', minorThird: 'Minor third', majorThird: 'Major third', augmentedThird: 'Augmented third',
+      diminishedFourth: 'Diminished fourth', perfectFourth: 'Perfect fourth', augmentedFourth: 'Augmented fourth',
+      diminishedFifth: 'Diminished fifth', perfectFifth: 'Perfect fifth', augmentedFifth: 'Augmented fifth',
+      diminishedSixth: 'Diminished sixth', minorSixth: 'Minor sixth', majorSixth: 'Major sixth', augmentedSixth: 'Augmented sixth',
+      diminishedSeventh: 'Diminished seventh', minorSeventh: 'Minor seventh', majorSeventh: 'Major seventh', augmentedSeventh: 'Augmented seventh',
+      diminishedOctave: 'Diminished octave', perfectOctave: 'Perfect octave'
+    } },
     settings: {
       title: 'Settings',
       language: 'Language',

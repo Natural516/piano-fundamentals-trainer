@@ -4,6 +4,7 @@ import {
   type Scheduler
 } from '../../../src/sightReading/controller'
 import type { SightReadingMidiEvent } from '../../../src/sightReading/midi'
+import { resolveLegacySightNoteSnapshot } from '../../../src/sightReading/legacyNoteSnapshot'
 import {
   saveSightReadingReport,
   type SightReadingSessionReport
@@ -150,7 +151,7 @@ export function formatReactionTime(reactionMs: number | null): string {
 }
 
 export function getPrimaryErrorNote(report: SightReadingSessionReport): string | null {
-  return report.weakestNote === '暂无' ? null : report.weakestNote
+  return resolveLegacySightNoteSnapshot(report.weakestNote)
 }
 
 export class AndroidSightReadingRuntime {
