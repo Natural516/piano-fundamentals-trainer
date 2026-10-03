@@ -15,7 +15,7 @@ import {
   type SightReadingWriteResult
 } from '../../../src/sightReading/sightReadingSettings'
 import {
-  AndroidBluetoothMidiAdapter,
+  MidiInputProvider,
   NativeAndroidBluetoothMidi,
   type AndroidBluetoothMidiPlugin,
   type AndroidBluetoothMidiSnapshot
@@ -41,6 +41,7 @@ export interface AndroidSightReadingRuntimeDependencies {
   scheduler: Scheduler
   random: () => number
   bluetoothPlugin?: AndroidBluetoothMidiPlugin | null
+  requireMidiIdentity?: boolean
   initialMidiSource?: AndroidMidiInputSource
   initialSettings?: SightReadingSettings
   initialSettingsPersisted?: boolean
@@ -155,7 +156,7 @@ export function getPrimaryErrorNote(report: SightReadingSessionReport): string |
 export class AndroidSightReadingRuntime {
   readonly reports = new InMemorySightReadingReportRepository()
   readonly midi: DevelopmentMidiAdapter
-  readonly bluetooth: AndroidBluetoothMidiAdapter
+  readonly midiInput: MidiInputProvider
   readonly controller: SightReadingController
   readonly midiRouter: AndroidMidiInputRouter
   private readonly settingsRepository: DurableSettingsRepository | null
@@ -176,6 +177,7 @@ export class AndroidSightReadingRuntime {
   private historyErrorValue: string | null
   private readonly listeners = new Set<() => void>()
   private midiResumeRequiredValue = false
+  private midiBoundaryVersionValue = 0
 
   constructor(dependencies: AndroidSightReadingRuntimeDependencies) {
     this.settingsRepository = dependencies.settingsRepository ?? null
@@ -212,14 +214,15 @@ export class AndroidSightReadingRuntime {
       readMidiWatermark: this.midiRouter.readWatermark
     })
     this.controller = controller
-    this.bluetooth = new AndroidBluetoothMidiAdapter(
+    this.midiInput = new MidiInputProvider(
       dependencies.bluetoothPlugin ?? null,
       this.midiRouter,
       {
         onTransportLost: () => this.handleBluetoothTransportLost(),
         onTransportReady: () => this.handleBluetoothTransportReady(),
         onChange: () => this.notify()
-      }
+      },
+      dependencies.requireMidiIdentity ?? false
     )
     this.controller.subscribe(() => {
       const report = this.controller.snapshot.report
@@ -255,8 +258,14 @@ export class AndroidSightReadingRuntime {
   }
 
   get bluetoothSnapshot(): AndroidBluetoothMidiSnapshot {
-    return this.bluetooth.snapshot
+    return this.midiInput.snapshot
   }
+
+  /** Compatibility alias for existing QA tools; all transports share the same provider. */
+  get bluetooth(): MidiInputProvider { return this.midiInput }
+
+  get midiReady(): boolean { return this.midiSource === 'development' || this.midiInput.ready }
+  get midiBoundaryVersion(): number { return this.midiBoundaryVersionValue }
 
   get persistenceSnapshot(): AndroidPersistenceSnapshot {
     return { ...this.persistenceValue }
@@ -352,7 +361,7 @@ export class AndroidSightReadingRuntime {
     this.sessionStartedAt = this.wallClock.now()
     this.sessionSettings = { ...this.settingsValue }
     this.controller.start(this.settingsValue)
-    if (this.midiSource === 'bluetooth' && this.bluetoothSnapshot.connectionState !== 'CONNECTED') {
+    if (!this.midiReady) {
       this.midiResumeRequiredValue = true
       this.controller.disconnect()
     } else {
@@ -369,8 +378,8 @@ export class AndroidSightReadingRuntime {
   }
 
   resume(): void {
-    if (this.midiSource === 'bluetooth') {
-      if (this.bluetoothSnapshot.connectionState !== 'CONNECTED') return
+    if (this.midiSource !== 'development') {
+      if (!this.midiReady) return
       this.controller.reconnect()
     } else if (this.midiResumeRequiredValue) {
       this.controller.reconnect()
@@ -422,7 +431,7 @@ export class AndroidSightReadingRuntime {
     this.midiResumeRequiredValue = this.snapshot.status === 'running'
     if (this.snapshot.status === 'running') {
       this.controller.disconnect()
-      if (source === 'development' || this.bluetoothSnapshot.connectionState === 'CONNECTED') {
+      if (this.midiReady) {
         this.controller.reconnect()
       }
     }
@@ -443,7 +452,7 @@ export class AndroidSightReadingRuntime {
     await this.bluetooth.resumeDelivery()
     await this.bluetooth.refresh()
     if (this.snapshot.status === 'running') {
-      if (this.midiSource === 'development' || this.bluetoothSnapshot.connectionState === 'CONNECTED') {
+      if (this.midiReady) {
         this.controller.reconnect()
       }
     }
@@ -456,13 +465,15 @@ export class AndroidSightReadingRuntime {
   }
 
   private handleBluetoothTransportLost(): void {
-    if (this.midiSource !== 'bluetooth' || this.snapshot.status !== 'running') return
+    ++this.midiBoundaryVersionValue
+    this.notify()
+    if (this.midiSource === 'development' || this.snapshot.status !== 'running') return
     this.midiResumeRequiredValue = true
     this.controller.disconnect()
   }
 
   private handleBluetoothTransportReady(): void {
-    if (this.midiSource !== 'bluetooth' || this.snapshot.status !== 'running') return
+    if (this.midiSource === 'development' || this.snapshot.status !== 'running') return
     this.controller.reconnect()
     this.midiResumeRequiredValue = true
     this.notify()
@@ -538,6 +549,7 @@ export async function createBrowserAndroidSightReadingRuntime(options?: { native
     },
     random: () => Math.random(),
     bluetoothPlugin: nativeBluetooth ? NativeAndroidBluetoothMidi : null,
+    requireMidiIdentity: nativeBluetooth,
     initialMidiSource: nativeBluetooth ? 'bluetooth' : 'development',
     initialSettings: persistence.settingsLoad.settings,
     initialSettingsPersisted: persistence.settingsLoad.success && persistence.settingsLoad.source === 'stored',

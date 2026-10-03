@@ -306,19 +306,32 @@ function presentMidiStatus(runtime: AndroidSightReadingRuntime): MidiStatusPrese
     return { label: 'MIDI 输入就绪', detail: '可以开始练习', tone: 'connected' }
   }
   const midi = runtime.bluetoothSnapshot
-  const name = midi.connectedDeviceName ?? 'FP-30X'
+  const name = midi.connectedDeviceName ?? 'MIDI 设备'
+  const transport = midi.activeInput?.transport === 'usb' ? 'USB MIDI' : 'Bluetooth MIDI'
+  const reasons: Record<string, string> = {
+    NO_OUTPUT_PORT: '此设备没有可用的 MIDI 输入，请选择其他设备',
+    PORT_SELECTION_REQUIRED: '请选择设备的 MIDI 输入端口',
+    INVALID_PORT: '该端口已不可用，请重新选择',
+    DEVICE_REMOVED: '设备已断开，请重新连接',
+    OPEN_FAILED: '无法连接，请检查设备后重试',
+    SCAN_FAILED: '扫描未完成，请检查蓝牙后重试',
+    BLUETOOTH_OFF: '蓝牙已关闭；也可以连接 USB MIDI 设备'
+  }
+  if (midi.reasonCode && midi.connectionState !== 'CONNECTED') {
+    return { label: midi.reasonCode === 'PORT_SELECTION_REQUIRED' ? '请选择输入端口' : 'MIDI 未就绪', detail: reasons[midi.reasonCode] ?? '请重新选择 MIDI 设备', tone: 'idle' }
+  }
   const states: Record<AndroidBluetoothMidiConnectionState, MidiStatusPresentation> = {
-    UNSUPPORTED: { label: '不支持 MIDI', detail: '设备缺少 BLE MIDI 能力', tone: 'error' },
+    UNSUPPORTED: { label: '不支持 MIDI', detail: '此设备无法接收 MIDI 输入', tone: 'error' },
     PERMISSION_REQUIRED: { label: '需要权限', detail: '允许附近设备后扫描', tone: 'idle' },
     PERMISSION_DENIED: { label: '权限被拒绝', detail: '请重新授权附近设备', tone: 'error' },
     BLUETOOTH_OFF: { label: '蓝牙已关闭', detail: '请先打开系统蓝牙', tone: 'error' },
-    IDLE: { label: 'MIDI 未连接', detail: '打开 MIDI 页面扫描', tone: 'idle' },
-    SCANNING: { label: '正在扫描', detail: '查找 BLE MIDI 钢琴', tone: 'busy' },
-    DEVICE_FOUND: { label: '已发现设备', detail: '请选择钢琴连接', tone: 'busy' },
+    IDLE: { label: 'MIDI 未连接', detail: '连接 USB MIDI 或扫描 Bluetooth MIDI', tone: 'idle' },
+    SCANNING: { label: '正在扫描', detail: '查找 Bluetooth MIDI 设备', tone: 'busy' },
+    DEVICE_FOUND: { label: '已发现设备', detail: '请选择 MIDI 设备连接', tone: 'busy' },
     CONNECTING: { label: '正在连接', detail: name, tone: 'busy' },
-    CONNECTED: { label: `${name} 已连接`, detail: 'MIDI 输入端口已打开', tone: 'connected' },
+    CONNECTED: { label: `${name} 已连接`, detail: `${transport} · ${runtime.midiReady ? '可以开始练习' : '输入已暂停'}`, tone: runtime.midiReady ? 'connected' : 'idle' },
     DISCONNECTED: { label: 'MIDI 已断开', detail: '可重新扫描并连接', tone: 'error' },
-    ERROR: { label: 'MIDI 连接错误', detail: midi.lastError ?? '请重试', tone: 'error' }
+    ERROR: { label: 'MIDI 连接错误', detail: '请检查设备连接后重试', tone: 'error' }
   }
   return states[midi.connectionState]
 }
@@ -621,18 +634,19 @@ function NotationPaper({
 function HomeScreen({
   chordHistory,
   chordPersistence,
+  intervalSettingsReady,
   settings,
   theme
 }: {
   chordHistory: ChordPersistenceSnapshot
   chordPersistence: ChordReportPersistenceCoordinator
+  intervalSettingsReady: boolean
   settings: SightReadingSettings
   theme: ThemeDefinition
 }): JSX.Element {
   const { runtime } = useMidiUi()
   const { openAuxiliary } = useAppNavigation()
   const midiStatus = presentMidiStatus(runtime)
-  const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
   const history = runtime.historySnapshot
   const recentPractice = projectMixedPracticeHistory(history.records, chordHistory.records)[0] ?? null
   useEffect(() => {
@@ -665,15 +679,18 @@ function HomeScreen({
               <img src={composedHome.assets.headline} alt="" aria-hidden="true" />
             </h1>
           ) : <h1>让眼睛先认出，<br />再让手指弹出来。</h1>}
-          <p>{STAFF_MODE_LABELS[settings.staffMode]} · {settings.questionCount} 题 · 每题固定 {answerTimeLimitSeconds} 秒</p>
           <div className="home-practice-actions">
             <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>
               <Icon name="play" />
-              开始识谱练习
+              识谱练习
             </button>
-            <button className="secondary-action" type="button" onClick={() => navigate('chord-mode-select')}>
+            <button className="primary-action" type="button" onClick={() => navigate('chord-mode-select')}>
               <Icon name="book" />
               和弦练习
+            </button>
+            <button className="primary-action" disabled={!intervalSettingsReady} type="button" onClick={() => navigate('interval-practice')}>
+              <Icon name="book" />
+              音程练习
             </button>
           </div>
           {composedHome ? <small className="themed-home-hero__memo">{composedHome.memo}</small> : null}
@@ -898,9 +915,8 @@ function IntervalPracticeActiveScreen({
   const [borderClip, setBorderClip] = useState('inset(50%)')
   const [foregroundLayout, setForegroundLayout] = useState({ textClip: 'inset(50%)', dockClip: 'inset(50%)', anchorStyle: {} as CSSProperties })
   const [showEarlyEnd, setShowEarlyEnd] = useState(false)
-  const transportReady = midiRuntime.midiSource === 'development'
-    || midiRuntime.bluetoothSnapshot.connectionState === 'CONNECTED'
-  const inputBoundary = `${midiRuntime.midiSource}:${midiRuntime.bluetoothSnapshot.connectionState}:${midiRuntime.bluetoothSnapshot.connectedDeviceId ?? ''}`
+  const transportReady = midiRuntime.midiReady
+  const inputBoundary = `${midiRuntime.midiSource}:${midiRuntime.midiInput.boundary}:${midiRuntime.midiBoundaryVersion}`
   const inputBoundaryRef = useRef(inputBoundary)
   const practiceState = snapshot.practiceState
 
@@ -968,7 +984,9 @@ function IntervalPracticeActiveScreen({
     if (inputBoundaryRef.current === inputBoundary) return
     inputBoundaryRef.current = inputBoundary
     runtime.resetInputState()
-  }, [inputBoundary, runtime])
+    runtime.setTransportReady(false)
+    runtime.setTransportReady(transportReady)
+  }, [inputBoundary, runtime, transportReady])
 
   useEffect(() => {
     if (snapshot.status === 'SESSION_COMPLETE') onSessionComplete()
@@ -2066,7 +2084,7 @@ function ChordPracticeScreen({
   useEffect(() => {
     const status = runtime.snapshot.status
     if (status === 'IDLE' || status === 'STOPPED') runtime.start(initialSessionConfig.current)
-    if (midiRuntime.midiSource === 'bluetooth' && midiRuntime.bluetoothSnapshot.connectionState !== 'CONNECTED') {
+    if (!midiRuntime.midiReady) {
       runtime.handleTransportLost()
     }
   }, [midiRuntime, runtime])
@@ -2205,7 +2223,7 @@ function SightReadyScreen({
             <h2>{settings.noteMode === 'double' ? `${settings.questionCount} 道双音题` : `${settings.questionCount} 个音符`}</h2>
             <p>{midiStatus.tone === 'connected'
               ? `${midiStatus.label}，可以直接弹奏目标音。`
-              : '开始前请打开 MIDI 页面，扫描并连接 FP-30X。'}</p>
+              : '开始前请打开 MIDI 页面，连接 MIDI 设备。'}</p>
           </div>
           <div className="setting-summary">
             <div><small>谱表</small><strong>{STAFF_MODE_LABELS[settings.staffMode]}</strong></div>
@@ -2319,8 +2337,8 @@ function SightFocusScreen({
   const targetName = snapshot.currentTargetNotes.map((note) => note.noteName).join(' + ') || '—'
   const intervalLabel = snapshot.currentIntervalLabel
   const midiStatus = presentMidiStatus(runtime)
-  const transportPause = runtime.midiSource === 'bluetooth' && runtime.midiResumeRequired
-  const resumeBlocked = transportPause && runtime.bluetoothSnapshot.connectionState !== 'CONNECTED'
+  const transportPause = runtime.midiSource !== 'development' && runtime.midiResumeRequired
+  const resumeBlocked = transportPause && !runtime.midiReady
   const pausedPrompt = transportPause
     ? resumeBlocked ? 'MIDI 已断开，练习已安全暂停' : 'MIDI 已恢复，请点击继续'
     : '练习已暂停'
@@ -3097,12 +3115,12 @@ function SettingsScreen({
         ) : null}
         <div className="settings-panels">
           <section className="settings-group settings-card settings-card--midi">
-            <div className="group-title"><span>设备</span><small>蓝牙 MIDI 设备</small></div>
+            <div className="group-title"><span>设备</span><small>MIDI 输入设备</small></div>
             <SettingRow
               description={midiStatus.detail}
               icon="bluetooth"
               onClick={() => openAuxiliary('midi')}
-              title={runtime.bluetoothSnapshot.connectedDeviceName ?? 'Roland FP-30X'}
+              title={runtime.bluetoothSnapshot.connectedDeviceName ?? 'MIDI 设备'}
               action={<span className={`connected-label is-${midiStatus.tone}`}><i />{midiStatus.label}</span>}
             />
             {composedSettings ? <img alt="" aria-hidden="true" className="settings-card__decoration" src={composedSettings.assets.midi} /> : null}
@@ -3171,17 +3189,15 @@ function MidiScreen(): JSX.Element {
   const { returnFromAuxiliary } = useAppNavigation()
   const midi = runtime.bluetoothSnapshot
   const status = presentMidiStatus(runtime)
-  const scanActive = midi.connectionState === 'SCANNING' || midi.connectionState === 'DEVICE_FOUND'
-  const lastEvent = midi.diagnostics.lastNormalizedEvent
+  const scanActive = midi.scanning ?? (midi.connectionState === 'SCANNING' || midi.connectionState === 'DEVICE_FOUND')
+  const [selectedPorts, setSelectedPorts] = useState<Record<string, number>>({})
+  const bluetoothAvailable = midi.capabilities?.bluetooth.available
+    ?? (midi.bluetoothState === 'ON' && midi.permissionState === 'GRANTED')
+  const bluetoothReason = midi.capabilities?.bluetooth.reason
+    ?? (midi.permissionState === 'GRANTED' ? 'BLUETOOTH_OFF' : 'PERMISSION_REQUIRED')
   const action = (() => {
     if (midi.connectionState === 'UNSUPPORTED') {
       return { label: '此设备不支持', disabled: true, run: () => {} }
-    }
-    if (midi.connectionState === 'PERMISSION_REQUIRED' || midi.connectionState === 'PERMISSION_DENIED') {
-      return { label: '允许附近设备', disabled: false, run: () => { void runtime.bluetooth.requestPermissions() } }
-    }
-    if (midi.connectionState === 'BLUETOOTH_OFF') {
-      return { label: '请先打开系统蓝牙', disabled: true, run: () => {} }
     }
     if (midi.connectionState === 'CONNECTED') {
       return { label: '断开 MIDI', disabled: false, run: () => { void runtime.bluetooth.disconnect() } }
@@ -3189,7 +3205,7 @@ function MidiScreen(): JSX.Element {
     if (scanActive) {
       return { label: '停止扫描', disabled: false, run: () => { void runtime.bluetooth.stopScan() } }
     }
-    return { label: '扫描 MIDI 设备', disabled: false, run: () => { void runtime.bluetooth.scan() } }
+    return { label: '刷新 MIDI 设备', disabled: false, run: () => { void runtime.midiInput.refresh() } }
   })()
 
   return (
@@ -3199,36 +3215,45 @@ function MidiScreen(): JSX.Element {
         <section className="device-hero">
           <div className="device-orbit"><span><Icon name="bluetooth" size={42} /></span><i /><i /><i /></div>
           <span className={`connected-label large is-${status.tone}`}><i />{status.label}</span>
-          <h1>{midi.connectedDeviceName ?? 'Roland FP-30X'}</h1>
-          <p>{status.detail}。使用 Android 原生 BLE MIDI / MidiManager 接收钢琴输入，不需要经典蓝牙音频配对。</p>
+          <h1>{midi.connectedDeviceName ?? 'MIDI 设备'}</h1>
+          <p>{status.detail}。支持 Bluetooth MIDI 和 USB MIDI；一次连接一个输入设备。</p>
           <button className="secondary-action midi-primary-action" disabled={action.disabled} type="button" onClick={action.run}>
             <Icon name="refresh" />{action.label}
           </button>
         </section>
         <section className="device-details">
-          <div><small>设备类型</small><strong>BLE MIDI · receive only</strong></div>
-          <div><small>输入端口</small><strong>{midi.midiPortState}</strong></div>
-          <div><small>最近活动</small><strong>{lastEvent ? `${lastEvent.type} · ${lastEvent.midiNumber ?? '—'}` : '等待真实输入'}</strong></div>
-          <div><small>应用发声</small><strong>关闭</strong></div>
+          <div><small>连接方式</small><strong>{midi.activeInput ? midi.activeInput.transport === 'usb' ? 'USB MIDI' : 'Bluetooth MIDI' : '尚未选择'}</strong></div>
+          <div><small>MIDI 输入</small><strong>{runtime.midiReady ? '已就绪' : '尚未就绪'}{midi.activeInput ? ` · 端口 ${midi.activeInput.portNumber + 1}` : ''}</strong></div>
+          <div><small>练习状态</small><strong>{runtime.midiReady ? '可以练习' : '请连接设备'}</strong></div>
         </section>
         {midi.discoveredDevices.length > 0 ? (
-          <section className="midi-device-list" aria-label="发现的 Bluetooth MIDI 设备">
+          <section className="midi-device-list" aria-label="发现的 MIDI 设备">
             <div className="list-heading"><h2>发现的 MIDI 设备</h2><span>{midi.discoveredDevices.length} 个候选</span></div>
             <div>
               {midi.discoveredDevices.map((device) => {
                 const connected = midi.connectionState === 'CONNECTED' && midi.connectedDeviceId === device.id
+                const ports = device.outputPorts ?? []
+                const needsPort = ports.length > 1 && selectedPorts[device.id] === undefined
+                const unavailable = device.transport !== 'usb' && !bluetoothAvailable
                 return (
+                  <div className="midi-candidate" key={device.id}>
+                  {ports.length > 1 ? <label className="midi-port-selector">MIDI 输入端口
+                    <select aria-label={`${device.name} MIDI 输入端口`} value={selectedPorts[device.id] ?? ''} onChange={(event) => setSelectedPorts((previous) => ({ ...previous, [device.id]: Number(event.target.value) }))}>
+                      <option value="" disabled>请选择端口</option>
+                      {ports.map((port) => <option key={port.portNumber} value={port.portNumber}>{port.name}</option>)}
+                    </select>
+                  </label> : null}
                   <button
                     className={connected ? 'is-connected' : ''}
-                    disabled={midi.connectionState === 'CONNECTING' || connected}
-                    key={device.id}
+                    disabled={midi.connectionState === 'CONNECTING' || connected || needsPort || unavailable || (device.source === 'midiManager' && ports.length === 0)}
                     type="button"
-                    onClick={() => { void runtime.bluetooth.connect(device.id) }}
+                    onClick={() => { void runtime.midiInput.connect(device.id, selectedPorts[device.id] ?? ports[0]?.portNumber) }}
                   >
                     <span><Icon name="bluetooth" /></span>
-                    <span><strong>{device.name}</strong><small>{device.manufacturer ?? device.product ?? '标准 BLE MIDI'}</small></span>
-                    <em>{connected ? '已连接' : '连接'}</em>
+                    <span><strong>{device.name}</strong><small>{device.transport === 'usb' ? 'USB MIDI' : 'Bluetooth MIDI'}{device.manufacturer || device.product ? ` · ${device.manufacturer ?? device.product}` : ''}</small></span>
+                    <em>{connected ? '已连接' : needsPort ? '请选择端口' : device.source === 'midiManager' && !ports.length ? '无输入端口' : '连接'}</em>
                   </button>
+                  </div>
                 )
               })}
             </div>
@@ -3237,11 +3262,12 @@ function MidiScreen(): JSX.Element {
         <section className="device-help">
           <span><Icon name="info" /></span>
           <div>
-            <strong>{midi.lastError ? '连接诊断' : '没有发现或收到琴键输入？'}</strong>
-            <p>{midi.lastError ?? '确认 FP-30X 已开机且 Bluetooth MIDI 可用，然后重新扫描。A3.1 不要求反复进行经典蓝牙配对。'}</p>
+            <strong>连接你的 MIDI 设备</strong>
+            <p>USB MIDI：用数据线连接后刷新设备。Bluetooth MIDI：打开设备和系统蓝牙，允许附近设备权限后扫描。</p>
+            {!bluetoothAvailable ? <p>{bluetoothReason === 'PERMISSION_REQUIRED' || bluetoothReason === 'PERMISSION_DENIED' ? 'Bluetooth MIDI 需要附近设备权限；不影响 USB MIDI。' : bluetoothReason === 'BLUETOOTH_OFF' ? '系统蓝牙已关闭；仍可使用 USB MIDI。' : '此设备不支持 Bluetooth MIDI；请尝试 USB MIDI。'}</p> : null}
           </div>
-          <button className="secondary-action" disabled={midi.bluetoothState !== 'ON' || midi.permissionState !== 'GRANTED'} type="button" onClick={() => { void runtime.bluetooth.scan() }}>
-            <Icon name="refresh" />重新扫描
+          <button className="secondary-action" disabled={!bluetoothAvailable && !['PERMISSION_REQUIRED', 'PERMISSION_DENIED'].includes(bluetoothReason)} type="button" onClick={() => { void (bluetoothAvailable ? runtime.midiInput.scan() : runtime.midiInput.requestPermissions()) }}>
+            <Icon name="refresh" />{bluetoothAvailable ? '扫描 MIDI 设备' : '允许附近设备'}
           </button>
         </section>
       </main>
@@ -3423,13 +3449,13 @@ function ReviewDock({
                 <strong>MIDI 输入源</strong>
               </div>
               <div className="developer-midi__source" role="group" aria-label="DEBUG MIDI 输入源">
-                <button className={!developmentInputActive ? 'is-active' : ''} type="button" onClick={() => runtime.setMidiInputSource('bluetooth')}>真实蓝牙 MIDI</button>
+                <button className={!developmentInputActive ? 'is-active' : ''} type="button" onClick={() => runtime.setMidiInputSource(midi.activeInput?.transport ?? 'bluetooth')}>真实 MIDI 输入</button>
                 <button className={developmentInputActive ? 'is-active' : ''} type="button" onClick={() => runtime.setMidiInputSource('development')}>开发模拟 MIDI</button>
               </div>
               <div className="developer-midi__status">
                 <span>目标 <strong>{snapshot.currentTargetNotes.map((note) => note.noteName).join(' + ') || '—'}</strong></span>
                 <span>阶段 <strong>{snapshot.phase}</strong></span>
-                <span>来源 <strong>{developmentInputActive ? 'DEVELOPMENT' : 'REAL BLUETOOTH'}</strong></span>
+                <span>来源 <strong>{developmentInputActive ? 'DEVELOPMENT' : midi.activeInput?.transport === 'usb' ? 'REAL USB' : 'REAL BLUETOOTH'}</strong></span>
               </div>
               <div className="developer-midi__actions">
                 <button disabled={!canAnswer || !developmentInputActive} type="button" onClick={() => runtime.sendCorrect()}>答对</button>
@@ -3453,7 +3479,12 @@ function ReviewDock({
               <small>normalized NOTE_ON → shared controller；真实 {getSightReadingAnswerTimeoutMs(runtime.settings) / 1000} 秒 timeout 没有快捷按钮。</small>
               <small>内存报告 {reports.length} 份{latestReport ? ` · 最近：${latestReport.completionState} / ${latestReport.completedQuestions} 题` : ''}</small>
               <div className="bluetooth-midi-diagnostic">
-                <strong>BLUETOOTH MIDI DIAGNOSTICS</strong>
+                <strong>MIDI INPUT DIAGNOSTICS</strong>
+                <span><b>transport</b>{midi.activeInput?.transport ?? '—'}</span>
+                <span><b>generation</b>{midi.activeInput?.connectionGeneration ?? midi.connectionGeneration ?? '—'}</span>
+                <span><b>delivery epoch</b>{midi.deliveryEpoch ?? '—'}</span>
+                <span><b>reason</b>{midi.reasonCode ?? '—'}</span>
+                <span><b>native error</b>{midi.lastError ?? '—'}</span>
                 <span><b>permission</b>{midi.permissionState}</span>
                 <span><b>Android API</b>{midi.androidApiLevel || 'browser'}</span>
                 <span><b>Bluetooth</b>{midi.bluetoothState}</span>
@@ -3673,15 +3704,17 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
     return unsubscribe
   }, [chordRuntime, runtime])
 
-  const chordTransportReady = runtime.midiSource === 'development'
-    || runtime.bluetoothSnapshot.connectionState === 'CONNECTED'
-  const previousChordTransportReady = useRef<boolean | null>(null)
+  const chordTransportReady = runtime.midiReady
+  const chordInputBoundary = `${runtime.midiSource}:${runtime.midiBoundaryVersion}`
+  const previousChordTransportReady = useRef<{ ready: boolean; boundary: string } | null>(null)
   useEffect(() => {
-    if (previousChordTransportReady.current === chordTransportReady) return
-    previousChordTransportReady.current = chordTransportReady
+    const previous = previousChordTransportReady.current
+    if (previous?.ready === chordTransportReady && previous.boundary === chordInputBoundary) return
+    previousChordTransportReady.current = { ready: chordTransportReady, boundary: chordInputBoundary }
+    if (previous && previous.boundary !== chordInputBoundary && chordTransportReady) chordRuntime.handleTransportLost()
     if (chordTransportReady) chordRuntime.handleTransportReady()
     else chordRuntime.handleTransportLost()
-  }, [chordRuntime, chordTransportReady])
+  }, [chordRuntime, chordTransportReady, chordInputBoundary])
 
   useEffect(() => {
     if (!__QA_BUILD__) void updater.initialize()
@@ -3969,7 +4002,7 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
 
   const content = (() => {
     switch (screen) {
-      case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} settings={settings} theme={activeTheme} />
+      case 'home': return <HomeScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} intervalSettingsReady={intervalSettingsReady} settings={settings} theme={activeTheme} />
       case 'practice': return <PracticeHubScreen chordHistory={chordPersistenceSnapshot} chordPersistence={chordPersistence} intervalSettingsReady={intervalSettingsReady} settings={settings} theme={activeTheme} />
       case 'tools': return <ToolsHubScreen theme={activeTheme} />
       case 'chord-query-tool': return <ChordQueryToolScreen theme={activeTheme} />

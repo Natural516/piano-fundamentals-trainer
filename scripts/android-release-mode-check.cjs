@@ -61,7 +61,9 @@ try {
   assert.equal(bundle.includes('暂无练习记录'), true, 'Release APK is missing the durable History empty state')
   assert.equal(bundle.includes('提前结束'), true, 'Release APK is missing the STOPPED History presentation')
 
-  assert.equal(bundle.includes('Android 原生 BLE MIDI'), true, 'Release APK is missing the real Bluetooth MIDI path')
+  assert.equal(bundle.includes('AndroidBluetoothMidi'), true, 'Release APK is missing the real native MIDI bridge')
+  assert.equal(bundle.includes('Bluetooth MIDI'), true, 'Release APK is missing Bluetooth MIDI presentation')
+  assert.equal(bundle.includes('USB MIDI'), true, 'Release APK is missing USB MIDI presentation')
   assert.equal(bundle.includes('扫描 MIDI 设备'), true, 'Release APK is missing normal MIDI connection UI')
 
   for (const token of ['更新服务尚未配置', '安装始终由 Android 系统确认', '检查更新']) {

@@ -84,8 +84,8 @@ const tests = [
     assert.equal((registry.match(/settingsVisual: standardSettingsVisual/g) ?? []).length, 2)
   }],
   ['SET12', 'Android release identity remains frozen', () => {
-    assert.match(version, /^versionCode=13$/m)
-    assert.match(version, /^versionName=1\.5\.3$/m)
+    assert.match(version, /^versionCode=14$/m)
+    assert.match(version, /^versionName=1\.6\.0$/m)
   }]
 ]
 

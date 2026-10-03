@@ -403,8 +403,8 @@ button:focus-visible {
 .home-hero {
   display: grid;
   height: calc(100% - 154px);
-  min-height: 370px;
-  grid-template-columns: minmax(420px, 0.9fr) minmax(500px, 1.1fr);
+  min-height: min(370px, calc(100dvh - 320px));
+  grid-template-columns: minmax(0, 0.9fr) minmax(500px, 1.1fr);
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
@@ -437,12 +437,30 @@ button:focus-visible {
 
 .home-practice-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+  width: 100%;
 }
 
-.home-practice-actions .secondary-action {
-  min-width: 158px;
+.home-practice-actions button {
+  flex: 0 1 158px;
+  min-width: 0;
+  padding-inline: 12px;
+}
+
+.midi-candidate { min-width: 0; }
+.midi-port-selector { display: flex; align-items: center; gap: 12px; margin: 10px 0; color: var(--text-secondary); }
+.midi-port-selector select { padding: 8px; color: var(--text-primary); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+
+/* Home-only compact layout; notation rendering and other screens are unchanged. */
+@media (max-height: 700px) {
+  .home-hero { min-height: 0; }
+  .home-hero__copy { padding: 18px 28px; }
+  .home-hero__copy h1 { font-size: 38px; }
+  :root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-hero { min-height: 0; }
+  :root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .home-hero__copy { top: 3%; bottom: 3%; padding-block: 8px; }
+  :root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-hero__headline img { max-width: 280px; }
 }
 
 .home-hero__notation {
@@ -676,7 +694,7 @@ button:focus-visible {
   position: relative;
   display: block;
   height: calc(100% - 126px);
-  min-height: 440px;
+  min-height: min(440px, calc(100dvh - 280px));
   overflow: hidden;
   border: 1px solid rgba(229, 205, 193, .95);
   border-radius: 26px;
@@ -8023,7 +8041,7 @@ button.setting-row {
 }
 
 .device-details div:nth-child(2n) { border-right: 0; }
-.device-details div:nth-last-child(-n + 2) { border-bottom: 0; }
+.device-details div:last-child { grid-column: 1 / -1; border-right: 0; border-bottom: 0; }
 .device-details small { color: var(--ink-muted); font-size: 11px; }
 .device-details strong { font-size: 15px; }
 
@@ -8041,8 +8059,9 @@ button.setting-row {
   gap: 8px;
 }
 
-.midi-device-list > div:last-child > button {
+.midi-device-list .midi-candidate > button {
   display: grid;
+  width: 100%;
   min-height: 58px;
   align-items: center;
   grid-template-columns: 38px 1fr auto;

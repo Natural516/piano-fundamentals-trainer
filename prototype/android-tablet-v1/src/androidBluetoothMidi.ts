@@ -25,13 +25,32 @@ export type AndroidBluetoothMidiConnectionState =
 export type AndroidBluetoothPermissionState = 'UNSUPPORTED' | 'REQUIRED' | 'DENIED' | 'GRANTED'
 export type AndroidBluetoothState = 'UNSUPPORTED' | 'OFF' | 'ON'
 
+export type MidiTransport = 'bluetooth' | 'usb'
+export interface MidiInputIdentity {
+  transport: MidiTransport
+  deviceId: string
+  portNumber: number
+  connectionGeneration: number
+  displayName: string
+  manufacturer?: string
+  product?: string
+}
+export interface MidiTransportCapability {
+  supported: boolean
+  available: boolean
+  reason?: string
+}
+
 export interface AndroidBluetoothMidiDevice {
   id: string
   name: string
+  transport?: MidiTransport
+  outputPorts?: { portNumber: number; name: string }[]
   address?: string
   manufacturer?: string
   product?: string
   source: 'bleScan' | 'midiManager'
+  discoveryOrigins?: Array<'bleScan' | 'midiManager'>
   serviceUuids?: string[]
 }
 
@@ -51,12 +70,21 @@ export interface NativeAndroidBluetoothMidiState {
   disconnectCount: number
   reconnectCount: number
   lastError?: string
+  reasonCode?: string
+  capabilities?: Record<MidiTransport, MidiTransportCapability>
+  activeInput?: MidiInputIdentity
+  connectionGeneration?: number
+  deliveryEpoch?: number
+  stateRevision?: number
+  scanning?: boolean
 }
 
 export interface NativeAndroidMidiChunk {
   bytes: number[]
   nativeTimestampNanos: number
   callbackReceivedNanos: number
+  identity?: MidiInputIdentity
+  deliveryEpoch?: number
 }
 
 export interface AndroidBluetoothMidiPlugin {
@@ -64,7 +92,7 @@ export interface AndroidBluetoothMidiPlugin {
   requestMidiPermissions(): Promise<NativeAndroidBluetoothMidiState>
   startScan(): Promise<NativeAndroidBluetoothMidiState>
   stopScan(): Promise<NativeAndroidBluetoothMidiState>
-  connect(options: { deviceId: string }): Promise<NativeAndroidBluetoothMidiState>
+  connect(options: { deviceId: string; portNumber?: number }): Promise<NativeAndroidBluetoothMidiState>
   disconnect(): Promise<NativeAndroidBluetoothMidiState>
   suspendDelivery(): Promise<NativeAndroidBluetoothMidiState>
   resumeDelivery(): Promise<NativeAndroidBluetoothMidiState>
@@ -118,8 +146,9 @@ const unsupportedState: NativeAndroidBluetoothMidiState = {
   reconnectCount: 0
 }
 
-export class AndroidBluetoothMidiAdapter {
-  private readonly parser = new AndroidMidiByteStreamParser()
+/** One native handle owner, one parser per connection, one application input. */
+export class MidiInputProvider {
+  private parser = new AndroidMidiByteStreamParser()
   private readonly listenerHandles: PluginListenerHandle[] = []
   private state: NativeAndroidBluetoothMidiState = unsupportedState
   private diagnosticsValue: AndroidBluetoothMidiDiagnostics = {
@@ -131,12 +160,29 @@ export class AndroidBluetoothMidiAdapter {
     lastController: '—'
   }
   private started = false
+  private switching = false
+  private deliverySuspended = false
+  private selectionSequence = 0
 
   constructor(
     private readonly plugin: AndroidBluetoothMidiPlugin | null,
     private readonly router: AndroidMidiInputRouter,
-    private readonly callbacks: AndroidBluetoothMidiAdapterCallbacks
+    private readonly callbacks: AndroidBluetoothMidiAdapterCallbacks,
+    // Legacy injected Bluetooth test adapters predate identity; production is always strict.
+    private readonly requireIdentity = false
   ) {}
+
+  get ready(): boolean {
+    return !this.switching && !this.deliverySuspended && this.state.connectionState === 'CONNECTED'
+      && this.state.midiPortState === 'OPEN' && (!this.requireIdentity || !!this.state.activeInput)
+  }
+
+  get boundary(): string {
+    const input = this.state.activeInput
+    return input
+      ? `${input.transport}:${input.deviceId}:${input.portNumber}:${input.connectionGeneration}:${this.state.deliveryEpoch}`
+      : `${this.state.connectionState}:${this.state.connectedDeviceId ?? ''}`
+  }
 
   get snapshot(): AndroidBluetoothMidiSnapshot {
     return {
@@ -176,7 +222,6 @@ export class AndroidBluetoothMidiAdapter {
   }
 
   async scan(): Promise<void> {
-    this.parser.reset()
     await this.perform(() => this.plugin?.startScan())
   }
 
@@ -184,19 +229,41 @@ export class AndroidBluetoothMidiAdapter {
     await this.perform(() => this.plugin?.stopScan())
   }
 
-  async connect(deviceId: string): Promise<void> {
+  async connect(deviceId: string, portNumber?: number): Promise<void> {
+    if (!this.plugin) return
+    const sequence = ++this.selectionSequence
+    this.switching = true
     this.parser.reset()
     this.router.advanceWatermark()
-    await this.perform(() => this.plugin?.connect({ deviceId }))
+    this.callbacks.onTransportLost()
+    this.callbacks.onChange()
+    // Stop delivery before closing the old handle; late bytes cannot cross this boundary.
+    const suspended = await this.perform(() => this.plugin?.suspendDelivery())
+    if (sequence !== this.selectionSequence) return
+    if (!suspended) { this.switching = false; this.callbacks.onChange(); return }
+    const disconnected = await this.perform(() => this.plugin?.disconnect())
+    if (sequence !== this.selectionSequence) return
+    if (!disconnected) { this.switching = false; this.callbacks.onChange(); return }
+    this.switching = false
+    await this.perform(() => this.plugin?.connect({ deviceId, portNumber }))
   }
 
   async disconnect(): Promise<void> {
+    const sequence = ++this.selectionSequence
+    this.switching = true
     this.parser.reset()
     this.router.advanceWatermark()
+    this.callbacks.onTransportLost()
+    this.callbacks.onChange()
     await this.perform(() => this.plugin?.disconnect())
+    if (sequence === this.selectionSequence) {
+      this.switching = false
+      this.callbacks.onChange()
+    }
   }
 
   async suspendDelivery(): Promise<void> {
+    this.deliverySuspended = true
     this.parser.reset()
     this.router.advanceWatermark()
     await this.perform(() => this.plugin?.suspendDelivery())
@@ -205,6 +272,7 @@ export class AndroidBluetoothMidiAdapter {
   async resumeDelivery(): Promise<void> {
     this.parser.reset()
     this.router.advanceWatermark()
+    this.deliverySuspended = false
     await this.perform(() => this.plugin?.resumeDelivery())
   }
 
@@ -223,29 +291,39 @@ export class AndroidBluetoothMidiAdapter {
     this.handleNativeChunk(message)
   }
 
-  private async perform(operation: () => Promise<NativeAndroidBluetoothMidiState> | undefined): Promise<void> {
-    if (!this.plugin) return
+  private async perform(operation: () => Promise<NativeAndroidBluetoothMidiState> | undefined): Promise<boolean> {
+    if (!this.plugin) return false
     try {
       const result = await operation()
       if (result) this.applyState(result)
+      return !!result
     } catch (error) {
       this.applyError(error)
+      return false
     }
   }
 
   private applyState(next: NativeAndroidBluetoothMidiState): void {
+    if (next.stateRevision !== undefined && this.state.stateRevision !== undefined
+      && next.stateRevision < this.state.stateRevision) return
     const wasConnected = this.state.connectionState === 'CONNECTED'
     const isConnected = next.connectionState === 'CONNECTED'
+    const previousBoundary = this.boundary
     this.state = {
       ...next,
       discoveredDevices: next.discoveredDevices ?? []
     }
-    if (wasConnected !== isConnected) {
-      this.parser.reset()
+    const boundaryChanged = previousBoundary !== this.boundary
+    if (wasConnected !== isConnected || boundaryChanged) {
+      this.parser = new AndroidMidiByteStreamParser()
       this.router.advanceWatermark()
     }
-    if (wasConnected && !isConnected) this.callbacks.onTransportLost()
-    else if (!wasConnected && isConnected) this.callbacks.onTransportReady()
+    if (wasConnected && (!isConnected || boundaryChanged)) this.callbacks.onTransportLost()
+    if (next.activeInput && this.router.activeSource !== 'development') {
+      this.router.setActiveSource(next.activeInput.transport)
+    }
+    if (isConnected && (!wasConnected || boundaryChanged) && !this.switching
+      && (!this.requireIdentity || this.ready)) this.callbacks.onTransportReady()
     this.callbacks.onChange()
   }
 
@@ -260,6 +338,8 @@ export class AndroidBluetoothMidiAdapter {
   }
 
   private applyError(error: unknown): void {
+    this.parser.reset()
+    this.router.advanceWatermark()
     this.state = {
       ...this.state,
       connectionState: 'ERROR',
@@ -270,6 +350,15 @@ export class AndroidBluetoothMidiAdapter {
   }
 
   private handleNativeChunk(message: NativeAndroidMidiChunk): void {
+    if (this.requireIdentity || message.identity) {
+      const active = this.state.activeInput
+      const incoming = message.identity
+      if (!this.ready || !active || !incoming
+        || incoming.transport !== active.transport || incoming.deviceId !== active.deviceId
+        || incoming.portNumber !== active.portNumber
+        || incoming.connectionGeneration !== active.connectionGeneration
+        || message.deliveryEpoch !== this.state.deliveryEpoch) return
+    }
     const bytes = Array.isArray(message.bytes)
       ? message.bytes.filter((byte) => Number.isInteger(byte)).map((byte) => byte & 0xff)
       : []
@@ -288,9 +377,12 @@ export class AndroidBluetoothMidiAdapter {
       this.diagnosticsValue.lastController = payload.type === 'controlChange'
         ? `CC${payload.controllerNumber}=${payload.controllerValue}`
         : '—'
-      const accepted = this.router.emit('bluetooth', payload)
+      const accepted = this.router.emit(this.state.activeInput?.transport ?? 'bluetooth', payload)
       this.diagnosticsValue.lastNormalizedEvent = accepted
     }
     this.callbacks.onChange()
   }
 }
+
+// Compatibility name for existing injected Bluetooth regression seams, not a second provider.
+export { MidiInputProvider as AndroidBluetoothMidiAdapter }
