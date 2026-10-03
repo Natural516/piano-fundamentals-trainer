@@ -180,7 +180,7 @@ test('candidate wrapper uses existing full-width device button visual for Blueto
   assert.equal(declarations.display, 'grid')
   assert.equal(declarations.width, '100%')
   assert.equal(declarations['min-height'], '58px')
-  assert.equal(declarations['grid-template-columns'], '38px 1fr auto')
+  assert.equal(declarations['grid-template-columns'], '38px minmax(0, 1fr) auto')
   assert.equal(declarations.background, 'var(--surface-soft)')
   assert.equal(declarations.color, 'var(--ink)')
   const main = read('prototype/android-tablet-v1/src/main.tsx')
@@ -194,7 +194,7 @@ test('MIDI details show only connection, input and practice readiness without an
   const main = read('prototype/android-tablet-v1/src/main.tsx')
   const ui = main.slice(main.indexOf('function MidiScreen'), main.indexOf('function updaterStatusCopy'))
   const details = ui.match(/<section className="device-details">([\s\S]*?)<\/section>/)[1]
-  assert.deepEqual([...details.matchAll(/<small>([^<]+)<\/small>/g)].map(match => match[1]), ['连接方式', 'MIDI 输入', '练习状态'])
+  assert.deepEqual([...details.matchAll(/<small>([^<]+)<\/small>/g)].map(match => match[1]), ["{t('connectionMethod')}", "{t('input')}", "{t('practiceState')}"])
   assert.equal((details.match(/<div>/g) ?? []).length, 3)
   assert.doesNotMatch(ui, /应用发声|visibility:\s*hidden|opacity:\s*0/)
   const postcss = require('postcss')
@@ -216,7 +216,7 @@ test('byte parser and mature judgement/persistence/signing/updater source stay f
 test('Android product copy is neutral and raw MIDI diagnostics remain QA-only', () => {
   const main = read('prototype/android-tablet-v1/src/main.tsx'); const ui = main.slice(main.indexOf('function MidiScreen'), main.indexOf('function updaterStatusCopy'))
   assert.doesNotMatch(main, /FP-30X|FP30X|Roland/); assert.doesNotMatch(ui, /A3\.1|MidiManager|lastError|midiPortState|lastNormalizedEvent/)
-  assert.match(ui, /device.name/); assert.match(ui, /USB MIDI/); assert.match(ui, /Bluetooth MIDI/); assert.match(ui, /ports.length > 1/); assert.match(ui, /请选择端口/)
+  assert.match(ui, /device.name/); assert.match(ui, /USB MIDI/); assert.match(ui, /Bluetooth MIDI/); assert.match(ui, /ports.length > 1/); assert.match(ui, /t\('selectPort'\)/)
   assert.match(main.slice(main.indexOf('function ReviewDock')), /diagnostics/)
 })
 async function run() {

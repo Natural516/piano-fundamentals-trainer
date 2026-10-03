@@ -68,7 +68,7 @@ const tests = [
   }],
   ['NAV05', 'global Settings contains only Device Appearance and About group headings', () => {
     const groups = [...settings.matchAll(/<div className="group-title"><span>([^<]+)<\/span>/g)].map((match) => match[1])
-    assert.deepEqual(groups, ['设备', '外观', '关于'])
+    assert.deepEqual(groups, ["{t('device')}", "{t('appearance')}", "{t('about')}"])
     assert.doesNotMatch(settings, /识谱练习设置|默认谱表|音符数量/)
   }],
   ['NAV06', 'Sight Reading owns its settings drawer while retaining the existing settings contract', () => {
@@ -98,7 +98,8 @@ const tests = [
     assert.match(version, /^versionCode=14$/m)
     assert.match(version, /^versionName=1\.6\.0$/m)
     assert.match(ui, /if \(!__QA_BUILD__\) void updater\.initialize\(\)/)
-    assert.match(settings, /正式更新通道已关闭/)
+    assert.match(settings, /description=\{t\('qaUpdateDescription'\)\}/)
+    assert.match(fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/shellResources.ts'), 'utf8'), /qaUpdateDescription: '与正式版独立安装；正式更新通道已关闭'/)
   }],
   ['NAV10', 'Chord History empty state contains no Sight Reading or fabricated metric', () => {
     assert.match(history, /filter === 'chord'[\s\S]*?'暂无和弦练习记录'/)
@@ -155,7 +156,7 @@ const tests = [
   ['NAV18', 'Settings and Update share installed package metadata without fixed release copy', () => {
     assert.doesNotMatch(settings, /V\d+\.\d+\.\d+|versionCode \d+/)
     assert.match(settings, /updater\.installed \? `V\$\{updater\.installed\.versionName\}` : `V\$\{__ANDROID_VERSION_NAME__\}`/)
-    assert.match(settings, /updater\.installed[\s\S]*?`versionCode \$\{updater\.installed\.versionCode\}`[\s\S]*?`versionCode \$\{__ANDROID_VERSION_CODE__\}`/)
+    assert.match(settings, /updater\.installed[\s\S]*?t\('versionCode', \{ code: updater\.installed\.versionCode \}\)[\s\S]*?t\('versionCode', \{ code: __ANDROID_VERSION_CODE__ \}\)/)
     assert.match(updateScreen, /snapshot\.installed \? `V\$\{snapshot\.installed\.versionName\} · \$\{snapshot\.installed\.versionCode\}` : '正在读取'/)
   }]
 ]

@@ -63,6 +63,7 @@ import { LocalizationService } from './localization/localizationService'
 import { LocaleProvider } from './localization/LocaleProvider'
 import { LanguageSetting } from './localization/LanguageSetting'
 import { IntervalDisplayName, SightNoteValue } from './localization/LegacyDisplayValues'
+import { getSettingsThemeDisplayName, presentLocalizedMidiStatus } from './localization/midiPresentation'
 import {
   DEFAULT_INTERVAL_PRACTICE_SETTINGS,
   INTERVAL_QUESTION_COUNT_OPTIONS,
@@ -515,9 +516,10 @@ function useViewportMetrics(): ViewportMetrics | null {
 }
 
 function MidiStatusButton({ compact = false, interactive = true }: { compact?: boolean; interactive?: boolean }): JSX.Element {
+  const { t } = useTranslation('midi')
   const { runtime } = useMidiUi()
   const { openAuxiliary } = useAppNavigation()
-  const status = presentMidiStatus(runtime)
+  const status = presentLocalizedMidiStatus(runtime, t)
   const content = (
     <>
       <span className="midi-status__signal"><Icon name="bluetooth" size={18} /></span>
@@ -533,18 +535,19 @@ function MidiStatusButton({ compact = false, interactive = true }: { compact?: b
     )
   }
   return (
-    <button aria-label={compact ? '打开 MIDI 设备' : undefined} className={`midi-status is-${status.tone} ${compact ? 'is-compact' : ''}`} type="button" onClick={() => openAuxiliary('midi')}>
+    <button aria-label={compact ? t('openMidi', { ns: 'navigation' }) : undefined} className={`midi-status is-${status.tone} ${compact ? 'is-compact' : ''}`} type="button" onClick={() => openAuxiliary('midi')}>
       {content}
     </button>
   )
 }
 
 function ProductHeader({ midiStatusInteractive = true, title, onBack }: { midiStatusInteractive?: boolean; title: string; onBack?: () => void }): JSX.Element {
+  const { t } = useTranslation('navigation')
   return (
     <header className="product-header">
       <div className="product-header__left">
         {onBack ? (
-          <button className="icon-button" aria-label="返回" type="button" onClick={onBack}>
+          <button className="icon-button" aria-label={t('back')} type="button" onClick={onBack}>
             <Icon name="arrow-left" />
           </button>
         ) : (
@@ -563,14 +566,15 @@ function ProductHeader({ midiStatusInteractive = true, title, onBack }: { midiSt
 type ProductNavigationId = 'home' | 'practice' | 'tools' | 'history' | 'settings'
 
 function BottomNavigation({ active }: { active: ProductNavigationId }): JSX.Element {
+  const { t } = useTranslation('navigation')
   return (
-    <nav className="bottom-navigation" aria-label="主要导航">
+    <nav className="bottom-navigation" aria-label={t('primary')}>
       {productNavigation.map((item) => {
         const itemActive = item.id === active
         return (
           <button className={itemActive ? 'is-active' : ''} key={item.id} type="button" onClick={() => navigate(item.id)}>
             <Icon name={item.icon} />
-            <span>{item.label}</span>
+            <span>{t(item.id)}</span>
           </button>
         )
       })}
@@ -591,9 +595,10 @@ function ProductFrame({
   onBack?: () => void
   title: string
 }): JSX.Element {
+  const { t } = useTranslation('navigation')
   return (
     <div className={`product-frame${className ? ` ${className}` : ''}`}>
-      <ProductHeader onBack={onBack} title={title} />
+      <ProductHeader onBack={onBack} title={onBack ? title : t(active === 'home' ? 'homeTitle' : active === 'history' ? 'historyTitle' : active)} />
       <main className="product-content">{children}</main>
       <BottomNavigation active={active} />
     </div>
@@ -3010,14 +3015,15 @@ function ExternalThemeCard({ active, record, onActivate, onInfo }: {
   onActivate: () => void
   onInfo: () => void
 }): JSX.Element {
+  const { t } = useTranslation('settings')
   return (
     <article className={`settings-external-theme${active ? ' is-active' : ''}`}>
       <button className="settings-external-theme__main" type="button" onClick={onActivate}>
         <span className="settings-external-theme__mark" aria-hidden="true"><Icon name="grid" size={20} /></span>
-        <span><strong>{record.name}</strong><small>{record.subtitle} · {record.version} · 已验证</small></span>
+        <span><strong>{record.name}</strong><small>{t('externalSummary', { subtitle: record.subtitle, version: record.version })}</small></span>
         {active ? <span className="settings-theme-option__check"><Icon name="check" size={16} /></span> : null}
       </button>
-      <button className="settings-external-theme__info" type="button" onClick={onInfo}>主题信息</button>
+      <button className="settings-external-theme__info" type="button" onClick={onInfo}>{t('themeInfo')}</button>
     </article>
   )
 }
@@ -3082,6 +3088,7 @@ function SettingsScreen({
   themeManager: ThemeRuntimeManager
 }): JSX.Element {
   const { t } = useTranslation('settings')
+  const { t: midiT } = useTranslation('midi')
   const { runtime } = useMidiUi()
   const { snapshot: updater } = useUpdaterUi()
   const { openAuxiliary } = useAppNavigation()
@@ -3091,18 +3098,18 @@ function SettingsScreen({
   const [infoRecord, setInfoRecord] = useState<InstalledThemeRecord | null>(null)
   const composedSettings = settingsVisual.kind === 'hero-cards' ? settingsVisual : null
   const visibleThemeOptions = SETTINGS_THEME_OPTIONS
-  const midiStatus = presentMidiStatus(runtime)
+  const midiStatus = presentLocalizedMidiStatus(runtime, midiT)
   const updaterLabel = updater.status === 'updateAvailable'
-    ? '发现新版本'
+    ? t('updateAvailable')
     : updater.status === 'readyToInstall'
-      ? '已验证'
+      ? t('updateVerified')
       : updater.status === 'checking' || updater.status === 'downloading' || updater.status === 'verifying'
-        ? '处理中'
-        : updater.status === 'error' ? '需要检查' : '检查更新'
+        ? t('updateProcessing')
+        : updater.status === 'error' ? t('updateNeedsAttention') : t('checkUpdates')
   const installedVersionAction = updater.installed ? `V${updater.installed.versionName}` : `V${__ANDROID_VERSION_NAME__}`
   const installedVersionDescription = updater.installed
-    ? `versionCode ${updater.installed.versionCode}`
-    : `versionCode ${__ANDROID_VERSION_CODE__}`
+    ? t('versionCode', { code: updater.installed.versionCode })
+    : t('versionCode', { code: __ANDROID_VERSION_CODE__ })
   return (
     <ProductFrame
       active="settings"
@@ -3111,8 +3118,8 @@ function SettingsScreen({
     >
       <section className={`settings-dashboard${composedSettings ? ' has-settings-visual' : ''}`}>
         {composedSettings ? (
-          <aside className="settings-hero" aria-label="孤独摇滚主题设置主视觉">
-            <img alt="红发吉他手主题插画" src={composedSettings.assets.hero} />
+          <aside className="settings-hero" aria-label={t('heroLabel')}>
+            <img alt={t('heroAlt')} src={composedSettings.assets.hero} />
             <div className="settings-hero__caption">
               <span>MY FAVORITE SETUP</span>
               <h1>让喜欢的声音，<br />一直陪着练习。</h1>
@@ -3122,32 +3129,32 @@ function SettingsScreen({
         ) : null}
         <div className="settings-panels">
           <section className="settings-group settings-card settings-card--midi">
-            <div className="group-title"><span>设备</span><small>MIDI 输入设备</small></div>
+            <div className="group-title"><span>{t('device')}</span><small>{t('deviceDescription')}</small></div>
             <SettingRow
               description={midiStatus.detail}
               icon="bluetooth"
               onClick={() => openAuxiliary('midi')}
-              title={runtime.bluetoothSnapshot.connectedDeviceName ?? 'MIDI 设备'}
+              title={runtime.bluetoothSnapshot.connectedDeviceName ?? midiT('device')}
               action={<span className={`connected-label is-${midiStatus.tone}`}><i />{midiStatus.label}</span>}
             />
             {composedSettings ? <img alt="" aria-hidden="true" className="settings-card__decoration" src={composedSettings.assets.midi} /> : null}
           </section>
           <section className="settings-group settings-card settings-card--theme">
-            <div className="group-title"><span>外观</span><small>适合谱架距离阅读</small></div>
+            <div className="group-title"><span>{t('appearance')}</span><small>{t('appearanceDescription')}</small></div>
             <LanguageSetting />
             <div className="settings-theme-content">
               <div className="settings-theme-heading">
                 <span className="setting-row__icon"><Icon name="grid" /></span>
-                <span className="setting-row__copy"><strong>显示主题</strong><small>当前：{theme.displayName}</small></span>
+                <span className="setting-row__copy"><strong>{t('theme')}</strong><small>{t('currentTheme', { name: getSettingsThemeDisplayName(theme, t) })}</small></span>
               </div>
-              <div className="settings-theme-options" role="group" aria-label="显示主题">
+              <div className="settings-theme-options" role="group" aria-label={t('theme')}>
                 {visibleThemeOptions.map((option) => (
                   <SettingsThemeOption
                     active={theme.id === option.id}
-                    description={option.description}
+                    description={t(`${option.id}Description`)}
                     icon={option.icon}
                     key={option.id}
-                    label={option.label}
+                    label={t(option.id)}
                     onSelect={() => { void themeManager.selectThemeId(String(option.id)) }}
                     preview={option.id}
                   />
@@ -3161,25 +3168,25 @@ function SettingsScreen({
                   onInfo={() => setInfoRecord(record)}
                   record={record}
                 />
-              ))}</div> : <p className="settings-theme-empty">尚未安装外部主题</p>}
-              {Capacitor.isNativePlatform() ? <button className="settings-import-theme" type="button" onClick={() => setShowImporter(true)}><Icon name="grid" size={18} />导入主题包</button> : null}
+              ))}</div> : <p className="settings-theme-empty">{t('noExternalThemes')}</p>}
+              {Capacitor.isNativePlatform() ? <button className="settings-import-theme" type="button" onClick={() => setShowImporter(true)}><Icon name="grid" size={18} />{t('importTheme')}</button> : null}
             </div>
             {composedSettings ? <img alt="" aria-hidden="true" className="settings-card__decoration" src={composedSettings.assets.theme} /> : null}
           </section>
           <section className="settings-group settings-card settings-card--about">
-            <div className="group-title"><span>关于</span><small>个人版</small></div>
-            <SettingRow description="Android Tablet Personal Edition" icon="info" title="钢琴基本功训练器" action={<strong>Android</strong>} />
-            <SettingRow description={installedVersionDescription} icon="info" title="当前版本" action={<strong>{installedVersionAction}</strong>} />
+            <div className="group-title"><span>{t('about')}</span><small>{t('edition')}</small></div>
+            <SettingRow description={t('personalEdition')} icon="info" title={t('appTitle', { ns: 'common' })} action={<strong>Android</strong>} />
+            <SettingRow description={installedVersionDescription} icon="info" title={t('currentVersion')} action={<strong>{installedVersionAction}</strong>} />
             {__QA_BUILD__ ? (
-              <SettingRow description="与正式版独立安装；正式更新通道已关闭" icon="refresh" title="应用内更新" action={<strong>不可用</strong>} />
+              <SettingRow description={t('qaUpdateDescription')} icon="refresh" title={t('appUpdates')} action={<strong>{t('unavailable')}</strong>} />
             ) : (
-              <SettingRow description="查看版本与更新状态" icon="refresh" onClick={() => openAuxiliary('update')} title="检查更新" action={<strong>{updaterLabel}</strong>} />
+              <SettingRow description={t('updateDescription')} icon="refresh" onClick={() => openAuxiliary('update')} title={t('checkUpdates')} action={<strong>{updaterLabel}</strong>} />
             )}
             <SettingRow
               description="Natural516 / Apache-2.0"
               icon="book"
               onClick={() => { void openSourceRepository() }}
-              title="开源项目"
+              title={t('openSource')}
               action={<><strong>GitHub</strong><Icon name="chevron" size={18} /></>}
             />
             {composedSettings ? <img alt="" aria-hidden="true" className="settings-card__decoration" src={composedSettings.assets.about} /> : null}
@@ -3193,10 +3200,11 @@ function SettingsScreen({
 }
 
 function MidiScreen(): JSX.Element {
+  const { t } = useTranslation('midi')
   const { runtime } = useMidiUi()
   const { returnFromAuxiliary } = useAppNavigation()
   const midi = runtime.bluetoothSnapshot
-  const status = presentMidiStatus(runtime)
+  const status = presentLocalizedMidiStatus(runtime, t)
   const scanActive = midi.scanning ?? (midi.connectionState === 'SCANNING' || midi.connectionState === 'DEVICE_FOUND')
   const [selectedPorts, setSelectedPorts] = useState<Record<string, number>>({})
   const bluetoothAvailable = midi.capabilities?.bluetooth.available
@@ -3205,38 +3213,38 @@ function MidiScreen(): JSX.Element {
     ?? (midi.permissionState === 'GRANTED' ? 'BLUETOOTH_OFF' : 'PERMISSION_REQUIRED')
   const action = (() => {
     if (midi.connectionState === 'UNSUPPORTED') {
-      return { label: '此设备不支持', disabled: true, run: () => {} }
+      return { label: t('unsupportedAction'), disabled: true, run: () => {} }
     }
     if (midi.connectionState === 'CONNECTED') {
-      return { label: '断开 MIDI', disabled: false, run: () => { void runtime.bluetooth.disconnect() } }
+      return { label: t('disconnect'), disabled: false, run: () => { void runtime.bluetooth.disconnect() } }
     }
     if (scanActive) {
-      return { label: '停止扫描', disabled: false, run: () => { void runtime.bluetooth.stopScan() } }
+      return { label: t('stopScan'), disabled: false, run: () => { void runtime.bluetooth.stopScan() } }
     }
-    return { label: '刷新 MIDI 设备', disabled: false, run: () => { void runtime.midiInput.refresh() } }
+    return { label: t('refresh'), disabled: false, run: () => { void runtime.midiInput.refresh() } }
   })()
 
   return (
     <div className="standalone-frame">
-      <ProductHeader midiStatusInteractive={false} title="MIDI 连接" onBack={() => returnFromAuxiliary('settings')} />
+      <ProductHeader midiStatusInteractive={false} title={t('title')} onBack={() => returnFromAuxiliary('settings')} />
       <main className="standalone-content">
         <section className="device-hero">
           <div className="device-orbit"><span><Icon name="bluetooth" size={42} /></span><i /><i /><i /></div>
           <span className={`connected-label large is-${status.tone}`}><i />{status.label}</span>
-          <h1>{midi.connectedDeviceName ?? 'MIDI 设备'}</h1>
-          <p>{status.detail}。支持 Bluetooth MIDI 和 USB MIDI；一次连接一个输入设备。</p>
+          <h1>{midi.connectedDeviceName ?? t('device')}</h1>
+          <p>{t('heroDescription', { detail: status.detail })}</p>
           <button className="secondary-action midi-primary-action" disabled={action.disabled} type="button" onClick={action.run}>
             <Icon name="refresh" />{action.label}
           </button>
         </section>
         <section className="device-details">
-          <div><small>连接方式</small><strong>{midi.activeInput ? midi.activeInput.transport === 'usb' ? 'USB MIDI' : 'Bluetooth MIDI' : '尚未选择'}</strong></div>
-          <div><small>MIDI 输入</small><strong>{runtime.midiReady ? '已就绪' : '尚未就绪'}{midi.activeInput ? ` · 端口 ${midi.activeInput.portNumber + 1}` : ''}</strong></div>
-          <div><small>练习状态</small><strong>{runtime.midiReady ? '可以练习' : '请连接设备'}</strong></div>
+          <div><small>{t('connectionMethod')}</small><strong>{midi.activeInput ? midi.activeInput.transport === 'usb' ? 'USB MIDI' : 'Bluetooth MIDI' : t('notSelected')}</strong></div>
+          <div><small>{t('input')}</small><strong>{midi.activeInput ? t('inputWithPort', { readiness: t(runtime.midiReady ? 'ready' : 'pending'), port: midi.activeInput.portNumber + 1 }) : t(runtime.midiReady ? 'ready' : 'pending')}</strong></div>
+          <div><small>{t('practiceState')}</small><strong>{t(runtime.midiReady ? 'canPractice' : 'connectFirst')}</strong></div>
         </section>
         {midi.discoveredDevices.length > 0 ? (
-          <section className="midi-device-list" aria-label="发现的 MIDI 设备">
-            <div className="list-heading"><h2>发现的 MIDI 设备</h2><span>{midi.discoveredDevices.length} 个候选</span></div>
+          <section className="midi-device-list" aria-label={t('devices')}>
+            <div className="list-heading"><h2>{t('devices')}</h2><span>{t('devicesFound', { count: midi.discoveredDevices.length })}</span></div>
             <div>
               {midi.discoveredDevices.map((device) => {
                 const connected = midi.connectionState === 'CONNECTED' && midi.connectedDeviceId === device.id
@@ -3245,9 +3253,9 @@ function MidiScreen(): JSX.Element {
                 const unavailable = device.transport !== 'usb' && !bluetoothAvailable
                 return (
                   <div className="midi-candidate" key={device.id}>
-                  {ports.length > 1 ? <label className="midi-port-selector">MIDI 输入端口
-                    <select aria-label={`${device.name} MIDI 输入端口`} value={selectedPorts[device.id] ?? ''} onChange={(event) => setSelectedPorts((previous) => ({ ...previous, [device.id]: Number(event.target.value) }))}>
-                      <option value="" disabled>请选择端口</option>
+                  {ports.length > 1 ? <label className="midi-port-selector">{t('inputPort')}
+                    <select aria-label={t('deviceInputPort', { deviceName: device.name })} value={selectedPorts[device.id] ?? ''} onChange={(event) => setSelectedPorts((previous) => ({ ...previous, [device.id]: Number(event.target.value) }))}>
+                      <option value="" disabled>{t('selectPort')}</option>
                       {ports.map((port) => <option key={port.portNumber} value={port.portNumber}>{port.name}</option>)}
                     </select>
                   </label> : null}
@@ -3258,8 +3266,8 @@ function MidiScreen(): JSX.Element {
                     onClick={() => { void runtime.midiInput.connect(device.id, selectedPorts[device.id] ?? ports[0]?.portNumber) }}
                   >
                     <span><Icon name="bluetooth" /></span>
-                    <span><strong>{device.name}</strong><small>{device.transport === 'usb' ? 'USB MIDI' : 'Bluetooth MIDI'}{device.manufacturer || device.product ? ` · ${device.manufacturer ?? device.product}` : ''}</small></span>
-                    <em>{connected ? '已连接' : needsPort ? '请选择端口' : device.source === 'midiManager' && !ports.length ? '无输入端口' : '连接'}</em>
+                    <span><strong>{device.name}</strong><small>{device.manufacturer || device.product ? t('candidateDetail', { transport: device.transport === 'usb' ? 'USB MIDI' : 'Bluetooth MIDI', manufacturer: device.manufacturer ?? device.product! }) : device.transport === 'usb' ? 'USB MIDI' : 'Bluetooth MIDI'}</small></span>
+                    <em>{t(connected ? 'connected' : needsPort ? 'selectPort' : device.source === 'midiManager' && !ports.length ? 'noInputPort' : 'connect')}</em>
                   </button>
                   </div>
                 )
@@ -3270,12 +3278,12 @@ function MidiScreen(): JSX.Element {
         <section className="device-help">
           <span><Icon name="info" /></span>
           <div>
-            <strong>连接你的 MIDI 设备</strong>
-            <p>USB MIDI：用数据线连接后刷新设备。Bluetooth MIDI：打开设备和系统蓝牙，允许附近设备权限后扫描。</p>
-            {!bluetoothAvailable ? <p>{bluetoothReason === 'PERMISSION_REQUIRED' || bluetoothReason === 'PERMISSION_DENIED' ? 'Bluetooth MIDI 需要附近设备权限；不影响 USB MIDI。' : bluetoothReason === 'BLUETOOTH_OFF' ? '系统蓝牙已关闭；仍可使用 USB MIDI。' : '此设备不支持 Bluetooth MIDI；请尝试 USB MIDI。'}</p> : null}
+            <strong>{t('helpTitle')}</strong>
+            <p>{t('help')}</p>
+            {!bluetoothAvailable ? <p>{t(bluetoothReason === 'PERMISSION_REQUIRED' || bluetoothReason === 'PERMISSION_DENIED' ? 'bluetoothPermission' : bluetoothReason === 'BLUETOOTH_OFF' ? 'bluetoothOffAvailableUsb' : 'bluetoothUnsupported')}</p> : null}
           </div>
           <button className="secondary-action" disabled={!bluetoothAvailable && !['PERMISSION_REQUIRED', 'PERMISSION_DENIED'].includes(bluetoothReason)} type="button" onClick={() => { void (bluetoothAvailable ? runtime.midiInput.scan() : runtime.midiInput.requestPermissions()) }}>
-            <Icon name="refresh" />{bluetoothAvailable ? '扫描 MIDI 设备' : '允许附近设备'}
+            <Icon name="refresh" />{t(bluetoothAvailable ? 'scan' : 'allowDevices')}
           </button>
         </section>
       </main>
@@ -3535,7 +3543,8 @@ function ReviewDock({
 }
 
 function OrientationNotice(): JSX.Element {
-  return <div className="orientation-notice"><div className="rotate-device">↻</div><h1>请横放平板</h1><p>Android V1 专为钢琴谱架上的横屏使用设计。</p></div>
+  const { t } = useTranslation('navigation')
+  return <div className="orientation-notice"><div className="rotate-device">↻</div><h1>{t('landscapeTitle')}</h1><p>{t('landscapeDescription')}</p></div>
 }
 
 function PersistenceErrorNotice({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element | null {

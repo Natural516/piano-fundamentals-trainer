@@ -17,7 +17,7 @@ export function createLocalizationInstance(locale: ResolvedLocale): i18n {
   const instance = createInstance()
   void instance.use(initReactI18next).init({
     lng: locale, supportedLngs: ['zh-CN', 'en'], fallbackLng: 'zh-CN',
-    resources: localizationResources, ns: ['common', 'settings', 'music'], defaultNS: 'common',
+    resources: localizationResources, ns: ['common', 'settings', 'music', 'navigation', 'midi'], defaultNS: 'common',
     load: 'currentOnly', initAsync: false,
     interpolation: { escapeValue: false }, // React renders text nodes; no HTML insertion.
     react: { useSuspense: false },

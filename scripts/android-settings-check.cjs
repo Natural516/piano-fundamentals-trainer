@@ -16,11 +16,11 @@ const settings = main.slice(main.indexOf('const SETTINGS_THEME_OPTIONS'), main.i
 const tests = [
   ['SET01', 'Settings keeps only the real Device Appearance and About groups', () => {
     const groups = [...settings.matchAll(/<div className="group-title"><span>([^<]+)<\/span>/g)].map((match) => match[1])
-    assert.deepEqual(groups, ['设备', '外观', '关于'])
+    assert.deepEqual(groups, ["{t('device')}", "{t('appearance')}", "{t('about')}"])
     assert.doesNotMatch(settings, /练习提醒|每题时间|答题计时|音效与反馈|默认谱表|音符数量/)
   }],
   ['SET02', 'MIDI card presents live runtime state and preserves the MIDI route', () => {
-    assert.match(settings, /presentMidiStatus\(runtime\)/)
+    assert.match(settings, /presentLocalizedMidiStatus\(runtime, midiT\)/)
     assert.match(settings, /runtime\.bluetoothSnapshot\.connectedDeviceName/)
     assert.match(settings, /openAuxiliary\('midi'\)/)
     assert.match(settings, /midiStatus\.detail/)
@@ -28,13 +28,14 @@ const tests = [
   }],
   ['SET03', 'About reads installed package metadata without fixed release copy', () => {
     assert.match(settings, /updater\.installed \? `V\$\{updater\.installed\.versionName\}` : `V\$\{__ANDROID_VERSION_NAME__\}`/)
-    assert.match(settings, /`versionCode \$\{updater\.installed\.versionCode\}`/)
-    assert.match(settings, /`versionCode \$\{__ANDROID_VERSION_CODE__\}`/)
+    assert.match(settings, /t\('versionCode', \{ code: updater\.installed\.versionCode \}\)/)
+    assert.match(settings, /t\('versionCode', \{ code: __ANDROID_VERSION_CODE__ \}\)/)
     assert.doesNotMatch(settings, /V1\.5\.2|versionCode 12/)
   }],
   ['SET04', 'QA updater remains fail closed while production retains the real route', () => {
     assert.match(settings, /__QA_BUILD__ \? \(/)
-    assert.match(settings, /正式更新通道已关闭/)
+    assert.match(settings, /description=\{t\('qaUpdateDescription'\)\}/)
+    assert.match(fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/shellResources.ts'), 'utf8'), /qaUpdateDescription: '与正式版独立安装；正式更新通道已关闭'/)
     assert.match(settings, /openAuxiliary\('update'\)/)
   }],
   ['SET04B', 'Open Source uses one app-owned canonical HTTPS URL and Android external ACTION_VIEW', () => {
@@ -70,8 +71,8 @@ const tests = [
   }],
   ['SET09', 'decorations are presentation-only and real values remain HTML', () => {
     assert.match(settings, /aria-hidden="true" className="settings-card__decoration"/)
-    assert.match(settings, /当前版本/)
-    assert.match(settings, /显示主题/)
+    assert.match(settings, /title=\{t\('currentVersion'\)\}/)
+    assert.match(settings, /<strong>\{t\('theme'\)\}<\/strong>/)
     assert.match(settings, /connected-label/)
   }],
   ['SET10', 'Bocchi Settings CSS is scoped to the active visual recipe', () => {

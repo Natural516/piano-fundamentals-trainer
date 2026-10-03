@@ -257,6 +257,8 @@ button:focus-visible {
   align-items: center;
   gap: 11px;
   min-height: 48px;
+  min-width: 0;
+  max-width: min(480px, 45vw);
   padding: 6px 14px 6px 7px;
   border: 1px solid var(--line);
   border-radius: 17px;
@@ -272,6 +274,7 @@ button:focus-visible {
 
 .midi-status__signal {
   display: grid;
+  flex: none;
   width: 34px;
   height: 34px;
   place-items: center;
@@ -282,6 +285,8 @@ button:focus-visible {
 
 .midi-status > span:nth-child(2) {
   display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
   gap: 0;
   text-align: left;
 }
@@ -451,7 +456,8 @@ button:focus-visible {
 
 .midi-candidate { min-width: 0; }
 .midi-port-selector { display: flex; align-items: center; gap: 12px; margin: 10px 0; color: var(--text-secondary); }
-.midi-port-selector select { padding: 8px; color: var(--text-primary); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.midi-port-selector { flex-wrap: wrap; }
+.midi-port-selector select { min-width: 0; max-width: 100%; padding: 8px; color: var(--text-primary); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 
 /* Home-only compact layout; notation rendering and other screens are unchanged. */
 @media (max-height: 700px) {
@@ -7549,6 +7555,21 @@ button.setting-row {
   white-space: normal;
 }
 
+/* B4.1: only Settings text columns; preserve row actions and touch targets. */
+.settings-panels .setting-row__copy strong,
+.settings-panels .setting-row__action {
+  overflow-wrap: anywhere;
+}
+
+.settings-panels .setting-row__action {
+  min-width: 0;
+  max-width: min(260px, 22vw);
+}
+
+.settings-panels .setting-row__action .connected-label {
+  white-space: normal;
+}
+
 .settings-language__status,
 .settings-language__error {
   margin: 0;
@@ -8023,6 +8044,14 @@ button.setting-row {
   margin: 13px 0 8px;
   font-size: 34px;
   letter-spacing: -0.04em;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.device-hero > .connected-label {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .device-hero p {
@@ -8081,7 +8110,7 @@ button.setting-row {
   width: 100%;
   min-height: 58px;
   align-items: center;
-  grid-template-columns: 38px 1fr auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   gap: 10px;
   padding: 8px 12px;
   border: 1px solid var(--line);
@@ -8104,6 +8133,8 @@ button.setting-row {
 
 .midi-device-list button > span:nth-child(2) {
   display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
   gap: 2px;
 }
 

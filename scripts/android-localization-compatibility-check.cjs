@@ -356,11 +356,18 @@ test('B3R4', 'only authorized UI display points change; Query output and protect
   assert.equal((main.match(/<IntervalDisplayName intervalId=\{entry.intervalId\} \/>/g) ?? []).length, 2)
   assert.equal((main.match(/<SightNoteValue value=\{primaryError\} \/>/g) ?? []).length, 2)
   assert.doesNotMatch(main, /entry\.intervalName/)
-  const originalUI = main.replace(/^import \{ IntervalDisplayName, SightNoteValue \} from '\.\/localization\/LegacyDisplayValues'\n/m, '')
-    .replaceAll('<strong><IntervalDisplayName intervalId={entry.intervalId} /></strong>', '<strong>{entry.intervalName}</strong>')
-    .replace('<strong><SightNoteValue value={primaryError} /></strong>', '<strong>{primaryError}</strong>')
-    .replace('<strong><SightNoteValue value={primaryError} /></strong>', '<strong>暂无</strong>')
-  assert.equal(originalUI, baseline(file))
+  // B4.1 may change only these presentation functions, not B3 display points or App/runtime.
+  const allowed = ['MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice']
+  const maskB41 = (source) => {
+    source = source.replace(/^import \{ getSettingsThemeDisplayName, presentLocalizedMidiStatus \} from '\.\/localization\/midiPresentation'\n/m, '')
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const nodes = ast.statements.filter(node => ts.isFunctionDeclaration(node) && allowed.includes(node.name?.text))
+    assert.deepEqual(nodes.map(node => node.name.text).sort(), [...allowed].sort())
+    for (const node of nodes.reverse()) source = source.slice(0, node.getStart(ast)) + `/* B4.1 presentation: ${node.name.text} */` + source.slice(node.end)
+    return source
+  }
+  const checkpointUI = execFileSync('git', ['show', 'ae51b91a8135c54ec5fa05bfbd076c7affd30ac5:' + file], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
+  assert.equal(maskB41(main), maskB41(checkpointUI))
   for (const file of ['prototype/android-tablet-v1/src/intervalQueryTool.ts', 'prototype/android-tablet-v1/src/intervalPractice/persistence.ts', 'prototype/android-tablet-v1/src/intervalPractice/settings.ts', 'prototype/android-tablet-v1/src/androidPersistenceCore.ts', 'prototype/android-tablet-v1/src/historyProjection.ts', 'src/sightReading/report.ts', 'src/sightReading/sightReadingSession.ts', 'src/sightReading/sightReadingSettings.ts', 'prototype/android-tablet-v1/src/localization/appPreferences.ts', 'prototype/android-tablet-v1/src/localization/locale.ts', 'prototype/android-tablet-v1/src/localization/LocaleProvider.tsx', 'prototype/android-tablet-v1/src/localization/LanguageSetting.tsx']) assert.equal(read(file), baseline(file), file)
   const candidatePath = 'prototype/android-tablet-v1/src/musicTheory/intervals/candidates.ts'
   const outsideGuard = (source) => source.replace('getIntervalNumber, getIntervalPitchSemitone, getIntervalQueryResult', 'getIntervalNumber, getIntervalQueryResult').replace(/export function validateIntervalPracticeQuestion[\s\S]*?(?=export function getLegalIntervalCandidates)/, '')

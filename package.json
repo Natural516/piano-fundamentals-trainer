@@ -41,6 +41,7 @@
     "test:android-history-dashboard": "node scripts/android-history-dashboard-check.cjs",
     "test:android-settings": "node scripts/android-settings-check.cjs",
     "test:android-localization": "node scripts/android-localization-check.cjs && node scripts/android-localization-compatibility-check.cjs",
+    "test:android-localization-shell": "node scripts/android-localization-shell-check.cjs",
     "test:android-practice-hub": "node scripts/android-practice-hub-summary-check.cjs",
     "test:android-updater": "node scripts/android-updater-check.cjs",
     "test:android-updater:native": "node scripts/android-updater-native-check.cjs",

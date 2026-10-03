@@ -185,8 +185,13 @@ function flatten(value, prefix = '') {
 test('LOC15', 'all migrated resource namespaces have identical nonempty key shapes', () => {
   const zh = flatten(localizationResources['zh-CN'])
   const en = flatten(localizationResources.en)
-  assert.deepEqual(zh.map(([key]) => key).sort(), en.map(([key]) => key).sort())
-  assert.equal(zh.length, 41) // B2's 14 keys + B3's 26 interval names and No data.
+  // CLDR Chinese uses the unsuffixed count key; English requires one/other variants.
+  const keys = (entries) => [...new Set(entries.map(([key]) => key.replace(/_(one|other)$/, '')))].sort()
+  assert.deepEqual(keys(zh), keys(en))
+  assert.deepEqual(Object.keys(localizationResources.en.midi).filter(key => key.startsWith('devicesFound')), ['devicesFound_one', 'devicesFound_other'])
+  assert.equal(localizationResources['zh-CN'].midi.devicesFound, '{{count}} 个候选')
+  assert.equal(zh.length, 150) // B2/B3 41 + B4.1 109 semantic keys.
+  assert.equal(en.length, zh.length + 1)
   for (const [, value] of [...zh, ...en]) assert.ok(value.trim())
   for (const [key] of en) {
     const [ns, ...parts] = key.split('.')
@@ -196,7 +201,10 @@ test('LOC15', 'all migrated resource namespaces have identical nonempty key shap
 test('LOC16', 'named interpolation parameters match in Chinese and English', () => {
   const en = new Map(flatten(localizationResources.en))
   const placeholders = (value) => [...value.matchAll(/{{\s*([^},\s]+).*?}}/g)].map((match) => match[1]).sort()
-  for (const [key, value] of flatten(localizationResources['zh-CN'])) assert.deepEqual(placeholders(value), placeholders(en.get(key)), key)
+  for (const [key, value] of flatten(localizationResources['zh-CN'])) {
+    const variants = en.has(key) ? [key] : [key + '_one', key + '_other']
+    for (const variant of variants) { assert.ok(en.has(variant), variant); assert.deepEqual(placeholders(value), placeholders(en.get(variant)), variant) }
+  }
   assert.deepEqual(placeholders(localizationResources.en.settings.currentLanguage), ['language'])
 })
 test('LOC17', 'offline initialization uses safe missing-key fallback and React text interpolation', () => {

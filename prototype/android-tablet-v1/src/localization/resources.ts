@@ -1,5 +1,9 @@
+import { shellResources } from './shellResources'
+
 export const localizationResources = {
   'zh-CN': {
+    navigation: shellResources['zh-CN'].navigation,
+    midi: shellResources['zh-CN'].midi,
     common: { appTitle: '钢琴基本功训练器', noData: '暂无' },
     music: { intervals: {
       perfectUnison: '纯一度', augmentedUnison: '增一度',
@@ -12,6 +16,7 @@ export const localizationResources = {
       diminishedOctave: '减八度', perfectOctave: '纯八度'
     } },
     settings: {
+      ...shellResources['zh-CN'].settings,
       title: '设置',
       language: '语言',
       languageDescription: '即时生效，无需重启。其它页面的翻译将逐步完善。',
@@ -30,6 +35,8 @@ export const localizationResources = {
     }
   },
   en: {
+    navigation: shellResources.en.navigation,
+    midi: shellResources.en.midi,
     common: { appTitle: 'Piano Fundamentals Trainer', noData: 'No data' },
     music: { intervals: {
       perfectUnison: 'Perfect unison', augmentedUnison: 'Augmented unison',
@@ -42,6 +49,7 @@ export const localizationResources = {
       diminishedOctave: 'Diminished octave', perfectOctave: 'Perfect octave'
     } },
     settings: {
+      ...shellResources.en.settings,
       title: 'Settings',
       language: 'Language',
       languageDescription: 'Applies immediately, without restarting. Other pages will be translated gradually.',
