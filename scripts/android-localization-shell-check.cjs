@@ -23,6 +23,7 @@ const { LocaleProvider } = require(loc + 'LocaleProvider.tsx')
 const { localizationResources } = require(loc + 'resources.ts')
 const { presentLocalizedMidiStatus, getSettingsThemeDisplayName } = require(loc + 'midiPresentation.ts')
 const { AndroidSightReadingRuntime } = require('../prototype/android-tablet-v1/src/sightReadingIntegration.ts')
+const { AndroidPersistenceStore, SightReadingReportRepository, ANDROID_PERSISTENCE_KEYS } = require('../prototype/android-tablet-v1/src/androidPersistenceCore.ts')
 
 // Compile the actual production component declarations in memory, not a rewritten mock UI.
 // This is a React/DOM contract; it does not claim browser pixels or physical device evidence.
@@ -37,13 +38,17 @@ function declarations(source) {
   return result
 }
 const current = declarations(main), old = declarations(baseline(mainPath))
-const componentNames = ['MidiUiContext', 'UpdaterUiContext', 'AppNavigationContext', 'useMidiUi', 'useUpdaterUi', 'useAppNavigation', 'productNavigation', 'SETTINGS_THEME_OPTIONS', 'Icon', 'navigate', 'presentMidiStatus', 'MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'SettingRow', 'SettingsThemeOption', 'useThemeRuntime', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice']
+const componentNames = ['MidiUiContext', 'UpdaterUiContext', 'AppNavigationContext', 'useMidiUi', 'useUpdaterUi', 'useAppNavigation', 'productNavigation', 'SETTINGS_THEME_OPTIONS', 'Icon', 'navigate', 'presentMidiStatus', 'MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'SettingRow', 'SettingsThemeOption', 'useThemeRuntime', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'THEORY_TOOLS', 'ToolsHubScreen']
 const componentSource = `
-import { createContext, useContext, useState, useSyncExternalStore } from 'react'
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Capacitor } from '@capacitor/core'
 import { LanguageSetting } from './localization/LanguageSetting'
 import { getSettingsThemeDisplayName, presentLocalizedMidiStatus } from './localization/midiPresentation'
+import { presentHomeRecentPractice } from './localization/homePresentation'
+import { projectMixedPracticeHistory } from './mixedHistoryProjection'
+import { spellMidiPitch } from '../../../src/sightReading/musicPitchSpelling'
+function NotationPaper({ label }) { return <div className="notation-paper" aria-label={label} /> }
 const __QA_BUILD__ = false
 const __ANDROID_VERSION_NAME__ = '1.6.0'
 const __ANDROID_VERSION_CODE__ = 14
@@ -126,13 +131,31 @@ async function mounted(page, run, options = {}) {
   const backend = new MemoryBackend()
   const service = new LocalizationService(new AppPreferencesRepository(backend), () => ['zh-CN'])
   const plugin = new NativeFixture()
-  const runtime = new AndroidSightReadingRuntime({ clock: { now: () => 1000 }, scheduler: { schedule: () => 1, cancel() {} }, random: () => 0.42, bluetoothPlugin: plugin, requireMidiIdentity: true, initialMidiSource: 'bluetooth' })
+  let reportRepository
+  if (options.sightRecords) {
+    const keys = ANDROID_PERSISTENCE_KEYS
+    backend.values.set(keys.schemaVersion, '1')
+    backend.values.set(keys.sightReadingReportIndex, JSON.stringify({ schemaVersion: 1, recordIds: options.sightRecords.map(record => record.recordId) }))
+    for (const record of options.sightRecords) backend.values.set(keys.sightReadingReportPrefix + record.recordId, JSON.stringify(record))
+    const store = new AndroidPersistenceStore(backend)
+    assert.equal((await store.ensureSchema()).success, true)
+    reportRepository = new SightReadingReportRepository(store)
+    assert.equal((await reportRepository.initialize()).success, true)
+  }
+  const runtime = new AndroidSightReadingRuntime({ clock: { now: () => 1000 }, scheduler: { schedule: () => 1, cancel() {} }, random: () => 0.42, bluetoothPlugin: plugin, requireMidiIdentity: true, initialMidiSource: 'bluetooth', reportRepository })
   await runtime.startMidi()
   await runtime.midiInput.connect('usb-identity', 3)
   runtime.start(); runtime.pause()
   assert.equal(runtime.snapshot.isPaused, true)
+  if (options.historyStatus) runtime.historyStatusValue = options.historyStatus // Controlled loading fixture; no product setting writes.
+  const refreshCalls = []
+  const initialRefresh = runtime.refreshHistory
+  if (['home', 'practice', 'tools'].includes(page)) runtime.refreshHistory = async () => { refreshCalls.push('sight') }
+  const chordHistory = { status: options.historyStatus ?? 'ready', records: options.chordRecords ?? [] }
+  const chordPersistence = { refresh: async () => { refreshCalls.push('chord') } }
+  const hubProps = { chordHistory, chordPersistence, intervalSettingsReady: options.ready ?? true, settings: runtime.settings }
   const pointerCalls = []
-  const theme = options.theme ?? { id: 'light', displayName: '浅色', source: 'builtin', capabilities: { settingsVisual: { kind: 'standard' } } }
+  const theme = options.theme ?? { id: 'light', displayName: '浅色', source: 'builtin', capabilities: { settingsVisual: { kind: 'standard' }, homeVisual: { kind: 'standard' }, practiceVisual: { kind: 'standard' }, toolsVisual: { kind: 'standard' } } }
   const themeSnapshot = { installed: options.installed ?? [], theme }
   const themeManager = { snapshot: themeSnapshot, subscribe: () => () => {}, selectThemeId: id => pointerCalls.push(id), activateExternal: record => pointerCalls.push(record.themeId) }
   let mounts = 0, unmounts = 0, renderer
@@ -145,15 +168,17 @@ async function mounted(page, run, options = {}) {
     return React.createElement(ui.MidiUiContext.Provider, { value: { runtime: ownedRuntime } },
       React.createElement(ui.UpdaterUiContext.Provider, { value: updaterValue },
         React.createElement(ui.AppNavigationContext.Provider, { value: navValue },
-          React.createElement(page === 'settings' ? ui.SettingsScreen : ui.MidiScreen, page === 'settings' ? { theme, themeManager } : {}))))
+          React.createElement({ settings: ui.SettingsScreen, midi: ui.MidiScreen, home: ui.HomeScreen, practice: ui.PracticeHubScreen, tools: ui.ToolsHubScreen }[page],
+            page === 'settings' ? { theme, themeManager } : page === 'midi' ? {} : { ...hubProps, theme }))))
   }
   try {
     await act(async () => { renderer = create(React.createElement(LocaleProvider, { service }, React.createElement(Owner))); await service.initialize() })
     const getText = () => text(renderer.toJSON())
     const switchTo = async locale => { await act(async () => { await service.changeLanguagePreference(locale) }) }
-    await run({ renderer, backend, service, plugin, runtime, theme, themeManager, pointerCalls, getText, switchTo, lifecycle: () => ({ mounts, unmounts }) })
+    await run({ renderer, backend, service, plugin, runtime, theme, themeManager, pointerCalls, refreshCalls, chordHistory, getText, switchTo, lifecycle: () => ({ mounts, unmounts }) })
   } finally {
     if (renderer) await act(async () => { renderer.unmount() })
+    runtime.refreshHistory = initialRefresh
     await runtime.dispose()
     global.window = oldWindow; global.document = oldDocument
   }
@@ -178,10 +203,10 @@ test('N3', 'live round trip preserves route; navigation clicks still use stable 
 test('N4', 'ScreenId, ProductNavigationId, screen metadata and route functions are byte frozen', () => {
   for (const name of ['ScreenId', 'ProductNavigationId', 'screens', 'productNavigation', 'navigate', 'readScreen']) assert.equal(current.get(name), old.get(name), name)
 })
-test('N5', 'Home body and Hub are frozen with removed setting summaries and pills still absent', () => {
-  for (const name of ['HomeScreen', 'PracticeHubScreen']) assert.equal(current.get(name), old.get(name), name)
+test('N5', 'Home/Hub B4.2A presentation retains removed summaries/pills and original entry routes', () => {
   assert.doesNotMatch(current.get('HomeScreen'), /homeSettingsSummary|home-training-summary/)
-  assert.doesNotMatch(current.get('PracticeHubScreen'), /practice-card__annotation|practice-card__status/)
+  assert.doesNotMatch(current.get('PracticeHubScreen'), /practice-card__annotation|practice-card__status|sightConfigurationSummary/)
+  for (const name of ['HomeScreen', 'PracticeHubScreen']) for (const route of ['sight-ready', 'chord-mode-select', 'interval-practice']) assert.ok(current.get(name).includes(`navigate('${route}')`))
 })
 
 test('ST1', 'Settings Device Appearance About and real entry copy render in both locales', async () => mounted('settings', async h => {
@@ -358,7 +383,7 @@ test('M12', 'actual full-row candidates and multi-port selector preserve identit
 }))
 
 test('B41R1', 'all out-of-scope main declarations and Bocchi headline/dialogs stay byte frozen', () => {
-  const permitted = new Set(['MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice'])
+  const permitted = new Set(['MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'ToolsHubScreen'])
   assert.deepEqual([...current.keys()], [...old.keys()])
   for (const [name, source] of current) if (!permitted.has(name)) assert.equal(source, old.get(name), name)
   const caption = source => source.match(/<div className="settings-hero__caption">[\s\S]*?<\/div>/)[0]
@@ -445,7 +470,8 @@ test('B41R7', 'native-gated Settings import CTA is bilingual without opening a t
   } finally { Capacitor.isNativePlatform = previousNative }
 }))
 
-;(async () => {
+module.exports = { mounted, ui, current, declarations, read, text, contains, businessBytes, translator }
+if (require.main === module) void (async () => {
   let passed = 0
   for (const { id, description, run } of tests) {
     try { await run(); passed++; console.log(`PASS ${id} ${description}`) }

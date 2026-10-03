@@ -64,6 +64,7 @@ import { LocaleProvider } from './localization/LocaleProvider'
 import { LanguageSetting } from './localization/LanguageSetting'
 import { IntervalDisplayName, SightNoteValue } from './localization/LegacyDisplayValues'
 import { getSettingsThemeDisplayName, presentLocalizedMidiStatus } from './localization/midiPresentation'
+import { presentHomeRecentPractice } from './localization/homePresentation'
 import {
   DEFAULT_INTERVAL_PRACTICE_SETTINGS,
   INTERVAL_QUESTION_COUNT_OPTIONS,
@@ -655,53 +656,45 @@ function HomeScreen({
   settings: SightReadingSettings
   theme: ThemeDefinition
 }): JSX.Element {
+  const { t } = useTranslation('home')
+  const { t: practiceT } = useTranslation('practice')
+  const { t: midiT } = useTranslation('midi')
   const { runtime } = useMidiUi()
   const { openAuxiliary } = useAppNavigation()
-  const midiStatus = presentMidiStatus(runtime)
+  const midiStatus = presentLocalizedMidiStatus(runtime, midiT)
   const history = runtime.historySnapshot
   const recentPractice = projectMixedPracticeHistory(history.records, chordHistory.records)[0] ?? null
   useEffect(() => {
     void runtime.refreshHistory()
     void chordPersistence.refresh()
   }, [chordPersistence, runtime])
-  const recentPracticeTitle = recentPractice?.module === 'chord'
-    ? `${formatHistoryPercentage(recentPractice.firstPassCompletionRate)}% 完成率`
-    : recentPractice?.module === 'interval'
-      ? `${formatIntervalAccuracy(recentPractice.firstTryAccuracy)} 首次正确率`
-      : recentPractice ? `${formatHistoryPercentage(recentPractice.accuracy)}% 正确率` : '暂无练习记录'
-  const recentPracticeDetail = recentPractice?.module === 'chord'
-    ? `${formatHistoryTimestamp(recentPractice.endedAt)} · ${recentPractice.modeSummary} · 完成 ${recentPractice.completedQuestions}${recentPractice.plannedQuestionCount === null ? '' : `/${recentPractice.plannedQuestionCount}`}`
-    : recentPractice?.module === 'interval'
-      ? `${formatHistoryTimestamp(recentPractice.endedAt)} · ${recentPractice.modeSummary} · 完成 ${recentPractice.completedQuestions}${recentPractice.configuredQuestionCount === null ? '' : `/${recentPractice.configuredQuestionCount}`}`
-      : recentPractice
-      ? `${formatHistoryTimestamp(recentPractice.endedAt)} · 识谱 · 完成 ${recentPractice.completed}/${recentPractice.plannedQuestionCount}`
-      : '完成一次练习后，这里会显示最近结果。'
+  const recentDisplay = presentHomeRecentPractice(recentPractice, t)
   const homeVisual = theme.capabilities.homeVisual
   const composedHome = homeVisual.kind === 'single-image-hero' ? homeVisual : null
   return (
-    <ProductFrame active="home" className={composedHome?.frameClassName} title="今天，读几页新音符">
+    <ProductFrame active="home" className={composedHome?.frameClassName} title={t('title')}>
       <section className={`home-hero${composedHome ? ` ${composedHome.heroClassName}` : ''}`}>
         {composedHome ? <img className="themed-home-hero__art" src={composedHome.assets.hero} alt="" aria-hidden="true" /> : null}
         <div className="home-hero__copy">
-          <span className="eyebrow">今日练习</span>
+          <span className="eyebrow">{t('today')}</span>
           {composedHome ? (
             <h1 className="themed-home-hero__headline">
-              <span className="themed-sr-only">让眼睛先认出，再让手指弹出来。</span>
+              <span className="themed-sr-only">{t('headline')}</span>
               <img src={composedHome.assets.headline} alt="" aria-hidden="true" />
             </h1>
-          ) : <h1>让眼睛先认出，<br />再让手指弹出来。</h1>}
+          ) : <h1>{t('headlineFirst')}<br />{t('headlineSecond')}</h1>}
           <div className="home-practice-actions">
             <button className="primary-action" type="button" onClick={() => navigate('sight-ready')}>
               <Icon name="play" />
-              识谱练习
+              {practiceT('sightTitle')}
             </button>
             <button className="primary-action" type="button" onClick={() => navigate('chord-mode-select')}>
               <Icon name="book" />
-              和弦练习
+              {practiceT('chordTitle')}
             </button>
             <button className="primary-action" disabled={!intervalSettingsReady} type="button" onClick={() => navigate('interval-practice')}>
               <Icon name="book" />
-              音程练习
+              {practiceT('intervalTitle')}
             </button>
           </div>
           {composedHome ? <small className="themed-home-hero__memo">{composedHome.memo}</small> : null}
@@ -712,7 +705,7 @@ function HomeScreen({
             <span className="floating-note note-two">♩</span>
             <NotationPaper
               keySignature={settings.keySignature}
-              label="识谱练习预览"
+              label={t('preview')}
               note={spellMidiPitch(67, settings.keySignature, settings.staffMode)}
               staffMode={settings.staffMode}
             />
@@ -720,13 +713,13 @@ function HomeScreen({
         ) : null}
       </section>
 
-      <section className={`home-glance${composedHome ? ' themed-home-glance' : ''}`} aria-label="今日概览">
+      <section className={`home-glance${composedHome ? ' themed-home-glance' : ''}`} aria-label={t('overview')}>
         <button className={`glance-item${composedHome ? ' is-history' : ''}`} type="button" onClick={() => navigate('history')}>
           <span className="glance-icon"><Icon name="chart" /></span>
           <span>
-            <small>上次练习</small>
-            <strong>{history.status === 'loading' || chordHistory.status === 'loading' ? '正在读取记录' : recentPracticeTitle}</strong>
-            <em>{recentPracticeDetail}</em>
+            <small>{t('lastPractice')}</small>
+            <strong>{history.status === 'loading' || chordHistory.status === 'loading' ? t('loading') : recentDisplay.title}</strong>
+            <em>{recentDisplay.detail}</em>
           </span>
           {composedHome ? (
             <>
@@ -739,7 +732,7 @@ function HomeScreen({
         </button>
         <button className={`glance-item${composedHome ? ' is-midi' : ''}`} type="button" onClick={() => openAuxiliary('midi')}>
           <span className="glance-icon is-blue"><Icon name="bluetooth" /></span>
-          <span><small>MIDI 输入</small><strong>{midiStatus.label}</strong><em>{midiStatus.detail}</em></span>
+          <span><small>{t('midiInput')}</small><strong>{midiStatus.label}</strong><em>{midiStatus.detail}</em></span>
           {composedHome ? (
             <span className="themed-glance-art is-midi" aria-hidden="true">
               <img src={composedHome.assets.midi} alt="" />
@@ -749,7 +742,7 @@ function HomeScreen({
         </button>
         <button className={`glance-item${composedHome ? ' is-tools' : ''}`} type="button" onClick={() => navigate('tools')}>
           <span className="glance-icon is-amber"><Icon name="tools" /></span>
-          <span><small>乐理工具</small><strong>基础知识查询</strong><em>和弦、音阶、音程与调号</em></span>
+          <span><small>{t('theory')}</small><strong>{t('theoryTitle')}</strong><em>{t('theoryDetail')}</em></span>
           {composedHome ? (
             <>
               <span className="themed-glance-art is-tools" aria-hidden="true">
@@ -776,12 +769,12 @@ function PracticeHubScreen({
   settings: SightReadingSettings
   theme: ThemeDefinition
 }): JSX.Element {
+  const { t } = useTranslation('practice')
   const { runtime } = useMidiUi()
   const practiceVisual = theme.capabilities.practiceVisual
   const composedPractice = practiceVisual.kind === 'hero-cards' ? practiceVisual : null
   const intervalVisual = theme.capabilities.intervalPracticeVisual
   const intervalCollage = intervalVisual?.kind === 'blue-notebook' ? intervalVisual.assets.hubCardCollage : undefined
-  const sightConfigurationSummary = `${settings.noteMode === 'double' ? '双音' : '单音'} · ${STAFF_MODE_LABELS[settings.staffMode]} · ${settings.questionCount} 题`
 
   useEffect(() => {
     void runtime.refreshHistory()
@@ -789,64 +782,64 @@ function PracticeHubScreen({
   }, [chordPersistence, runtime])
 
   return (
-    <ProductFrame active="practice" className={composedPractice?.frameClassName} title="练习">
+    <ProductFrame active="practice" className={composedPractice?.frameClassName} title={t('title')}>
       <section className={`hub-layout${composedPractice ? ' themed-practice-hub' : ''}`} aria-labelledby="practice-hub-title">
         {composedPractice ? (
           <div className={`themed-practice-hero ${composedPractice.heroClassName}`}>
             <img className="themed-practice-hero__art" src={composedPractice.assets.hero} alt="" aria-hidden="true" />
             <div className="themed-practice-hero__copy">
-              <span className="eyebrow">练习中心</span>
+              <span className="eyebrow">{t('hubLabel')}</span>
               <h1 id="practice-hub-title">每天一点练习，<br />让喜欢的音乐离你更近。</h1>
-              <p>选择识谱、和弦或音程练习，把基础一步一步练扎实。</p>
+              <p>{t('hubDescription')}</p>
               <small>今天，也弹一点。</small>
             </div>
           </div>
         ) : (
           <div className="hub-heading">
             <span className="eyebrow">PRACTICE</span>
-            <h1 id="practice-hub-title">选择今天的练习</h1>
-            <p>从识谱、和弦或音程开始，按自己的节奏打牢基础。</p>
+            <h1 id="practice-hub-title">{t('heading')}</h1>
+            <p>{t('description')}</p>
           </div>
         )}
         <div className={`practice-module-grid has-interval${composedPractice ? ' themed-practice-module-grid' : ''}`}>
           <button className={`module-card${composedPractice ? ' themed-practice-card is-sight' : ''}`} type="button" onClick={() => navigate('sight-ready')}>
             <span className="module-card__icon"><Icon name="book" size={30} /></span>
             <span className="module-card__copy">
-              <small>识谱训练</small>
-              <strong>识谱练习</strong>
-              <em>{sightConfigurationSummary}</em>
+              <small>{t('sightCategory')}</small>
+              <strong>{t('sightTitle')}</strong>
+              <em>{t('sightDescription')}</em>
             </span>
             {composedPractice ? (
               <>
                 <span className="themed-practice-card__art" aria-hidden="true"><img src={composedPractice.assets.sight} alt="" /></span>
-                <span className="themed-practice-card__action"><Icon name="play" size={19} />开始练习</span>
+                <span className="themed-practice-card__action"><Icon name="play" size={19} />{t('start')}</span>
               </>
             ) : <Icon name="chevron" />}
           </button>
           <button className={`module-card${composedPractice ? ' themed-practice-card is-chord' : ''}`} type="button" onClick={() => navigate('chord-mode-select')}>
             <span className="module-card__icon is-amber"><Icon name="grid" size={30} /></span>
             <span className="module-card__copy">
-              <small>和弦与转位</small>
-              <strong>和弦练习</strong>
-              <em>三和弦 / 七和弦 · 原位与转位 · 柱式 + 分解</em>
+              <small>{t('chordCategory')}</small>
+              <strong>{t('chordTitle')}</strong>
+              <em>{t('chordDescription')}</em>
             </span>
             {composedPractice ? (
               <>
                 <span className="themed-practice-card__art" aria-hidden="true"><img src={composedPractice.assets.chord} alt="" /></span>
-                <span className="themed-practice-card__action"><Icon name="play" size={19} />开始练习</span>
+                <span className="themed-practice-card__action"><Icon name="play" size={19} />{t('start')}</span>
               </>
             ) : <Icon name="chevron" />}
           </button>
           <button className={`module-card interval-practice-card${intervalCollage ? ' interval-notebook-card' : ''}`} disabled={!intervalSettingsReady} type="button" onClick={() => navigate('interval-practice')}>
             <span className={`module-card__icon ${intervalCollage ? 'is-blue' : 'is-violet'}`}><Icon name="chart" size={30} /></span>
             <span className="module-card__copy">
-              <small>音程辨识与构造</small>
-              <strong>音程练习</strong>
-              <em>{intervalCollage ? '指定低音构造 · 26 种音程' : '指定低音构造 · 26 种音程 · 固定大谱表'}</em>
+              <small>{t('intervalCategory')}</small>
+              <strong>{t('intervalTitle')}</strong>
+              <em>{t('intervalDescription')}</em>
             </span>
             {intervalCollage ? <>
               <span aria-hidden="true" className="interval-notebook-card__art"><img alt="" src={intervalCollage} /></span>
-              <span className="interval-notebook-card__action"><Icon name="play" size={18} />开始练习</span>
+              <span className="interval-notebook-card__action"><Icon name="play" size={18} />{t('start')}</span>
             </> : <Icon name="chevron" />}
           </button>
         </div>
@@ -1172,6 +1165,7 @@ const THEORY_TOOLS = [
 ] as const
 
 function ToolsHubScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
+  const { t } = useTranslation('tools')
   const toolsVisual = theme.capabilities.toolsVisual
   const composedTools = toolsVisual.kind === 'hero-cards' ? toolsVisual : null
   const toolCards = THEORY_TOOLS.map((tool) => (
@@ -1182,18 +1176,18 @@ function ToolsHubScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
       onClick={() => navigate(tool.screen)}
     >
       <span className="tool-card__icon"><Icon name="tools" size={27} /></span>
-      <span className="tool-card__copy"><strong>{tool.title}</strong><small>{tool.detail}</small></span>
+      <span className="tool-card__copy"><strong>{t(`${tool.id}Title`)}</strong><small>{t(`${tool.id}Detail`)}</small></span>
       {composedTools ? (
         <span className="themed-tool-card__art" aria-hidden="true">
           <img src={composedTools.assets[tool.id]} alt="" />
         </span>
       ) : null}
-      <em>{composedTools ? '打开工具' : '打开'} <Icon name="chevron" size={15} /></em>
+      <em>{t(composedTools ? 'openTool' : 'open')} <Icon name="chevron" size={15} /></em>
     </button>
   ))
 
   return (
-    <ProductFrame active="tools" className={composedTools?.frameClassName} title="工具">
+    <ProductFrame active="tools" className={composedTools?.frameClassName} title={t('title')}>
       <section className={`hub-layout tools-hub${composedTools ? ' themed-tools-hub' : ''}`} aria-labelledby="tools-hub-title">
         {composedTools ? (
           <>
@@ -1204,8 +1198,8 @@ function ToolsHubScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
             <div className="themed-tools-panel">
               <div className="themed-tools-heading">
                 <span className="eyebrow">THEORY REFERENCE</span>
-                <h1 id="tools-hub-title">乐理工具</h1>
-                <p>快速查询和弦、音程与自然大调音阶、调号。</p>
+                <h1 id="tools-hub-title">{t('shortHeading')}</h1>
+                <p>{t('panelDescription')}</p>
               </div>
               <div className="tool-card-grid themed-tool-card-grid">{toolCards}</div>
             </div>
@@ -1214,8 +1208,8 @@ function ToolsHubScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
           <>
             <div className="hub-heading">
               <span className="eyebrow">THEORY REFERENCE</span>
-              <h1 id="tools-hub-title">乐理基础知识查询</h1>
-              <p>快速查询常用和弦、音阶、音程与调号基础信息。</p>
+              <h1 id="tools-hub-title">{t('heading')}</h1>
+              <p>{t('description')}</p>
             </div>
             <div className="tool-card-grid">{toolCards}</div>
           </>

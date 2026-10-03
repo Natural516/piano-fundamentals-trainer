@@ -29,6 +29,8 @@ const {
 const { projectChordHistory } = require('../prototype/android-tablet-v1/src/chordPractice/historyProjection.ts')
 const { projectMixedPracticeHistory } = require('../prototype/android-tablet-v1/src/mixedHistoryProjection.ts')
 const { AndroidSightReadingRuntime } = require('../prototype/android-tablet-v1/src/sightReadingIntegration.ts')
+const { createLocalizationInstance } = require('../prototype/android-tablet-v1/src/localization/localizationService.ts')
+const { presentHomeRecentPractice } = require('../prototype/android-tablet-v1/src/localization/homePresentation.ts')
 
 class FakePreferencesBackend {
   constructor(values = new Map()) {
@@ -447,12 +449,14 @@ test('HIS41 Home newest-practice projection selects Sight when Sight is newer', 
 test('HIS42 Home newest-practice projection selects Chord when Chord is newer', () => {
   const [latest] = projectMixedPracticeHistory([record({ endedAt: 50_000 })], [chordRecord({ endedAtEpochMs: 60_000 })])
   assert.equal(latest.module, 'chord')
-  assert.match(homeSource, /% 完成率/)
+  assert.match(homeSource, /presentHomeRecentPractice\(recentPractice, t\)/)
+  assert.equal(presentHomeRecentPractice(latest, createLocalizationInstance('zh-CN').getFixedT('zh-CN', 'home')).title, '85% 完成率')
 })
 
 test('HIS43 Home retains the truthful no-record state', () => {
   assert.equal(projectMixedPracticeHistory([], []).length, 0)
-  assert.match(homeSource, /暂无练习记录/)
+  assert.match(homeSource, /presentHomeRecentPractice\(recentPractice, t\)/)
+  assert.equal(presentHomeRecentPractice(null, createLocalizationInstance('zh-CN').getFixedT('zh-CN', 'home')).title, '暂无练习记录')
 })
 
 test('HIS24 durable report and History projection semantics remain unchanged', () => {

@@ -356,10 +356,11 @@ test('B3R4', 'only authorized UI display points change; Query output and protect
   assert.equal((main.match(/<IntervalDisplayName intervalId=\{entry.intervalId\} \/>/g) ?? []).length, 2)
   assert.equal((main.match(/<SightNoteValue value=\{primaryError\} \/>/g) ?? []).length, 2)
   assert.doesNotMatch(main, /entry\.intervalName/)
-  // B4.1 may change only these presentation functions, not B3 display points or App/runtime.
-  const allowed = ['MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice']
+  // Explicit B4.1 + B4.2A presentation only; B3 display points and App/runtime stay frozen.
+  const allowed = ['MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'ToolsHubScreen']
   const maskB41 = (source) => {
     source = source.replace(/^import \{ getSettingsThemeDisplayName, presentLocalizedMidiStatus \} from '\.\/localization\/midiPresentation'\n/m, '')
+    source = source.replace(/^import \{ presentHomeRecentPractice \} from '\.\/localization\/homePresentation'\n/m, '')
     const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
     const nodes = ast.statements.filter(node => ts.isFunctionDeclaration(node) && allowed.includes(node.name?.text))
     assert.deepEqual(nodes.map(node => node.name.text).sort(), [...allowed].sort())

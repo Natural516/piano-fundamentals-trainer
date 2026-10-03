@@ -35,9 +35,9 @@ const tests = [
     assert.doesNotMatch(navigation, /label: '识谱'/)
   }],
   ['NAV02', 'Practice Hub routes to Sight Reading and the Chord-internal Mode Select', () => {
-    assert.match(practice, /识谱练习/)
+    assert.match(practice, /t\('sightTitle'\)/)
     assert.match(practice, /navigate\('sight-ready'\)/)
-    assert.match(practice, /和弦练习/)
+    assert.match(practice, /t\('chordTitle'\)/)
     assert.match(practice, /navigate\('chord-mode-select'\)/)
     assert.match(practice, /function ChordModeSelectScreen/)
   }],
@@ -59,12 +59,13 @@ const tests = [
     )
   }],
   ['NAV04', 'Home glance cards are Last Practice MIDI Input and Theory Tools', () => {
-    for (const label of ['上次练习', 'MIDI 输入', '乐理工具']) assert.match(home, new RegExp(label))
+    for (const key of ['lastPractice', 'midiInput', 'theory']) assert.ok(home.includes(`t('${key}')`))
     assert.doesNotMatch(home, /<small>应用版本<\/small>/)
     assert.doesNotMatch(home, /85% 正确率|今天 09:42|· 20 题/)
     assert.match(home, /projectMixedPracticeHistory\(history\.records, chordHistory\.records\)\[0\]/)
     assert.match(home, /runtime\.refreshHistory\(\)/)
-    assert.match(home, /暂无练习记录/)
+    assert.match(home, /presentHomeRecentPractice\(recentPractice, t\)/)
+    assert.match(fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/hubResources.ts'), 'utf8'), /empty: '暂无练习记录'/)
   }],
   ['NAV05', 'global Settings contains only Device Appearance and About group headings', () => {
     const groups = [...settings.matchAll(/<div className="group-title"><span>([^<]+)<\/span>/g)].map((match) => match[1])

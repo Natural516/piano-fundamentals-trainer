@@ -1,7 +1,11 @@
 import { shellResources } from './shellResources'
+import { hubResources } from './hubResources'
 
 export const localizationResources = {
   'zh-CN': {
+    home: hubResources['zh-CN'].home,
+    practice: hubResources['zh-CN'].practice,
+    tools: hubResources['zh-CN'].tools,
     navigation: shellResources['zh-CN'].navigation,
     midi: shellResources['zh-CN'].midi,
     common: { appTitle: '钢琴基本功训练器', noData: '暂无' },
@@ -35,6 +39,9 @@ export const localizationResources = {
     }
   },
   en: {
+    home: hubResources.en.home,
+    practice: hubResources.en.practice,
+    tools: hubResources.en.tools,
     navigation: shellResources.en.navigation,
     midi: shellResources.en.midi,
     common: { appTitle: 'Piano Fundamentals Trainer', noData: 'No data' },

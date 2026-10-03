@@ -9,6 +9,7 @@ const { chromium } = require('@playwright/test')
 const root = path.resolve(__dirname, '..')
 const baseUrl = process.env.HOME_UI_QA_URL || 'http://127.0.0.1:4185'
 const output = process.argv[2]
+const contractsOnly = process.argv.includes('--contracts-only')
 if (!output) throw new Error('Provide the per-task report directory; start prototype:android on port 4185 first')
 fs.mkdirSync(output, { recursive: true })
 const source = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/main.tsx'), 'utf8')
@@ -16,21 +17,27 @@ const home = source.slice(source.indexOf('function HomeScreen'), source.indexOf(
 const homeCode = ts.transpileModule(`${home}\nexports.Home = HomeScreen`, {
   compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
 }).outputText
+for (const extension of ['.ts', '.tsx']) require.extensions[extension] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+  compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true }, fileName: filename
+}).outputText, filename)
+const { I18nextProvider, useTranslation } = require('react-i18next')
+const { createLocalizationInstance } = require('../prototype/android-tablet-v1/src/localization/localizationService.ts')
+const { presentHomeRecentPractice } = require('../prototype/android-tablet-v1/src/localization/homePresentation.ts')
 
 // The loading case renders the actual Home component with its real readiness prop.
 // Only surrounding dependencies/data are fixtures; no substitute UI or product hook is shipped.
 function loadingMarkup() {
   const exports = {}
-  new Function('require', 'exports', 'useMidiUi', 'useAppNavigation', 'presentMidiStatus', 'useEffect', 'projectMixedPracticeHistory', 'ProductFrame', 'Icon', 'navigate', 'NotationPaper', 'spellMidiPitch', homeCode)(
+  new Function('require', 'exports', 'useMidiUi', 'useAppNavigation', 'presentLocalizedMidiStatus', 'useEffect', 'projectMixedPracticeHistory', 'ProductFrame', 'Icon', 'navigate', 'NotationPaper', 'spellMidiPitch', 'useTranslation', 'presentHomeRecentPractice', homeCode)(
     require, exports, () => ({ runtime: { historySnapshot: { status: 'ready', records: [] }, refreshHistory() {} } }),
     () => ({ openAuxiliary() {} }), () => ({ label: 'MIDI 未连接', detail: '请选择设备', tone: 'idle' }), React.useEffect,
     () => [], ({ children }) => React.createElement('main', null, children), () => React.createElement('svg'), () => {},
-    () => React.createElement('div', { className: 'notation-paper' }), () => ({})
+    () => React.createElement('div', { className: 'notation-paper' }), () => ({}), useTranslation, presentHomeRecentPractice
   )
-  return renderToStaticMarkup(React.createElement(exports.Home, {
+  return renderToStaticMarkup(React.createElement(I18nextProvider, { i18n: createLocalizationInstance('zh-CN') }, React.createElement(exports.Home, {
     chordHistory: { status: 'ready', records: [] }, chordPersistence: { refresh() {} }, intervalSettingsReady: false,
     settings: { staffMode: 'grand', keySignature: 'C' }, theme: { capabilities: { homeVisual: { kind: 'standard' } } }
-  }))
+  })))
 }
 
 const viewports = [
@@ -51,6 +58,21 @@ async function run() {
     assert.match(source, /case 'home': return <HomeScreen[^\n]*intervalSettingsReady=\{intervalSettingsReady\}/)
     completed++
     console.log('PASS Home routing, readiness wiring and preview settings contracts')
+    if (contractsOnly) {
+      const markup = loadingMarkup()
+      const section = markup.match(/<div class="home-practice-actions">([\s\S]*?)<\/div>/)[1]
+      const actions = [...section.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0])
+      assert.equal(actions.length, 3)
+      assert.match(actions[2], /disabled=""/)
+      assert.match(actions[2], /音程练习/)
+      assert.doesNotMatch(actions[0] + actions[1], /disabled=""/)
+      assert.doesNotMatch(home, /homeSettingsSummary|home-training-summary/)
+      completed++
+      console.log('PASS actual localized Home component loading prop keeps disabled Interval entry and three peer CTAs')
+      console.log('2/2 Home non-browser contracts PASS')
+      console.log('HOME BROWSER VALIDATION BLOCKED; HOME MULTI-VIEWPORT VALIDATION BLOCKED; 12 browser matrix cases NOT RUN')
+      return
+    }
     browser = await chromium.launch({ headless: true })
     const loadingPage = await browser.newPage()
     await loadingPage.setContent(loadingMarkup())
@@ -143,7 +165,7 @@ async function run() {
   } catch (error) {
     console.error(error.stack); process.exitCode = 1
   } finally {
-    fs.writeFileSync(path.join(output, 'home-generalization-results.json'), JSON.stringify({ completed, expected: 14, skipped: 0, records }, null, 2))
+    fs.writeFileSync(path.join(output, 'home-generalization-results.json'), JSON.stringify({ completed, expected: 14, mode: contractsOnly ? 'contracts-only' : 'full-browser', browserMatrix: contractsOnly ? 'BLOCKED_NOT_RUN' : 'ATTEMPTED', browserCasesNotRun: contractsOnly ? 12 : undefined, records }, null, 2))
     await browser?.close()
   }
 }

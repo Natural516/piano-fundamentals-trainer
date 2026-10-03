@@ -454,6 +454,25 @@ button:focus-visible {
   padding-inline: 12px;
 }
 
+/* Entry-page localization only: keep approved geometry/art, allow longer translated copy. */
+.home-hero__copy { min-width: 0; }
+.home-hero__copy h1, .home-glance .glance-item > span:nth-child(2) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.home-practice-actions .primary-action {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+.practice-module-grid .module-card__copy,
+.tools-hub .tool-card__copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.practice-module-grid .module-card__copy em { line-height: 1.45; }
+.tools-hub .tool-card em { flex-wrap: wrap; }
+
 .midi-candidate { min-width: 0; }
 .midi-port-selector { display: flex; align-items: center; gap: 12px; margin: 10px 0; color: var(--text-secondary); }
 .midi-port-selector { flex-wrap: wrap; }
