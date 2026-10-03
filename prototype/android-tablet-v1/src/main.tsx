@@ -57,6 +57,11 @@ import {
   type ChordSettings
 } from './chordPractice/settings'
 import { CapacitorPreferencesBackend } from './androidPersistence'
+import { useTranslation } from 'react-i18next'
+import { AppPreferencesRepository } from './localization/appPreferences'
+import { LocalizationService } from './localization/localizationService'
+import { LocaleProvider } from './localization/LocaleProvider'
+import { LanguageSetting } from './localization/LanguageSetting'
 import {
   DEFAULT_INTERVAL_PRACTICE_SETTINGS,
   INTERVAL_QUESTION_COUNT_OPTIONS,
@@ -3075,6 +3080,7 @@ function SettingsScreen({
   theme: ThemeDefinition
   themeManager: ThemeRuntimeManager
 }): JSX.Element {
+  const { t } = useTranslation('settings')
   const { runtime } = useMidiUi()
   const { snapshot: updater } = useUpdaterUi()
   const { openAuxiliary } = useAppNavigation()
@@ -3100,7 +3106,7 @@ function SettingsScreen({
     <ProductFrame
       active="settings"
       className={[composedSettings?.frameClassName, Capacitor.isNativePlatform() ? 'has-external-theme-manager' : ''].filter(Boolean).join(' ')}
-      title="设置"
+      title={t('title')}
     >
       <section className={`settings-dashboard${composedSettings ? ' has-settings-visual' : ''}`}>
         {composedSettings ? (
@@ -3127,6 +3133,7 @@ function SettingsScreen({
           </section>
           <section className="settings-group settings-card settings-card--theme">
             <div className="group-title"><span>外观</span><small>适合谱架距离阅读</small></div>
+            <LanguageSetting />
             <div className="settings-theme-content">
               <div className="settings-theme-heading">
                 <span className="setting-row__icon"><Icon name="grid" /></span>
@@ -4144,8 +4151,15 @@ function AndroidAppBootstrap(): JSX.Element {
   return <App runtime={runtime} themeManager={themeManager} />
 }
 
+const localizationService = new LocalizationService(
+  new AppPreferencesRepository(CapacitorPreferencesBackend),
+  () => navigator.languages.length ? navigator.languages : navigator.language
+)
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AndroidAppBootstrap />
+    <LocaleProvider service={localizationService}>
+      <AndroidAppBootstrap />
+    </LocaleProvider>
   </StrictMode>
 )

@@ -7544,6 +7544,23 @@ button.setting-row {
   font-size: 13px;
 }
 
+.settings-language .setting-row__copy small {
+  overflow: visible;
+  white-space: normal;
+}
+
+.settings-language__status,
+.settings-language__error {
+  margin: 0;
+  padding: 4px 18px 10px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.settings-language__error {
+  color: var(--practice-feedback-danger);
+}
+
 .settings-card--about .setting-row {
   min-height: 48px;
   padding-top: 6px;

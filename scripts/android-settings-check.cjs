@@ -86,6 +86,16 @@ const tests = [
   ['SET12', 'Android release identity remains frozen', () => {
     assert.match(version, /^versionCode=14$/m)
     assert.match(version, /^versionName=1\.6\.0$/m)
+  }],
+  ['SET13', 'Language is an app-level appearance preference with a real bilingual Settings surface', () => {
+    assert.match(settings, /useTranslation\('settings'\)/)
+    assert.match(settings, /title=\{t\('title'\)\}/)
+    assert.match(settings, /<LanguageSetting \/>/)
+    const language = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/LanguageSetting.tsx'), 'utf8')
+    for (const value of ['system', 'zh-CN', 'en']) assert.ok(language.includes(`value="${value}"`))
+    assert.match(language, /changeLanguagePreference\(value\)/)
+    assert.match(language, /role="alert"/)
+    assert.doesNotMatch(language, /String\(error\)|dangerouslySetInnerHTML|window\.location/)
   }]
 ]
 
