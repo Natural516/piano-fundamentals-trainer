@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- Same Simplified Chinese policy as production; keep QA identity distinct. -->
+    <string name="app_name">钢琴基本功训练器 QA</string>
+    <string name="title_activity_main">钢琴基本功训练器 QA</string>
+</resources>

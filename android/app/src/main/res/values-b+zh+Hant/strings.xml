@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- Hant is a matching qualifier, not a Traditional Chinese translation.
+         First-version policy: all Chinese locales use the approved Simplified Chinese copy. -->
+    <string name="app_name">钢琴基本功训练器</string>
+    <string name="title_activity_main">钢琴基本功训练器</string>
+    <string name="midi_unnamed_device">MIDI 设备</string>
+    <string name="midi_input_port">MIDI 输入 %1$d</string>
+</resources>

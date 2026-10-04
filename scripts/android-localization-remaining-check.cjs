@@ -77,7 +77,7 @@ test('R5', 'actual subscribed Theme UI locale switch invokes no manager action a
   const f = themeFixture()
   await mounted('chord-flow', async h => { const before = businessBytes(h.backend), writes = h.backend.writes.length; await roundTrip(h); assert.deepEqual(f.calls, []); assert.deepEqual(businessBytes(h.backend), before); assert.equal(h.backend.writes.length-writes, 2) }, { render: () => React.createElement(components.ThemeInfoDialog, { manager: f.manager, record, active: true, onClose() {} }) })
 })
-test('R6', 'Theme API, recipes, PNGs, package/signature/trust and native files are byte frozen', () => execFileSync('git', ['diff','--exit-code',guard.base,'--','theme-packages','theme-api','android','prototype/android-tablet-v1/src/theme'], { cwd: root }))
+test('R6', 'Theme API, recipes, PNGs, package/signature/trust and native business are byte frozen; exact B5 presentation delta verified', () => guard.assertFrozenDiff(guard.base, ['theme-packages','theme-api','android','prototype/android-tablet-v1/src/theme']))
 test('R7', 'approved visible artwork/headlines remain identical and intentionally deferred', () => {
   const previous = guard.namedNodes(guard.oldFile(guard.mainPath))
   for (const name of ['HomeScreen','PracticeHubScreen','ToolsHubScreen','HistoryScreen','SettingsScreen']) assert.equal(declaration(name), previous.get(name).n.getText(previous.get(name).ast))
@@ -128,7 +128,7 @@ test('R19', 'every unrelated production declaration and core lifecycle is byte-f
   assert.deepEqual(effect(declaration('AndroidAppBootstrap')),effect(old.get('AndroidAppBootstrap').n.getText(old.get('AndroidAppBootstrap').ast)))
   for (const name of ['ThemePackageDialog','ThemeInfoDialog']) { const calls = source => { const a=ts.createSourceFile('x.tsx',source,99,true,ts.ScriptKind.TSX),r=[];function f(n){if(ts.isCallExpression(n)&&ts.isPropertyAccessExpression(n.expression)&&n.expression.expression.getText(a)==='manager')r.push(n.getText(a));ts.forEachChild(n,f)}f(a);return r };assert.deepEqual(calls(declaration(name)),calls(old.get(name).n.getText(old.get(name).ast))) }
 })
-test('R20', 'Android native locale B5 not started; native resources and adapters unchanged', () => execFileSync('git',['diff','--exit-code',guard.base,'--','android'],{cwd:root}))
+test('R20', 'B5 permits exact native resources/two unnamed MIDI fallbacks only; native behavior unchanged', () => require('./android-localization-native-contract.cjs').assertNativePresentationOnly())
 test('R21', 'all new leaves exist explicitly in English with placeholder parity and fallback disabled', () => {
   const leaves=(o,p='')=>Object.entries(o).flatMap(([k,v])=>typeof v==='string'?[[p+k,v]]:leaves(v,p+k+'.'))
   for (const ns of ['themeManagement','updater']) {

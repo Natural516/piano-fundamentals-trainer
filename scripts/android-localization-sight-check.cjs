@@ -289,7 +289,9 @@ test('SIGHT-E25', 'scope freeze: domain/native/runtime/Interval and Chord branch
   const files = execFileSync('git', ['ls-tree', '-r', '--name-only', base, '--', 'src/sightReading', 'android', 'prototype/android-tablet-v1/src/intervalPractice', 'prototype/android-tablet-v1/src/chordPractice', 'prototype/android-tablet-v1/src/musicTheory', 'prototype/android-tablet-v1/src/theme'], { cwd: root, encoding: 'utf8' }).trim().split('\n')
   files.push(...['sightReadingIntegration.ts', 'sightReadingPresentation.ts', 'sightReadingFeedbackPresentation.ts', 'androidBluetoothMidi.ts', 'androidBluetoothMidiCore.ts', 'androidPersistenceCore.ts', 'historyProjection.ts', 'mixedHistoryProjection.ts', 'activePracticeSession.ts', 'practiceKeepAwake.ts'].map(n => 'prototype/android-tablet-v1/src/' + n))
   files.push(...['intervalPracticePresentation.ts', 'intervalPreparationResources.ts', 'intervalFlowResources.ts', 'legacyPresentation.ts', 'LegacyDisplayValues.tsx'].map(n => 'prototype/android-tablet-v1/src/localization/' + n))
+  const native = require('./android-localization-native-contract.cjs'); native.assertNativePresentationOnly()
   for (const file of files) {
+    if (native.allowedPaths.has(file)) continue
     const raw = execFileSync('git', ['show', `${base}:${file}`], { cwd: root }); const fs = require('node:fs'), now = fs.readFileSync(path.join(root, file))
     // Source checkout line endings are not domain facts. Binary theme files remain byte-exact.
     if (/\.(?:ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh)$/.test(file)) assert.equal(now.toString().replaceAll('\r\n', '\n'), raw.toString().replaceAll('\r\n', '\n'), file)

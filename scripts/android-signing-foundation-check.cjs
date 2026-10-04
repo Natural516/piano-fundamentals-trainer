@@ -26,7 +26,8 @@ check('permanent Android identity remains frozen', () => {
   assert.match(gradle, /applicationId "com\.pianofundamentals\.trainer"/)
   assert.match(capacitor, /appId: 'com\.pianofundamentals\.trainer'/)
   assert.match(capacitor, /appName: '钢琴基本功训练器'/)
-  assert.match(strings, /<string name="app_name">钢琴基本功训练器<\/string>/)
+  assert.match(strings, /<string name="app_name">Piano Fundamentals Trainer<\/string>/)
+  assert.match(read('android/app/src/main/res/values-zh/strings.xml'), /<string name="app_name">钢琴基本功训练器<\/string>/)
 })
 
 check('Android version has one explicit committed source', () => {

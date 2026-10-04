@@ -282,7 +282,9 @@ test('CHORD-E20','fixed checkpoint freeze protects Sight/Interval/domain/MIDI/na
   const files=execFileSync('git',['ls-tree','-r','--name-only',base,'--','src','android','theme-packages','prototype/android-tablet-v1/src/chordPractice','prototype/android-tablet-v1/src/intervalPractice','prototype/android-tablet-v1/src/musicTheory','prototype/android-tablet-v1/src/theme'],{cwd:root,encoding:'utf8'}).trim().split('\n')
   files.push(...['sightReadingIntegration.ts','androidBluetoothMidi.ts','androidBluetoothMidiCore.ts','androidPersistenceCore.ts','activePracticeSession.ts','practiceKeepAwake.ts','historyProjection.ts','mixedHistoryProjection.ts'].map(n=>'prototype/android-tablet-v1/src/'+n))
   files.push(...['sightReadingPresentation.ts','sightReadingResources.ts','intervalPracticePresentation.ts','intervalPreparationResources.ts','intervalFlowResources.ts','theoryQueryResources.ts','legacyPresentation.ts'].map(n=>'prototype/android-tablet-v1/src/localization/'+n))
-  for(const file of files){if (file === 'src/renderer/src/components/MusicStaffRenderer.tsx') { assertRendererDisplayOnly(base); continue }
+  const native = require('./android-localization-native-contract.cjs'); native.assertNativePresentationOnly()
+  for(const file of files){if (native.allowedPaths.has(file)) continue
+    if (file === 'src/renderer/src/components/MusicStaffRenderer.tsx') { assertRendererDisplayOnly(base); continue }
     const was=execFileSync('git',['show',base+':'+file],{cwd:root,maxBuffer:64*1024*1024}),now=fs.readFileSync(path.join(root,file))
     if(/\.(ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh|html|css|txt)$/.test(file))assert.equal(now.toString().replaceAll('\r\n','\n'),was.toString().replaceAll('\r\n','\n'),file)
     else assert.equal(createHash('sha256').update(now).digest('hex'),createHash('sha256').update(was).digest('hex'),file)

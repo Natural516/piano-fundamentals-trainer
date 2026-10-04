@@ -42,7 +42,10 @@ function assertRendererDisplayOnly(ref = base) {
   assert.equal(renderer,oldFile(rendererPath,ref),'shared renderer permits ONLY optional localized error text')
 }
 function assertFrozenDiff(ref, paths) {
-  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+rendererPath],{cwd:root})
+  const native = require('./android-localization-native-contract.cjs')
+  // B5 separately freezes every native byte except the exact verified resources/two display calls.
+  native.assertNativePresentationOnly()
+  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+rendererPath,...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
   assertRendererDisplayOnly(ref)
 }
 const cssSuffix = "/* Theme/update English wrapping only; practice and artwork geometry stay frozen. */\n.theme-manager-modal__card header > span,\n.theme-manager-modal__card dd,\n.update-card .version-line strong,\n.update-release-notes {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n.theme-manager-modal__card footer {\n  flex-wrap: wrap;\n}\n.theme-manager-modal__card small,\n.update-card p,\n.update-security-note {\n  white-space: normal;\n  line-height: 1.6;\n}";

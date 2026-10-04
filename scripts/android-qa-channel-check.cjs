@@ -26,11 +26,13 @@ const checks = [
     assert.match(version, /^versionName=1\.6\.0$/m)
   }],
   ['QA launcher name and package resources are distinct', () => {
-    assert.match(qaStrings, />钢琴基本功训练器 QA</)
+    assert.match(qaStrings, />Piano Fundamentals Trainer QA</)
+    assert.match(read('android', 'app', 'src', 'qa', 'res', 'values-zh', 'strings.xml'), />钢琴基本功训练器 QA</)
     assert.match(qaStrings, />com\.pianofundamentals\.trainer\.qa</)
   }],
-  ['Production launcher name remains unchanged', () => {
-    assert.match(productionStrings, />钢琴基本功训练器</)
+  ['Production approved bilingual launcher names have no QA marker', () => {
+    assert.match(productionStrings, />Piano Fundamentals Trainer</)
+    assert.match(read('android', 'app', 'src', 'main', 'res', 'values-zh', 'strings.xml'), />钢琴基本功训练器</)
     assert.doesNotMatch(productionStrings, /QA/)
   }],
   ['FileProvider authority is variant-safe', () => {

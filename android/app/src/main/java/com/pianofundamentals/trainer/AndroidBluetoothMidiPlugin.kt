@@ -509,7 +509,7 @@ class AndroidBluetoothMidiPlugin : Plugin() {
             name = properties.getString(MidiDeviceInfo.PROPERTY_NAME)
                 ?: properties.getString(MidiDeviceInfo.PROPERTY_PRODUCT)
                 ?: safeBluetoothName(bluetoothDevice)
-                ?: "MIDI 设备",
+                ?: context.getString(R.string.midi_unnamed_device),
             address = safeBluetoothAddress(bluetoothDevice),
             manufacturer = properties.getString(MidiDeviceInfo.PROPERTY_MANUFACTURER),
             product = properties.getString(MidiDeviceInfo.PROPERTY_PRODUCT),
@@ -767,7 +767,7 @@ class AndroidBluetoothMidiPlugin : Plugin() {
         result.put("outputPorts", JSArray(candidate.outputPorts
             .map { port -> JSObject().apply {
                 put("portNumber", port.portNumber)
-                put("name", port.name?.takeIf { it.isNotBlank() } ?: "MIDI 输入 ${port.portNumber + 1}")
+                put("name", port.name?.takeIf { it.isNotBlank() } ?: context.getString(R.string.midi_input_port, port.portNumber + 1))
             } }))
         result.put("address", candidate.address)
         result.put("manufacturer", candidate.manufacturer)
