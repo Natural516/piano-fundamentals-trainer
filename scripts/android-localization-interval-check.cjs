@@ -272,7 +272,16 @@ test('E19', 'scope freeze preserves Preparation and all unrelated main declarati
   assert.equal(branch(current.get('HistoryRecord')), branch(previous.get('HistoryRecord')))
   const sight = body => body.slice(body.lastIndexOf('return ('))
   assert.equal(sight(current.get('HistoryRecord')), sight(previous.get('HistoryRecord')))
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'prototype/android-tablet-v1/src/localization/intervalPreparationResources.ts', 'prototype/android-tablet-v1/src/localization/hubResources.ts', 'prototype/android-tablet-v1/src/localization/shellResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryPresentation.ts', 'prototype/android-tablet-v1/src/practiceKeepAwake.ts'], { cwd: root })
+  // Preparation resources were added in B4.3: freeze the reviewed checkpoint content, not their absence in the old base.
+  const preparationPath = 'prototype/android-tablet-v1/src/localization/intervalPreparationResources.ts'
+  const preparationSnapshot = execFileSync('git', ['show', '1024a9f43b6e1a9401e2627eec98ca6e8d13d246:' + preparationPath], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
+  assert.equal(createHash('sha256').update(preparationSnapshot).digest('hex'), 'bbf7f79543c99097c3322f78b75cd4ee25e50e360efabbd79b3c56d8fa0986bb')
+  const assertPreparationFrozen = content => assert.equal(content, preparationSnapshot, 'Preparation resources must match the reviewed B4.3 checkpoint')
+  assertPreparationFrozen(read(preparationPath))
+  // In-memory mutations exercise the same guard without touching the product file.
+  assert.throws(() => assertPreparationFrozen(preparationSnapshot.replace('音程练习', '未授权修改')), { name: 'AssertionError' })
+  assert.throws(() => assertPreparationFrozen(preparationSnapshot + '\n// unauthorized content\n'), { name: 'AssertionError' })
+  execFileSync('git', ['diff', '--exit-code', base, '--', 'prototype/android-tablet-v1/src/localization/hubResources.ts', 'prototype/android-tablet-v1/src/localization/shellResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryPresentation.ts', 'prototype/android-tablet-v1/src/practiceKeepAwake.ts'], { cwd: root })
 })
 test('E20', 'resource semantics/placeholders/plural parity and explicit English exist without fallback', () => {
   const zh = localizationResources['zh-CN'].intervalPractice, en = localizationResources.en.intervalPractice
