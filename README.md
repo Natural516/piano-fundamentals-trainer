@@ -193,23 +193,9 @@ The first version covers **26 interval types within the octave**, with fixed-cou
 
 ### Screenshots
 
-The screenshots below are from the real Android 1.6.0 app running on a Lenovo tablet with the built-in Light theme.
+The stable 1.6.0 screenshots in the Chinese section reflect the currently published release UI. They are intentionally **not reused here as English-interface screenshots**.
 
-#### Home
-
-![Home: start practice, view recent practice, and check MIDI connection](docs/screenshots/android-v1.6.0-home.png)
-
-#### Sight Reading
-
-![Sight Reading: staff notation and answer state](docs/screenshots/android-v1.6.0-sight-reading.png)
-
-#### Chord Practice
-
-![Chord Practice: current chord, notation, and MIDI feedback](docs/screenshots/android-v1.6.0-chord-practice.png)
-
-#### Practice History
-
-![Practice History: saved sessions, result summaries, and trends](docs/screenshots/android-v1.6.0-history.png)
+English UI localization exists in current repository development, but it is newer than the 1.6.0 release artifact. English screenshots will be added here from a build that actually contains the English interface rather than presenting Chinese screenshots as English UI evidence.
 
 ### Why use it
 
