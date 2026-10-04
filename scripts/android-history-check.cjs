@@ -31,6 +31,7 @@ const { projectMixedPracticeHistory } = require('../prototype/android-tablet-v1/
 const { AndroidSightReadingRuntime } = require('../prototype/android-tablet-v1/src/sightReadingIntegration.ts')
 const { createLocalizationInstance } = require('../prototype/android-tablet-v1/src/localization/localizationService.ts')
 const { presentHomeRecentPractice } = require('../prototype/android-tablet-v1/src/localization/homePresentation.ts')
+const { chordPracticeResources } = require('../prototype/android-tablet-v1/src/localization/chordPracticeResources.ts')
 
 class FakePreferencesBackend {
   constructor(values = new Map()) {
@@ -365,7 +366,9 @@ test('HIS26 one Chord record projects a real Chord-specific card', () => {
 test('HIS27 finite Chord completion projects 20/20 facts', () => {
   const [item] = projectChordHistory([chordRecord()])
   assert.deepEqual([item.completedQuestions, item.plannedQuestionCount], [20, 20])
-  assert.match(historyPresentationSource, /完成 \$\{item\.completedQuestions\}\/\$\{item\.plannedQuestionCount\}/)
+  assert.match(historyPresentationSource, /chordT\('recordCompleted', \{ completed: item\.completedQuestions, total: item\.plannedQuestionCount \}\)/)
+  assert.equal(chordPracticeResources['zh-CN'].recordCompleted, '完成 {{completed}}/{{total}}')
+  assert.equal(chordPracticeResources.en.recordCompleted, 'Completed {{completed}}/{{total}}')
 })
 
 test('HIS28 stopped finite Chord completion projects 7/20 and a neutral marker', () => {
@@ -387,14 +390,18 @@ test('HIS30 Chord completion rate derives from first-pass counters', () => {
 
 test('HIS31 Chord primary metric is called completion rate, not accuracy', () => {
   const chordBranch = historyPresentationSource.slice(historyPresentationSource.indexOf("if (item.module === 'chord')"), historyPresentationSource.indexOf("return (", historyPresentationSource.indexOf("if (item.module === 'chord')") + 100) + 1)
-  assert.match(historyPresentationSource, /<small>完成率(?: <Icon name="chevron" size=\{13\} \/>)?<\/small>/)
+  assert.match(historyPresentationSource, /<small>\{chordT\('metrics\.firstPassRate'\)\} <Icon name="chevron" size=\{13\} \/><\/small>/)
+  assert.equal(chordPracticeResources['zh-CN'].metrics.firstPassRate, '完成率')
+  assert.equal(chordPracticeResources.en.metrics.firstPassRate, 'First-pass success rate')
   assert.doesNotMatch(chordBranch, /准确率|总体正确率/)
 })
 
 test('HIS32 Chord card error count uses totalErrors', () => {
   const [item] = projectChordHistory([chordRecord({ arpeggioErrors: 4, blockErrors: 5, totalErrors: 9 })])
   assert.equal(item.totalErrors, 9)
-  assert.match(historyPresentationSource, /错误 \{item\.totalErrors\}/)
+  assert.match(historyPresentationSource, /chordT\('recordFacts', \{ completed, errors: item\.totalErrors, duration: presentSightDuration\(item\.practiceDurationMs, sightT\) \}\)/)
+  assert.equal(chordPracticeResources['zh-CN'].recordFacts, '{{completed}} · 错误 {{errors}} · 练习时长 {{duration}}')
+  assert.equal(chordPracticeResources.en.recordFacts, '{{completed}} · Errors {{errors}} · Practice duration {{duration}}')
 })
 
 test('HIS33 Sequential Chord mode displays its persisted key snapshot', () => {

@@ -8,6 +8,7 @@ const css = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/sty
 const persistence = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/androidPersistenceCore.ts'), 'utf8')
 const mainActivity = fs.readFileSync(path.join(root, 'android/app/src/main/java/com/pianofundamentals/trainer/MainActivity.java'), 'utf8')
 const version = fs.readFileSync(path.join(root, 'android/version.properties'), 'utf8')
+const chordResources = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/chordPracticeResources.ts'), 'utf8')
 
 function between(start, end) {
   const from = ui.indexOf(start)
@@ -88,7 +89,9 @@ const tests = [
     const sightResources = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/sightReadingResources.ts'), 'utf8')
     assert.match(sightResources, /historyModule: '识谱'/)
     assert.match(sightResources, /historyModule: 'Sight Reading'/)
-    assert.match(ui, /history-module-badge is-chord">和弦/)
+    assert.match(ui, /history-module-badge is-chord">\{chordT\('badge'\)\}/)
+    assert.match(chordResources, /badge: '和弦'/)
+    assert.match(chordResources, /badge: 'Chords'/)
     assert.doesNotMatch(history, /piano\.v1\.|Preferences\.|localStorage/)
   }],
   ['NAV08', 'submodule and Android Back paths follow the frozen Chord-internal hierarchy', () => {
@@ -96,7 +99,9 @@ const tests = [
     assert.match(ui, /'sight-result': 'practice'/)
     assert.match(ui, /'chord-mode-select': 'practice'/)
     assert.match(ui, /'chord-practice': 'chord-mode-select'/)
-    assert.match(ui, /aria-label="返回练习"/)
+    assert.match(ui, /aria-label=\{t\('backPractice'\)\}/)
+    assert.match(chordResources, /backPractice: '返回练习'/)
+    assert.match(chordResources, /backPractice: 'Back to practice'/)
   }],
   ['NAV09', 'QA channel and production version identities remain frozen', () => {
     assert.match(version, /^versionCode=14$/m)
@@ -146,7 +151,9 @@ const tests = [
     assert.match(historyRecord, /<button[\s\S]*?onOpenChordReport\(item\.recordId\)/)
     assert.match(ui, /navigate\('chord-report-detail'\)/)
     assert.match(ui, /resolveChordReportById\(chordPersistenceSnapshot\.records, selectedChordRecordId\)/)
-    assert.match(chordReport, /title="和弦练习报告"/)
+    assert.match(chordReport, /title=\{t\('reportTitle'\)\}/)
+    assert.match(chordResources, /reportTitle: '和弦练习报告'/)
+    assert.match(chordResources, /reportTitle: 'Chord Practice report'/)
   }],
   ['NAV16', 'Chord report Back restores History while filter remains app-owned', () => {
     assert.match(ui, /const \[historyFilter, setHistoryFilter\] = useState<HistoryFilter>\('all'\)/)

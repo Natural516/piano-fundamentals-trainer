@@ -26,6 +26,14 @@ const mockSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/
 const contractSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/musicTheory/chords/productContract.ts'), 'utf8')
 
 const tests = []
+const { chordPracticeResources } = require('../prototype/android-tablet-v1/src/localization/chordPracticeResources.ts')
+function displayBinding(source, key, zh, en) {
+  if (key === 'triadsSevenths') assert.ok(source.includes("t(mode === 'sequential' ? 'countScope' : 'triadsSevenths')"))
+  else if (key === 'allInversions') assert.ok(source.includes("t(mode === 'sequential' ? 'balanced' : 'allInversions')"))
+  else assert.ok(source.includes("t('" + key + "'"), key + ' resource binding')
+  assert.equal(chordPracticeResources['zh-CN'][key], zh)
+  assert.equal(chordPracticeResources.en[key], en)
+}
 const test = (id, title, callback) => tests.push({ id, title, callback })
 
 test('CUI01', 'six required Human QA states are explicit and complete', () => {
@@ -101,13 +109,16 @@ test('CUI06', 'Chord renderer is one Grand Staff with left arpeggio and right bl
   assert.match(rendererSource, /左侧分解和弦，右侧柱式和弦/)
   assert.ok(rendererSource.indexOf('pitches.forEach((pitch, index)') < rendererSource.lastIndexOf("drawAt(context, trebleStave, pitches.filter"))
   const chordUi = mainSource.slice(mainSource.indexOf('function ChordGroupBadge'), mainSource.indexOf('function SightReadyScreen'))
-  assert.ok(chordUi.indexOf('label="分解"') < chordUi.indexOf('label="柱式"'))
+  assert.ok(chordUi.indexOf("label={t('arpeggio')}") < chordUi.indexOf("label={t('block')}"))
+  displayBinding(chordUi, 'arpeggio', '分解', 'Arpeggio')
+  displayBinding(chordUi, 'block', '柱式', 'Block chord')
   assert.doesNotMatch(rendererSource, /addKeySignature|addTimeSignature/)
 })
 
 test('CUI07', 'Chord page exposes only approved settings and compact practice facts', () => {
-  for (const label of ['三和弦 + 七和弦', '全部转位', '随机音区', '分解 + 柱式']) assert.match(mainSource, new RegExp(label.replace('+', '\\+')))
-  assert.match(mainSource, /\{ label: '无限', value: 'endless' \}/)
+  for (const [key, zh, en] of [['triadsSevenths', '三和弦 + 七和弦', 'Triads + Seventh chords'], ['allInversions', '全部转位', 'All inversions'], ['randomRegister', '随机音区', 'Random register'], ['phaseOrder', '分解 + 柱式', 'Arpeggio + Block chord']]) displayBinding(mainSource, key, zh, en)
+  assert.match(mainSource, /\{ label: t\('endless'\), value: 'endless' \}/)
+  displayBinding(mainSource, 'endless', '无限', 'Endless')
   assert.match(mainSource, /snapshot\.counters\.completedQuestions/)
   assert.match(mainSource, /snapshot\.counters\.currentFirstPassStreak/)
   assert.doesNotMatch(mainSource.slice(mainSource.indexOf('function ChordSettingsDrawer'), mainSource.indexOf('function SightReadyScreen')), /Reaction Time|Best Streak|Most Missed|倒计时/)
@@ -166,9 +177,10 @@ test('CUI12', 'Chord V1 block capture is frozen outside UI and static failures r
 
 test('CUI13', 'Mode Select and accessible help modal preserve Chord-internal navigation', () => {
   assert.match(mainSource, /function ChordModeSelectScreen/)
-  assert.match(mainSource, /选择和弦练习方式/)
-  assert.match(mainSource, /根据你的目标，选择更适合的练习模式。/)
-  assert.match(mainSource, /aria-label="查看和弦练习方式说明"/)
+  displayBinding(mainSource, 'selectTitle', '选择和弦练习方式', 'Choose your chord practice mode')
+  displayBinding(mainSource, 'selectHelp', '根据你的目标，选择更适合的练习模式。', 'Choose the practice mode that fits your goal.')
+  assert.match(mainSource, /aria-label=\{t\('helpOpen'\)\}/)
+  displayBinding(mainSource, 'helpOpen', '查看和弦练习方式说明', 'About chord practice modes')
   assert.match(mainSource, /aria-modal="true"/)
   assert.match(mainSource, /onSelectMode\('sequential'\)/)
   assert.match(mainSource, /onSelectMode\('comprehensive'\)/)
@@ -180,23 +192,24 @@ test('CUI14', 'current-inversion Chord tones are optional without an empty separ
   assert.match(chordUi, /mockChord\.writtenPitches\.map/)
   assert.match(chordUi, /liveQuestion\?\.blockNotes\.map\(formatWrittenPitchClass\)\.join\(' · '\)/)
   assert.match(chordUi, /chordSettings\.showChordTones && chordToneText/)
-  assert.match(chordUi, /<span> · 构成音：\{chordToneText\}<\/span>/)
+  assert.match(chordUi, /<span>\{t\('tones', \{ notes: chordToneText \}\)\}<\/span>/)
+  displayBinding(chordUi, 'tones', ' · 构成音：{{notes}}', ' · Chord tones: {{notes}}')
   assert.doesNotMatch(chordUi, /spellChord\(mockChord\.root/)
 })
 
 test('CUI16', 'normal Comprehensive help removes internal Chord V1 wording', () => {
   const modeSelect = mainSource.slice(mainSource.indexOf('function ChordModeSelectScreen'), mainSource.indexOf('const THEORY_TOOLS'))
-  assert.match(modeSelect, /从完整和弦范围中综合随机出题/)
+  displayBinding(modeSelect, 'mixedDescription', '从完整和弦范围中综合随机出题', 'Random questions from the full chord range')
   assert.doesNotMatch(modeSelect, /Chord V1/)
 })
 
 test('CUI15', 'Sequential and Comprehensive drawers share count and tones while key is Sequential-only', () => {
   const drawer = mainSource.slice(mainSource.indexOf('function ChordSettingsDrawer'), mainSource.indexOf('function SightSettingsRows'))
   assert.match(drawer, /mode === 'sequential'/)
-  assert.match(drawer, /选择循序练习当前调/)
+  displayBinding(drawer, 'selectKey', '选择循序练习当前调', 'Choose the key for progressive practice')
   assert.match(drawer, /CHORD_SEQUENTIAL_MAJOR_KEY_IDS\.map/)
-  assert.match(drawer, /显示构成音/)
-  assert.match(drawer, /和弦练习题数/)
+  displayBinding(drawer, 'showTones', '显示构成音', 'Show chord tones')
+  displayBinding(drawer, 'countAria', '和弦练习题数', 'Chord practice question count')
   assert.doesNotMatch(drawer, /和弦类型筛选|转位筛选|掌握度/)
 })
 

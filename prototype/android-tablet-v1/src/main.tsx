@@ -64,6 +64,7 @@ import { LocaleProvider } from './localization/LocaleProvider'
 import { LanguageSetting } from './localization/LanguageSetting'
 import { IntervalDisplayName, SightNoteValue } from './localization/LegacyDisplayValues'
 import { presentSightKey, presentSightPrompt, presentSightReaction, presentSightHistory, presentSightDuration } from './localization/sightReadingPresentation'
+import { presentChordKey, presentChordQuestion, presentChordHistorySummary, presentLocalizedChordPractice, presentLocalizedChordReport } from './localization/chordPracticePresentation'
 import { getSettingsThemeDisplayName, presentLocalizedMidiStatus } from './localization/midiPresentation'
 import { presentHomeRecentPractice } from './localization/homePresentation'
 import { useAppLocale } from './localization/LocaleProvider'
@@ -1098,38 +1099,39 @@ function IntervalPracticeActiveScreen({
 }
 
 function ChordModeSelectScreen({ onSelectMode, settingsReady }: { onSelectMode: (mode: ChordPracticeMode) => void; settingsReady: boolean }): JSX.Element {
+  const { t } = useTranslation('chordPractice')
   const [helpOpen, setHelpOpen] = useState(false)
   return (
-    <ProductFrame active="practice" onBack={() => navigate('practice')} title="和弦练习">
+    <ProductFrame active="practice" onBack={() => navigate('practice')} title={t('title')}>
       <section className="hub-layout chord-mode-layout" aria-labelledby="chord-mode-title">
         <div className="hub-heading chord-mode-heading">
           <div>
             <span className="eyebrow">CHORD PRACTICE</span>
-            <h1 id="chord-mode-title">选择和弦练习方式</h1>
-            <p>根据你的目标，选择更适合的练习模式。</p>
+            <h1 id="chord-mode-title">{t('selectTitle')}</h1>
+            <p>{t('selectHelp')}</p>
           </div>
-          <button aria-label="查看和弦练习方式说明" className="chord-help-button" type="button" onClick={() => setHelpOpen(true)}>?</button>
+          <button aria-label={t('helpOpen')} className="chord-help-button" type="button" onClick={() => setHelpOpen(true)}>?</button>
         </div>
         <div className="practice-module-grid chord-mode-grid">
           <button className="module-card chord-mode-card" disabled={!settingsReady} type="button" onClick={() => onSelectMode('sequential')}>
             <span className="module-card__icon"><Icon name="book" size={30} /></span>
             <span className="module-card__copy">
-              <small><b>推荐</b> 学习模式</small>
-              <strong>循序练习</strong>
-              <em>围绕单一大调，逐步扩展练习内容</em>
-              <i>适合记忆和弦构成、转位与调内和弦关系</i>
-              <span>三和弦 → 七和弦 → 转位</span>
+              <small><b>{t('recommended')}</b> {t('learning')}</small>
+              <strong>{t('modes.sequential')}</strong>
+              <em>{t('sequentialDescription')}</em>
+              <i>{t('sequentialSuitable')}</i>
+              <span>{t('sequentialPath')}</span>
             </span>
             <Icon name="chevron" />
           </button>
           <button className="module-card chord-mode-card" disabled={!settingsReady} type="button" onClick={() => onSelectMode('comprehensive')}>
             <span className="module-card__icon is-amber"><Icon name="grid" size={30} /></span>
             <span className="module-card__copy">
-              <small>综合复习</small>
-              <strong>综合随机</strong>
-              <em>从完整和弦范围中综合随机出题</em>
-              <i>适合复习、巩固与检验整体反应能力</i>
-              <span>根音 · 和弦类型 · 转位综合混合</span>
+              <small>{t('review')}</small>
+              <strong>{t('modes.comprehensive')}</strong>
+              <em>{t('mixedDescription')}</em>
+              <i>{t('mixedSuitable')}</i>
+              <span>{t('mixedPath')}</span>
             </span>
             <Icon name="chevron" />
           </button>
@@ -1138,26 +1140,26 @@ function ChordModeSelectScreen({ onSelectMode, settingsReady }: { onSelectMode: 
       {helpOpen ? (
         <div className="chord-mode-help-backdrop" onClick={() => setHelpOpen(false)}>
           <section aria-labelledby="chord-mode-help-title" aria-modal="true" className="chord-mode-help" role="dialog" onClick={(event) => event.stopPropagation()}>
-            <header><h2 id="chord-mode-help-title">练习方式说明</h2><button aria-label="关闭练习方式说明" className="icon-button subtle" type="button" onClick={() => setHelpOpen(false)}><Icon name="close" /></button></header>
+            <header><h2 id="chord-mode-help-title">{t('helpTitle')}</h2><button aria-label={t('helpClose')} className="icon-button subtle" type="button" onClick={() => setHelpOpen(false)}><Icon name="close" /></button></header>
             <div className="chord-mode-help__content">
               <article>
-                <h3>循序练习</h3>
-                <p>每次练习只围绕一个大调的 7 个调内和弦出题。当前调由你选择，练习过程中不会自动切换到其他调。</p>
+                <h3>{t('modes.sequential')}</h3>
+                <p>{t('sequentialHelp')}</p>
                 <dl>
-                  <div><dt>10 / 20 题</dt><dd>仅练习调内三和弦原位</dd></div>
-                  <div><dt>50 题</dt><dd>加入调内七和弦原位</dd></div>
-                  <div><dt>100 题</dt><dd>进一步加入三和弦转位</dd></div>
-                  <div><dt>无限</dt><dd>加入三和弦与七和弦的全部转位，并持续围绕当前调练习，直到手动结束</dd></div>
+                  <div><dt>{t('questionRange', { from: 10, to: 20 })}</dt><dd>{t('scope10')}</dd></div>
+                  <div><dt>{t('questions', { count: 50 })}</dt><dd>{t('scope50')}</dd></div>
+                  <div><dt>{t('questions', { count: 100 })}</dt><dd>{t('scope100')}</dd></div>
+                  <div><dt>{t('endless')}</dt><dd>{t('scopeEndless')}</dd></div>
                 </dl>
-                <p>题目采用均衡题袋方式安排，尽量让当前范围内的和弦获得均匀练习机会。</p>
+                <p>{t('balancedHelp')}</p>
               </article>
               <article>
-                <h3>综合随机</h3>
-                <p>从完整和弦范围中综合随机出题，覆盖不同根音、和弦类型与转位。</p>
-                <p>它不会限制在单一大调内，适合已经熟悉基础内容后进行综合复习与反应训练。</p>
+                <h3>{t('modes.comprehensive')}</h3>
+                <p>{t('mixedHelp')}</p>
+                <p>{t('mixedHelpMore')}</p>
               </article>
             </div>
-            <button className="primary-action" type="button" onClick={() => setHelpOpen(false)}>知道了</button>
+            <button className="primary-action" type="button" onClick={() => setHelpOpen(false)}>{t('understood')}</button>
           </section>
         </div>
       ) : null}
@@ -1762,11 +1764,8 @@ function ChordGroupBadge({
   label: string
   state: 'active' | 'completed' | 'wrong' | 'secondary'
 }): JSX.Element {
-  const stateLabel = state === 'completed'
-    ? '已完成'
-    : state === 'wrong'
-      ? '需重试'
-      : state === 'active' ? '当前' : '稍后'
+  const { t } = useTranslation('chordPractice')
+  const stateLabel = t(`group.${state}`)
   return (
     <div className={`chord-group-badge is-${state}`}>
       <span>{label}</span>
@@ -1794,12 +1793,13 @@ function ChordSettingsDrawer({
   onQuestionCountChange: (value: ChordQuestionCount) => void
   questionCount: ChordQuestionCount
 }): JSX.Element {
+  const { t } = useTranslation('chordPractice')
   const options: readonly { label: string; value: ChordQuestionCount }[] = [
     { label: '10', value: 10 },
     { label: '20', value: 20 },
     { label: '50', value: 50 },
     { label: '100', value: 100 },
-    { label: '无限', value: 'endless' }
+    { label: t('endless'), value: 'endless' }
   ]
   const keyIndex = CHORD_SEQUENTIAL_MAJOR_KEY_IDS.indexOf(chordSettings.sequentialKey)
   const selectAdjacentKey = (offset: -1 | 1): void => {
@@ -1816,28 +1816,28 @@ function ChordSettingsDrawer({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="chord-settings-drawer__header">
-          <div><span className="eyebrow">练习设置</span><h2 id="chord-settings-title">和弦练习</h2></div>
-          <button aria-label="关闭练习设置" className="icon-button subtle" type="button" onClick={onClose}><Icon name="close" /></button>
+          <div><span className="eyebrow">{t('settings')}</span><h2 id="chord-settings-title">{t('title')}</h2></div>
+          <button aria-label={t('closeSettings')} className="icon-button subtle" type="button" onClick={onClose}><Icon name="close" /></button>
         </div>
         {mode === 'sequential' ? (
           <section className="chord-settings-section">
-            <div className="group-title"><span>当前调</span><small>新练习开始时生效</small></div>
+            <div className="group-title"><span>{t('currentKey')}</span><small>{t('nextSession')}</small></div>
             <div className="chord-key-stepper">
-              <button aria-label="上一个大调" type="button" onClick={() => selectAdjacentKey(-1)}>‹</button>
+              <button aria-label={t('previousKey')} type="button" onClick={() => selectAdjacentKey(-1)}>‹</button>
               <select
-                aria-label="选择循序练习当前调"
+                aria-label={t('selectKey')}
                 value={chordSettings.sequentialKey}
                 onChange={(event) => onChordSettingsChange({ sequentialKey: event.target.value as ChordSequentialMajorKeyId })}
               >
-                {CHORD_SEQUENTIAL_MAJOR_KEY_IDS.map((keyId) => <option key={keyId} value={keyId}>{formatChordKeyName(keyId)}</option>)}
+                {CHORD_SEQUENTIAL_MAJOR_KEY_IDS.map((keyId) => <option key={keyId} value={keyId}>{presentChordKey(keyId, t)}</option>)}
               </select>
-              <button aria-label="下一个大调" type="button" onClick={() => selectAdjacentKey(1)}>›</button>
+              <button aria-label={t('nextKey')} type="button" onClick={() => selectAdjacentKey(1)}>›</button>
             </div>
           </section>
         ) : null}
         <section className="chord-settings-section">
-          <div className="group-title"><span>题数</span><small>选择本轮练习题量</small></div>
-          <div className="chord-question-count" role="group" aria-label="和弦练习题数">
+          <div className="group-title"><span>{t('questionCount')}</span><small>{t('countHelp')}</small></div>
+          <div className="chord-question-count" role="group" aria-label={t('countAria')}>
             {options.map((option) => (
               <button
                 className={questionCount === option.value ? 'is-active' : ''}
@@ -1851,9 +1851,9 @@ function ChordSettingsDrawer({
           </div>
         </section>
         <section className="chord-settings-section chord-tone-setting">
-          <div className="group-title"><span>显示构成音</span><small>按当前转位顺序显示</small></div>
+          <div className="group-title"><span>{t('showTones')}</span><small>{t('tonesHelp')}</small></div>
           <button
-            aria-label={`显示构成音已${chordSettings.showChordTones ? '开启' : '关闭'}`}
+            aria-label={t(chordSettings.showChordTones ? 'tonesOn' : 'tonesOff')}
             className={`mock-switch ${chordSettings.showChordTones ? 'is-on' : ''}`}
             type="button"
             onClick={() => onChordSettingsChange({ showChordTones: !chordSettings.showChordTones })}
@@ -1862,13 +1862,13 @@ function ChordSettingsDrawer({
           </button>
         </section>
         <section className="chord-settings-section chord-settings-summary">
-          <div className="group-title"><span>本次训练</span><small>{mode === 'sequential' ? formatChordKeyName(chordSettings.sequentialKey) : '完整随机范围'}</small></div>
-          <div><Icon name="check" size={18} /><span>{mode === 'sequential' ? '题数决定循序范围' : '三和弦 + 七和弦'}</span></div>
-          <div><Icon name="check" size={18} /><span>{mode === 'sequential' ? '均衡题袋' : '全部转位'}</span></div>
-          <div><Icon name="check" size={18} /><span>随机音区</span></div>
-          <div><Icon name="check" size={18} /><span>分解 + 柱式</span></div>
+          <div className="group-title"><span>{t('training')}</span><small>{mode === 'sequential' ? presentChordKey(chordSettings.sequentialKey, t) : t('fullRange')}</small></div>
+          <div><Icon name="check" size={18} /><span>{t(mode === 'sequential' ? 'countScope' : 'triadsSevenths')}</span></div>
+          <div><Icon name="check" size={18} /><span>{t(mode === 'sequential' ? 'balanced' : 'allInversions')}</span></div>
+          <div><Icon name="check" size={18} /><span>{t('randomRegister')}</span></div>
+          <div><Icon name="check" size={18} /><span>{t('phaseOrder')}</span></div>
         </section>
-        <small className="chord-settings-note">题数和当前调将在下一轮练习开始时生效；构成音显示立即生效。</small>
+        <small className="chord-settings-note">{t('settingsNote')}</small>
       </aside>
     </div>
   )
@@ -2047,13 +2047,15 @@ function ChordPracticeScreen({
   questionCount: ChordQuestionCount
   theme: ThemeDefinition
 }): JSX.Element {
+  const { t } = useTranslation('chordPractice')
+  const { t: theoryT } = useTranslation('theoryQuery')
   const snapshot = useChordPracticeRuntime(runtime)
   const initialSessionConfig = useRef({ mode, questionCount, sequentialKey: chordSettings.sequentialKey })
   const preview = previewStateId === 'live' ? null : getChordMockState(previewStateId)
   const mockChord = getChordMockCase(caseId)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const livePresentation = presentChordPractice(snapshot)
-  const presentation: ChordPracticePresentation = preview
+  const livePresentation = presentLocalizedChordPractice(snapshot, t)
+  const presentation: ReturnType<typeof presentLocalizedChordPractice> = preview
     ? {
         arpeggio: preview.arpeggio,
         block: preview.block,
@@ -2076,10 +2078,10 @@ function ChordPracticeScreen({
     : liveQuestion
       ? {
           symbol: liveQuestion.chordSymbol,
-          inversion: liveQuestion.chineseInversionLabel,
+          inversion: t(`inversions.${liveQuestion.inversionIndex}`),
           writtenPitches: toChordWrittenPitches(liveQuestion)
         }
-      : { symbol: '—', inversion: '正在准备', writtenPitches: [] }
+      : { symbol: '—', inversion: t('preparing'), writtenPitches: [] }
   const chordToneText = preview
     ? mockChord.writtenPitches.map((pitch) => pitch.spelling.replace(/\d+$/, '')).join(' · ')
     : liveQuestion?.blockNotes.map(formatWrittenPitchClass).join(' · ') ?? ''
@@ -2087,15 +2089,15 @@ function ChordPracticeScreen({
   const resumeWaitingForRelease = snapshot.judgement?.state.phase === 'RESUME_WAIT_ALL_KEYS_UP'
   const activeQuestionCount = snapshot.questionCount
   const progressLabel = activeQuestionCount === 'endless'
-    ? `已完成 ${snapshot.counters.completedQuestions}`
+    ? t('completedCount', { count: snapshot.counters.completedQuestions })
     : `${String(Math.min(snapshot.questionIndex, activeQuestionCount)).padStart(2, '0')} / ${activeQuestionCount}`
   const pauseBlocked = snapshot.status === 'SESSION_COMPLETE'
     || snapshot.status === 'STOPPED'
     || resumeWaitingForRelease
     || (paused && !snapshot.transportReady)
   const endActionLabel = snapshot.status === 'SESSION_COMPLETE'
-    ? '完成'
-    : snapshot.counters.completedQuestions > 0 ? '结束并保存' : '结束'
+    ? t('done')
+    : t(snapshot.counters.completedQuestions > 0 ? 'endSave' : 'end')
   const practiceActiveVisual = theme.capabilities.practiceActiveVisual
   const chordArtwork = practiceActiveVisual.kind === 'decorated-focus'
     ? practiceActiveVisual.chordArtwork ?? null
@@ -2122,14 +2124,14 @@ function ChordPracticeScreen({
     >
       <header className="chord-focus-header">
         <div className="chord-focus-header__left">
-          <button aria-label="返回练习" className="icon-button subtle" type="button" onClick={leavePractice}><Icon name="arrow-left" /></button>
-          <div><small>PIANO FUNDAMENTALS</small><strong>{mode === 'sequential' ? '循序练习' : '综合随机'}</strong></div>
+          <button aria-label={t('backPractice')} className="icon-button subtle" type="button" onClick={leavePractice}><Icon name="arrow-left" /></button>
+          <div><small>PIANO FUNDAMENTALS</small><strong>{t(`modes.${mode}`)}</strong></div>
         </div>
         <div className="focus-actions">
           <MidiStatusButton compact />
-          <button aria-label="练习设置" className="icon-button subtle" type="button" onClick={() => setSettingsOpen(true)}><Icon name="settings" /></button>
+          <button aria-label={t('settings')} className="icon-button subtle" type="button" onClick={() => setSettingsOpen(true)}><Icon name="settings" /></button>
           <button className="outline-action" disabled={pauseBlocked} type="button" onClick={() => paused ? runtime.resume() : runtime.pause()}>
-            <Icon name={paused ? 'play' : 'pause'} /><span>{paused ? '继续' : '暂停'}</span>
+            <Icon name={paused ? 'play' : 'pause'} /><span>{t(paused ? 'resume' : 'pause')}</span>
           </button>
           <button className="outline-action" type="button" onClick={leavePractice}>
             <Icon name="stop" /><span>{endActionLabel}</span>
@@ -2154,15 +2156,15 @@ function ChordPracticeScreen({
           </div>
         ) : null}
         <div className="chord-identity">
-          <span>当前和弦</span>
+          <span>{t('currentChord')}</span>
           <h1>{chord.symbol}</h1>
-          <strong>{chord.inversion}{chordSettings.showChordTones && chordToneText ? <span> · 构成音：{chordToneText}</span> : null}</strong>
+          <strong>{chord.inversion}{chordSettings.showChordTones && chordToneText ? <span>{t('tones', { notes: chordToneText })}</span> : null}</strong>
         </div>
 
-        <section className={`chord-notation-card has-${presentation.semantic}`} data-feedback-semantic={presentation.semantic} aria-label={`${chord.symbol} ${chord.inversion}`}>
+        <section className={`chord-notation-card has-${presentation.semantic}`} data-feedback-semantic={presentation.semantic} aria-label={liveQuestion && !preview ? presentChordQuestion(liveQuestion, t, theoryT) : `${chord.symbol} ${chord.inversion}`}>
           <div className="chord-group-labels" aria-hidden="true">
-            <ChordGroupBadge label="分解" state={presentation.arpeggio} />
-            <ChordGroupBadge label="柱式" state={presentation.block} />
+            <ChordGroupBadge label={t('arpeggio')} state={presentation.arpeggio} />
+            <ChordGroupBadge label={t('block')} state={presentation.block} />
           </div>
           <span className="chord-group-divider" aria-hidden="true" />
           <ChordGrandStaff
@@ -2170,9 +2172,11 @@ function ChordPracticeScreen({
             blockState={presentation.block}
             pitches={chord.writtenPitches}
             symbol={chord.symbol}
+            ariaLabel={t('staffLabel', { symbol: chord.symbol })}
+            fontErrorLabel={t('fontFailed')}
           />
           {paused ? (
-            <div className="chord-pause-overlay"><Icon name="pause" size={34} /><strong>练习已暂停</strong></div>
+            <div className="chord-pause-overlay"><Icon name="pause" size={34} /><strong>{t('paused')}</strong></div>
           ) : null}
         </section>
 
@@ -2180,13 +2184,13 @@ function ChordPracticeScreen({
           <span className="chord-stage-prompt__icon">
             <Icon name={presentation.semantic === 'success' ? 'check' : presentation.semantic === 'danger' ? 'close' : presentation.semantic === 'warning' ? 'clock' : 'play'} />
           </span>
-          <div><small>当前阶段 · {presentation.stageLabel}</small><strong>{paused ? !snapshot.transportReady ? 'MIDI 已断开，练习已安全暂停' : resumeWaitingForRelease ? '请先松开琴键以继续' : '练习已暂停' : presentation.prompt}</strong></div>
+          <div><small>{t('currentStage', { stage: presentation.stageLabel })}</small><strong>{paused ? t(!snapshot.transportReady ? 'disconnected' : resumeWaitingForRelease ? 'releaseResume' : 'paused') : presentation.prompt}</strong></div>
         </section>
 
         <footer className="chord-progress-footer">
-          <span><small>{activeQuestionCount === 'endless' ? '进度' : '当前题目'}</small><strong>{progressLabel}</strong></span>
+          <span><small>{t(activeQuestionCount === 'endless' ? 'progress' : 'currentQuestion')}</small><strong>{progressLabel}</strong></span>
           <i />
-          <span><small>本轮状态</small><strong>连续正确 {snapshot.counters.currentFirstPassStreak}</strong></span>
+          <span><small>{t('sessionStatus')}</small><strong>{t('streak', { count: snapshot.counters.currentFirstPassStreak })}</strong></span>
         </footer>
       </main>
 
@@ -2679,35 +2683,39 @@ function HistoryTrendChart({ buckets }: { buckets: readonly HistoryDailyBucket[]
 
 function HistoryRecord({
   item,
+  chordReport,
   onOpenChordReport,
   onOpenIntervalReport
 }: {
   item: MixedPracticeHistoryItem
+  chordReport?: ChordPersistenceSnapshot['records'][number]
   onOpenChordReport: (recordId: string) => void
   onOpenIntervalReport: (recordId: string) => void
 }): JSX.Element {
   const { t } = useTranslation('intervalPractice')
+  const { t: chordT } = useTranslation('chordPractice')
   const { t: sightT } = useTranslation('sightReading')
   const { runtime } = useMidiUi()
   const { resolvedLocale } = useAppLocale()
   if (item.module === 'chord') {
+    const modeSummary = presentChordHistorySummary(chordReport, item.modeSummary, chordT)
     const completed = item.plannedQuestionCount === null
-      ? `完成 ${item.completedQuestions}`
-      : `完成 ${item.completedQuestions}/${item.plannedQuestionCount}`
+      ? chordT('recordEndless', { count: item.completedQuestions })
+      : chordT('recordCompleted', { completed: item.completedQuestions, total: item.plannedQuestionCount })
     return (
       <button
-        aria-label={`打开${item.modeSummary}练习报告`}
+        aria-label={chordT('openReport', { summary: modeSummary })}
         className={`history-row is-${item.completionReason} is-interactive`}
         type="button"
         onClick={() => onOpenChordReport(item.recordId)}
       >
         <span className="history-row__mark"><Icon name="book" /></span>
         <span className="history-row__copy">
-          <small><b className="history-module-badge is-chord">和弦</b>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small>
-          <strong>{item.modeSummary}</strong>
-          <em>{completed} · 错误 {item.totalErrors} · 练习时长 {formatHistoryDuration(item.practiceDurationMs)}</em>
+          <small><b className="history-module-badge is-chord">{chordT('badge')}</b>{formatIntervalHistoryTimestamp(item.endedAt, resolvedLocale)} · {chordT(`status.${item.completionReason}`)}</small>
+          <strong>{modeSummary}</strong>
+          <em>{chordT('recordFacts', { completed, errors: item.totalErrors, duration: presentSightDuration(item.practiceDurationMs, sightT) })}</em>
         </span>
-        <span className="history-row__score"><strong>{formatHistoryPercentage(item.firstPassCompletionRate)}%</strong><small>完成率 <Icon name="chevron" size={13} /></small></span>
+        <span className="history-row__score"><strong>{formatHistoryPercentage(item.firstPassCompletionRate)}%</strong><small>{chordT('metrics.firstPassRate')} <Icon name="chevron" size={13} /></small></span>
       </button>
     )
   }
@@ -2824,7 +2832,7 @@ function HistoryScreen({
             </div>
             <div className="history-list__rows">
               {visibleItems.length > 0
-                ? visibleItems.map((item) => <HistoryRecord item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} onOpenIntervalReport={(recordId) => onOpenIntervalReport(recordId, filter)} />)
+                ? visibleItems.map((item) => <HistoryRecord chordReport={chordHistory.records.find(record => record.recordId === item.recordId)} item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} onOpenIntervalReport={(recordId) => onOpenIntervalReport(recordId, filter)} />)
                 : (
                   <div className="history-empty" role={anyError ? 'alert' : 'status'}>
                     <span className="history-row__mark"><Icon name={anyError ? 'info' : 'history'} /></span>
@@ -2862,52 +2870,54 @@ function ChordReportDetailScreen({
   onBack: () => void
   report: ChordPersistenceSnapshot['records'][number] | null
 }): JSX.Element {
+  const { t } = useTranslation('chordPractice')
+  const { resolvedLocale } = useAppLocale()
   if (!report) {
     return (
-      <ProductFrame active="history" onBack={onBack} title="和弦练习报告">
+      <ProductFrame active="history" onBack={onBack} title={t('reportTitle')}>
         <section className="chord-report-detail is-unavailable">
           <div className="chord-report-unavailable" role="status">
             <span className="history-row__mark"><Icon name="info" /></span>
-            <div><h1>记录不可用</h1><p>这条练习记录无法读取。</p></div>
-            <button className="primary-action" type="button" onClick={onBack}>返回记录</button>
+            <div><h1>{t('unavailable')}</h1><p>{t('unavailableHelp')}</p></div>
+            <button className="primary-action" type="button" onClick={onBack}>{t('backHistory')}</button>
           </div>
         </section>
       </ProductFrame>
     )
   }
 
-  const detail = projectChordReportDetail(report)
+  const detail = presentLocalizedChordReport(report, t, resolvedLocale)
   return (
-    <ProductFrame active="history" onBack={onBack} title="和弦练习报告">
+    <ProductFrame active="history" onBack={onBack} title={t('reportTitle')}>
       <section className="chord-report-detail">
         <div className="chord-report-detail__body">
           <header className="chord-report-identity">
-            <div><span className="eyebrow">练习记录</span><h1>{detail.modeIdentity}</h1><p>以下内容来自本轮已保存的练习事实。</p></div>
+            <div><span className="eyebrow">{t('journal')}</span><h1>{detail.modeIdentity}</h1><p>{t('savedFacts')}</p></div>
             <span className={`chord-report-status is-${report.completionReason}`}>{detail.statusLabel}</span>
           </header>
           <div className="chord-report-columns">
             <div className="chord-report-column">
               <section className="chord-report-card chord-report-overview" aria-labelledby="chord-report-overview-title">
-                <div className="chord-report-card__heading"><div><span className="eyebrow">本轮概览</span><h2 id="chord-report-overview-title">练习结果</h2></div></div>
+                <div className="chord-report-card__heading"><div><span className="eyebrow">{t('overview')}</span><h2 id="chord-report-overview-title">{t('result')}</h2></div></div>
                 <dl className="chord-report-metrics">
                   {detail.overviewMetrics.map((metric) => (
-                    <div className={metric.primary ? 'is-primary' : ''} key={metric.label}>
+                    <div className={metric.primary ? 'is-primary' : ''} key={metric.id}>
                       <dt>{metric.label}</dt><dd>{metric.value}</dd>
                     </div>
                   ))}
                 </dl>
-                <p className="chord-report-explanation">分解与柱式均首次成功，才计为首次通过。</p>
+                <p className="chord-report-explanation">{t('firstPassHelp')}</p>
               </section>
               <section className="chord-report-card" aria-labelledby="chord-report-errors-title">
-                <div className="chord-report-card__heading"><div><span className="eyebrow">事实计数</span><h2 id="chord-report-errors-title">错误分布</h2></div></div>
+                <div className="chord-report-card__heading"><div><span className="eyebrow">{t('factCounts')}</span><h2 id="chord-report-errors-title">{t('errors')}</h2></div></div>
                 <dl className="chord-report-error-grid">
-                  {detail.errorRows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
+                  {detail.errorRows.map((row) => <div key={row.id}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
                 </dl>
               </section>
             </div>
             <div className="chord-report-column">
               <section className="chord-report-card" aria-labelledby="chord-report-timing-title">
-                <div className="chord-report-card__heading"><div><span className="eyebrow">中位数</span><h2 id="chord-report-timing-title">演奏时间</h2></div><small>按已完成题目汇总</small></div>
+                <div className="chord-report-card__heading"><div><span className="eyebrow">{t('median')}</span><h2 id="chord-report-timing-title">{t('timing')}</h2></div><small>{t('completedSamples')}</small></div>
                 <dl className="chord-report-rows chord-report-timing">
                   {detail.timingRows.map((row) => (
                     <div key={row.id}><dt>{row.label}</dt><dd><strong>{row.value}</strong><small>{row.sampleLabel}</small></dd></div>
@@ -2915,9 +2925,9 @@ function ChordReportDetailScreen({
                 </dl>
               </section>
               <section className="chord-report-card" aria-labelledby="chord-report-session-title">
-                <div className="chord-report-card__heading"><div><span className="eyebrow">历史快照</span><h2 id="chord-report-session-title">本轮信息</h2></div></div>
+                <div className="chord-report-card__heading"><div><span className="eyebrow">{t('snapshot')}</span><h2 id="chord-report-session-title">{t('sessionInfo')}</h2></div></div>
                 <dl className="chord-report-rows chord-report-session">
-                  {detail.sessionRows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
+                  {detail.sessionRows.map((row) => <div key={row.id}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
                 </dl>
               </section>
             </div>
@@ -3586,12 +3596,13 @@ function PersistenceErrorNotice({ runtime }: { runtime: AndroidSightReadingRunti
 }
 
 function ChordPersistenceErrorNotice({ persistence }: { persistence: ChordPersistenceSnapshot }): JSX.Element | null {
+  const { t } = useTranslation('chordPractice')
   if (persistence.status !== 'error') return null
   return (
     <aside className="persistence-error" role="alert">
       {persistence.errorContext === 'save'
-        ? <span><strong>练习已结束，但记录保存失败。</strong><small>和弦练习结果没有被加入练习记录。</small></span>
-        : <span><strong>暂时无法读取和弦练习记录。</strong><small>其他练习功能仍可正常使用。</small></span>}
+        ? <span><strong>{t('saveFailed')}</strong><small>{t('saveFailedHelp')}</small></span>
+        : <span><strong>{t('readFailed')}</strong><small>{t('readFailedHelp')}</small></span>}
     </aside>
   )
 }

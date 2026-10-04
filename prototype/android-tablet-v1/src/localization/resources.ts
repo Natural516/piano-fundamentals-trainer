@@ -4,9 +4,11 @@ import { theoryQueryResources } from './theoryQueryResources'
 import { intervalPreparationResources } from './intervalPreparationResources'
 import { intervalFlowResources } from './intervalFlowResources'
 import { sightReadingResources } from './sightReadingResources'
+import { chordPracticeResources } from './chordPracticeResources'
 
 export const localizationResources = {
   'zh-CN': {
+    chordPractice: chordPracticeResources['zh-CN'],
     sightReading: sightReadingResources['zh-CN'],
     intervalPractice: { ...intervalPreparationResources['zh-CN'], ...intervalFlowResources['zh-CN'] },
     theoryQuery: theoryQueryResources['zh-CN'],
@@ -46,6 +48,7 @@ export const localizationResources = {
     }
   },
   en: {
+    chordPractice: chordPracticeResources.en,
     sightReading: sightReadingResources.en,
     intervalPractice: { ...intervalPreparationResources.en, ...intervalFlowResources.en },
     theoryQuery: theoryQueryResources.en,

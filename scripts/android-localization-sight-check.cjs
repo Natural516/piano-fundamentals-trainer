@@ -279,10 +279,11 @@ test('SIGHT-E24', 'all legacy Chinese prompts remain equivalent; pairs translate
   }
 })
 test('SIGHT-E25', 'scope freeze: domain/native/runtime/Interval and Chord branches/shared History stay exact', () => {
-  const allowed = new Set(['SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'HistoryRecord', 'PersistenceErrorNotice'])
+  const allowed = new Set(['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'HistoryScreen', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'HistoryRecord', 'PersistenceErrorNotice'])
   assert.deepEqual([...current.keys()], [...previous.keys()]); for (const [name, body] of current) if (!allowed.has(name)) assert.equal(body, previous.get(name), name)
-  const branches = body => body.slice(body.indexOf("if (item.module === 'chord')"), body.indexOf('  const sightPresentation'))
-  const oldBranches = previous.get('HistoryRecord').slice(previous.get('HistoryRecord').indexOf("if (item.module === 'chord')"), previous.get('HistoryRecord').lastIndexOf('  return ('))
+  // B4.5 changes Chord display only. Interval remains byte-frozen; CHORD-E20 also freezes the reviewed Sight display.
+  const branches = body => body.slice(body.indexOf("if (item.module === 'interval')"), body.indexOf('  const sightPresentation'))
+  const oldBranches = previous.get('HistoryRecord').slice(previous.get('HistoryRecord').indexOf("if (item.module === 'interval')"), previous.get('HistoryRecord').lastIndexOf('  return ('))
   assert.equal(branches(current.get('HistoryRecord')), oldBranches)
   const files = execFileSync('git', ['ls-tree', '-r', '--name-only', base, '--', 'src/sightReading', 'android', 'prototype/android-tablet-v1/src/intervalPractice', 'prototype/android-tablet-v1/src/chordPractice', 'prototype/android-tablet-v1/src/musicTheory', 'prototype/android-tablet-v1/src/theme'], { cwd: root, encoding: 'utf8' }).trim().split('\n')
   files.push(...['sightReadingIntegration.ts', 'sightReadingPresentation.ts', 'sightReadingFeedbackPresentation.ts', 'androidBluetoothMidi.ts', 'androidBluetoothMidiCore.ts', 'androidPersistenceCore.ts', 'historyProjection.ts', 'mixedHistoryProjection.ts', 'activePracticeSession.ts', 'practiceKeepAwake.ts'].map(n => 'prototype/android-tablet-v1/src/' + n))

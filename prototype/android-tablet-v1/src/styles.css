@@ -8863,3 +8863,22 @@ button.setting-row {
   white-space: normal;
   line-height: 1.5;
 }
+
+/* Chord English text wrapping only; notation and theme geometry stay unchanged. */
+.chord-mode-card .module-card__copy,
+.chord-settings-drawer .group-title,
+.chord-identity,
+.chord-stage-prompt > div,
+.chord-report-detail__body .chord-report-metrics dt {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.chord-settings-drawer .group-title,
+.chord-focus-header .focus-actions {
+  flex-wrap: wrap;
+}
+.chord-mode-help p,
+.chord-settings-note,
+.chord-report-detail__body .chord-report-explanation {
+  line-height: 1.6;
+}

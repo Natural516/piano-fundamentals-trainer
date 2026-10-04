@@ -185,7 +185,7 @@ test('IP11', 'locale round trip keeps exact Start handler identity and cannot cr
 }))
 test('IP12', 'B4.3 permits Interval flow/shared History presentation only; all other declarations remain frozen', () => {
   assert.deepEqual([...current.keys()], [...previous.keys()])
-  const allowed = new Set(['SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
+  const allowed = new Set(['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
   for (const [name, source] of current) if (!allowed.has(name)) assert.equal(source, previous.get(name), name)
 })
 test('IP13', 'all twenty setting combinations survive mounted locale round trips with zero business writes', async () => {
@@ -273,7 +273,28 @@ test('IP20', 'domain scheduler judgement report/legacy validator remain locale-f
 })
 test('IP21', 'only Preparation and English Interval report wrapping is added; preexisting CSS/notation/theme geometry is unchanged', () => {
   const oldCss = execFileSync('git', ['show', base + ':prototype/android-tablet-v1/src/styles.css'], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
-  const css = read('prototype/android-tablet-v1/src/styles.css')
+  const chordWrapping = `\n/* Chord English text wrapping only; notation and theme geometry stay unchanged. */
+.chord-mode-card .module-card__copy,
+.chord-settings-drawer .group-title,
+.chord-identity,
+.chord-stage-prompt > div,
+.chord-report-detail__body .chord-report-metrics dt {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.chord-settings-drawer .group-title,
+.chord-focus-header .focus-actions {
+  flex-wrap: wrap;
+}
+.chord-mode-help p,
+.chord-settings-note,
+.chord-report-detail__body .chord-report-explanation {
+  line-height: 1.6;
+}
+`
+  const currentCss = read('prototype/android-tablet-v1/src/styles.css')
+  assert.ok(currentCss.endsWith(chordWrapping), 'only the explicitly approved B4.5 suffix may follow Sight wrapping')
+  const css = currentCss.slice(0, -chordWrapping.length)
   const addition = css.match(/\n\/\* Preparation-only wrapping; ACTIVE and notation geometry stay unchanged\. \*\/[\s\S]*?(?=\n\.interval-ready-settings \{)/)
   assert.ok(addition)
   const reportWrapping = css.match(/\n\/\* Interval report English wrapping only; ACTIVE\/theme geometry is unchanged\. \*\/[\s\S]*?overflow-wrap: anywhere;\n\}/)

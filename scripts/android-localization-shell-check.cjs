@@ -38,8 +38,11 @@ function declarations(source) {
   return result
 }
 const current = declarations(main), old = declarations(baseline(mainPath))
-const componentNames = ['MidiUiContext', 'UpdaterUiContext', 'AppNavigationContext', 'useMidiUi', 'useUpdaterUi', 'useAppNavigation', 'productNavigation', 'SETTINGS_THEME_OPTIONS', 'Icon', 'navigate', 'presentMidiStatus', 'MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'SettingRow', 'SettingSelect', 'SettingsThemeOption', 'useThemeRuntime', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'THEORY_TOOLS', 'ToolsHubScreen', 'ScaleNoteToken', 'parseChordAccidentalGroup', 'ChordAccidentalGlyph', 'ChordAccidentalGroup', 'ChordSymbol', 'ChordTheoreticalNoteToken', 'ToolDetailShell', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalPitchToken', 'IntervalPitchSelector', 'IntervalQueryToolScreen', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'useRemainingTime', 'PracticeMetric', 'getPracticeScreen', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'NotationPaper', 'useIntervalPracticeRuntime', 'useIntervalPersistence', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice']
+const componentNames = ['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'useChordPracticeRuntime', 'toChordWrittenPitches', 'MidiUiContext', 'UpdaterUiContext', 'AppNavigationContext', 'useMidiUi', 'useUpdaterUi', 'useAppNavigation', 'productNavigation', 'SETTINGS_THEME_OPTIONS', 'Icon', 'navigate', 'presentMidiStatus', 'MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'SettingRow', 'SettingSelect', 'SettingsThemeOption', 'useThemeRuntime', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'THEORY_TOOLS', 'ToolsHubScreen', 'ScaleNoteToken', 'parseChordAccidentalGroup', 'ChordAccidentalGlyph', 'ChordAccidentalGroup', 'ChordSymbol', 'ChordTheoreticalNoteToken', 'ToolDetailShell', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalPitchToken', 'IntervalPitchSelector', 'IntervalQueryToolScreen', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'useRemainingTime', 'PracticeMetric', 'getPracticeScreen', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'NotationPaper', 'useIntervalPracticeRuntime', 'useIntervalPersistence', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice']
 const componentSource = `
+import { CHORD_SEQUENTIAL_MAJOR_KEY_IDS, formatWrittenPitchClass } from './musicTheory/chords'
+import { getChordMockCase, getChordMockState } from './chordPracticeMocks'
+import { presentChordKey, presentChordQuestion, presentChordHistorySummary, presentLocalizedChordPractice, presentLocalizedChordReport } from './localization/chordPracticePresentation'
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Capacitor } from '@capacitor/core'
@@ -68,6 +71,7 @@ import { projectChordHistory } from './chordPractice/historyProjection'
 import { projectHistoryDashboard } from './historyDashboardProjection'
 // Only test the staff's production props here. VexFlow pixels remain browser-blocked.
 function MusicStaffRenderer(props) { return <div data-test-staff="wiring-only" aria-label={props.ariaLabel} /> }
+function ChordGrandStaff(props) { return <div data-test-chord-staff="wiring-only" aria-label={props.ariaLabel} /> }
 const __QA_BUILD__ = false
 const __ANDROID_VERSION_NAME__ = '1.6.0'
 const __ANDROID_VERSION_CODE__ = 14
@@ -171,7 +175,7 @@ async function mounted(page, run, options = {}) {
   const runtime = new AndroidSightReadingRuntime({ clock: { now: () => 1000 }, scheduler: { schedule: () => 1, cancel() {} }, random: () => 0.42, bluetoothPlugin: plugin, requireMidiIdentity: true, initialMidiSource: 'bluetooth', reportRepository, settingsRepository, ...(options.runtimeDependencies ?? {}) })
   await runtime.startMidi()
   await runtime.midiInput.connect('usb-identity', 3)
-  if (!['interval-practice', 'interval-flow', 'sight-flow'].includes(page)) {
+  if (!['interval-practice', 'interval-flow', 'sight-flow', 'chord-flow'].includes(page)) {
     runtime.start(); runtime.pause()
     assert.equal(runtime.snapshot.isPaused, true)
   }
@@ -183,6 +187,7 @@ async function mounted(page, run, options = {}) {
   const chordPersistence = { refresh: async () => { refreshCalls.push('chord') } }
   const hubProps = { chordHistory, chordPersistence, intervalSettingsReady: options.ready ?? true, settings: runtime.settings }
   const pointerCalls = []
+  if (options.beforeRender) await options.beforeRender({ backend, runtime })
   const theme = options.theme ?? { id: 'light', displayName: '浅色', source: 'builtin', capabilities: { settingsVisual: { kind: 'standard' }, homeVisual: { kind: 'standard' }, practiceVisual: { kind: 'standard' }, toolsVisual: { kind: 'standard' }, toolDetailVisual: { kind: 'standard' } } }
   const themeSnapshot = { installed: options.installed ?? [], theme }
   const themeManager = { snapshot: themeSnapshot, subscribe: () => () => {}, selectThemeId: id => pointerCalls.push(id), activateExternal: record => pointerCalls.push(record.themeId) }
@@ -196,7 +201,7 @@ async function mounted(page, run, options = {}) {
     return React.createElement(ui.MidiUiContext.Provider, { value: { runtime: ownedRuntime } },
       React.createElement(ui.UpdaterUiContext.Provider, { value: updaterValue },
         React.createElement(ui.AppNavigationContext.Provider, { value: navValue },
-          ['interval-practice', 'interval-flow', 'sight-flow'].includes(page) ? options.render({ backend, runtime, theme, ui }) : React.createElement({ settings: ui.SettingsScreen, midi: ui.MidiScreen, home: ui.HomeScreen, practice: ui.PracticeHubScreen, tools: ui.ToolsHubScreen, 'chord-query-tool': ui.ChordQueryToolScreen, 'interval-query-tool': ui.IntervalQueryToolScreen, 'scale-key-signature-tool': ui.ScaleKeySignatureToolScreen }[page],
+          ['interval-practice', 'interval-flow', 'sight-flow', 'chord-flow'].includes(page) ? options.render({ backend, runtime, theme, ui }) : React.createElement({ settings: ui.SettingsScreen, midi: ui.MidiScreen, home: ui.HomeScreen, practice: ui.PracticeHubScreen, tools: ui.ToolsHubScreen, 'chord-query-tool': ui.ChordQueryToolScreen, 'interval-query-tool': ui.IntervalQueryToolScreen, 'scale-key-signature-tool': ui.ScaleKeySignatureToolScreen }[page],
             page === 'settings' ? { theme, themeManager } : page === 'midi' ? {} : { ...hubProps, theme }))))
   }
   try {
@@ -411,7 +416,7 @@ test('M12', 'actual full-row candidates and multi-port selector preserve identit
 }))
 
 test('B41R1', 'all out-of-scope main declarations and Bocchi headline/dialogs stay byte frozen', () => {
-  const permitted = new Set(['MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'ToolsHubScreen', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalQueryToolScreen', 'IntervalPitchSelector', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
+  const permitted = new Set(['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'ToolsHubScreen', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalQueryToolScreen', 'IntervalPitchSelector', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
   assert.deepEqual([...current.keys()], [...old.keys()])
   for (const [name, source] of current) if (!permitted.has(name)) assert.equal(source, old.get(name), name)
   const caption = source => source.match(/<div className="settings-hero__caption">[\s\S]*?<\/div>/)[0]

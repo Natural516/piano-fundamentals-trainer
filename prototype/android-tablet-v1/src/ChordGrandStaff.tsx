@@ -20,6 +20,8 @@ interface ChordGrandStaffProps {
   blockState: ChordGroupVisualState
   pitches: readonly ChordWrittenPitch[]
   symbol: string
+  ariaLabel?: string
+  fontErrorLabel?: string
 }
 
 const MIN_RENDER_WIDTH = 760
@@ -162,7 +164,9 @@ export function ChordGrandStaff({
   arpeggioState,
   blockState,
   pitches,
-  symbol
+  symbol,
+  ariaLabel,
+  fontErrorLabel
 }: ChordGrandStaffProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const [fontReady, setFontReady] = useState(false)
@@ -220,11 +224,11 @@ export function ChordGrandStaff({
     <div
       ref={containerRef}
       aria-busy={!fontReady && !fontError}
-      aria-label={`${symbol}：左侧分解和弦，右侧柱式和弦`}
+      aria-label={ariaLabel ?? `${symbol}：左侧分解和弦，右侧柱式和弦`}
       className="chord-grand-staff"
       role="img"
     >
-      {fontError ? <span className="music-staff-renderer__error" role="alert">{fontError}</span> : null}
+      {fontError ? <span className="music-staff-renderer__error" role="alert">{fontErrorLabel ?? fontError}</span> : null}
     </div>
   )
 }
