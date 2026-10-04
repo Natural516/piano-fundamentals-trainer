@@ -190,8 +190,8 @@ test('LOC15', 'all migrated resource namespaces have identical nonempty key shap
   assert.deepEqual(keys(zh), keys(en))
   assert.deepEqual(Object.keys(localizationResources.en.midi).filter(key => key.startsWith('devicesFound')), ['devicesFound_one', 'devicesFound_other'])
   assert.equal(localizationResources['zh-CN'].midi.devicesFound, '{{count}} 个候选')
-  assert.equal(zh.length, 150 + 58) // B2/B3/B4.1 150 + B4.2A 58 semantic keys.
-  assert.equal(en.length, zh.length + 2) // MIDI candidate + Home completed-question plurals.
+  assert.equal(zh.length, 150 + 58 + 121) // B2/B3/B4.1 + B4.2A + B4.2B query resource keys.
+  assert.equal(en.length, zh.length + 4) // MIDI/Home counts plus query semitone/help plurals.
   for (const [, value] of [...zh, ...en]) assert.ok(value.trim())
   for (const [key] of en) {
     const [ns, ...parts] = key.split('.')

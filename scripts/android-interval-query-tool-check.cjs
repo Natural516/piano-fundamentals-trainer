@@ -179,20 +179,21 @@ test('IQ20', 'Tools navigation opens and returns from the Interval Query route',
 
 test('IQ21', 'visible UI has two grouped pitch selectors and approved default C4 to G4', () => {
   assert.equal((screenSource.match(/<IntervalPitchSelector/g) ?? []).length, 2)
-  assert.match(screenSource, /label="起始音"/)
-  assert.match(screenSource, /label="目标音"/)
+  assert.match(screenSource, /label=\{t\('interval.start'\)\}/)
+  assert.match(screenSource, /label=\{t\('interval.target'\)\}/)
   assert.match(screenSource, /useState<IntervalQueryLetter>\('C'\)/)
   assert.match(screenSource, /useState<IntervalQueryLetter>\('G'\)/)
   assert.equal((screenSource.match(/useState<IntervalQueryOctave>\(4\)/g) ?? []).length, 2)
-  assert.match(mainSource, /aria-label=\{`\$\{label\} 变音记号`\}/)
-  assert.match(mainSource, /<option aria-label=\{option\.accessibleLabel\}/)
+  assert.match(mainSource, /aria-label=\{t\('interval.pitchAccidental', \{ pitch: label \}\)\}/)
+  assert.match(mainSource, /<option aria-label=\{presentQueryAccidental\(option.value, t\)\}/)
 })
 
-test('IQ22', 'visible UI follows the frozen result hierarchy and exact product copy', () => {
-  for (const copy of ['INTERVAL REFERENCE', 'INTERVAL RESULT', '音程查询', '选择起始音与目标音，查看音程名称、方向与等音程参考。', '结果信息', '方向', '度数', '性质', '半音数', 'ENHARMONIC INTERVALS', '等音程参考']) {
-    assert.match(screenSource, new RegExp(copy))
+test('IQ22', 'visible UI follows the frozen result hierarchy with stable-key localized product copy', () => {
+  for (const key of ['reference', 'resultEyebrow', 'title', 'description', 'facts', 'direction', 'degree', 'quality', 'semitones', 'referenceEyebrow', 'references']) {
+    assert.ok(screenSource.includes(`t('interval.${key}')`))
   }
-  assert.match(screenSource, /result\.displayName/)
+  assert.match(screenSource, /presentIntervalQuery\(result, t, i18n.language\)/)
+  assert.match(screenSource, /display\.displayName/)
   assert.match(screenSource, /result\.enharmonicReferences\.map/)
 })
 

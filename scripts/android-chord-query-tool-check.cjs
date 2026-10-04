@@ -218,12 +218,13 @@ test('CQ22', 'one grouped selector contains the nine approved non-selectable cat
   assert.deepEqual(CHORD_QUERY_TYPE_GROUPS.map((group) => group.label), [
     '基础三和弦', '七和弦', '挂留和弦', '六和弦 / 加音', '九和弦', '十一和弦', '十三和弦', '变化属和弦', '其他'
   ])
-  assert.match(screenSource, /<optgroup key=\{group\.id\} label=\{group\.label\}>/)
+  assert.match(screenSource, /<optgroup key=\{group\.id\} label=\{t\(`chord.groups.\$\{group.id\}`\)\}>/)
   assert.equal((screenSource.match(/<select/g) ?? []).length, 3)
 })
 
-test('CQ23', 'visible result contains only symbol Chinese name and theoretical notes', () => {
-  for (const label of ['CHORD SYMBOL', '理论构成音']) assert.match(screenSource, new RegExp(label))
+test('CQ23', 'visible result contains only stable symbol localized name and theoretical notes', () => {
+  for (const key of ['chord.symbol', 'chord.tones']) assert.ok(screenSource.includes(`t('${key}')`))
+  assert.ok(screenSource.includes('t(`chord.types.${result.type.id}`)'))
   assert.doesNotMatch(screenSource, /键盘构成示意|PIANO MAP|MusicStaffRenderer|formula|公式|指法|转位|播放|收藏|最近查询|推荐|伴奏|History|MIDI/)
 })
 

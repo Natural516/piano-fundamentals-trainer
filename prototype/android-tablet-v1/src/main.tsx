@@ -65,6 +65,7 @@ import { LanguageSetting } from './localization/LanguageSetting'
 import { IntervalDisplayName, SightNoteValue } from './localization/LegacyDisplayValues'
 import { getSettingsThemeDisplayName, presentLocalizedMidiStatus } from './localization/midiPresentation'
 import { presentHomeRecentPractice } from './localization/homePresentation'
+import { presentChordTypeOption, presentIntervalName, presentIntervalQuery, presentQueryAccidental } from './localization/theoryQueryPresentation'
 import {
   DEFAULT_INTERVAL_PRACTICE_SETTINGS,
   INTERVAL_QUESTION_COUNT_OPTIONS,
@@ -1400,6 +1401,7 @@ function ToolDetailShell({
 }
 
 function ChordQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
+  const { t } = useTranslation('theoryQuery')
   const [noteLetter, setNoteLetter] = useState<ChordQueryNoteLetter>('C')
   const [accidental, setAccidental] = useState<ChordQueryInputAccidental>(0)
   const [chordType, setChordType] = useState<ChordQueryTypeId>('major')
@@ -1409,7 +1411,7 @@ function ChordQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Elemen
   const decoratedReference = toolDetailVisual.kind === 'decorated-reference' ? toolDetailVisual : null
 
   return (
-    <ProductFrame active="tools" className={decoratedReference?.frameClassName} onBack={() => navigate('tools')} title="和弦查询">
+    <ProductFrame active="tools" className={decoratedReference?.frameClassName} onBack={() => navigate('tools')} title={t('chord.title')}>
       <ToolDetailShell
         ariaLabelledby="chord-query-title"
         className="chord-query-layout"
@@ -1418,15 +1420,15 @@ function ChordQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Elemen
         visual={toolDetailVisual}
         heading={(
           <div>
-            <span className="eyebrow">CHORD REFERENCE</span>
-            <h1 id="chord-query-title">和弦查询</h1>
-            <p>选择根音和和弦类型，查看规范名称与完整理论构成音。</p>
+            <span className="eyebrow">{t('chord.reference')}</span>
+            <h1 id="chord-query-title">{t('chord.title')}</h1>
+            <p>{t('chord.description')}</p>
           </div>
         )}
         query={(
-          <div className="chord-query-selectors" aria-label="和弦查询条件">
+          <div className="chord-query-selectors" aria-label={t('chord.conditions')}>
             <label>
-              <span>音名</span>
+              <span>{t('noteName')}</span>
               <span className="setting-select-wrap">
                 <select className="setting-select" value={noteLetter} onChange={(event) => setNoteLetter(event.target.value as ChordQueryNoteLetter)}>
                   {CHORD_QUERY_NOTE_LETTERS.map((letter) => <option key={letter} value={letter}>{letter}</option>)}
@@ -1435,21 +1437,21 @@ function ChordQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Elemen
               </span>
             </label>
             <label>
-              <span>变音记号</span>
+              <span>{t('accidental')}</span>
               <span className="setting-select-wrap">
                 <select className="setting-select" value={accidental} onChange={(event) => setAccidental(Number(event.target.value) as ChordQueryInputAccidental)}>
-                  {CHORD_QUERY_INPUT_ACCIDENTALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  {CHORD_QUERY_INPUT_ACCIDENTALS.map((option) => <option aria-label={presentQueryAccidental(option.value, t)} key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
                 <Icon name="chevron-down" size={17} />
               </span>
             </label>
             <label>
-              <span>和弦类型</span>
+              <span>{t('chord.type')}</span>
               <span className="setting-select-wrap">
                 <select className="setting-select" value={chordType} onChange={(event) => setChordType(event.target.value as ChordQueryTypeId)}>
                   {CHORD_QUERY_TYPE_GROUPS.map((group) => (
-                    <optgroup key={group.id} label={group.label}>
-                      {group.types.map((option) => <option key={option.id} value={option.id}>{option.selectorLabel}</option>)}
+                    <optgroup key={group.id} label={t(`chord.groups.${group.id}`)}>
+                      {group.types.map((option) => <option key={option.id} value={option.id}>{presentChordTypeOption(option, t)}</option>)}
                     </optgroup>
                   ))}
                 </select>
@@ -1459,9 +1461,9 @@ function ChordQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Elemen
           </div>
         )}
         primaryResult={(
-          <article className="chord-query-card chord-query-answer" aria-label={`${result.symbol} 查询结果`}>
+          <article className="chord-query-card chord-query-answer" aria-label={t('chord.result', { chordName: result.symbol })}>
           <div className="chord-query-identity">
-            <span className="eyebrow">CHORD SYMBOL</span>
+            <span className="eyebrow">{t('chord.symbol')}</span>
             <h2>
               <ChordSymbol
                 accidental={result.rootLabel.slice(1)}
@@ -1472,12 +1474,12 @@ function ChordQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Elemen
             </h2>
             <p>
               <ChordTheoreticalNoteToken accidental={result.rootLabel.slice(1)} label={result.rootLabel} letter={result.root.letter} />
-              <span>{result.type.chineseName}</span>
+              <span>{t(`chord.types.${result.type.id}`)}</span>
             </p>
           </div>
           <div className="chord-query-composition">
-            <span className="eyebrow">理论构成音</span>
-            <p aria-label={`${result.chineseLabel}理论构成音`}>
+            <span className="eyebrow">{t('chord.tones')}</span>
+            <p aria-label={t('chord.composition', { root: result.rootLabel, chordName: t(`chord.types.${result.type.id}`) })}>
               {result.pitches.map((pitch, index) => (
                 <span className="chord-query-note-item" key={`${pitch.label}-${pitch.degree}`}>
                   {index > 0 ? <span aria-hidden="true" className="chord-query-note-separator">·</span> : null}
@@ -1494,14 +1496,16 @@ function ChordQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Elemen
 }
 
 function ScaleKeySignatureToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
+  const { t } = useTranslation('theoryQuery')
   const [root, setRoot] = useState<MajorKeyId>('C')
   const [scaleType, setScaleType] = useState<ScaleTypeId>('naturalMajor')
   const result = useMemo(() => getNaturalMajorToolResult(root), [root])
+  const keyName = t('scale.scaleTitle', { tonic: result.tonicLabel })
   const toolDetailVisual = theme.capabilities.toolDetailVisual
   const decoratedReference = toolDetailVisual.kind === 'decorated-reference' ? toolDetailVisual : null
 
   return (
-    <ProductFrame active="tools" className={decoratedReference?.frameClassName} onBack={() => navigate('tools')} title="音阶与调号">
+    <ProductFrame active="tools" className={decoratedReference?.frameClassName} onBack={() => navigate('tools')} title={t('scale.title')}>
       <ToolDetailShell
         ariaLabelledby="scale-tool-title"
         className="scale-tool-layout"
@@ -1511,15 +1515,15 @@ function ScaleKeySignatureToolScreen({ theme }: { theme: ThemeDefinition }): JSX
         visual={toolDetailVisual}
         heading={(
           <div>
-            <span className="eyebrow">SCALE / KEY SIGNATURE REFERENCE</span>
-            <h1 id="scale-tool-title">音阶与调号</h1>
-            <p>选择主音，查看自然大调的规范音名与五线谱调号。</p>
+            <span className="eyebrow">{t('scale.reference')}</span>
+            <h1 id="scale-tool-title">{t('scale.title')}</h1>
+            <p>{t('scale.description')}</p>
           </div>
         )}
         query={(
-          <div className="scale-tool-selectors" aria-label="音阶查询条件">
+          <div className="scale-tool-selectors" aria-label={t('scale.conditions')}>
             <label>
-              <span>主音</span>
+              <span>{t('scale.tonic')}</span>
               <span className="setting-select-wrap">
                 <select className="setting-select" value={root} onChange={(event) => setRoot(event.target.value as MajorKeyId)}>
                   {NATURAL_MAJOR_TOOL_ROOT_IDS.map((keyId) => (
@@ -1530,11 +1534,11 @@ function ScaleKeySignatureToolScreen({ theme }: { theme: ThemeDefinition }): JSX
               </span>
             </label>
             <label>
-              <span>音阶类型</span>
+              <span>{t('scale.type')}</span>
               <span className="setting-select-wrap">
                 <select className="setting-select" value={scaleType} onChange={(event) => setScaleType(event.target.value as ScaleTypeId)}>
                   {AVAILABLE_SCALE_TYPE_OPTIONS.map((option) => (
-                    <option key={option.id} value={option.id}>{option.label}</option>
+                    <option key={option.id} value={option.id}>{t('scale.major')}</option>
                   ))}
                 </select>
                 <Icon name="chevron-down" size={17} />
@@ -1546,9 +1550,9 @@ function ScaleKeySignatureToolScreen({ theme }: { theme: ThemeDefinition }): JSX
           <div className="scale-tool-results">
           <article className="scale-tool-card scale-tool-scale-card">
             <div className="scale-tool-scale-content">
-              <h2><ScaleNoteToken value={result.tonicLabel} /> <span>自然大调</span></h2>
-              <span className="eyebrow scale-tool-section-label">音阶构成</span>
-              <p className="scale-tool-note-sequence" aria-label={`${result.title}音阶构成`}>
+              <h2><ScaleNoteToken value={result.tonicLabel} /> <span>{t('scale.major')}</span></h2>
+              <span className="eyebrow scale-tool-section-label">{t('scale.composition')}</span>
+              <p className="scale-tool-note-sequence" aria-label={t('scale.compositionLabel', { keyName })}>
                 {result.notes.ascending.map((note, index) => (
                   <span className="scale-tool-sequence-item" key={`${note}-${index}`}>
                     {index > 0 ? <span aria-hidden="true" className="scale-tool-note-separator">·</span> : null}
@@ -1558,20 +1562,20 @@ function ScaleKeySignatureToolScreen({ theme }: { theme: ThemeDefinition }): JSX
               </p>
             </div>
             <div className="scale-tool-relative-section">
-              <span className="eyebrow scale-tool-section-label">关系调</span>
-              <small>相对小调</small>
-              <strong><ScaleNoteToken value={result.relativeMinorTonicLabel} /> <span>小调</span></strong>
+              <span className="eyebrow scale-tool-section-label">{t('scale.relatedKeys')}</span>
+              <small>{t('scale.relativeMinor')}</small>
+              <strong><ScaleNoteToken value={result.relativeMinorTonicLabel} /> <span>{t('scale.minor')}</span></strong>
             </div>
           </article>
 
           <article className="scale-tool-card scale-tool-signature-card">
             <div className="scale-tool-card-heading">
-              <span className="eyebrow">KEY SIGNATURE</span>
-              <h2>调号</h2>
+              <span className="eyebrow">{t('scale.signatureEyebrow')}</span>
+              <h2>{t('scale.signature')}</h2>
             </div>
             <div className="scale-key-signature-paper">
               <MusicStaffRenderer
-                ariaLabel={`${result.title}调号大谱表`}
+                ariaLabel={t('scale.signatureLabel', { keyName })}
                 feedback={null}
                 keySignature={result.keySignatureId}
                 notes={[]}
@@ -1611,11 +1615,12 @@ function IntervalPitchSelector({
   onAccidentalChange: (value: IntervalQueryVisibleAccidental) => void
   onOctaveChange: (value: IntervalQueryOctave) => void
 }): JSX.Element {
+  const { t } = useTranslation('theoryQuery')
   return (
     <fieldset className="interval-query-selector-group">
       <legend>{label}</legend>
       <label>
-        <span>音名</span>
+        <span>{t('noteName')}</span>
         <span className="setting-select-wrap">
           <select className="setting-select" value={pitch.letter} onChange={(event) => onLetterChange(event.target.value as IntervalQueryLetter)}>
             {INTERVAL_QUERY_LETTERS.map((letter) => <option key={letter} value={letter}>{letter}</option>)}
@@ -1624,16 +1629,16 @@ function IntervalPitchSelector({
         </span>
       </label>
       <label>
-        <span>变音记号</span>
+        <span>{t('accidental')}</span>
         <span className="setting-select-wrap">
-          <select aria-label={`${label} 变音记号`} className="setting-select" value={pitch.accidental} onChange={(event) => onAccidentalChange(Number(event.target.value) as IntervalQueryVisibleAccidental)}>
-            {INTERVAL_QUERY_VISIBLE_ACCIDENTALS.map((option) => <option aria-label={option.accessibleLabel} key={option.value} value={option.value}>{option.selectorLabel}</option>)}
+          <select aria-label={t('interval.pitchAccidental', { pitch: label })} className="setting-select" value={pitch.accidental} onChange={(event) => onAccidentalChange(Number(event.target.value) as IntervalQueryVisibleAccidental)}>
+            {INTERVAL_QUERY_VISIBLE_ACCIDENTALS.map((option) => <option aria-label={presentQueryAccidental(option.value, t)} key={option.value} value={option.value}>{option.selectorLabel}</option>)}
           </select>
           <Icon name="chevron-down" size={17} />
         </span>
       </label>
       <label>
-        <span>八度</span>
+        <span>{t('octave')}</span>
         <span className="setting-select-wrap">
           <select className="setting-select" value={pitch.octave} onChange={(event) => onOctaveChange(Number(event.target.value) as IntervalQueryOctave)}>
             {INTERVAL_QUERY_OCTAVES.map((octave) => <option key={octave} value={octave}>{octave}</option>)}
@@ -1646,6 +1651,7 @@ function IntervalPitchSelector({
 }
 
 function IntervalQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Element {
+  const { t, i18n } = useTranslation('theoryQuery')
   const [startLetter, setStartLetter] = useState<IntervalQueryLetter>('C')
   const [startAccidental, setStartAccidental] = useState<IntervalQueryVisibleAccidental>(0)
   const [startOctave, setStartOctave] = useState<IntervalQueryOctave>(4)
@@ -1655,11 +1661,12 @@ function IntervalQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Ele
   const start = useMemo(() => ({ letter: startLetter, accidental: startAccidental, octave: startOctave }), [startAccidental, startLetter, startOctave])
   const target = useMemo(() => ({ letter: targetLetter, accidental: targetAccidental, octave: targetOctave }), [targetAccidental, targetLetter, targetOctave])
   const result = useMemo(() => getIntervalQueryResult(start, target), [start, target])
+  const display = presentIntervalQuery(result, t, i18n.language)
   const toolDetailVisual = theme.capabilities.toolDetailVisual
   const decoratedReference = toolDetailVisual.kind === 'decorated-reference' ? toolDetailVisual : null
 
   return (
-    <ProductFrame active="tools" className={decoratedReference?.frameClassName} onBack={() => navigate('tools')} title="音程查询">
+    <ProductFrame active="tools" className={decoratedReference?.frameClassName} onBack={() => navigate('tools')} title={t('interval.title')}>
       <ToolDetailShell
         ariaLabelledby="interval-query-title"
         className="interval-query-layout"
@@ -1669,15 +1676,15 @@ function IntervalQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Ele
         visual={toolDetailVisual}
         heading={(
           <div className="interval-query-heading">
-            <span className="eyebrow">INTERVAL REFERENCE</span>
-            <h1 id="interval-query-title">音程查询</h1>
-            <p>选择起始音与目标音，查看音程名称、方向与等音程参考。</p>
+            <span className="eyebrow">{t('interval.reference')}</span>
+            <h1 id="interval-query-title">{t('interval.title')}</h1>
+            <p>{t('interval.description')}</p>
           </div>
         )}
         query={(
-          <div className="interval-query-selectors" aria-label="音程查询条件">
+          <div className="interval-query-selectors" aria-label={t('interval.conditions')}>
             <IntervalPitchSelector
-              label="起始音"
+              label={t('interval.start')}
               onAccidentalChange={setStartAccidental}
               onLetterChange={setStartLetter}
               onOctaveChange={setStartOctave}
@@ -1685,7 +1692,7 @@ function IntervalQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Ele
             />
             <span aria-hidden="true" className="interval-query-selector-arrow">→</span>
             <IntervalPitchSelector
-              label="目标音"
+              label={t('interval.target')}
               onAccidentalChange={setTargetAccidental}
               onLetterChange={setTargetLetter}
               onOctaveChange={setTargetOctave}
@@ -1695,24 +1702,24 @@ function IntervalQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Ele
         )}
         primaryResult={(
           <div className="interval-query-results">
-            <article className="interval-query-card interval-query-answer" aria-label={`${result.displayName}查询结果`}>
+            <article className="interval-query-card interval-query-answer" aria-label={t('interval.result', { intervalName: display.displayName })}>
               <div className="interval-query-identity">
-                <span className="eyebrow">INTERVAL RESULT</span>
-                <h2>{result.displayName}</h2>
+                <span className="eyebrow">{t('interval.resultEyebrow')}</span>
+                <h2>{display.displayName}</h2>
                 <div className="interval-query-pitch-pair">
                   <IntervalPitchToken pitch={result.start} />
                   <span aria-hidden="true" className="interval-query-pitch-arrow">→</span>
                   <IntervalPitchToken pitch={result.target} />
-                  {result.soundingRelationshipLabel ? <em>{result.soundingRelationshipLabel}</em> : null}
+                  {display.relationship ? <em>{display.relationship}</em> : null}
                 </div>
               </div>
               <div className="interval-query-facts">
-                <span className="eyebrow">结果信息</span>
+                <span className="eyebrow">{t('interval.facts')}</span>
                 <dl>
-                  <div><dt>方向</dt><dd>{result.directionLabel}</dd></div>
-                  <div><dt>度数</dt><dd>{result.intervalNumberLabel}</dd></div>
-                  <div><dt>性质</dt><dd>{result.quality}</dd></div>
-                  <div><dt>半音数</dt><dd>{result.semitoneDistance}</dd></div>
+                  <div><dt>{t('interval.direction')}</dt><dd>{display.direction}</dd></div>
+                  <div><dt>{t('interval.degree')}</dt><dd>{display.degree}</dd></div>
+                  <div><dt>{t('interval.quality')}</dt><dd>{display.quality}</dd></div>
+                  <div><dt>{t('interval.semitones')}</dt><dd>{result.semitoneDistance}</dd></div>
                 </dl>
               </div>
             </article>
@@ -1720,17 +1727,17 @@ function IntervalQueryToolScreen({ theme }: { theme: ThemeDefinition }): JSX.Ele
             <article className="interval-query-card interval-query-references">
               <header>
                 <div>
-                  <span className="eyebrow">ENHARMONIC INTERVALS</span>
-                  <h2>等音程参考</h2>
+                  <span className="eyebrow">{t('interval.referenceEyebrow')}</span>
+                  <h2>{t('interval.references')}</h2>
                 </div>
-                <p>保持 {result.semitoneDistance} 个半音不变，比较相邻级数的理论命名。</p>
+                <p>{t('interval.referenceHelp', { count: result.semitoneDistance })}</p>
               </header>
               <div className="interval-query-reference-list">
                 {result.enharmonicReferences.map((reference) => (
                   <div className={reference.isCurrent ? 'is-current' : ''} key={reference.intervalNumber}>
-                    <span>{reference.intervalName}</span>
-                    <small>{reference.semitoneDistance} 个半音</small>
-                    {reference.isCurrent ? <em>当前</em> : <i aria-hidden="true" />}
+                    <span>{presentIntervalName(reference.intervalNumber, reference.semitoneDistance, t, i18n.language).name}</span>
+                    <small>{t('interval.semitoneCount', { count: reference.semitoneDistance })}</small>
+                    {reference.isCurrent ? <em>{t('interval.current')}</em> : <i aria-hidden="true" />}
                   </div>
                 ))}
               </div>

@@ -8748,6 +8748,28 @@ button.setting-row {
   font-weight: 700;
 }
 
+/* Query-detail text only: do not change notation or the shared shell geometry. */
+.tool-detail-shell .tool-detail-heading,
+.tool-detail-shell .chord-query-identity p,
+.tool-detail-shell .interval-query-identity h2,
+.tool-detail-shell .interval-query-facts dd,
+.tool-detail-shell .interval-query-references header p,
+.tool-detail-shell .scale-tool-relative-section {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tool-detail-shell .chord-query-identity p,
+.tool-detail-shell .scale-tool-relative-section strong {
+  flex-wrap: wrap;
+}
+
+.tool-detail-shell .interval-query-reference-list span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
 @media (orientation: portrait) {
   body {
     min-width: 0;

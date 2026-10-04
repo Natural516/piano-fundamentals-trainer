@@ -1,8 +1,10 @@
 import { shellResources } from './shellResources'
 import { hubResources } from './hubResources'
+import { theoryQueryResources } from './theoryQueryResources'
 
 export const localizationResources = {
   'zh-CN': {
+    theoryQuery: theoryQueryResources['zh-CN'],
     home: hubResources['zh-CN'].home,
     practice: hubResources['zh-CN'].practice,
     tools: hubResources['zh-CN'].tools,
@@ -39,6 +41,7 @@ export const localizationResources = {
     }
   },
   en: {
+    theoryQuery: theoryQueryResources.en,
     home: hubResources.en.home,
     practice: hubResources.en.practice,
     tools: hubResources.en.tools,

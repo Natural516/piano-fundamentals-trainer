@@ -147,8 +147,8 @@ test('T3', 'three localized tool entries retain original metadata, IDs and desti
   assert.equal(current.get('THEORY_TOOLS'), old.get('THEORY_TOOLS'))
   await h.switchTo('en'); tools(h).forEach((card, index) => { card.props.onClick(); assert.equal(global.window.location.hash, ['chord-query-tool', 'interval-query-tool', 'scale-key-signature-tool'][index]) })
 }))
-test('T4', 'Query detail/theory and all out-of-scope main declarations are byte-frozen', () => {
-  const allowed = new Set(['HomeScreen', 'PracticeHubScreen', 'ToolsHubScreen'])
+test('T4', 'B4.2B permits only query presentation; theory and all other declarations remain byte-frozen', () => {
+  const allowed = new Set(['HomeScreen', 'PracticeHubScreen', 'ToolsHubScreen', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalQueryToolScreen', 'IntervalPitchSelector'])
   assert.deepEqual([...current.keys()], [...old.keys()])
   for (const [name, source] of current) if (!allowed.has(name)) assert.equal(source, old.get(name), name)
   execFileSync('git', ['diff', '--exit-code', base, '--', 'prototype/android-tablet-v1/src/musicTheory', 'prototype/android-tablet-v1/src/intervalQueryTool.ts', 'prototype/android-tablet-v1/src/scaleKeySignatureTool.ts'], { cwd: root })
