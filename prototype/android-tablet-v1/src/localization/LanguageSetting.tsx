@@ -1,12 +1,17 @@
 import { useTranslation } from 'react-i18next'
 import { useAppLocale } from './LocaleProvider'
-import { isLanguagePreference } from './locale'
 
-/** A real, small bilingual Settings surface; other product pages remain unchanged in B2. */
+/** Fixed autonyms: language choices are not translated interface copy. */
+export const LANGUAGE_OPTIONS = [
+  { id: 'zh-CN', label: '中文' },
+  { id: 'en', label: 'English' }
+] as const
+
+/** Legacy system preferences display the resolved language without rewriting storage. */
 export function LanguageSetting(): JSX.Element {
   const { t } = useTranslation('settings')
   const locale = useAppLocale()
-  const language = t(locale.resolvedLocale === 'zh-CN' ? 'chinese' : 'english')
+  const language = LANGUAGE_OPTIONS[locale.resolvedLocale === 'zh-CN' ? 0 : 1].label
   return (
     <div className="settings-language">
       <div className="setting-row">
@@ -15,15 +20,13 @@ export function LanguageSetting(): JSX.Element {
           <strong>{t('language')}</strong><small>{t('languageDescription')}</small>
         </label>
         <span className="setting-select-wrap">
-          <select id="app-language-preference" className="setting-select" value={locale.preference}
+          <select id="app-language-preference" className="setting-select" value={locale.resolvedLocale}
             disabled={!locale.ready || locale.saving || !locale.writable}
             onChange={(event) => {
               const value = event.target.value
-              if (isLanguagePreference(value)) void locale.changeLanguagePreference(value)
+              if (value === 'zh-CN' || value === 'en') void locale.changeLanguagePreference(value)
             }}>
-            <option value="system">{t('system')}</option>
-            <option value="zh-CN">{t('chinese')}</option>
-            <option value="en">{t('english')}</option>
+            {LANGUAGE_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
           </select>
         </span>
       </div>

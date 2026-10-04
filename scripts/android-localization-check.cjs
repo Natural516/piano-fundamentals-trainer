@@ -191,7 +191,8 @@ test('LOC15', 'all migrated resource namespaces have identical nonempty key shap
   assert.deepEqual(keys(zh), keys(en))
   assert.deepEqual(Object.keys(localizationResources.en.midi).filter(key => key.startsWith('devicesFound')), ['devicesFound_one', 'devicesFound_other'])
   assert.equal(localizationResources['zh-CN'].midi.devicesFound, '{{count}} 个候选')
-  assert.equal(zh.length, 150 + 58 + 121 + 19 + 112 + 107 + 148 + 148) // Existing stages + explicit B4.6 Theme/Updater/common display keys.
+  assert.equal(zh.length, 150 + 58 + 121 + 19 + 112 + 107 + 148 + 148 - 3) // B6 removes only the three translated language-option keys.
+  for (const locale of ['zh-CN', 'en']) for (const key of ['system', 'chinese', 'english']) assert.equal(Object.hasOwn(localizationResources[locale].settings, key), false)
   assert.equal(en.length, zh.length + 30) // Existing plural differences plus five Chord English plurals.
   for (const [, value] of [...zh, ...en]) assert.ok(value.trim())
   for (const [key] of en) {
@@ -277,12 +278,14 @@ test('LOC20', 'real React provider/settings switch live without remounting runti
     assert.match(treeText(), /设置/)
     const identity = latestIdentity
     const options = () => renderer.root.findAllByType('option').map((node) => ({ value: node.props.value, label: node.children.join('') }))
-    assert.deepEqual(options().map((v) => v.value), ['system', 'zh-CN', 'en'])
+    const expectedOptions = [{ value: 'zh-CN', label: '中文' }, { value: 'en', label: 'English' }]
+    assert.deepEqual(options(), expectedOptions)
+    assert.equal(renderer.root.findByType('select').props.value, 'zh-CN')
     await act(async () => { renderer.root.findByType('select').props.onChange({ target: { value: 'en' } }); await service.changeLanguagePreference('en') })
     assert.match(treeText(), /Settings/)
     assert.match(treeText(), /Language/)
-    assert.match(treeText(), /Follow system/)
-    assert.match(treeText(), /Simplified Chinese/)
+    assert.deepEqual(options(), expectedOptions)
+    assert.doesNotMatch(treeText(), /Follow system|Simplified Chinese/)
     assert.equal(global.document.documentElement.lang, 'en')
     assert.equal(global.document.title, 'Piano Fundamentals Trainer')
     backend.failWrite = true
@@ -292,7 +295,7 @@ test('LOC20', 'real React provider/settings switch live without remounting runti
     assert.doesNotMatch(treeText(), /RAW_NATIVE_PREFERENCES_SECRET/)
     backend.failWrite = false
     await act(async () => { await service.changeLanguagePreference('zh-CN') })
-    assert.match(treeText(), /跟随系统/)
+    assert.deepEqual(options(), expectedOptions)
     assert.equal(global.document.documentElement.lang, 'zh-CN')
     assert.equal(global.document.title, '钢琴基本功训练器')
     await act(async () => { await service.changeLanguagePreference('system') })

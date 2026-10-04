@@ -248,7 +248,10 @@ test('ST1', 'Settings Device Appearance About and real entry copy render in both
   for (const label of ['设备', '外观', '关于', '当前版本', '检查更新', '开源项目']) contains(h.getText(), label)
   await h.switchTo('en')
   for (const label of ['Device', 'Appearance', 'About', 'Current version', 'Check for updates', 'Open source', 'V1.6.0', 'versionCode 14']) contains(h.getText(), label)
-  assert.doesNotMatch(h.getText(), /[\u3400-\u9fff]/)
+  const language = h.renderer.root.findByProps({ id: 'app-language-preference' })
+  assert.equal(text(language.findByProps({ value: 'zh-CN' })), '中文')
+  // Only the one approved option autonym remains Chinese, not any other English Settings copy.
+  assert.deepEqual(h.getText().match(/[\u3400-\u9fff]+/g), ['中文'])
 }))
 test('ST2', 'Light/Dark display from stable IDs, with selection handlers still sending IDs', async () => {
   for (const id of ['light', 'dark']) await mounted('settings', async h => {

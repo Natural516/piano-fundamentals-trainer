@@ -65,6 +65,12 @@ function audit() {
     const source = read(file), entries = literals(source, file)
     if (!entries.length) continue
     if (file.startsWith(prefix + 'localization/')) {
+      if (file === prefix + 'localization/LanguageSetting.tsx') {
+        require('./android-language-selector-contract.cjs').assertB6PresentationOnly()
+        assert.deepEqual(entries.map(entry => entry.value), ['中文'], 'exact approved language autonym, not an untranslated UI string')
+        for (const entry of entries) evidence.push({ file, ...entry, category: 'C', reason: 'B6 approved fixed language autonym; never translated and exact selector source delta is verified' })
+        continue
+      }
       assert.ok(/Resources\.ts$|\/resources\.ts$/.test(file), 'unclassified localization literal: ' + file)
       for (const entry of entries) evidence.push({ file, ...entry, category: 'A', reason: 'Explicit Chinese locale resource; paired English resource tested without fallback' })
     } else if (file === mainPath) {

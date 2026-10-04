@@ -41,6 +41,7 @@
     "test:android-history-dashboard": "node scripts/android-history-dashboard-check.cjs",
     "test:android-settings": "node scripts/android-settings-check.cjs",
     "test:android-localization": "node scripts/android-localization-check.cjs && node scripts/android-localization-compatibility-check.cjs",
+    "test:android-language-selector": "node scripts/android-language-selector-check.cjs",
     "test:android-localization-sight": "node scripts/android-localization-sight-check.cjs",
     "test:android-localization-chord": "node scripts/android-localization-chord-check.cjs",
     "test:android-localization-remaining": "node scripts/android-localization-remaining-check.cjs",
