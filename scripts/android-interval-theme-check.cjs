@@ -69,7 +69,8 @@ const checks = [
     assert.match(main, /textNodes\.forEach\(\(node\) => observer\.observe\(node\)\)/)
     assert.match(main, /if \(dock\) observer\.observe\(dock\)/)
     const hub = main.slice(main.indexOf('function PracticeHubScreen'), main.indexOf('type IntervalPracticeSettingChanges'))
-    assert.match(hub, /指定低音构造 · 26 种音程/)
+    assert.match(hub, /t\('intervalDescription'\)/)
+    assert.match(fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/hubResources.ts'), 'utf8'), /指定低音构造 · 26 种音程/)
     assert.doesNotMatch(hub, /复现 \/ 构造/)
   }]
 ]

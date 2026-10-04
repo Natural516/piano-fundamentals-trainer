@@ -171,7 +171,7 @@ const tests = [
     assert.doesNotMatch(settings, /V\d+\.\d+\.\d+|versionCode \d+/)
     assert.match(settings, /updater\.installed \? `V\$\{updater\.installed\.versionName\}` : `V\$\{__ANDROID_VERSION_NAME__\}`/)
     assert.match(settings, /updater\.installed[\s\S]*?t\('versionCode', \{ code: updater\.installed\.versionCode \}\)[\s\S]*?t\('versionCode', \{ code: __ANDROID_VERSION_CODE__ \}\)/)
-    assert.match(updateScreen, /snapshot\.installed \? `V\$\{snapshot\.installed\.versionName\} · \$\{snapshot\.installed\.versionCode\}` : '正在读取'/)
+    assert.match(updateScreen, /snapshot\.installed \? `V\$\{snapshot\.installed\.versionName\} · \$\{snapshot\.installed\.versionCode\}` : t\('reading'\)/)
   }]
 ]
 

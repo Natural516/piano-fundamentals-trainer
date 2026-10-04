@@ -5,9 +5,13 @@ import { intervalPreparationResources } from './intervalPreparationResources'
 import { intervalFlowResources } from './intervalFlowResources'
 import { sightReadingResources } from './sightReadingResources'
 import { chordPracticeResources } from './chordPracticeResources'
+import { themeManagementResources } from './themeManagementResources'
+import { updaterResources } from './updaterResources'
 
 export const localizationResources = {
   'zh-CN': {
+    themeManagement: themeManagementResources['zh-CN'],
+    updater: updaterResources['zh-CN'],
     chordPractice: chordPracticeResources['zh-CN'],
     sightReading: sightReadingResources['zh-CN'],
     intervalPractice: { ...intervalPreparationResources['zh-CN'], ...intervalFlowResources['zh-CN'] },
@@ -17,7 +21,7 @@ export const localizationResources = {
     tools: hubResources['zh-CN'].tools,
     navigation: shellResources['zh-CN'].navigation,
     midi: shellResources['zh-CN'].midi,
-    common: { appTitle: '钢琴基本功训练器', noData: '暂无' },
+    common: { appTitle: '钢琴基本功训练器', noData: '暂无', localData: '本地数据', initFailed: '无法初始化应用数据', initHelp: '暂时无法载入本地数据，请重试。', retry: '重试', loading: '正在载入练习设置…', fontFailed: '本地音乐字体加载失败。' },
     music: { intervals: {
       perfectUnison: '纯一度', augmentedUnison: '增一度',
       diminishedSecond: '减二度', minorSecond: '小二度', majorSecond: '大二度', augmentedSecond: '增二度',
@@ -32,7 +36,7 @@ export const localizationResources = {
       ...shellResources['zh-CN'].settings,
       title: '设置',
       language: '语言',
-      languageDescription: '即时生效，无需重启。其它页面的翻译将逐步完善。',
+      languageDescription: '即时生效，无需重启。',
       system: '跟随系统',
       chinese: '简体中文',
       english: 'English',
@@ -48,6 +52,8 @@ export const localizationResources = {
     }
   },
   en: {
+    themeManagement: themeManagementResources.en,
+    updater: updaterResources.en,
     chordPractice: chordPracticeResources.en,
     sightReading: sightReadingResources.en,
     intervalPractice: { ...intervalPreparationResources.en, ...intervalFlowResources.en },
@@ -57,7 +63,7 @@ export const localizationResources = {
     tools: hubResources.en.tools,
     navigation: shellResources.en.navigation,
     midi: shellResources.en.midi,
-    common: { appTitle: 'Piano Fundamentals Trainer', noData: 'No data' },
+    common: { appTitle: 'Piano Fundamentals Trainer', noData: 'No data', localData: 'Local data', initFailed: 'Could not initialize app data', initHelp: 'Local data could not be loaded. Please try again.', retry: 'Retry', loading: 'Loading practice settings…', fontFailed: 'The local music font could not be loaded.' },
     music: { intervals: {
       perfectUnison: 'Perfect unison', augmentedUnison: 'Augmented unison',
       diminishedSecond: 'Diminished second', minorSecond: 'Minor second', majorSecond: 'Major second', augmentedSecond: 'Augmented second',
@@ -72,7 +78,7 @@ export const localizationResources = {
       ...shellResources.en.settings,
       title: 'Settings',
       language: 'Language',
-      languageDescription: 'Applies immediately, without restarting. Other pages will be translated gradually.',
+      languageDescription: 'Applies immediately, without restarting.',
       system: 'Follow system',
       chinese: 'Simplified Chinese',
       english: 'English',

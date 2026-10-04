@@ -1,3 +1,4 @@
+const { normalizeB46Main, assertFrozenDiff, assertRendererDisplayOnly, stripB46Css } = require('./android-localization-remaining-contract.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -29,6 +30,7 @@ const { AndroidPersistenceStore, SightReadingReportRepository, SightReadingSetti
 // This is a React/DOM contract; it does not claim browser pixels or physical device evidence.
 const main = read(mainPath)
 function declarations(source) {
+  source = normalizeB46Main(source)
   const ast = ts.createSourceFile(mainPath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const result = new Map()
   for (const node of ast.statements) {
@@ -424,7 +426,7 @@ test('B41R1', 'all out-of-scope main declarations and Bocchi headline/dialogs st
   for (const file of ['android/version.properties', 'android/updater.properties', 'android/app/build.gradle', 'prototype/android-tablet-v1/src/theme/themePackageRuntime.ts']) assert.equal(read(file), baseline(file), file)
 })
 test('B41R2', 'local CSS keeps full-row/touch contracts and constrains long English/device copy', () => {
-  const css = read('prototype/android-tablet-v1/src/styles.css')
+  const css = stripB46Css(read('prototype/android-tablet-v1/src/styles.css'))
   assert.match(css, /\.midi-device-list \.midi-candidate > button \{[\s\S]*?width: 100%;[\s\S]*?min-height: 58px;[\s\S]*?grid-template-columns: 38px minmax\(0, 1fr\) auto;/)
   assert.match(css, /\.midi-device-list button > span:nth-child\(2\) \{[\s\S]*?min-width: 0;[\s\S]*?overflow-wrap: anywhere;/)
   assert.match(css, /\.midi-port-selector \{ flex-wrap: wrap; \}/)

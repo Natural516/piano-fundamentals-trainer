@@ -1,3 +1,4 @@
+const { normalizeB46Main, assertFrozenDiff, assertRendererDisplayOnly, stripB46Css } = require('./android-localization-remaining-contract.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -190,7 +191,7 @@ test('LOC15', 'all migrated resource namespaces have identical nonempty key shap
   assert.deepEqual(keys(zh), keys(en))
   assert.deepEqual(Object.keys(localizationResources.en.midi).filter(key => key.startsWith('devicesFound')), ['devicesFound_one', 'devicesFound_other'])
   assert.equal(localizationResources['zh-CN'].midi.devicesFound, '{{count}} 个候选')
-  assert.equal(zh.length, 150 + 58 + 121 + 19 + 112 + 107 + 148) // Existing stages + actual B4.5 Chord keys.
+  assert.equal(zh.length, 150 + 58 + 121 + 19 + 112 + 107 + 148 + 148) // Existing stages + explicit B4.6 Theme/Updater/common display keys.
   assert.equal(en.length, zh.length + 30) // Existing plural differences plus five Chord English plurals.
   for (const [, value] of [...zh, ...en]) assert.ok(value.trim())
   for (const [key] of en) {
@@ -318,7 +319,7 @@ test('LOC20', 'real React provider/settings switch live without remounting runti
 test('LOC21', 'MIDI/session/bootstrap stay frozen; only explicit B3 compatibility boundaries may change', () => {
   const base = '5c24110604e16b098c665757a05d06e16c813498'
   const mainPath = 'prototype/android-tablet-v1/src/main.tsx'
-  const main = read(mainPath)
+  const main = normalizeB46Main(read(mainPath))
   const old = execFileSync('git', ['show', base + ':' + mainPath], { cwd: root, encoding: 'utf8' })
   const normalize = (source) => source.replaceAll('\r\n', '\n')
   const slice = (source, start, end) => {

@@ -2,7 +2,7 @@ import { Component, StrictMode, createContext, useCallback, useContext, useEffec
 import { createRoot } from 'react-dom/client'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
-import { MusicStaffRenderer } from '../../../src/renderer/src/components/MusicStaffRenderer'
+import { MusicStaffRenderer as BaseMusicStaffRenderer } from '../../../src/renderer/src/components/MusicStaffRenderer'
 import { getMajorKeySignature, MAJOR_KEY_DISPLAY_SIGNATURES, type MajorKeyId } from '../../../src/sightReading/musicKeySignatures'
 import { spellMidiPitch } from '../../../src/sightReading/musicPitchSpelling'
 import type { MusicNotationFeedback, MusicNotationPitch } from '../../../src/sightReading/musicNotationTypes'
@@ -68,6 +68,7 @@ import { presentChordKey, presentChordQuestion, presentChordHistorySummary, pres
 import { getSettingsThemeDisplayName, presentLocalizedMidiStatus } from './localization/midiPresentation'
 import { presentHomeRecentPractice } from './localization/homePresentation'
 import { useAppLocale } from './localization/LocaleProvider'
+import { presentThemeError, formatThemeInstalledAt, presentUpdaterError } from './localization/remainingPresentation'
 import { presentLocalizedIntervalPractice, formatIntervalReportAccuracy, formatIntervalHistoryTimestamp } from './localization/intervalPracticePresentation'
 import { presentChordTypeOption, presentIntervalName, presentIntervalQuery, presentQueryAccidental } from './localization/theoryQueryPresentation'
 import {
@@ -144,7 +145,7 @@ import {
   type ThemeDefinition,
   type ThemeId
 } from './theme/themeRegistry'
-import { THEME_PACKAGE_ERRORS, ThemeRuntimeManager, type InstalledThemeRecord, type ThemeRuntimeSnapshot } from './theme/themePackageRuntime'
+import { ThemeRuntimeManager, type InstalledThemeRecord, type ThemeRuntimeSnapshot } from './theme/themePackageRuntime'
 import './styles.css'
 
 declare const __QA_BUILD__: boolean
@@ -3033,8 +3034,8 @@ function SettingsThemeOption({
 }
 
 const THEME_PACKAGE_STAGE_LABELS: Readonly<Record<string, string>> = {
-  READING: '正在读取', VALIDATING: '正在验证', CHECKING_SIGNATURE: '正在检查签名',
-  CHECKING_ASSETS: '正在检查素材', READY_TO_INSTALL: '等待安装确认', INSTALLING: '正在安装', INSTALLED: '安装完成'
+  READING: 'stages.READING', VALIDATING: 'stages.VALIDATING', CHECKING_SIGNATURE: 'stages.CHECKING_SIGNATURE',
+  CHECKING_ASSETS: 'stages.CHECKING_ASSETS', READY_TO_INSTALL: 'stages.READY_TO_INSTALL', INSTALLING: 'stages.INSTALLING', INSTALLED: 'stages.INSTALLED'
 }
 
 function useThemeRuntime(manager: ThemeRuntimeManager): ThemeRuntimeSnapshot {
@@ -3061,26 +3062,27 @@ function ExternalThemeCard({ active, record, onActivate, onInfo }: {
 }
 
 function ThemePackageDialog({ manager, onClose }: { manager: ThemeRuntimeManager; onClose: () => void }): JSX.Element {
+  const { t } = useTranslation('themeManagement')
   const snapshot = useThemeRuntime(manager)
   const inspection = snapshot.inspection
-  const stageLabel = snapshot.progressStage ? THEME_PACKAGE_STAGE_LABELS[snapshot.progressStage] ?? snapshot.progressStage : null
+  const stageLabel = snapshot.progressStage ? t(THEME_PACKAGE_STAGE_LABELS[snapshot.progressStage] ?? 'processing') : null
   return (
-    <div className="theme-manager-modal" role="dialog" aria-modal="true" aria-label="导入主题包">
+    <div className="theme-manager-modal" role="dialog" aria-modal="true" aria-label={t('importTitle')}>
       <div className="theme-manager-modal__card">
-        <header><span><strong>{inspection ? '安装主题' : '导入主题包'}</strong><small>{stageLabel ?? '使用 Android 系统文件选择器选择 .pftheme'}</small></span><button type="button" onClick={onClose} aria-label="关闭">×</button></header>
-        {snapshot.errorCode ? <p className="theme-manager-error" role="alert">{THEME_PACKAGE_ERRORS[snapshot.errorCode] ?? `主题处理失败（${snapshot.errorCode}）`}</p> : null}
+        <header><span><strong>{t(inspection ? 'installTitle' : 'importTitle')}</strong><small>{stageLabel ?? t('pickerHelp')}</small></span><button type="button" onClick={onClose} aria-label={t('close')}>×</button></header>
+        {snapshot.errorCode ? <p className="theme-manager-error" role="alert">{presentThemeError(snapshot.errorCode, t)}</p> : null}
         {inspection ? (
           <section className="theme-package-inspection">
             <div className="theme-package-inspection__preview"><Icon name="grid" size={34} /></div>
             <dl>
-              <div><dt>主题</dt><dd>{inspection.name}</dd></div><div><dt>副标题</dt><dd>{inspection.subtitle}</dd></div>
-              <div><dt>版本</dt><dd>{inspection.version}</dd></div><div><dt>签名</dt><dd>{inspection.signatureStatus === 'VERIFIED' ? '已验证' : inspection.signatureStatus}</dd></div>
-              <div><dt>兼容范围</dt><dd>{inspection.minAppVersion} – &lt; {inspection.maxAppVersionExclusive}</dd></div>
+              <div><dt>{t('theme')}</dt><dd>{inspection.name}</dd></div><div><dt>{t('subtitle')}</dt><dd>{inspection.subtitle}</dd></div>
+              <div><dt>{t('version')}</dt><dd>{inspection.version}</dd></div><div><dt>{t('signature')}</dt><dd>{inspection.signatureStatus === 'VERIFIED' ? t('verified') : inspection.signatureStatus}</dd></div>
+              <div><dt>{t('compatibility')}</dt><dd>{inspection.minAppVersion} – &lt; {inspection.maxAppVersionExclusive}</dd></div>
             </dl>
-            <button className="primary-action" type="button" disabled={snapshot.progressStage === 'INSTALLING'} onClick={() => { void manager.installInspected() }}>{snapshot.installed.some((item) => item.themeId === inspection.themeId) ? '更新主题' : '安装'}</button>
+            <button className="primary-action" type="button" disabled={snapshot.progressStage === 'INSTALLING'} onClick={() => { void manager.installInspected() }}>{t(snapshot.installed.some((item) => item.themeId === inspection.themeId) ? 'update' : 'install')}</button>
           </section>
         ) : (
-          <button className="primary-action" type="button" onClick={() => { void manager.inspectPackage().catch(() => {}) }}>选择主题包</button>
+          <button className="primary-action" type="button" onClick={() => { void manager.inspectPackage().catch(() => {}) }}>{t('choose')}</button>
         )}
       </div>
     </div>
@@ -3088,24 +3090,26 @@ function ThemePackageDialog({ manager, onClose }: { manager: ThemeRuntimeManager
 }
 
 function ThemeInfoDialog({ active, manager, record, onClose }: { active: boolean; manager: ThemeRuntimeManager; record: InstalledThemeRecord; onClose: () => void }): JSX.Element {
-  const [status, setStatus] = useState<string | null>(null)
+  const { t } = useTranslation('themeManagement')
+  const { resolvedLocale } = useAppLocale()
+  const [status, setStatus] = useState<{ kind: 'verifying' | 'intact' | 'failed'; code?: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   return (
-    <div className="theme-manager-modal" role="dialog" aria-modal="true" aria-label="主题信息">
+    <div className="theme-manager-modal" role="dialog" aria-modal="true" aria-label={t('info')}>
       <div className="theme-manager-modal__card theme-manager-modal__card--info">
-        <header><span><strong>主题信息</strong><small>{record.name}</small></span><button type="button" onClick={onClose} aria-label="关闭">×</button></header>
+        <header><span><strong>{t('info')}</strong><small>{record.name}</small></span><button type="button" onClick={onClose} aria-label={t('close')}>×</button></header>
         <dl className="theme-info-list">
-          <div><dt>名称</dt><dd>{record.name}</dd></div><div><dt>版本</dt><dd>{record.version}</dd></div>
-          <div><dt>themeId</dt><dd>{record.themeId}</dd></div><div><dt>Theme API</dt><dd>{record.themeApiVersion}</dd></div>
-          <div><dt>签名状态</dt><dd>已验证</dd></div><div><dt>签名 keyId</dt><dd>{record.trustKeyId ?? '未签名调试包'}</dd></div>
-          <div><dt>安装日期</dt><dd>{new Date(record.installedAt).toLocaleString()}</dd></div><div><dt>兼容范围</dt><dd>{record.minAppVersion} – &lt; {record.maxAppVersionExclusive}</dd></div>
+          <div><dt>{t('name')}</dt><dd>{record.name}</dd></div><div><dt>{t('version')}</dt><dd>{record.version}</dd></div>
+          <div><dt>{t('themeId')}</dt><dd>{record.themeId}</dd></div><div><dt>{t('api')}</dt><dd>{record.themeApiVersion}</dd></div>
+          <div><dt>{t('signatureState')}</dt><dd>{t('verified')}</dd></div><div><dt>{t('keyId')}</dt><dd>{record.trustKeyId ?? t('unsignedDebug')}</dd></div>
+          <div><dt>{t('installedAt')}</dt><dd>{formatThemeInstalledAt(record.installedAt, resolvedLocale)}</dd></div><div><dt>{t('compatibility')}</dt><dd>{record.minAppVersion} – &lt; {record.maxAppVersionExclusive}</dd></div>
         </dl>
-        {status ? <p className="theme-manager-status" aria-live="polite">{status}</p> : null}
+        {status ? <p className="theme-manager-status" aria-live="polite">{status.kind === 'failed' ? presentThemeError(status.code ?? '', t, 'verifyFailed') : t(status.kind)}</p> : null}
         <footer>
-          <button type="button" onClick={() => { setStatus('正在验证主题…'); void manager.verify(record).then(() => setStatus('主题完整')).catch((error) => { setStatus(THEME_PACKAGE_ERRORS[String((error as Error).message)] ?? '主题验证失败'); if (active) void manager.recoverExternal('VERIFY_FAILED') }) }}>验证主题</button>
+          <button type="button" onClick={() => { setStatus({ kind: 'verifying' }); void manager.verify(record).then(() => setStatus({ kind: 'intact' })).catch((error) => { setStatus({ kind: 'failed', code: String((error as Error).message) }); if (active) void manager.recoverExternal('VERIFY_FAILED') }) }}>{t('verify')}</button>
           {confirmDelete
-            ? <><span>确认删除{active ? '（将先切换浅色）' : ''}？</span><button className="danger-action" type="button" onClick={() => { void manager.remove(record).then(onClose) }}>确认删除</button></>
-            : <button className="danger-action" type="button" onClick={() => setConfirmDelete(true)}>删除主题</button>}
+            ? <><span>{t(active ? 'confirmActive' : 'confirmInactive')}</span><button className="danger-action" type="button" onClick={() => { void manager.remove(record).then(onClose) }}>{t('confirmRemove')}</button></>
+            : <button className="danger-action" type="button" onClick={() => setConfirmDelete(true)}>{t('remove')}</button>}
         </footer>
       </div>
     </div>
@@ -3323,52 +3327,41 @@ function MidiScreen(): JSX.Element {
   )
 }
 
-function updaterStatusCopy(status: UpdaterStatus): { eyebrow: string; title: string; detail: string } {
-  const copy: Record<UpdaterStatus, { eyebrow: string; title: string; detail: string }> = {
-    idle: { eyebrow: '更新状态', title: '检查应用更新', detail: '仅在你点击后连接公开的 HTTPS 更新服务。' },
-    checking: { eyebrow: '正在检查', title: '正在获取更新信息', detail: '练习、记录与 MIDI 功能不会被更新检查阻塞。' },
-    upToDate: { eyebrow: '更新状态', title: '当前没有可用的新版本', detail: '版本判断只使用 Android versionCode。' },
-    updateAvailable: { eyebrow: '发现更新', title: '有新的应用版本', detail: '下载后还会验证大小、哈希、包名、版本与永久签名。' },
-    downloading: { eyebrow: '正在下载', title: '正在下载更新包', detail: '更新包保存在应用私有缓存中，下载完成前不可安装。' },
-    verifying: { eyebrow: '安全验证', title: '正在验证更新包', detail: '所有验证步骤都必须通过，没有跳过按钮。' },
-    readyToInstall: { eyebrow: '验证完成', title: '更新包可以交给系统安装', detail: '点击后仍需在 Android 系统安装器中明确确认。' },
-    installPermissionRequired: { eyebrow: '需要系统授权', title: '允许此应用安装更新', detail: '打开系统设置并授权后，返回应用重新确认，再次点击安装。' },
-    installerLaunched: { eyebrow: '系统安装器', title: '已打开 Android 系统安装器', detail: '这不代表安装已经成功；完成后重新打开应用确认真实版本。' },
-    error: { eyebrow: '更新未完成', title: '暂时无法完成这次更新操作', detail: '该问题只影响更新功能，练习与本地记录仍可正常使用。' }
-  }
-  return copy[status]
+function updaterStatusCopy(status: UpdaterStatus, t: (key: string) => string): { eyebrow: string; title: string; detail: string } {
+  return { eyebrow: t(`states.${status}.eyebrow`), title: t(`states.${status}.title`), detail: t(`states.${status}.detail`) }
 }
 
 function UpdateScreen(): JSX.Element {
+  const { t } = useTranslation('updater')
   const { controller, snapshot } = useUpdaterUi()
   const { returnFromAuxiliary } = useAppNavigation()
-  const copy = updaterStatusCopy(snapshot.status)
-  const currentVersion = snapshot.installed ? `V${snapshot.installed.versionName} · ${snapshot.installed.versionCode}` : '正在读取'
+  const copy = updaterStatusCopy(snapshot.status, t)
+  const currentVersion = snapshot.installed ? `V${snapshot.installed.versionName} · ${snapshot.installed.versionCode}` : t('reading')
   const targetVersion = snapshot.manifest ? `V${snapshot.manifest.versionName} · ${snapshot.manifest.versionCode}` : '—'
   const action: { label: string; disabled: boolean; run: () => void; secondary?: boolean } = (() => {
     if (snapshot.status === 'checking' || snapshot.status === 'verifying') {
-      return { label: '处理中…', disabled: true, run: () => {} }
+      return { label: t('processing'), disabled: true, run: () => {} }
     }
     if (snapshot.status === 'downloading') {
-      return { label: '取消下载', disabled: false, run: () => { void controller.cancelDownload() }, secondary: true }
+      return { label: t('cancel'), disabled: false, run: () => { void controller.cancelDownload() }, secondary: true }
     }
     if (snapshot.status === 'updateAvailable') {
-      return { label: '下载更新', disabled: false, run: () => { void controller.download() } }
+      return { label: t('download'), disabled: false, run: () => { void controller.download() } }
     }
     if (snapshot.status === 'readyToInstall') {
-      return { label: '交给系统安装', disabled: false, run: () => { void controller.install() } }
+      return { label: t('install'), disabled: false, run: () => { void controller.install() } }
     }
     if (snapshot.status === 'installPermissionRequired') {
-      return { label: '打开系统设置', disabled: false, run: () => { void controller.openInstallSettings() } }
+      return { label: t('settings'), disabled: false, run: () => { void controller.openInstallSettings() } }
     }
     if (snapshot.status === 'installerLaunched') {
-      return { label: '等待系统安装确认', disabled: true, run: () => {} }
+      return { label: t('waiting'), disabled: true, run: () => {} }
     }
     if (snapshot.status === 'error') {
-      if (!snapshot.retryAction) return { label: '无法继续', disabled: true, run: () => {} }
-      return { label: snapshot.retryAction === 'download' ? '重新下载' : snapshot.retryAction === 'install' ? '重试安装' : '重新检查', disabled: false, run: () => { void controller.retry() } }
+      if (!snapshot.retryAction) return { label: t('cannotContinue'), disabled: true, run: () => {} }
+      return { label: t(snapshot.retryAction === 'download' ? 'retryDownload' : snapshot.retryAction === 'install' ? 'retryInstall' : 'retryCheck'), disabled: false, run: () => { void controller.retry() } }
     }
-    return { label: snapshot.status === 'upToDate' ? '再次检查' : '检查更新', disabled: false, run: () => { void controller.check() } }
+    return { label: t(snapshot.status === 'upToDate' ? 'checkAgain' : 'check'), disabled: false, run: () => { void controller.check() } }
   })()
   const icon: IconName = snapshot.status === 'error'
     ? 'close'
@@ -3378,25 +3371,25 @@ function UpdateScreen(): JSX.Element {
 
   return (
     <div className="standalone-frame">
-      <ProductHeader title="检查更新" onBack={() => returnFromAuxiliary('settings')} />
+      <ProductHeader title={t('title')} onBack={() => returnFromAuxiliary('settings')} />
       <main className="update-content">
         <section className={`update-card is-${snapshot.status}`} aria-live="polite">
           <div className="update-illustration"><Icon name={icon} size={52} /><span /></div>
           <span className="eyebrow">{copy.eyebrow}</span>
           <h1>{copy.title}</h1>
-          <p>{snapshot.errorMessage ?? copy.detail}</p>
-          <div className="version-line"><span>当前版本</span><strong>{currentVersion}</strong></div>
-          <div className="version-line"><span>目标版本</span><strong>{targetVersion}</strong></div>
+          <p>{snapshot.errorCode ? presentUpdaterError(snapshot.errorCode, t) : snapshot.errorMessage ?? copy.detail}</p>
+          <div className="version-line"><span>{t('current')}</span><strong>{currentVersion}</strong></div>
+          <div className="version-line"><span>{t('target')}</span><strong>{targetVersion}</strong></div>
           {snapshot.manifest && snapshot.status === 'updateAvailable' ? (
-            <div className="update-release-notes" aria-label="版本说明">
-              <strong>本次更新</strong>
+            <div className="update-release-notes" aria-label={t('notesLabel')}>
+              <strong>{t('notesTitle')}</strong>
               {snapshot.manifest.releaseNotes.length > 0
                 ? <ul>{snapshot.manifest.releaseNotes.map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}</ul>
-                : <p>此版本没有附加说明。</p>}
+                : <p>{t('noNotes')}</p>}
             </div>
           ) : null}
           {snapshot.status === 'downloading' && snapshot.progress ? (
-            <div className="update-progress" aria-label={`下载进度 ${Math.round(snapshot.progress.percent)}%`}>
+            <div className="update-progress" aria-label={t('progress', { percent: Math.round(snapshot.progress.percent) })}>
               <div><span style={{ width: `${snapshot.progress.percent}%` }} /></div>
               <small>{Math.round(snapshot.progress.percent)}% · {Math.round(snapshot.progress.receivedBytes / 1024)} / {Math.round(snapshot.progress.totalBytes / 1024)} KiB</small>
             </div>
@@ -3405,9 +3398,9 @@ function UpdateScreen(): JSX.Element {
             <Icon name={snapshot.status === 'readyToInstall' ? 'chevron' : 'refresh'} />{action.label}
           </button>
           {snapshot.status === 'installPermissionRequired' ? (
-            <button className="update-inline-action" type="button" onClick={() => { void controller.refreshInstallPermission() }}>我已返回，重新检查授权</button>
+            <button className="update-inline-action" type="button" onClick={() => { void controller.refreshInstallPermission() }}>{t('permissionRecheck')}</button>
           ) : null}
-          <small className="update-security-note">安装始终由 Android 系统确认。更新失败不会影响离线练习与本地记录。</small>
+          <small className="update-security-note">{t('securityNote')}</small>
         </section>
       </main>
     </div>
@@ -3626,6 +3619,16 @@ function IntervalPersistenceErrorNotice({
   )
 }
 
+function ThemeRecoveryMessage(): JSX.Element {
+  const { t } = useTranslation('themeManagement')
+  return <main className="persistence-loading" role="alert"><span className="eyebrow">{t('recoveryTitle')}</span><h1>{t('recoveryDetail')}</h1></main>
+}
+
+function MusicStaffRenderer(props: Parameters<typeof BaseMusicStaffRenderer>[0]): JSX.Element {
+  const { t } = useTranslation('common')
+  return <BaseMusicStaffRenderer {...props} fontErrorLabel={t('fontFailed')} />
+}
+
 class ThemeRecoveryBoundary extends Component<{ children: ReactNode; manager: ThemeRuntimeManager; theme: ThemeDefinition }, { error: Error | null }> {
   state: { error: Error | null } = { error: null }
   static getDerivedStateFromError(error: Error): { error: Error } { return { error } }
@@ -3637,7 +3640,7 @@ class ThemeRecoveryBoundary extends Component<{ children: ReactNode; manager: Th
     if (!this.state.error) return this.props.children
     const isThemeFailure = this.props.theme.source === 'external' && /(THEME|ASSET|RECIPE|CAPABILITY|TOKEN|PARAMETER)/i.test(this.state.error.message)
     if (!isThemeFailure) throw this.state.error
-    return <main className="persistence-loading" role="alert"><span className="eyebrow">主题恢复</span><h1>主题加载失败，正在恢复浅色主题…</h1></main>
+    return <ThemeRecoveryMessage />
   }
 }
 
@@ -4158,6 +4161,7 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
 }
 
 function AndroidAppBootstrap(): JSX.Element {
+  const { t } = useTranslation('common')
   const [runtime, setRuntime] = useState<AndroidSightReadingRuntime | null>(null)
   const [themeManager] = useState(() => {
     const initialId = resolveInitialThemeId(window.location.search, SHOW_DEVELOPMENT_TOOLS)
@@ -4183,15 +4187,15 @@ function AndroidAppBootstrap(): JSX.Element {
   if (initializationError) {
     return (
       <main className="persistence-loading" role="alert">
-        <span className="eyebrow">本地数据</span>
-        <h1>无法初始化应用数据</h1>
-        <p>{initializationError}</p>
-        <button className="primary-action" type="button" onClick={() => window.location.reload()}>重试</button>
+        <span className="eyebrow">{t('localData')}</span>
+        <h1>{t('initFailed')}</h1>
+        <p>{t('initHelp')}</p>
+        <button className="primary-action" type="button" onClick={() => window.location.reload()}>{t('retry')}</button>
       </main>
     )
   }
   if (!runtime || !themeRuntime.ready) {
-    return <main className="persistence-loading" aria-live="polite"><span className="eyebrow">本地数据</span><h1>正在载入练习设置…</h1></main>
+    return <main className="persistence-loading" aria-live="polite"><span className="eyebrow">{t('localData')}</span><h1>{t('loading')}</h1></main>
   }
   return <App runtime={runtime} themeManager={themeManager} />
 }

@@ -1,3 +1,4 @@
+const { normalizeB46Main, assertFrozenDiff, assertRendererDisplayOnly, stripB46Css } = require('./android-localization-remaining-contract.cjs')
 const assert = require('node:assert/strict')
 const { execFileSync } = require('node:child_process')
 const { createHash } = require('node:crypto')
@@ -260,7 +261,7 @@ test('IP19', '26 IDs/1575 candidates/digest/29..91 range/ascending within octave
     assert.ok(candidate.rootMidi >= 29 && candidate.targetMidi <= 91)
     assert.ok(candidate.targetMidi >= candidate.rootMidi && candidate.targetMidi - candidate.rootMidi <= 12)
   }
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'prototype/android-tablet-v1/src/musicTheory/intervals', 'prototype/android-tablet-v1/src/intervalPractice'], { cwd: root })
+  assertFrozenDiff(base, ['prototype/android-tablet-v1/src/musicTheory/intervals', 'prototype/android-tablet-v1/src/intervalPractice'])
 })
 test('IP20', 'domain scheduler judgement report/legacy validator remain locale-free and byte-frozen', () => {
   const dirs = ['prototype/android-tablet-v1/src/musicTheory', 'prototype/android-tablet-v1/src/intervalPractice']
@@ -269,7 +270,7 @@ test('IP20', 'domain scheduler judgement report/legacy validator remain locale-f
     // Chord RegisterWindow parameters are not the browser window. Audit the Interval domain for DOM access.
     if (file.startsWith('prototype/android-tablet-v1/src/intervalPractice/') || file.startsWith('prototype/android-tablet-v1/src/musicTheory/intervals/')) assert.doesNotMatch(read(file), /document\.|window\./)
   }
-  execFileSync('git', ['diff', '--exit-code', base, '--', ...dirs, 'android', 'src', 'theme-packages', 'prototype/android-tablet-v1/src/theme', 'prototype/android-tablet-v1/src/localization/hubResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryPresentation.ts'], { cwd: root })
+  assertFrozenDiff(base, [...dirs, 'android', 'src', 'theme-packages', 'prototype/android-tablet-v1/src/theme', 'prototype/android-tablet-v1/src/localization/hubResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryPresentation.ts'])
 })
 test('IP21', 'only Preparation and English Interval report wrapping is added; preexisting CSS/notation/theme geometry is unchanged', () => {
   const oldCss = execFileSync('git', ['show', base + ':prototype/android-tablet-v1/src/styles.css'], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
@@ -292,7 +293,7 @@ test('IP21', 'only Preparation and English Interval report wrapping is added; pr
   line-height: 1.6;
 }
 `
-  const currentCss = read('prototype/android-tablet-v1/src/styles.css')
+  const currentCss = stripB46Css(read('prototype/android-tablet-v1/src/styles.css'))
   assert.ok(currentCss.endsWith(chordWrapping), 'only the explicitly approved B4.5 suffix may follow Sight wrapping')
   const css = currentCss.slice(0, -chordWrapping.length)
   const addition = css.match(/\n\/\* Preparation-only wrapping; ACTIVE and notation geometry stay unchanged\. \*\/[\s\S]*?(?=\n\.interval-ready-settings \{)/)

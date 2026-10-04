@@ -1,3 +1,4 @@
+const { normalizeB46Main, assertFrozenDiff, assertRendererDisplayOnly, stripB46Css } = require('./android-localization-remaining-contract.cjs')
 const assert = require('node:assert/strict')
 const { execFileSync } = require('node:child_process')
 const { createHash } = require('node:crypto')
@@ -182,7 +183,7 @@ test('IQ9', 'B3 catalog 26 IDs and complete 1575 candidate digest remain frozen'
   const candidates = Object.values(INTERVAL_PRACTICE_CANDIDATES).flat()
   assert.equal(candidates.length, 1575)
   assert.equal(createHash('sha256').update(JSON.stringify(candidates)).digest('hex'), 'c643be252f5ea57519490033662008b4716bd1f98df0266d3357e3be171f460e')
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'prototype/android-tablet-v1/src/musicTheory/intervals'], { cwd: root })
+  assertFrozenDiff(base, ['prototype/android-tablet-v1/src/musicTheory/intervals'])
 })
 
 test('K1', 'actual Chinese Scale Query keeps Major/relative minor labels and notes', async () => queryPage('scale-key-signature-tool', async h => {
@@ -257,7 +258,7 @@ test('R1', 'theory resources have semantic/placeholder parity and all English ke
 })
 test('R2', 'theory/domain/query cores remain byte-frozen and contain no locale React or DOM dependency', () => {
   const files = ['prototype/android-tablet-v1/src/chordQueryTool.ts', 'prototype/android-tablet-v1/src/intervalQueryTool.ts', 'prototype/android-tablet-v1/src/scaleKeySignatureTool.ts', 'src/sightReading/musicKeySignatures.ts']
-  execFileSync('git', ['diff', '--exit-code', base, '--', ...files, 'prototype/android-tablet-v1/src/musicTheory'], { cwd: root })
+  assertFrozenDiff(base, [...files, 'prototype/android-tablet-v1/src/musicTheory'])
   for (const file of files) assert.doesNotMatch(read(file), /i18next|react-i18next|LocaleProvider|localization\/|document\.|window\./)
   for (const directory of ['prototype/android-tablet-v1/src/musicTheory', 'src/sightReading']) {
     const paths = execFileSync('git', ['ls-files', directory], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean)
@@ -269,7 +270,7 @@ test('R3', 'only Query/Interval presentation and necessary shared History chrome
   const allowed = new Set(['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalQueryToolScreen', 'IntervalPitchSelector', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
   assert.deepEqual([...current.keys()], [...old.keys()])
   for (const [name, value] of current) if (!allowed.has(name)) assert.equal(value, old.get(name), name)
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'android', 'src', 'theme-packages', 'prototype/android-tablet-v1/src/theme', 'prototype/android-tablet-v1/src/intervalPractice', 'prototype/android-tablet-v1/src/chordPractice', 'prototype/android-tablet-v1/src/localization/hubResources.ts', 'prototype/android-tablet-v1/src/localization/homePresentation.ts', 'prototype/android-tablet-v1/src/localization/shellResources.ts', 'prototype/android-tablet-v1/src/localization/midiPresentation.ts'], { cwd: root })
+  assertFrozenDiff(base, ['android', 'src', 'theme-packages', 'prototype/android-tablet-v1/src/theme', 'prototype/android-tablet-v1/src/intervalPractice', 'prototype/android-tablet-v1/src/chordPractice', 'prototype/android-tablet-v1/src/localization/hubResources.ts', 'prototype/android-tablet-v1/src/localization/homePresentation.ts', 'prototype/android-tablet-v1/src/localization/shellResources.ts', 'prototype/android-tablet-v1/src/localization/midiPresentation.ts'])
 })
 test('R4', 'selection/handlers/memo dependencies and navigation remain byte-identical to checkpoint', () => {
   const ts = require('typescript')
@@ -298,10 +299,10 @@ test('R5', 'Light Dark and decorated external query themes preserve bilingual fu
   }
 })
 test('R6', 'query local wrapping leaves notation geometry/tokens and shared shell unchanged', () => {
-  const css = read('prototype/android-tablet-v1/src/styles.css')
+  const css = stripB46Css(read('prototype/android-tablet-v1/src/styles.css'))
   assert.match(css, /\.tool-detail-shell \.interval-query-reference-list span \{[\s\S]*?white-space: normal;[\s\S]*?overflow-wrap: anywhere;/)
   assert.doesNotMatch(read('prototype/android-tablet-v1/src/localization/theoryQueryPresentation.ts'), /changeLanguage|\.save\(|navigate\(|document\.|window\.|getChordQueryResult|getIntervalQueryResult/)
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'src/renderer'], { cwd: root })
+  assertFrozenDiff(base, ['src/renderer'])
 })
 test('R7', 'actual Back and bottom Tools navigation still use stable routes', async () => {
   for (const page of ['chord-query-tool', 'interval-query-tool', 'scale-key-signature-tool']) await queryPage(page, async h => {

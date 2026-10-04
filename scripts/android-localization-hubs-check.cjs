@@ -1,3 +1,4 @@
+const { normalizeB46Main, assertFrozenDiff, assertRendererDisplayOnly, stripB46Css } = require('./android-localization-remaining-contract.cjs')
 const assert = require('node:assert/strict')
 const { execFileSync } = require('node:child_process')
 const path = require('node:path')
@@ -151,7 +152,7 @@ test('T4', 'B4.2B/B4.3 permit Query/Interval flow and shared History chrome; oth
   const allowed = new Set(['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'HomeScreen', 'PracticeHubScreen', 'ToolsHubScreen', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalQueryToolScreen', 'IntervalPitchSelector', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
   assert.deepEqual([...current.keys()], [...old.keys()])
   for (const [name, source] of current) if (!allowed.has(name)) assert.equal(source, old.get(name), name)
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'prototype/android-tablet-v1/src/musicTheory', 'prototype/android-tablet-v1/src/intervalQueryTool.ts', 'prototype/android-tablet-v1/src/scaleKeySignatureTool.ts'], { cwd: root })
+  assertFrozenDiff(base, ['prototype/android-tablet-v1/src/musicTheory', 'prototype/android-tablet-v1/src/intervalQueryTool.ts', 'prototype/android-tablet-v1/src/scaleKeySignatureTool.ts'])
 })
 test('T5', 'Tools locale switching does not invoke queries, native calls or navigation', async () => mounted('tools', async h => {
   const calls = [...h.plugin.calls], before = businessBytes(h.backend)
@@ -178,7 +179,7 @@ test('R1', 'each entry page live round trip preserves route/MIDI/session/provide
   }, { sightRecords: [sight], chordRecords: [chord] })
 })
 test('R2', 'signed theme source/assets, native/domain/persistence/updater/version and B4.1 resources/helpers stay frozen', () => {
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'theme-packages', 'android', 'src', 'prototype/android-tablet-v1/src/theme', 'prototype/android-tablet-v1/src/chordPractice', 'prototype/android-tablet-v1/src/intervalPractice', 'prototype/android-tablet-v1/src/sightReadingIntegration.ts', 'prototype/android-tablet-v1/src/androidPersistenceCore.ts', 'prototype/android-tablet-v1/src/historyProjection.ts', 'prototype/android-tablet-v1/src/mixedHistoryProjection.ts', 'prototype/android-tablet-v1/src/localization/shellResources.ts', 'prototype/android-tablet-v1/src/localization/midiPresentation.ts'], { cwd: root })
+  assertFrozenDiff(base, ['theme-packages', 'android', 'src', 'prototype/android-tablet-v1/src/theme', 'prototype/android-tablet-v1/src/chordPractice', 'prototype/android-tablet-v1/src/intervalPractice', 'prototype/android-tablet-v1/src/sightReadingIntegration.ts', 'prototype/android-tablet-v1/src/androidPersistenceCore.ts', 'prototype/android-tablet-v1/src/historyProjection.ts', 'prototype/android-tablet-v1/src/mixedHistoryProjection.ts', 'prototype/android-tablet-v1/src/localization/shellResources.ts', 'prototype/android-tablet-v1/src/localization/midiPresentation.ts'])
 })
 test('R3', 'new namespaces have semantic/placeholder parity and explicit English no-fallback resolution', () => {
   let keys = 0
@@ -220,7 +221,7 @@ test('R5', 'Home count plurals/null metrics and stable module facts work without
 })
 test('R6', 'loading recent-history display and local CSS retain functional structure without browser claims', async () => mounted('home', async h => {
   contains(h.getText(), '正在读取记录'); await h.switchTo('en'); contains(h.getText(), 'Loading practice records')
-  const css = read('prototype/android-tablet-v1/src/styles.css')
+  const css = stripB46Css(read('prototype/android-tablet-v1/src/styles.css'))
   assert.match(css, /\.home-practice-actions \.primary-action \{[\s\S]*?white-space: normal;[\s\S]*?line-height: 1.25;/)
   assert.match(css, /\.practice-module-grid \.module-card__copy,[\s\S]*?\.tools-hub \.tool-card__copy \{[\s\S]*?min-width: 0;[\s\S]*?overflow-wrap: anywhere;/)
 }, { historyStatus: 'loading' }))

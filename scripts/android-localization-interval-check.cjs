@@ -1,3 +1,4 @@
+const { normalizeB46Main, assertFrozenDiff, assertRendererDisplayOnly, stripB46Css } = require('./android-localization-remaining-contract.cjs')
 const assert = require('node:assert/strict')
 const { execFileSync } = require('node:child_process')
 const { createHash } = require('node:crypto')
@@ -230,7 +231,7 @@ test('E15', '26/1575/digest/range/low-weight and all Interval theory/domain sour
   assert.equal(theory.INTERVAL_TYPE_IDS.length, 26); assert.equal(candidates.length, 1575)
   assert.equal(createHash('sha256').update(JSON.stringify(candidates)).digest('hex'), 'c643be252f5ea57519490033662008b4716bd1f98df0266d3357e3be171f460e')
   for (const q of candidates) assert.ok(q.rootMidi >= 29 && q.targetMidi <= 91 && q.targetMidi - q.rootMidi <= 12)
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'prototype/android-tablet-v1/src/intervalPractice', 'prototype/android-tablet-v1/src/musicTheory', 'src', 'android', 'theme-packages'], { cwd: root })
+  assertFrozenDiff(base, ['prototype/android-tablet-v1/src/intervalPractice', 'prototype/android-tablet-v1/src/musicTheory', 'src', 'android', 'theme-packages'])
 })
 test('E16', 'native parser/provider and keep-awake ownership do not change at any locale boundary', async () => flow(async h => {
   await start(h); await note(h, question(h).rootMidi); assert.equal(phase(h), 'COLLECTING'); assert.ok(h.interval.snapshot.judgement.heldPitches.length)
@@ -283,7 +284,7 @@ test('E19', 'scope freeze preserves Preparation and all unrelated main declarati
   // In-memory mutations exercise the same guard without touching the product file.
   assert.throws(() => assertPreparationFrozen(preparationSnapshot.replace('音程练习', '未授权修改')), { name: 'AssertionError' })
   assert.throws(() => assertPreparationFrozen(preparationSnapshot + '\n// unauthorized content\n'), { name: 'AssertionError' })
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'prototype/android-tablet-v1/src/localization/hubResources.ts', 'prototype/android-tablet-v1/src/localization/shellResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryPresentation.ts', 'prototype/android-tablet-v1/src/practiceKeepAwake.ts'], { cwd: root })
+  assertFrozenDiff(base, ['prototype/android-tablet-v1/src/localization/hubResources.ts', 'prototype/android-tablet-v1/src/localization/shellResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryResources.ts', 'prototype/android-tablet-v1/src/localization/theoryQueryPresentation.ts', 'prototype/android-tablet-v1/src/practiceKeepAwake.ts'])
 })
 test('E20', 'resource semantics/placeholders/plural parity and explicit English exist without fallback', () => {
   const zh = localizationResources['zh-CN'].intervalPractice, en = localizationResources.en.intervalPractice

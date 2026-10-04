@@ -8882,3 +8882,21 @@ button.setting-row {
 .chord-report-detail__body .chord-report-explanation {
   line-height: 1.6;
 }
+
+/* Theme/update English wrapping only; practice and artwork geometry stay frozen. */
+.theme-manager-modal__card header > span,
+.theme-manager-modal__card dd,
+.update-card .version-line strong,
+.update-release-notes {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.theme-manager-modal__card footer {
+  flex-wrap: wrap;
+}
+.theme-manager-modal__card small,
+.update-card p,
+.update-security-note {
+  white-space: normal;
+  line-height: 1.6;
+}

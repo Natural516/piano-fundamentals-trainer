@@ -1,3 +1,4 @@
+const { normalizeB46Main, assertFrozenDiff, assertRendererDisplayOnly, stripB46Css } = require('./android-localization-remaining-contract.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs'), path = require('node:path'), ts = require('typescript')
 const { execFileSync } = require('node:child_process')
@@ -281,7 +282,8 @@ test('CHORD-E20','fixed checkpoint freeze protects Sight/Interval/domain/MIDI/na
   const files=execFileSync('git',['ls-tree','-r','--name-only',base,'--','src','android','theme-packages','prototype/android-tablet-v1/src/chordPractice','prototype/android-tablet-v1/src/intervalPractice','prototype/android-tablet-v1/src/musicTheory','prototype/android-tablet-v1/src/theme'],{cwd:root,encoding:'utf8'}).trim().split('\n')
   files.push(...['sightReadingIntegration.ts','androidBluetoothMidi.ts','androidBluetoothMidiCore.ts','androidPersistenceCore.ts','activePracticeSession.ts','practiceKeepAwake.ts','historyProjection.ts','mixedHistoryProjection.ts'].map(n=>'prototype/android-tablet-v1/src/'+n))
   files.push(...['sightReadingPresentation.ts','sightReadingResources.ts','intervalPracticePresentation.ts','intervalPreparationResources.ts','intervalFlowResources.ts','theoryQueryResources.ts','legacyPresentation.ts'].map(n=>'prototype/android-tablet-v1/src/localization/'+n))
-  for(const file of files){const was=execFileSync('git',['show',base+':'+file],{cwd:root,maxBuffer:64*1024*1024}),now=fs.readFileSync(path.join(root,file))
+  for(const file of files){if (file === 'src/renderer/src/components/MusicStaffRenderer.tsx') { assertRendererDisplayOnly(base); continue }
+    const was=execFileSync('git',['show',base+':'+file],{cwd:root,maxBuffer:64*1024*1024}),now=fs.readFileSync(path.join(root,file))
     if(/\.(ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh|html|css|txt)$/.test(file))assert.equal(now.toString().replaceAll('\r\n','\n'),was.toString().replaceAll('\r\n','\n'),file)
     else assert.equal(createHash('sha256').update(now).digest('hex'),createHash('sha256').update(was).digest('hex'),file)
   }
@@ -314,7 +316,7 @@ test('CHORD-E23','AST freezes all Chord lifecycle/actions/notation props; only s
   renderer=renderer.replace('  ariaLabel?: string\n','').replace('  symbol,\n  ariaLabel','  symbol').replace('aria-label={ariaLabel ?? ','aria-label={')
   renderer=renderer.replace('  fontErrorLabel?: string\n','').replace('  symbol,\n  fontErrorLabel','  symbol').replace('{fontErrorLabel ?? fontError}', '{fontError}')
   assert.equal(renderer,oldFile('prototype/android-tablet-v1/src/ChordGrandStaff.tsx'))
-  const css=read('prototype/android-tablet-v1/src/styles.css'),old=oldFile('prototype/android-tablet-v1/src/styles.css')
+  const css=stripB46Css(read('prototype/android-tablet-v1/src/styles.css')),old=oldFile('prototype/android-tablet-v1/src/styles.css')
   assert.ok(css.startsWith(old));assert.doesNotMatch(css.slice(old.length),/(?:^|\n)\s*(?:height|width|transform|position):|\.notation-paper|\.chord-grand-staff|--paper/)
 })
 test('CHORD-E24','wrong arpeggio/block and release gate keep same question/retry semantics and first-pass counters',async()=>flow(async h=>{

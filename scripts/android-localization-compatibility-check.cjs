@@ -1,3 +1,4 @@
+const { normalizeB46Main, assertFrozenDiff, assertRendererDisplayOnly, stripB46Css } = require('./android-localization-remaining-contract.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -352,7 +353,7 @@ test('B3R3', 'pure compatibility/domain/persistence helpers have no translator, 
 })
 test('B3R4', 'only authorized UI display points change; Query output and protected schema/runtime sources stay frozen', () => {
   const file = 'prototype/android-tablet-v1/src/main.tsx'
-  const main = read(file)
+  const main = normalizeB46Main(read(file))
   assert.equal((main.match(/<IntervalDisplayName intervalId=\{entry.intervalId\} \/>/g) ?? []).length, 2)
   assert.equal((main.match(/<SightNoteValue value=\{primaryError\} \/>/g) ?? []).length, 2)
   assert.doesNotMatch(main, /entry\.intervalName/)

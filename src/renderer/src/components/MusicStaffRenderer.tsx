@@ -24,6 +24,7 @@ interface MusicStaffRendererProps {
   notes: readonly MusicNotationPitch[]
   feedback: MusicNotationFeedback
   ariaLabel: string
+  fontErrorLabel?: string
 }
 
 const MIN_RENDER_WIDTH = 420
@@ -247,7 +248,7 @@ export function MusicStaffRenderer(props: MusicStaffRendererProps): JSX.Element 
       aria-label={props.ariaLabel}
       aria-busy={!fontReady && !fontError}
     >
-      {fontError ? <span className="music-staff-renderer__error" role="alert">{fontError}</span> : null}
+      {fontError ? <span className="music-staff-renderer__error" role="alert">{props.fontErrorLabel ?? fontError}</span> : null}
     </div>
   )
 }

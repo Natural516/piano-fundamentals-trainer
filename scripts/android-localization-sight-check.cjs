@@ -1,3 +1,4 @@
+const { normalizeB46Main, assertFrozenDiff, assertRendererDisplayOnly, stripB46Css } = require('./android-localization-remaining-contract.cjs')
 const assert = require('node:assert/strict')
 const { execFileSync } = require('node:child_process')
 const { createHash } = require('node:crypto')
@@ -306,7 +307,7 @@ test('SIGHT-E26', 'Sight lifecycle/actions/selected IDs/notation/key props byte 
     } visit(ast); return nodes
   }
   for (const name of ['SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice']) assert.deepEqual(protectedNodes(current.get(name)), protectedNodes(previous.get(name)), name)
-  const css = read('prototype/android-tablet-v1/src/styles.css'), original = oldFile('prototype/android-tablet-v1/src/styles.css')
+  const css = stripB46Css(read('prototype/android-tablet-v1/src/styles.css')), original = oldFile('prototype/android-tablet-v1/src/styles.css')
   assert.ok(css.startsWith(original)); const addition = css.slice(original.length); assert.doesNotMatch(addition, /(?:^|\n)\s*(?:height|width|transform|position):|--paper|\.notation-paper|\.music-staff/)
   assert.match(addition, /sight-ready-layout/); assert.match(addition, /sight-result-layout/); assert.match(addition, /sight-focus-frame/)
   assert.match(addition, /\.settings-group--sight \.setting-row__copy small \{\s*overflow: visible;\s*white-space: normal;/)

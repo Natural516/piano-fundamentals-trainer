@@ -1,0 +1,55 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs'), path = require('node:path'), ts = require('typescript')
+const { execFileSync } = require('node:child_process')
+const root = path.resolve(__dirname, '..')
+const base = '5d4ed3bda5a7493726b4741b36a40786992346c7'
+const mainPath = 'prototype/android-tablet-v1/src/main.tsx'
+const rendererPath = 'src/renderer/src/components/MusicStaffRenderer.tsx'
+const read = file => fs.readFileSync(path.join(root, file), 'utf8').replaceAll('\r\n', '\n')
+const oldFile = (file, ref = base) => execFileSync('git', ['show', ref + ':' + file], { cwd: root, encoding: 'utf8', maxBuffer: 64*1024*1024 }).replaceAll('\r\n', '\n')
+const astOf = source => ts.createSourceFile(mainPath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+function namedNodes(source) {
+  const ast = astOf(source), nodes = new Map()
+  for (const n of ast.statements) {
+    if ((ts.isFunctionDeclaration(n) || ts.isClassDeclaration(n) || ts.isTypeAliasDeclaration(n)) && n.name) nodes.set(n.name.text, { n, ast })
+    if (ts.isVariableStatement(n)) for (const d of n.declarationList.declarations) nodes.set(d.name.getText(ast), { n, ast })
+  }
+  return nodes
+}
+const changed = ['THEME_PACKAGE_STAGE_LABELS','ThemePackageDialog','ThemeInfoDialog','updaterStatusCopy','UpdateScreen','ThemeRecoveryBoundary','AndroidAppBootstrap']
+const added = ['MusicStaffRenderer','ThemeRecoveryMessage']
+const original = oldFile(mainPath), previous = namedNodes(original)
+// Earlier stage source guards exclude ONLY explicitly authorized B4.6 presentation declarations.
+// The new B4.6 suite separately freezes every other declaration and the effects/actions within these.
+function normalizeB46Main(source) {
+  source = source.replaceAll('\r\n','\n')
+  if (!source.includes("from './localization/remainingPresentation'")) return source
+  const nodes = namedNodes(source)
+  const replacements = [...changed,...added].map(name => {
+    const entry = nodes.get(name); assert.ok(entry, name)
+    return { start: entry.n.getStart(entry.ast), end: entry.n.end, value: added.includes(name) ? '' : previous.get(name).n.getText(previous.get(name).ast) }
+  }).sort((a,b)=>b.start-a.start)
+  for (const r of replacements) source = source.slice(0,r.start)+r.value+source.slice(r.end)
+  source = source.replace(/^import \{ presentThemeError, formatThemeInstalledAt, presentUpdaterError \} from '\.\/localization\/remainingPresentation'\n/m,'')
+    .replace('MusicStaffRenderer as BaseMusicStaffRenderer','MusicStaffRenderer')
+    .replace("import { ThemeRuntimeManager, type InstalledThemeRecord", "import { THEME_PACKAGE_ERRORS, ThemeRuntimeManager, type InstalledThemeRecord")
+  // Removing new declarations leaves only their separating newlines; preserve the pre-B4.6 layout.
+  source = source.replace(/\n{3,}(?=class ThemeRecoveryBoundary)/, '\n\n')
+  return source
+}
+function assertRendererDisplayOnly(ref = base) {
+  const renderer = read(rendererPath).replace('  fontErrorLabel?: string\n','').replace('{props.fontErrorLabel ?? fontError}','{fontError}')
+  assert.equal(renderer,oldFile(rendererPath,ref),'shared renderer permits ONLY optional localized error text')
+}
+function assertFrozenDiff(ref, paths) {
+  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+rendererPath],{cwd:root})
+  assertRendererDisplayOnly(ref)
+}
+const cssSuffix = "/* Theme/update English wrapping only; practice and artwork geometry stay frozen. */\n.theme-manager-modal__card header > span,\n.theme-manager-modal__card dd,\n.update-card .version-line strong,\n.update-release-notes {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n.theme-manager-modal__card footer {\n  flex-wrap: wrap;\n}\n.theme-manager-modal__card small,\n.update-card p,\n.update-security-note {\n  white-space: normal;\n  line-height: 1.6;\n}";
+function stripB46Css(source) {
+  source=source.replaceAll('\r\n','\n')
+  if (!source.includes('/* Theme/update English wrapping only;')) return source
+  assert.ok(source.endsWith('\n\n'+cssSuffix+'\n'),'only exact B4.6 CSS suffix is allowed')
+  return source.slice(0,-('\n\n'+cssSuffix+'\n').length)+'\n'
+}
+module.exports={base,mainPath,rendererPath,read,oldFile,namedNodes,normalizeB46Main,assertRendererDisplayOnly,assertFrozenDiff,stripB46Css,changed,added}
