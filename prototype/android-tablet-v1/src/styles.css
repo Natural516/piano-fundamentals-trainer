@@ -8900,3 +8900,38 @@ button.setting-row {
   white-space: normal;
   line-height: 1.6;
 }
+
+/* Language choices reuse theme-card states; only this Settings row is affected. */
+.settings-language-row {
+  grid-template-columns: 44px minmax(0, 1fr) minmax(240px, .9fr);
+}
+.settings-language-options {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.settings-language-option {
+  min-height: 64px;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 12px 32px 12px 16px;
+}
+.settings-language-option strong {
+  font-size: 15px;
+}
+.settings-language-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.settings-language-option:disabled {
+  cursor: default;
+  opacity: .6;
+}
+@media (max-width: 1100px) {
+  .settings-language-row {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+  .settings-language-options {
+    grid-column: 2;
+  }
+}

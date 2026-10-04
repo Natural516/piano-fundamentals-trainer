@@ -277,11 +277,12 @@ test('LOC20', 'real React provider/settings switch live without remounting runti
     await act(async () => { renderer = create(React.createElement(LocaleProvider, { service }, React.createElement(OwnershipProbe))); await service.initialize() })
     assert.match(treeText(), /设置/)
     const identity = latestIdentity
-    const options = () => renderer.root.findAllByType('option').map((node) => ({ value: node.props.value, label: node.children.join('') }))
+    const choices = () => renderer.root.findByProps({ id: 'app-language-preference' }).findAllByType('button')
+    const options = () => choices().map((node) => ({ value: node.props.value, label: node.findByType('strong').children.join('') }))
     const expectedOptions = [{ value: 'zh-CN', label: '中文' }, { value: 'en', label: 'English' }]
     assert.deepEqual(options(), expectedOptions)
-    assert.equal(renderer.root.findByType('select').props.value, 'zh-CN')
-    await act(async () => { renderer.root.findByType('select').props.onChange({ target: { value: 'en' } }); await service.changeLanguagePreference('en') })
+    assert.equal(choices().find(node => node.props['aria-pressed']).props.value, 'zh-CN')
+    await act(async () => { choices().find(node => node.props.value === 'en').props.onClick(); await service.changeLanguagePreference('en') })
     assert.match(treeText(), /Settings/)
     assert.match(treeText(), /Language/)
     assert.deepEqual(options(), expectedOptions)
@@ -290,7 +291,7 @@ test('LOC20', 'real React provider/settings switch live without remounting runti
     assert.equal(global.document.title, 'Piano Fundamentals Trainer')
     backend.failWrite = true
     await act(async () => { await service.changeLanguagePreference('zh-CN') })
-    assert.equal(renderer.root.findByType('select').props.value, 'en')
+    assert.equal(choices().find(node => node.props['aria-pressed']).props.value, 'en')
     assert.match(treeText(), /not saved/)
     assert.doesNotMatch(treeText(), /RAW_NATIVE_PREFERENCES_SECRET/)
     backend.failWrite = false

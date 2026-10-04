@@ -28,6 +28,26 @@ const selectorEdits = [
             <option value="en">{t('english')}</option>`,
    '            {LANGUAGE_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}']
 ]
+// Explicit user-approved B7 control change, not a general presentation exemption.
+const clickChoiceEdits = [
+  [
+    "<div className=\"setting-row\">",
+    "<div className=\"setting-row settings-language-row\">"
+  ],
+  [
+    "<label className=\"setting-row__copy\" htmlFor=\"app-language-preference\">\n          <strong>{t('language')}</strong><small>{t('languageDescription')}</small>\n        </label>\n        <span className=\"setting-select-wrap\">\n          <select id=\"app-language-preference\" className=\"setting-select\" value={locale.resolvedLocale}\n            disabled={!locale.ready || locale.saving || !locale.writable}\n            onChange={(event) => {\n              const value = event.target.value\n              if (value === 'zh-CN' || value === 'en') void locale.changeLanguagePreference(value)\n            }}>\n            {LANGUAGE_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}\n          </select>\n        </span>",
+    "<div className=\"setting-row__copy\">\n          <strong id=\"app-language-label\">{t('language')}</strong><small id=\"app-language-description\">{t('languageDescription')}</small>\n        </div>\n        <div id=\"app-language-preference\" className=\"settings-language-options\" role=\"group\"\n          aria-labelledby=\"app-language-label\" aria-describedby=\"app-language-description\">\n          {LANGUAGE_OPTIONS.map((option) => (\n            <button key={option.id} type=\"button\" value={option.id}\n              className={`settings-theme-option settings-language-option${locale.resolvedLocale === option.id ? ' is-active' : ''}`}\n              aria-pressed={locale.resolvedLocale === option.id}\n              disabled={!locale.ready || locale.saving || !locale.writable}\n              onClick={() => { void locale.changeLanguagePreference(option.id) }}>\n              <strong>{option.label}</strong>\n              {locale.resolvedLocale === option.id ? <span className=\"settings-theme-option__check\" aria-hidden=\"true\">✓</span> : null}\n            </button>\n          ))}\n        </div>"
+  ]
+]
+const stylesPath = 'prototype/android-tablet-v1/src/styles.css'
+const clickChoiceCss = "/* Language choices reuse theme-card states; only this Settings row is affected. */\n.settings-language-row {\n  grid-template-columns: 44px minmax(0, 1fr) minmax(240px, .9fr);\n}\n.settings-language-options {\n  display: grid;\n  min-width: 0;\n  grid-template-columns: repeat(2, minmax(0, 1fr));\n  gap: 8px;\n}\n.settings-language-option {\n  min-height: 64px;\n  grid-template-columns: minmax(0, 1fr);\n  padding: 12px 32px 12px 16px;\n}\n.settings-language-option strong {\n  font-size: 15px;\n}\n.settings-language-option:focus-visible {\n  outline: 2px solid var(--accent);\n  outline-offset: 3px;\n}\n.settings-language-option:disabled {\n  cursor: default;\n  opacity: .6;\n}\n@media (max-width: 1100px) {\n  .settings-language-row {\n    grid-template-columns: 44px minmax(0, 1fr);\n  }\n  .settings-language-options {\n    grid-column: 2;\n  }\n}\n"
+function stripClickChoiceCss(source) {
+  source = source.replaceAll('\r\n', '\n')
+  if (!source.includes('/* Language choices reuse theme-card states;')) return source
+  assert.equal(source, old(stylesPath) + '\n' + clickChoiceCss, 'only exact language-row CSS may change; all existing geometry is frozen')
+  return old(stylesPath)
+}
+
 const resourceEdits = [
   ["      system: '跟随系统',\n      chinese: '简体中文',\n      english: 'English',\n", ''],
   ["      system: 'Follow system',\n      chinese: 'Simplified Chinese',\n      english: 'English',\n", '']
@@ -41,8 +61,14 @@ function approved(file, edits) {
   return expected
 }
 function assertB6PresentationOnly() {
-  assert.equal(read(selectorPath), approved(selectorPath, selectorEdits), 'only exact B6 autonyms/options/resolved selection may change')
+  let expected = approved(selectorPath, selectorEdits)
+  for (const [from, to] of clickChoiceEdits) {
+    assert.equal(expected.split(from).length - 1, 1, 'unique user-approved click-choice boundary')
+    expected = expected.replace(from, to)
+  }
+  assert.equal(read(selectorPath), expected, 'only exact B6 autonyms plus user-approved B7 click choices may change')
   assert.equal(read(resourcesPath), approved(resourcesPath, resourceEdits), 'only six dead translated option resources may be removed')
+  assert.equal(read(stylesPath), old(stylesPath) + '\n' + clickChoiceCss, 'language row only; no global or staff geometry changes')
 }
 function restoreLegacySelector(source) {
   assertB6PresentationOnly()
@@ -52,8 +78,8 @@ function restoreLegacySelector(source) {
 function assertB6ScopeFrozen() {
   assertB6PresentationOnly()
   execFileSync('git', ['diff', '--exit-code', base, '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages', 'capacitor.config.ts', 'package-lock.json',
-    ':(exclude)' + selectorPath, ':(exclude)' + resourcesPath], { cwd: root })
+    ':(exclude)' + selectorPath, ':(exclude)' + resourcesPath, ':(exclude)' + stylesPath], { cwd: root })
   const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages'], { cwd: root, encoding: 'utf8' }).trim()
   assert.equal(untracked, '', 'no unreviewed product source/resource additions')
 }
-module.exports = { base, root, selectorPath, resourcesPath, read, assertB6PresentationOnly, restoreLegacySelector, assertB6ScopeFrozen }
+module.exports = { base, root, selectorPath, resourcesPath, stylesPath, read, assertB6PresentationOnly, restoreLegacySelector, assertB6ScopeFrozen, stripClickChoiceCss }

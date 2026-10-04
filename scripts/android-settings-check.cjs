@@ -94,10 +94,10 @@ const tests = [
     assert.match(settings, /<LanguageSetting \/>/)
     const language = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/LanguageSetting.tsx'), 'utf8')
     require('./android-language-selector-contract.cjs').assertB6PresentationOnly()
-    assert.match(language, /value=\{locale\.resolvedLocale\}/)
+    assert.match(language, /aria-pressed=\{locale\.resolvedLocale === option\.id\}/)
     assert.match(language, /LANGUAGE_OPTIONS\.map/)
-    assert.doesNotMatch(language, /value="system"|t\('(system|chinese|english)'\)/)
-    assert.match(language, /changeLanguagePreference\(value\)/)
+    assert.doesNotMatch(language, /<select|<option|value="system"|t\('(system|chinese|english)'\)/)
+    assert.match(language, /changeLanguagePreference\(option\.id\)/)
     assert.match(language, /role="alert"/)
     assert.doesNotMatch(language, /String\(error\)|dangerouslySetInnerHTML|window\.location/)
   }]

@@ -50,7 +50,7 @@ function assertFrozenDiff(ref, paths) {
 }
 const cssSuffix = "/* Theme/update English wrapping only; practice and artwork geometry stay frozen. */\n.theme-manager-modal__card header > span,\n.theme-manager-modal__card dd,\n.update-card .version-line strong,\n.update-release-notes {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n.theme-manager-modal__card footer {\n  flex-wrap: wrap;\n}\n.theme-manager-modal__card small,\n.update-card p,\n.update-security-note {\n  white-space: normal;\n  line-height: 1.6;\n}";
 function stripB46Css(source) {
-  source=source.replaceAll('\r\n','\n')
+  source=require('./android-language-selector-contract.cjs').stripClickChoiceCss(source)
   if (!source.includes('/* Theme/update English wrapping only;')) return source
   assert.ok(source.endsWith('\n\n'+cssSuffix+'\n'),'only exact B4.6 CSS suffix is allowed')
   return source.slice(0,-('\n\n'+cssSuffix+'\n').length)+'\n'

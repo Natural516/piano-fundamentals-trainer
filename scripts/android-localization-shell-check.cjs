@@ -249,7 +249,7 @@ test('ST1', 'Settings Device Appearance About and real entry copy render in both
   await h.switchTo('en')
   for (const label of ['Device', 'Appearance', 'About', 'Current version', 'Check for updates', 'Open source', 'V1.6.0', 'versionCode 14']) contains(h.getText(), label)
   const language = h.renderer.root.findByProps({ id: 'app-language-preference' })
-  assert.equal(text(language.findByProps({ value: 'zh-CN' })), '中文')
+  assert.equal(text(language.findByProps({ value: 'zh-CN' }).findByType('strong')), '中文')
   // Only the one approved option autonym remains Chinese, not any other English Settings copy.
   assert.deepEqual(h.getText().match(/[\u3400-\u9fff]+/g), ['中文'])
 }))
@@ -257,7 +257,8 @@ test('ST2', 'Light/Dark display from stable IDs, with selection handlers still s
   for (const id of ['light', 'dark']) await mounted('settings', async h => {
     contains(h.getText(), '当前：' + (id === 'light' ? '浅色' : '深色'))
     await h.switchTo('en'); contains(h.getText(), 'Current: ' + (id === 'light' ? 'Light' : 'Dark'))
-    const choices = h.renderer.root.findAll(node => node.type === 'button' && String(node.props.className).startsWith('settings-theme-option '))
+    const choices = h.renderer.root.findByProps({ className: 'settings-theme-options' }).findAllByType('button')
+    assert.equal(choices.length, 2)
     await act(async () => { choices[1].props.onClick() })
     assert.deepEqual(h.pointerCalls, ['dark'])
     assert.equal(h.theme.id, id)
@@ -272,10 +273,10 @@ test('ST3', 'external theme names/subtitles remain exact author text, including 
   }
   assert.equal(getSettingsThemeDisplayName({ id: 'light', source: 'external', displayName: authorRecord.name }, translator('en', 'settings')), authorRecord.name)
 }, { installed: [authorRecord], theme: { id: authorRecord.themeId, source: 'external', displayName: authorRecord.name, version: '1.1.0', capabilities: { settingsVisual: { kind: 'standard' } } } }))
-test('ST4', 'actual LanguageSetting onChange updates the mounted Settings without reload/remount', async () => mounted('settings', async h => {
+test('ST4', 'actual LanguageSetting clicks update mounted Settings without reload/remount', async () => mounted('settings', async h => {
   const select = () => h.renderer.root.findByProps({ id: 'app-language-preference' })
   for (const [locale, label] of [['en', 'Appearance'], ['zh-CN', '外观']]) {
-    await act(async () => { select().props.onChange({ target: { value: locale } }); await new Promise(resolve => setImmediate(resolve)) })
+    await act(async () => { select().findByProps({ value: locale }).props.onClick(); await new Promise(resolve => setImmediate(resolve)) })
     contains(h.getText(), label); assert.equal(global.document.documentElement.lang, locale)
   }
   assert.deepEqual(h.lifecycle(), { mounts: 1, unmounts: 0 })

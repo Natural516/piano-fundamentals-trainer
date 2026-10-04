@@ -14,7 +14,9 @@ const { AppPreferencesRepository, APP_PREFERENCES_KEY } = require(loc + 'appPref
 const { localizationResources } = require(loc + 'resources.ts')
 const expected = [{ value: 'zh-CN', label: '中文' }, { value: 'en', label: 'English' }]
 const select = h => h.renderer.root.findByProps({ id: 'app-language-preference' })
-const options = h => select(h).findAllByType('option').map(node => ({ value: node.props.value, label: node.children.join('') }))
+const buttons = h => select(h).findAllByType('button')
+const options = h => buttons(h).map(node => ({ value: node.props.value, label: text(node.findByType('strong')) }))
+const selected = h => buttons(h).find(node => node.props['aria-pressed']).props.value
 // Serialize actual mounted host nodes, not client hooks or a reconstructed mock selector.
 function hostElement(node) {
   if (typeof node === 'string' || typeof node === 'number') return node
@@ -22,7 +24,7 @@ function hostElement(node) {
   return React.createElement(node.type, node.props, ...node.children.map(hostElement))
 }
 async function choose(h, value) {
-  await act(async () => { select(h).props.onChange({ target: { value } }); await new Promise(resolve => setImmediate(resolve)) })
+  await act(async () => { select(h).findByProps({ value }).props.onClick(); await new Promise(resolve => setImmediate(resolve)) })
 }
 function events() {
   const handlers = new Map()
@@ -62,11 +64,14 @@ async function selectorSession(run, { raw = null, languages = ['zh-CN'], failRea
 }
 const tests = [], test = (id, description, run) => tests.push({ id, description, run })
 
-test('LANGUAGE-SELECTOR-1', 'actual normal Settings has exactly two real, non-hidden options', () => mounted('settings', async h => {
-  assert.equal(select(h).findAllByType('option').length, 2)
-  for (const node of select(h).findAllByType('option')) {
+test('LANGUAGE-SELECTOR-1', 'actual Settings has exactly two visible theme-style click choices and no dropdown', () => mounted('settings', async h => {
+  assert.equal(buttons(h).length, 2)
+  assert.equal(select(h).findAllByType('select').length, 0)
+  assert.equal(select(h).findAllByType('option').length, 0)
+  for (const node of buttons(h)) {
     assert.notEqual(node.props.hidden, true); assert.notEqual(node.props['aria-hidden'], true)
     assert.equal(node.props.style, undefined); assert.notEqual(node.props.disabled, true)
+    assert.equal(node.props.type, 'button'); assert.match(node.props.className, /settings-theme-option settings-language-option/)
   }
 }))
 test('LANGUAGE-SELECTOR-2', 'stable choice IDs are exactly zh-CN / en', () => mounted('settings', async h => {
@@ -90,21 +95,24 @@ test('LANGUAGE-SELECTOR-3', 'fixed autonyms are exact literals, not translator o
 test('LANGUAGE-SELECTOR-4', 'Chinese Settings uses 中文 / English and a localized language title', () => mounted('settings', async h => {
   assert.equal(h.service.getSnapshot().resolvedLocale, 'zh-CN')
   assert.deepEqual(options(h), expected)
-  assert.equal(h.renderer.root.findByProps({ htmlFor: 'app-language-preference' }).findByType('strong').children.join(''), '语言')
+  assert.equal(text(h.renderer.root.findByProps({ id: 'app-language-label' })), '语言')
 }))
 test('LANGUAGE-SELECTOR-5', 'English Settings retains the same autonyms and localizes only the title', () => mounted('settings', async h => {
   await choose(h, 'en')
   assert.equal(h.service.getSnapshot().resolvedLocale, 'en')
   assert.deepEqual(options(h), expected)
-  assert.equal(h.renderer.root.findByProps({ htmlFor: 'app-language-preference' }).findByType('strong').children.join(''), 'Language')
+  assert.equal(text(h.renderer.root.findByProps({ id: 'app-language-label' })), 'Language')
   assert.ok(text(h.renderer.root.findByProps({ role: 'status' })).includes('English'))
 }))
-test('LANGUAGE-SELECTOR-6', 'no System third choice exists and invalid/legacy event values cannot be selected', () => mounted('settings', async h => {
+test('LANGUAGE-SELECTOR-6', 'no System/invalid choice exists; clicks use bound stable IDs, never event text', () => mounted('settings', async h => {
   const before = h.service.getSnapshot(), writes = [...h.backend.writes]
-  for (const value of ['system', 'auto', 'fr', 'zh-TW', '', '<unsafe>']) await choose(h, value)
+  for (const value of ['system', 'auto', 'fr', 'zh-TW', '', '<unsafe>']) assert.equal(buttons(h).filter(node => node.props.value === value).length, 0)
   assert.deepEqual(options(h), expected)
   assert.equal(h.service.getSnapshot(), before)
   assert.deepEqual(h.backend.writes, writes)
+  await act(async () => { select(h).findByProps({ value: 'en' }).props.onClick({ target: { value: 'system' } }); await new Promise(resolve => setImmediate(resolve)) })
+  assert.equal(h.service.getSnapshot().preference, 'en')
+  assert.equal(JSON.parse(h.backend.values.get(APP_PREFERENCES_KEY)).languagePreference, 'en')
 }))
 test('LANGUAGE-SELECTOR-7', 'legacy system reads safely and selects resolved language without rewriting raw bytes', async () => {
   for (const [languages, resolved] of [[['zh-TW'], 'zh-CN'], [['en-US'], 'en']]) {
@@ -112,7 +120,7 @@ test('LANGUAGE-SELECTOR-7', 'legacy system reads safely and selects resolved lan
     await selectorSession(async h => {
       assert.deepEqual(await new AppPreferencesRepository(h.backend).load(), { preference: 'system', error: null, writable: true })
       assert.equal(h.service.getSnapshot().preference, 'system')
-      assert.equal(select(h).props.value, resolved)
+      assert.equal(selected(h), resolved)
       assert.deepEqual(options(h), expected)
       assert.equal(h.backend.values.get(APP_PREFERENCES_KEY), raw)
       assert.equal(h.backend.writes.length, 0)
@@ -122,7 +130,7 @@ test('LANGUAGE-SELECTOR-7', 'legacy system reads safely and selects resolved lan
 test('LANGUAGE-SELECTOR-8', 'actual explicit choices persist only zh-CN/en and retain unrelated preference fields', () => selectorSession(async h => {
   for (const value of ['en', 'zh-CN']) {
     await choose(h, value)
-    assert.equal(select(h).props.value, value)
+    assert.equal(selected(h), value)
     assert.equal(h.service.getSnapshot().preference, value)
     assert.deepEqual(JSON.parse(h.backend.values.get(APP_PREFERENCES_KEY)), { schemaVersion: 1, languagePreference: value, other: 7 })
     const reloaded = new LocalizationService(new AppPreferencesRepository(h.backend), () => ['ja-JP'])
@@ -160,17 +168,28 @@ test('LANGUAGE-SELECTOR-10', 'B5 native/system strategy and Web services/bridges
   const source = Object.keys(native.literalPolicies).map(f => native.read(native.nativeDir + f)).join('\n')
   assert.doesNotMatch(source, /LocaleManager|setApplicationLocales|LocaleListCompat|updateConfiguration|\.recreate\s*\(/)
 })
-test('LANGUAGE-SELECTOR-11', 'semantic HTML option names stay exact; associated label localizes without overrides', () => mounted('settings', async h => {
+test('LANGUAGE-SELECTOR-11', 'native buttons have exact accessible autonyms, group label, pressed state and focus style', () => mounted('settings', async h => {
   for (const value of ['zh-CN', 'en']) {
     await choose(h, value)
     assert.deepEqual(options(h).map(x => x.label), ['中文', 'English'])
     assert.equal(select(h).props['aria-label'], undefined)
-    assert.equal(select(h).props['aria-labelledby'], undefined)
-    for (const node of select(h).findAllByType('option')) for (const field of ['aria-label', 'aria-labelledby', 'label', 'title']) assert.equal(node.props[field], undefined)
-    assert.equal(h.renderer.root.findAllByProps({ htmlFor: select(h).props.id }).length, 1)
+    assert.equal(select(h).props.role, 'group')
+    assert.equal(select(h).props['aria-labelledby'], 'app-language-label')
+    assert.equal(select(h).props['aria-describedby'], 'app-language-description')
+    assert.equal(h.renderer.root.findAllByProps({ id: 'app-language-label' }).length, 1)
+    assert.equal(h.renderer.root.findAllByProps({ id: 'app-language-description' }).length, 1)
+    assert.equal(buttons(h).filter(node => node.props['aria-pressed']).length, 1)
+    assert.equal(selected(h), value)
+    for (const node of buttons(h)) {
+      for (const field of ['aria-label', 'aria-labelledby', 'label', 'title']) assert.equal(node.props[field], undefined)
+      assert.equal(node.props.type, 'button') // Browser-native Enter/Space activation; no custom keyboard handler.
+      for (const mark of node.findAllByType('span')) assert.equal(mark.props['aria-hidden'], 'true')
+    }
     const markup = renderToStaticMarkup(hostElement(select(h)))
-    assert.match(markup, /<option value="zh-CN"(?: selected="")?>中文<\/option>/)
-    assert.match(markup, /<option value="en"(?: selected="")?>English<\/option>/)
+    assert.match(markup, /<strong>中文<\/strong>/)
+    assert.match(markup, /<strong>English<\/strong>/)
+    assert.doesNotMatch(markup, /<select|<option/)
+    assert.match(guard.read(guard.stylesPath), /\.settings-language-option:focus-visible/)
   }
 }))
 test('LANGUAGE-SELECTOR-12', 'language UI exposes no locale/region code text, flag, or extra region selector', () => mounted('settings', async h => {
@@ -179,7 +198,8 @@ test('LANGUAGE-SELECTOR-12', 'language UI exposes no locale/region code text, fl
     const language = h.renderer.root.findByProps({ className: 'settings-language' })
     const visible = text(language)
     assert.doesNotMatch(visible, /zh-CN|zh-TW|en-US|BCP.?47|Simplified Chinese|简体中文|Chinese|跟随系统|Follow system|Automatic|Auto|地区|国家|Region|Country|[\u{1F1E6}-\u{1F1FF}]/u)
-    assert.equal(language.findAllByType('select').length, 1)
+    assert.equal(language.findAllByType('select').length, 0)
+    assert.equal(buttons(h).length, 2)
     assert.equal(language.findAllByType('img').length, 0)
     assert.deepEqual(options(h), expected)
   }
@@ -189,7 +209,7 @@ test('LANGUAGE-SELECTOR-13', 'fresh/no-preference startup uses existing primary-
     await selectorSession(async h => {
       assert.equal(h.service.getSnapshot().preference, 'system')
       assert.equal(h.service.getSnapshot().resolvedLocale, resolved)
-      assert.equal(select(h).props.value, resolved)
+      assert.equal(selected(h), resolved)
       assert.deepEqual(options(h), expected)
       assert.equal(h.backend.values.has(APP_PREFERENCES_KEY), false)
       assert.equal(h.backend.writes.length, 0)
@@ -200,7 +220,7 @@ test('LANGUAGE-SELECTOR-14', 'read/future-schema/write failures preserve control
   const future = '{"schemaVersion":99,"languagePreference":"future","other":7}'
   await selectorSession(async h => {
     assert.equal(h.service.getSnapshot().error, 'futureSchema')
-    assert.equal(select(h).props.disabled, true)
+    assert.ok(buttons(h).every(node => node.props.disabled === true))
     assert.deepEqual(options(h), expected)
     await choose(h, 'en')
     assert.equal(h.backend.values.get(APP_PREFERENCES_KEY), future); assert.equal(h.backend.writes.length, 0)
@@ -215,7 +235,7 @@ test('LANGUAGE-SELECTOR-14', 'read/future-schema/write failures preserve control
     h.backend.failWrite = true
     await choose(h, 'en')
     assert.equal(h.service.getSnapshot().error, 'writeFailed')
-    assert.equal(select(h).props.value, 'zh-CN')
+    assert.equal(selected(h), 'zh-CN')
     assert.deepEqual(options(h), expected); assert.equal(h.backend.values.get(APP_PREFERENCES_KEY), before)
     assert.doesNotMatch(text(h.renderer.toJSON()), /RAW_PRIVATE_ERROR/)
   }, { raw: '{"schemaVersion":1,"languagePreference":"zh-CN"}' })
@@ -237,13 +257,13 @@ test('LANGUAGE-SELECTOR-16', 'legacy system refresh updates selection without re
   const control = select(h)
   h.setSystem(['en-US'])
   await act(async () => h.service.refreshSystemLocale())
-  assert.equal(select(h), control); assert.equal(select(h).props.value, 'en')
+  assert.equal(select(h), control); assert.equal(selected(h), 'en')
   assert.equal(h.backend.values.get(APP_PREFERENCES_KEY), raw); assert.equal(h.backend.writes.length, 0)
   assert.deepEqual(options(h), expected)
   await choose(h, 'zh-CN')
   h.setSystem(['ja-JP'])
   await act(async () => h.service.refreshSystemLocale())
-  assert.equal(select(h).props.value, 'zh-CN')
+  assert.equal(selected(h), 'zh-CN')
   assert.equal(h.service.getSnapshot().preference, 'zh-CN')
   assert.deepEqual(options(h), expected)
   assert.equal(h.backend.writes.length, 1)

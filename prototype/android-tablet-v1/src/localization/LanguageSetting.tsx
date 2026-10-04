@@ -14,21 +14,24 @@ export function LanguageSetting(): JSX.Element {
   const language = LANGUAGE_OPTIONS[locale.resolvedLocale === 'zh-CN' ? 0 : 1].label
   return (
     <div className="settings-language">
-      <div className="setting-row">
+      <div className="setting-row settings-language-row">
         <span className="setting-row__icon" aria-hidden="true">Aa</span>
-        <label className="setting-row__copy" htmlFor="app-language-preference">
-          <strong>{t('language')}</strong><small>{t('languageDescription')}</small>
-        </label>
-        <span className="setting-select-wrap">
-          <select id="app-language-preference" className="setting-select" value={locale.resolvedLocale}
-            disabled={!locale.ready || locale.saving || !locale.writable}
-            onChange={(event) => {
-              const value = event.target.value
-              if (value === 'zh-CN' || value === 'en') void locale.changeLanguagePreference(value)
-            }}>
-            {LANGUAGE_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-          </select>
-        </span>
+        <div className="setting-row__copy">
+          <strong id="app-language-label">{t('language')}</strong><small id="app-language-description">{t('languageDescription')}</small>
+        </div>
+        <div id="app-language-preference" className="settings-language-options" role="group"
+          aria-labelledby="app-language-label" aria-describedby="app-language-description">
+          {LANGUAGE_OPTIONS.map((option) => (
+            <button key={option.id} type="button" value={option.id}
+              className={`settings-theme-option settings-language-option${locale.resolvedLocale === option.id ? ' is-active' : ''}`}
+              aria-pressed={locale.resolvedLocale === option.id}
+              disabled={!locale.ready || locale.saving || !locale.writable}
+              onClick={() => { void locale.changeLanguagePreference(option.id) }}>
+              <strong>{option.label}</strong>
+              {locale.resolvedLocale === option.id ? <span className="settings-theme-option__check" aria-hidden="true">✓</span> : null}
+            </button>
+          ))}
+        </div>
       </div>
       <p className="settings-language__status" role="status">
         {!locale.ready ? t('loading') : locale.saving ? t('saving') : t('currentLanguage', { language })}
