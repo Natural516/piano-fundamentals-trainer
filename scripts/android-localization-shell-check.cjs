@@ -1,4 +1,5 @@
 const { normalizeB46Main, assertFrozenDiff, assertRendererDisplayOnly, stripB46Css } = require('./android-localization-remaining-contract.cjs')
+const { normalizeEarlyExitMain } = require('./android-practice-early-exit-contract.cjs')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -40,6 +41,7 @@ function declarations(source) {
   return result
 }
 const current = declarations(main), old = declarations(baseline(mainPath))
+const frozenCurrent = declarations(normalizeEarlyExitMain(main))
 const componentNames = ['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'useChordPracticeRuntime', 'toChordWrittenPitches', 'MidiUiContext', 'UpdaterUiContext', 'AppNavigationContext', 'useMidiUi', 'useUpdaterUi', 'useAppNavigation', 'productNavigation', 'SETTINGS_THEME_OPTIONS', 'Icon', 'navigate', 'presentMidiStatus', 'MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'SettingRow', 'SettingSelect', 'SettingsThemeOption', 'useThemeRuntime', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'THEORY_TOOLS', 'ToolsHubScreen', 'ScaleNoteToken', 'parseChordAccidentalGroup', 'ChordAccidentalGlyph', 'ChordAccidentalGroup', 'ChordSymbol', 'ChordTheoreticalNoteToken', 'ToolDetailShell', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalPitchToken', 'IntervalPitchSelector', 'IntervalQueryToolScreen', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'useRemainingTime', 'PracticeMetric', 'getPracticeScreen', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'NotationPaper', 'useIntervalPracticeRuntime', 'useIntervalPersistence', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice']
 const componentSource = `
 import { CHORD_SEQUENTIAL_MAJOR_KEY_IDS, formatWrittenPitchClass } from './musicTheory/chords'
@@ -49,6 +51,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef,
 import { useTranslation } from 'react-i18next'
 import { Capacitor } from '@capacitor/core'
 import { LanguageSetting } from './localization/LanguageSetting'
+import { PracticeEarlyExitDialog, usePracticeEarlyExit } from './PracticeEarlyExitDialog'
 import { getSettingsThemeDisplayName, presentLocalizedMidiStatus } from './localization/midiPresentation'
 import { presentHomeRecentPractice } from './localization/homePresentation'
 import { projectMixedPracticeHistory } from './mixedHistoryProjection'
@@ -139,6 +142,7 @@ function events() {
   return {
     addEventListener(name, handler) { if (!handlers.has(name)) handlers.set(name, new Set()); handlers.get(name).add(handler) },
     removeEventListener(name, handler) { handlers.get(name)?.delete(handler) },
+    dispatchEvent(event) { for (const handler of [...(handlers.get(event.type) ?? [])]) handler(event); return true },
     count() { return [...handlers.values()].reduce((sum, values) => sum + values.size, 0) },
     snapshot() { return [...handlers].map(([name, values]) => [name, [...values]]) }
   }
@@ -423,8 +427,8 @@ test('M12', 'actual full-row candidates and multi-port selector preserve identit
 
 test('B41R1', 'all out-of-scope main declarations and Bocchi headline/dialogs stay byte frozen', () => {
   const permitted = new Set(['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'ToolsHubScreen', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalQueryToolScreen', 'IntervalPitchSelector', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
-  assert.deepEqual([...current.keys()], [...old.keys()])
-  for (const [name, source] of current) if (!permitted.has(name)) assert.equal(source, old.get(name), name)
+  assert.deepEqual([...frozenCurrent.keys()], [...old.keys()])
+  for (const [name, source] of frozenCurrent) if (!permitted.has(name)) assert.equal(source, old.get(name), name)
   const caption = source => source.match(/<div className="settings-hero__caption">[\s\S]*?<\/div>/)[0]
   assert.equal(caption(current.get('SettingsScreen')), caption(old.get('SettingsScreen')))
   for (const file of ['android/version.properties', 'android/updater.properties', 'android/app/build.gradle', 'prototype/android-tablet-v1/src/theme/themePackageRuntime.ts']) assert.equal(read(file), baseline(file), file)
@@ -509,7 +513,7 @@ test('B41R7', 'native-gated Settings import CTA is bilingual without opening a t
   } finally { Capacitor.isNativePlatform = previousNative }
 }))
 
-module.exports = { mounted, ui, current, declarations, read, text, contains, businessBytes, translator }
+module.exports = { mounted, ui, current, frozenCurrent, declarations, read, text, contains, businessBytes, translator }
 if (require.main === module) void (async () => {
   let passed = 0
   for (const { id, description, run } of tests) {

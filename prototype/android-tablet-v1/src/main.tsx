@@ -62,6 +62,7 @@ import { AppPreferencesRepository } from './localization/appPreferences'
 import { LocalizationService } from './localization/localizationService'
 import { LocaleProvider } from './localization/LocaleProvider'
 import { LanguageSetting } from './localization/LanguageSetting'
+import { PracticeEarlyExitDialog, usePracticeEarlyExit } from './PracticeEarlyExitDialog'
 import { IntervalDisplayName, SightNoteValue } from './localization/LegacyDisplayValues'
 import { presentSightKey, presentSightPrompt, presentSightReaction, presentSightHistory, presentSightDuration } from './localization/sightReadingPresentation'
 import { presentChordKey, presentChordQuestion, presentChordHistorySummary, presentLocalizedChordPractice, presentLocalizedChordReport } from './localization/chordPracticePresentation'
@@ -913,7 +914,7 @@ function IntervalPracticeActiveScreen({
   theme
 }: {
   midiRuntime: AndroidSightReadingRuntime
-  onRequestEnd: () => void
+  onRequestEnd: (saveReport?: boolean) => void
   onSessionComplete: () => void
   runtime: IntervalPracticeSessionRuntime
   snapshot: IntervalSessionSnapshot
@@ -1005,14 +1006,14 @@ function IntervalPracticeActiveScreen({
     if (snapshot.status === 'SESSION_COMPLETE') onSessionComplete()
   }, [onSessionComplete, snapshot.status])
 
-  useEffect(() => {
-    const handleBackRequest = (): void => {
-      runtime.pause()
-      setShowEarlyEnd(true)
-    }
-    window.addEventListener('interval-request-end', handleBackRequest)
-    return () => window.removeEventListener('interval-request-end', handleBackRequest)
-  }, [runtime])
+  const earlyExit = usePracticeEarlyExit({
+    open: showEarlyEnd,
+    isPaused: () => runtime.snapshot.status === 'SUSPENDED',
+    pause: () => runtime.pause(),
+    resume: () => runtime.resume(),
+    show: () => setShowEarlyEnd(true),
+    hide: () => setShowEarlyEnd(false)
+  })
 
   if (!practiceState) return <main className="persistence-loading"><h1>{t('preparing')}</h1></main>
   const page = presentLocalizedIntervalPractice(practiceState, t, music)
@@ -1034,14 +1035,7 @@ function IntervalPracticeActiveScreen({
   const progressLabel = snapshot.questionCount === 'endless'
     ? t('progressEndless', { completed: snapshot.completedQuestions })
     : t('progressFixed', { completed: snapshot.completedQuestions, total: snapshot.questionCount })
-  const requestEnd = (): void => {
-    runtime.pause()
-    setShowEarlyEnd(true)
-  }
-  const continuePractice = (): void => {
-    setShowEarlyEnd(false)
-    runtime.resume()
-  }
+  const requestEnd = earlyExit.request
 
   return (
     <div
@@ -1087,13 +1081,7 @@ function IntervalPracticeActiveScreen({
         </section>
       </main>
       {showEarlyEnd ? (
-        <div className="early-end-backdrop">
-          <section aria-labelledby="interval-early-end-title" aria-modal="true" className="early-end-dialog" role="dialog">
-            <span className="early-end-dialog__icon"><Icon name="stop" /></span>
-            <div><span className="eyebrow">{t('title')}</span><h1 id="interval-early-end-title">{t('endTitle')}</h1><p>{snapshot.questionCount === 'endless' ? t('endEndless', { count: snapshot.completedQuestions }) : t('endFixed', { completed: snapshot.completedQuestions, total: snapshot.questionCount })}</p></div>
-            <div className="early-end-dialog__actions"><button className="secondary-action" type="button" onClick={continuePractice}>{t('continuePractice')}</button><button className="primary-action" type="button" onClick={onRequestEnd}>{t('endViewResult')}</button></div>
-          </section>
-        </div>
+        <PracticeEarlyExitDialog moduleTitle={t('title')} completed={snapshot.completedQuestions} total={snapshot.questionCount ?? practiceState.settings.questionCount} icon={<Icon name="stop" />} onCancel={earlyExit.cancel} onSave={() => onRequestEnd()} onDiscard={() => onRequestEnd(false)} />
       ) : null}
     </div>
   )
@@ -2042,7 +2030,7 @@ function ChordPracticeScreen({
   previewStateId: ChordPreviewStateId
   runtime: ChordPracticeRuntime
   midiRuntime: AndroidSightReadingRuntime
-  onExplicitEnd: () => void
+  onExplicitEnd: (saveReport?: boolean) => void
   onChordSettingsChange: (changes: Partial<Pick<ChordSettings, 'sequentialKey' | 'showChordTones'>>) => void
   onQuestionCountChange: (value: ChordQuestionCount) => void
   questionCount: ChordQuestionCount
@@ -2055,6 +2043,7 @@ function ChordPracticeScreen({
   const preview = previewStateId === 'live' ? null : getChordMockState(previewStateId)
   const mockChord = getChordMockCase(caseId)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [showEarlyEnd, setShowEarlyEnd] = useState(false)
   const livePresentation = presentLocalizedChordPractice(snapshot, t)
   const presentation: ReturnType<typeof presentLocalizedChordPractice> = preview
     ? {
@@ -2098,7 +2087,7 @@ function ChordPracticeScreen({
     || (paused && !snapshot.transportReady)
   const endActionLabel = snapshot.status === 'SESSION_COMPLETE'
     ? t('done')
-    : t(snapshot.counters.completedQuestions > 0 ? 'endSave' : 'end')
+    : t('end')
   const practiceActiveVisual = theme.capabilities.practiceActiveVisual
   const chordArtwork = practiceActiveVisual.kind === 'decorated-focus'
     ? practiceActiveVisual.chordArtwork ?? null
@@ -2112,8 +2101,17 @@ function ChordPracticeScreen({
     }
   }, [midiRuntime, runtime])
 
+  const earlyExit = usePracticeEarlyExit({
+    open: showEarlyEnd,
+    isPaused: () => runtime.snapshot.status === 'SUSPENDED',
+    pause: () => runtime.pause(),
+    resume: () => runtime.resume(),
+    show: () => setShowEarlyEnd(true),
+    hide: () => setShowEarlyEnd(false)
+  })
   const leavePractice = (): void => {
-    onExplicitEnd()
+    if (runtime.snapshot.status === 'SESSION_COMPLETE') onExplicitEnd()
+    else earlyExit.request()
   }
 
   return (
@@ -2195,6 +2193,9 @@ function ChordPracticeScreen({
         </footer>
       </main>
 
+      {showEarlyEnd ? (
+        <PracticeEarlyExitDialog moduleTitle={t(`modes.${mode}`)} completed={snapshot.counters.completedQuestions} total={snapshot.questionCount} icon={<Icon name="stop" />} onCancel={earlyExit.cancel} onSave={() => onExplicitEnd()} onDiscard={() => onExplicitEnd(false)} />
+      ) : null}
       {settingsOpen ? (
         <ChordSettingsDrawer
           chordSettings={chordSettings}
@@ -2347,7 +2348,7 @@ function SightFocusScreen({
   snapshot,
   theme
 }: {
-  onStopAndSave: () => void
+  onStopAndSave: (saveReport?: boolean) => void
   runtime: AndroidSightReadingRuntime
   screen: ScreenId
   settings: SightReadingSettings
@@ -2373,17 +2374,15 @@ function SightFocusScreen({
     ? t(resumeBlocked ? 'disconnectedPrompt' : 'recoveredPrompt')
     : t('pausedPrompt')
   const remainingTimeMs = useRemainingTime(runtime, snapshot)
-  const requestEnd = (): void => {
-    runtime.pause()
-    navigate('sight-early-end')
-  }
-  const continuePractice = (): void => {
-    runtime.resume()
-    navigate(getPracticeScreen(runtime))
-  }
-  const stopAndSave = (): void => {
-    onStopAndSave()
-  }
+  const earlyExit = usePracticeEarlyExit({
+    open: showEarlyEndConfirm,
+    isPaused: () => runtime.snapshot.isPaused,
+    pause: () => runtime.pause(),
+    resume: () => runtime.resume(),
+    show: () => navigate('sight-early-end'),
+    hide: () => navigate(getPracticeScreen(runtime))
+  })
+  const requestEnd = earlyExit.request
 
   return (
     <div
@@ -2461,20 +2460,7 @@ function SightFocusScreen({
         </div>
       </main>
       {showEarlyEndConfirm ? (
-        <div className="early-end-backdrop">
-          <section aria-labelledby="early-end-title" aria-modal="true" className="early-end-dialog" role="dialog">
-            <span className="early-end-dialog__icon"><Icon name="stop" /></span>
-            <div>
-              <span className="eyebrow">{t('title')}</span>
-              <h1 id="early-end-title">{t('endTitle')}</h1>
-              <p>{t('endProgress', { completed: snapshot.completedQuestions, total: settings.questionCount })}<br />{t('endHelp')}</p>
-            </div>
-            <div className="early-end-dialog__actions">
-              <button className="secondary-action" type="button" onClick={continuePractice}>{t('continuePractice')}</button>
-              <button className="primary-action" type="button" onClick={stopAndSave}>{t('endSave')}</button>
-            </div>
-          </section>
-        </div>
+        <PracticeEarlyExitDialog moduleTitle={t('title')} completed={snapshot.completedQuestions} total={settings.questionCount} icon={<Icon name="stop" />} onCancel={earlyExit.cancel} onSave={() => onStopAndSave()} onDiscard={() => onStopAndSave(false)} />
       ) : null}
     </div>
   )
@@ -3851,19 +3837,19 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
     navigate('history')
   }, [])
 
-  const endSightPractice = useCallback((): void => {
+  const endSightPractice = useCallback((saveReport = true): void => {
     const active = activeSessionHost.current
-    runtime.stop()
+    runtime.stop(saveReport)
     if (active?.module === 'sight') activeSessionHost.end(active.id)
     navigate('sight-ready')
   }, [activeSessionHost, runtime])
 
-  const endChordPractice = useCallback((): void => {
+  const endChordPractice = useCallback((saveReport = true): void => {
     const active = activeSessionHost.current
     chordRuntime.stop()
     if (active?.module === 'chord') {
       const finalizedNow = activeSessionHost.end(active.id)
-      if (finalizedNow) void chordPersistence.finalize(active.id, chordRuntime.snapshot, 'stopped')
+      if (finalizedNow && saveReport) void chordPersistence.finalize(active.id, chordRuntime.snapshot, 'stopped')
     }
     navigate('chord-mode-select')
   }, [activeSessionHost, chordPersistence, chordRuntime])
@@ -3880,7 +3866,13 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
     }
   }, [activeSessionHost, intervalPersistence, intervalRuntime])
 
-  const endIntervalPractice = useCallback((): void => finalizeIntervalPractice('STOPPED'), [finalizeIntervalPractice])
+  const endIntervalPractice = useCallback((saveReport = true): void => {
+    if (saveReport) { finalizeIntervalPractice('STOPPED'); return }
+    const active = activeSessionHost.current
+    intervalRuntime.stop()
+    if (active?.module === 'interval') activeSessionHost.end(active.id)
+    navigate('interval-practice')
+  }, [activeSessionHost, finalizeIntervalPractice, intervalRuntime])
   const completeIntervalPractice = useCallback((): void => finalizeIntervalPractice('COMPLETED'), [finalizeIntervalPractice])
 
   useEffect(() => {
@@ -3930,15 +3922,8 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
         return
       }
 
-      if (currentScreen === 'sight-early-end' && currentSnapshot.status === 'running') {
-        runtime.resume()
-        navigate(getPracticeScreen(runtime))
-        return
-      }
-
-      if (practiceScreens.includes(currentScreen) && currentSnapshot.status === 'running') {
-        runtime.pause()
-        navigate('sight-early-end')
+      if ((currentScreen === 'sight-early-end' || practiceScreens.includes(currentScreen)) && currentSnapshot.status === 'running') {
+        window.dispatchEvent(new CustomEvent('practice-request-end'))
         return
       }
 
@@ -3948,12 +3933,12 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
       }
 
       if (currentScreen === 'chord-practice') {
-        endChordPractice()
+        window.dispatchEvent(new CustomEvent('practice-request-end'))
         return
       }
 
       if (currentScreen === 'interval-active') {
-        window.dispatchEvent(new CustomEvent('interval-request-end'))
+        window.dispatchEvent(new CustomEvent('practice-request-end'))
         return
       }
 

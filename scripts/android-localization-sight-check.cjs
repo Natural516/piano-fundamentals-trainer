@@ -6,7 +6,7 @@ const path = require('node:path')
 const ts = require('typescript')
 const React = require('react')
 const { act } = require('react-test-renderer')
-const { mounted, ui, current, declarations, read, text, contains, businessBytes, translator } = require('./android-localization-shell-check.cjs')
+const { mounted, ui, current, frozenCurrent, declarations, read, text, contains, businessBytes, translator } = require('./android-localization-shell-check.cjs')
 const { ANDROID_SIGHT_READING_DEFAULTS } = require('../src/sightReading/sightReadingSettings.ts')
 const { createSightReadingSessionCounters } = require('../src/sightReading/sightReadingSession.ts')
 const { createSightReadingSessionReport } = require('../src/sightReading/report.ts')
@@ -258,7 +258,9 @@ test('SIGHT-E22', 'early-end confirmation/cancel/end keeps original handlers and
   await start(h); await answer(h); await advance(h, 350); await advance(h, 32)
   await click(h.renderer.root.findByProps({ className: 'focus-back' })); assert.equal(h.state().screen, 'sight-early-end'); await roundTrip(h)
   await h.switchTo('en'); contains(h.getText(), 'End this session?'); await click(h.renderer.root.findByProps({ className: 'early-end-dialog__actions' }).findAllByType('button')[0]); assert.equal(h.runtime.snapshot.isPaused, false)
-  await click(h.renderer.root.findByProps({ className: 'focus-back' })); await click(h.renderer.root.findByProps({ className: 'early-end-dialog__actions' }).findAllByType('button')[1]); await act(async () => h.runtime.flushPersistence())
+  await click(h.renderer.root.findByProps({ className: 'focus-back' })); await click(h.renderer.root.findByProps({ className: 'early-end-dialog__actions' }).findAllByType('button')[1])
+  assert.equal(h.runtime.historySnapshot.records.length, 1); assert.equal(h.runtime.snapshot.status, 'running')
+  await click(h.renderer.root.findByProps({ className: 'early-end-dialog__actions' }).findAllByType('button')[0]); await act(async () => h.runtime.flushPersistence())
   assert.equal(h.runtime.snapshot.status, 'stopped'); assert.equal(h.runtime.snapshot.report.completedQuestions, 1); assert.equal(h.runtime.snapshot.report.completionState, 'stopped'); assert.equal(h.host.current, null); assert.equal(h.state().screen, 'sight-ready'); assert.equal(h.runtime.historySnapshot.records.length, 2)
 }))
 test('SIGHT-E23', 'namespace semantic/placeholder parity; every English key explicit with fallback disabled', () => {
@@ -281,7 +283,7 @@ test('SIGHT-E24', 'all legacy Chinese prompts remain equivalent; pairs translate
 })
 test('SIGHT-E25', 'scope freeze: domain/native/runtime/Interval and Chord branches/shared History stay exact', () => {
   const allowed = new Set(['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'HistoryScreen', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'HistoryRecord', 'PersistenceErrorNotice'])
-  assert.deepEqual([...current.keys()], [...previous.keys()]); for (const [name, body] of current) if (!allowed.has(name)) assert.equal(body, previous.get(name), name)
+  assert.deepEqual([...frozenCurrent.keys()], [...previous.keys()]); for (const [name, body] of frozenCurrent) if (!allowed.has(name)) assert.equal(body, previous.get(name), name)
   // B4.5 changes Chord display only. Interval remains byte-frozen; CHORD-E20 also freezes the reviewed Sight display.
   const branches = body => body.slice(body.indexOf("if (item.module === 'interval')"), body.indexOf('  const sightPresentation'))
   const oldBranches = previous.get('HistoryRecord').slice(previous.get('HistoryRecord').indexOf("if (item.module === 'interval')"), previous.get('HistoryRecord').lastIndexOf('  return ('))
@@ -294,7 +296,10 @@ test('SIGHT-E25', 'scope freeze: domain/native/runtime/Interval and Chord branch
     if (native.allowedPaths.has(file)) continue
     const raw = execFileSync('git', ['show', `${base}:${file}`], { cwd: root }); const fs = require('node:fs'), now = fs.readFileSync(path.join(root, file))
     // Source checkout line endings are not domain facts. Binary theme files remain byte-exact.
-    if (/\.(?:ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh)$/.test(file)) assert.equal(now.toString().replaceAll('\r\n', '\n'), raw.toString().replaceAll('\r\n', '\n'), file)
+    if (/\.(?:ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh)$/.test(file)) {
+      const source = now.toString().replaceAll('\r\n', '\n')
+      assert.equal(file.endsWith('/sightReadingIntegration.ts') ? require('./android-practice-early-exit-contract.cjs').normalizeEarlyExitRuntime(source) : source, raw.toString().replaceAll('\r\n', '\n'), file)
+    }
     else assert.equal(createHash('sha256').update(now).digest('hex'), createHash('sha256').update(raw).digest('hex'), file)
   }
   assert.doesNotMatch(read('src/sightReading/controller.ts'), /i18next|LocaleProvider|document\./)
@@ -308,7 +313,7 @@ test('SIGHT-E26', 'Sight lifecycle/actions/selected IDs/notation/key props byte 
       ts.forEachChild(n, visit)
     } visit(ast); return nodes
   }
-  for (const name of ['SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice']) assert.deepEqual(protectedNodes(current.get(name)), protectedNodes(previous.get(name)), name)
+  for (const name of ['SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice']) assert.deepEqual(protectedNodes(frozenCurrent.get(name)), protectedNodes(previous.get(name)), name)
   const css = stripB46Css(read('prototype/android-tablet-v1/src/styles.css')), original = oldFile('prototype/android-tablet-v1/src/styles.css')
   assert.ok(css.startsWith(original)); const addition = css.slice(original.length); assert.doesNotMatch(addition, /(?:^|\n)\s*(?:height|width|transform|position):|--paper|\.notation-paper|\.music-staff/)
   assert.match(addition, /sight-ready-layout/); assert.match(addition, /sight-result-layout/); assert.match(addition, /sight-focus-frame/)
@@ -322,7 +327,8 @@ test('SIGHT-E27', 'completed report with a real missed note keeps spelling/count
   assert.equal(h.runtime.snapshot.report.weakestNote, target); assert.equal(h.runtime.snapshot.report.wrong, 1); assert.equal(h.runtime.snapshot.report.averageReactionMs, 80)
   contains(h.getText(), target); contains(h.getText(), '0.08 秒'); await h.switchTo('en'); contains(h.getText(), target); contains(h.getText(), '0.08 s'); contains(h.getText(), '1 wrong answer or timeout'); await roundTrip(h)
 }, { settings: { keySignature: 'Gb' } }))
-void (async () => {
+module.exports = { flow, start, answer, advance, complete, note, click, roundTrip }
+if (require.main === module) void (async () => {
   let passed = 0
   for (const item of tests) { try { await item.run(); passed++; console.log('PASS ' + item.id + ' ' + item.title) } catch (error) { console.error('FAIL ' + item.id + ' ' + item.title + '\n' + error.stack) } }
   console.log(`\n${passed}/${tests.length} B4.4 Complete Sight Reading localization checks PASS`)

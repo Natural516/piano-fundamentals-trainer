@@ -6,7 +6,7 @@ const path = require('node:path')
 const ts = require('typescript')
 const React = require('react')
 const { act } = require('react-test-renderer')
-const { mounted, ui, current, declarations, read, text, contains, businessBytes } = require('./android-localization-shell-check.cjs')
+const { mounted, ui, current, frozenCurrent, declarations, read, text, contains, businessBytes } = require('./android-localization-shell-check.cjs')
 const practice = require('../prototype/android-tablet-v1/src/intervalPractice/index.ts')
 const { getCanonicalIntervalSnapshotName } = require('../prototype/android-tablet-v1/src/intervalPractice/legacySnapshot.ts')
 const theory = require('../prototype/android-tablet-v1/src/musicTheory/intervals/index.ts')
@@ -203,6 +203,8 @@ test('E10', 'real fixed-count completion produces Result in zh/en without added 
 test('E11', 'STOPPED Result facts/object/timestamp/body/index remain unchanged through locale', async () => flow(async h => {
   await start(h); await correct(h); await release(h); await advance(h, 800); await click(h.renderer.root.findAllByProps({ className: 'outline-action' })[1])
   await h.switchTo('en'); contains(h.getText(), 'End this session?'); await click(h.renderer.root.findByProps({ className: 'early-end-dialog__actions' }).findAllByType('button')[1])
+  assert.equal(h.persistence.snapshot.records.length, 1)
+  await click(h.renderer.root.findByProps({ className: 'early-end-dialog__actions' }).findAllByType('button')[0])
   await act(async () => { await h.persistence.flush() }); assert.equal(h.state().screen, 'interval-result')
   contains(h.getText(), 'Session ended'); await roundTrip(h)
 }))
@@ -256,8 +258,8 @@ test('E18', 'no skip/next/retry button; original Back confirmation/cancel/end ha
 }))
 test('E19', 'scope freeze preserves Preparation and all unrelated main declarations/events/effects and legacy record branches', () => {
   const allowed = new Set(['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
-  assert.deepEqual([...current.keys()], [...previous.keys()])
-  for (const [name, body] of current) if (!allowed.has(name)) assert.equal(body, previous.get(name), name)
+  assert.deepEqual([...frozenCurrent.keys()], [...previous.keys()])
+  for (const [name, body] of frozenCurrent) if (!allowed.has(name)) assert.equal(body, previous.get(name), name)
   assert.equal(createHash('sha256').update(current.get('IntervalPracticeSetupScreen')).digest('hex'), '75ed16732bfdc17dfdfca0d0e714f2f15f6d75fdca83c15405c0c35ee6038918')
   function lifecycle(body) {
     const ast = ts.createSourceFile('body.tsx', body, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX), items = []
@@ -268,7 +270,7 @@ test('E19', 'scope freeze preserves Preparation and all unrelated main declarati
     }
     visit(ast); return items
   }
-  for (const name of ['IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice']) assert.deepEqual(lifecycle(current.get(name)), lifecycle(previous.get(name)), name)
+  for (const name of ['IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice']) assert.deepEqual(lifecycle(frozenCurrent.get(name)), lifecycle(previous.get(name)), name)
   const branch = body => body.slice(body.indexOf("if (item.module === 'chord')"), body.indexOf("if (item.module === 'interval')"))
   // B4.5 authorizes Chord text only; preserve its original handlers and stable keys.
   assert.deepEqual(lifecycle(branch(current.get('HistoryRecord'))), lifecycle(branch(previous.get('HistoryRecord'))))
@@ -384,7 +386,8 @@ test('E30', 'shared empty History states remain truthful for every stable filter
   await roundTrip(h)
 }, { screen: 'history', emptyHistory: true }))
 
-void (async () => {
+module.exports = { flow, start, correct, release, advance, note, click, roundTrip }
+if (require.main === module) void (async () => {
   let passed = 0
   for (const item of tests) { try { await item.run(); passed++; console.log('PASS ' + item.id + ' ' + item.title) } catch (error) { console.error('FAIL ' + item.id + ' ' + item.title + '\n' + error.stack) } }
   console.log('\n' + passed + '/' + tests.length + ' B4.3 Complete Interval localization checks PASS')

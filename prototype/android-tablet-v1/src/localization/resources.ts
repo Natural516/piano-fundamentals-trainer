@@ -7,9 +7,11 @@ import { sightReadingResources } from './sightReadingResources'
 import { chordPracticeResources } from './chordPracticeResources'
 import { themeManagementResources } from './themeManagementResources'
 import { updaterResources } from './updaterResources'
+import { practiceExitResources } from './practiceExitResources'
 
 export const localizationResources = {
   'zh-CN': {
+    practiceExit: practiceExitResources['zh-CN'],
     themeManagement: themeManagementResources['zh-CN'],
     updater: updaterResources['zh-CN'],
     chordPractice: chordPracticeResources['zh-CN'],
@@ -49,6 +51,7 @@ export const localizationResources = {
     }
   },
   en: {
+    practiceExit: practiceExitResources.en,
     themeManagement: themeManagementResources.en,
     updater: updaterResources.en,
     chordPractice: chordPracticeResources.en,

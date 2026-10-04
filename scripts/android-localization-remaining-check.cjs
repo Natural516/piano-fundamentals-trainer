@@ -120,7 +120,7 @@ test('R18', 'React keys and action/disabled identities remain source-frozen', ()
   for (const name of ['ThemePackageDialog','ThemeInfoDialog','UpdateScreen','AndroidAppBootstrap']) assert.deepEqual(attrs(declaration(name)),attrs(previous.get(name).n.getText(previous.get(name).ast)),name)
 })
 test('R19', 'every unrelated production declaration and core lifecycle is byte-frozen', () => {
-  assert.equal(guard.normalizeB46Main(actual),guard.oldFile(guard.mainPath))
+  assert.equal(guard.normalizeB46Main(require('./android-practice-early-exit-contract.cjs').normalizeEarlyExitMain(actual)),guard.oldFile(guard.mainPath))
   guard.assertRendererDisplayOnly()
   execFileSync('git',['diff','--exit-code',guard.base,'--','src',':(exclude)'+guard.rendererPath,'prototype/android-tablet-v1/src/chordPractice','prototype/android-tablet-v1/src/intervalPractice','prototype/android-tablet-v1/src/musicTheory'],{cwd:root})
   const old=guard.namedNodes(guard.oldFile(guard.mainPath))

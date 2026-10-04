@@ -166,6 +166,7 @@ export class AndroidSightReadingRuntime {
   private readonly idGenerator: () => string
   private settingsValue: SightReadingSettings
   private observedReport: SightReadingSessionReport | null = null
+  private discardingReport = false
   private sessionStartedAt: number | null = null
   private sessionSettings: SightReadingSettings | null = null
   private readonly pendingReportRecords = new Map<string, DurableSightReadingReport>()
@@ -228,6 +229,12 @@ export class AndroidSightReadingRuntime {
     this.controller.subscribe(() => {
       const report = this.controller.snapshot.report
       if (report && report !== this.observedReport) {
+        if (this.discardingReport) {
+          // Mark only this discarded report observed, so later notifications cannot save it.
+          this.observedReport = report
+          this.notify()
+          return
+        }
         const saved = saveSightReadingReport(report, this.reports)
         if (saved.success) {
           this.observedReport = report
@@ -390,8 +397,13 @@ export class AndroidSightReadingRuntime {
     this.notify()
   }
 
-  stop(): SightReadingSessionReport | null {
-    return this.controller.stop()
+  stop(saveReport = true): SightReadingSessionReport | null {
+    this.discardingReport = !saveReport
+    try {
+      return this.controller.stop()
+    } finally {
+      this.discardingReport = false
+    }
   }
 
   sendCorrect(): SightReadingMidiEvent | null {

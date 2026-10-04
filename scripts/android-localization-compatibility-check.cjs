@@ -353,7 +353,9 @@ test('B3R3', 'pure compatibility/domain/persistence helpers have no translator, 
 })
 test('B3R4', 'only authorized UI display points change; Query output and protected schema/runtime sources stay frozen', () => {
   const file = 'prototype/android-tablet-v1/src/main.tsx'
-  const main = normalizeB46Main(read(file))
+  const exit = require('./android-practice-early-exit-contract.cjs')
+  exit.assertEarlyExitDelta()
+  const main = normalizeB46Main(exit.normalizeEarlyExitMain(read(file)))
   assert.equal((main.match(/<IntervalDisplayName intervalId=\{entry.intervalId\} \/>/g) ?? []).length, 2)
   assert.equal((main.match(/<SightNoteValue value=\{primaryError\} \/>/g) ?? []).length, 2)
   assert.doesNotMatch(main, /entry\.intervalName/)

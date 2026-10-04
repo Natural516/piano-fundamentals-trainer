@@ -378,16 +378,20 @@ test('APS21', 'Sight early-end confirmation exposes no internal completion contr
   const sightFocus = mainSource.slice(mainSource.indexOf('function SightFocusScreen'), mainSource.indexOf('function SightResultScreen'))
   assert.doesNotMatch(sightFocus, /completionState\s*=/)
   assert.doesNotMatch(sightFocus, /partialEvidence\s*=/)
-  assert.match(sightFocus, /t\('endTitle'\)/)
-  assert.match(sightFocus, /t\('continuePractice'\)/)
-  assert.match(sightFocus, /t\('endSave'\)/)
-  const resources = require('../prototype/android-tablet-v1/src/localization/sightReadingResources.ts').sightReadingResources
+  assert.match(sightFocus, /<PracticeEarlyExitDialog/)
+  assert.match(sightFocus, /onSave=\{\(\) => onStopAndSave\(\)\}/)
+  assert.match(sightFocus, /onDiscard=\{\(\) => onStopAndSave\(false\)\}/)
+  const resources = require('../prototype/android-tablet-v1/src/localization/practiceExitResources.ts').practiceExitResources
   assert.equal(resources['zh-CN'].endTitle, '结束本轮？')
   assert.equal(resources['zh-CN'].continuePractice, '继续练习')
-  assert.equal(resources['zh-CN'].endSave, '结束并保存')
+  assert.equal(resources['zh-CN'].end, '结束')
+  assert.equal(resources['zh-CN'].saveEnd, '保存并结束')
+  assert.equal(resources['zh-CN'].discardEnd, '不保存并结束')
   assert.equal(resources.en.endTitle, 'End this session?')
   assert.equal(resources.en.continuePractice, 'Continue practice')
-  assert.equal(resources.en.endSave, 'End and save')
+  assert.equal(resources.en.end, 'End')
+  assert.equal(resources.en.saveEnd, 'Save and end')
+  assert.equal(resources.en.discardEnd, 'End without saving')
 })
 
 test('APS22', 'compact interactive MIDI button has a stable action-oriented accessible name', () => {

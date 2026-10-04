@@ -67,7 +67,9 @@ function assertB6PresentationOnly() {
     expected = expected.replace(from, to)
   }
   assert.equal(read(selectorPath), expected, 'only exact B6 autonyms plus user-approved B7 click choices may change')
-  assert.equal(read(resourcesPath), approved(resourcesPath, resourceEdits), 'only six dead translated option resources may be removed')
+  const exit = require('./android-practice-early-exit-contract.cjs')
+  exit.assertEarlyExitDelta()
+  assert.equal(exit.normalizeEarlyExitResources(read(resourcesPath)), approved(resourcesPath, resourceEdits), 'only six dead options and the exact bilingual exit namespace may change')
   assert.equal(read(stylesPath), old(stylesPath) + '\n' + clickChoiceCss, 'language row only; no global or staff geometry changes')
 }
 function restoreLegacySelector(source) {
@@ -77,9 +79,13 @@ function restoreLegacySelector(source) {
 }
 function assertB6ScopeFrozen() {
   assertB6PresentationOnly()
+  const exit = require('./android-practice-early-exit-contract.cjs')
+  const exitPaths = ['prototype/android-tablet-v1/src/main.tsx', 'prototype/android-tablet-v1/src/sightReadingIntegration.ts', 'prototype/android-tablet-v1/src/localization/localizationService.ts']
+  for (const [file, normalize] of [[exitPaths[0], exit.normalizeEarlyExitMain], [exitPaths[1], exit.normalizeEarlyExitRuntime], [exitPaths[2], exit.normalizeEarlyExitService]]) assert.equal(normalize(read(file)), old(file), file + ': exact early-exit delta only')
   execFileSync('git', ['diff', '--exit-code', base, '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages', 'capacitor.config.ts', 'package-lock.json',
-    ':(exclude)' + selectorPath, ':(exclude)' + resourcesPath, ':(exclude)' + stylesPath], { cwd: root })
+    ':(exclude)' + selectorPath, ':(exclude)' + resourcesPath, ':(exclude)' + stylesPath, ...exitPaths.map(file => ':(exclude)' + file), ...exit.reviewedAdditionPaths.map(file => ':(exclude)' + file)], { cwd: root })
   const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages'], { cwd: root, encoding: 'utf8' }).trim()
-  assert.equal(untracked, '', 'no unreviewed product source/resource additions')
+  const reviewedAdditions = new Set(exit.reviewedAdditionPaths)
+  assert.deepEqual(untracked.split('\n').filter(Boolean).filter(file => !reviewedAdditions.has(file)), [], 'no unreviewed product source/resource additions')
 }
 module.exports = { base, root, selectorPath, resourcesPath, stylesPath, read, assertB6PresentationOnly, restoreLegacySelector, assertB6ScopeFrozen, stripClickChoiceCss }

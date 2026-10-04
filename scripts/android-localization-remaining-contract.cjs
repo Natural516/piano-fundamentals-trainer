@@ -45,7 +45,11 @@ function assertFrozenDiff(ref, paths) {
   const native = require('./android-localization-native-contract.cjs')
   // B5 separately freezes every native byte except the exact verified resources/two display calls.
   native.assertNativePresentationOnly()
-  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+rendererPath,...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
+  const exit = require('./android-practice-early-exit-contract.cjs')
+  exit.assertEarlyExitDelta()
+  const sightRuntime = 'prototype/android-tablet-v1/src/sightReadingIntegration.ts'
+  assert.equal(exit.normalizeEarlyExitRuntime(read(sightRuntime)), oldFile(sightRuntime, ref), 'only the exact reviewed early-exit runtime delta is allowed')
+  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+rendererPath,':(exclude)'+sightRuntime,...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
   assertRendererDisplayOnly(ref)
 }
 const cssSuffix = "/* Theme/update English wrapping only; practice and artwork geometry stay frozen. */\n.theme-manager-modal__card header > span,\n.theme-manager-modal__card dd,\n.update-card .version-line strong,\n.update-release-notes {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n.theme-manager-modal__card footer {\n  flex-wrap: wrap;\n}\n.theme-manager-modal__card small,\n.update-card p,\n.update-security-note {\n  white-space: normal;\n  line-height: 1.6;\n}";

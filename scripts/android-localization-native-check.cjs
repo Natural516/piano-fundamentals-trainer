@@ -47,8 +47,11 @@ test('NATIVE-L9', 'resource values used only for existing display name fields, n
 test('NATIVE-L10', 'Web preference/infrastructure/bridge files remain byte-frozen; no locale bridge', () => {
   const selector = require('./android-language-selector-contract.cjs')
   selector.assertB6PresentationOnly() // Exact B6 resources plus user-approved click controls/local CSS; no broad Web exemption.
+  const exit = require('./android-practice-early-exit-contract.cjs')
+  const exitPaths = ['prototype/android-tablet-v1/src/main.tsx', 'prototype/android-tablet-v1/src/sightReadingIntegration.ts', 'prototype/android-tablet-v1/src/localization/localizationService.ts']
+  for (const [file, normalize] of [[exitPaths[0], exit.normalizeEarlyExitMain], [exitPaths[1], exit.normalizeEarlyExitRuntime], [exitPaths[2], exit.normalizeEarlyExitService]]) assert.equal(normalize(c.read(file)), c.old(file), 'exact reviewed early-exit delta: ' + file)
   c.git(['diff', '--exit-code', c.base, '--', 'prototype', 'src', 'capacitor.config.ts',
-    ':(exclude)' + selector.selectorPath, ':(exclude)' + selector.resourcesPath, ':(exclude)' + selector.stylesPath])
+    ':(exclude)' + selector.selectorPath, ':(exclude)' + selector.resourcesPath, ':(exclude)' + selector.stylesPath, ...exitPaths.map(file => ':(exclude)' + file), ...exit.reviewedAdditionPaths.map(file => ':(exclude)' + file)])
 })
 test('NATIVE-L11', 'no per-app locale sync/configuration override/recreate implementation', () => {
   const source = Object.keys(c.literalPolicies).map(f => c.read(c.nativeDir + f)).join('\n')

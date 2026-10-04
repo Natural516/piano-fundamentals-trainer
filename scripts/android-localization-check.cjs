@@ -191,7 +191,7 @@ test('LOC15', 'all migrated resource namespaces have identical nonempty key shap
   assert.deepEqual(keys(zh), keys(en))
   assert.deepEqual(Object.keys(localizationResources.en.midi).filter(key => key.startsWith('devicesFound')), ['devicesFound_one', 'devicesFound_other'])
   assert.equal(localizationResources['zh-CN'].midi.devicesFound, '{{count}} 个候选')
-  assert.equal(zh.length, 150 + 58 + 121 + 19 + 112 + 107 + 148 + 148 - 3) // B6 removes only the three translated language-option keys.
+  assert.equal(zh.length, 150 + 58 + 121 + 19 + 112 + 107 + 148 + 148 - 3 + 11) // B6 removes three options; early-exit adds exactly eleven bilingual keys.
   for (const locale of ['zh-CN', 'en']) for (const key of ['system', 'chinese', 'english']) assert.equal(Object.hasOwn(localizationResources[locale].settings, key), false)
   assert.equal(en.length, zh.length + 30) // Existing plural differences plus five Chord English plurals.
   for (const [, value] of [...zh, ...en]) assert.ok(value.trim())
@@ -323,7 +323,9 @@ test('LOC20', 'real React provider/settings switch live without remounting runti
 test('LOC21', 'MIDI/session/bootstrap stay frozen; only explicit B3 compatibility boundaries may change', () => {
   const base = '5c24110604e16b098c665757a05d06e16c813498'
   const mainPath = 'prototype/android-tablet-v1/src/main.tsx'
-  const main = normalizeB46Main(read(mainPath))
+  const exit = require('./android-practice-early-exit-contract.cjs')
+  exit.assertEarlyExitDelta()
+  const main = normalizeB46Main(exit.normalizeEarlyExitMain(read(mainPath)))
   const old = execFileSync('git', ['show', base + ':' + mainPath], { cwd: root, encoding: 'utf8' })
   const normalize = (source) => source.replaceAll('\r\n', '\n')
   const slice = (source, start, end) => {
@@ -340,7 +342,7 @@ test('LOC21', 'MIDI/session/bootstrap stay frozen; only explicit B3 compatibilit
   }
   // Preserve the complete Sight implementations outside the two exact legacy-boundary substitutions.
   for (const file of ['src/sightReading/sightReadingNotes.ts', 'prototype/android-tablet-v1/src/sightReadingIntegration.ts']) {
-    const current = normalize(read(file))
+    const current = normalize(file.endsWith('/sightReadingIntegration.ts') ? exit.normalizeEarlyExitRuntime(read(file)) : read(file))
       .replace(/^import \{ (?:LEGACY_SIGHT_EMPTY_NOTE_SENTINEL|resolveLegacySightNoteSnapshot) \} from '[^']+legacyNoteSnapshot'\n/m, '')
       .replace('return LEGACY_SIGHT_EMPTY_NOTE_SENTINEL', "return '暂无'")
       .replace('return resolveLegacySightNoteSnapshot(report.weakestNote)', "return report.weakestNote === '暂无' ? null : report.weakestNote")

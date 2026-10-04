@@ -4,7 +4,7 @@ const fs = require('node:fs'), path = require('node:path'), ts = require('typesc
 const { execFileSync } = require('node:child_process')
 const { createHash } = require('node:crypto')
 const React = require('react'), { act } = require('react-test-renderer')
-const { mounted, ui, current, declarations, read, text, contains, businessBytes, translator } = require('./android-localization-shell-check.cjs')
+const { mounted, ui, current, frozenCurrent, declarations, read, text, contains, businessBytes, translator } = require('./android-localization-shell-check.cjs')
 const root = path.resolve(__dirname, '..'), base = 'ed14ca99e044fd5f3ed6f057c722f65d0ab58b58'
 const oldFile = file => execFileSync('git', ['show', base + ':' + file], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
 const previous = declarations(oldFile('prototype/android-tablet-v1/src/main.tsx'))
@@ -274,7 +274,7 @@ test('CHORD-E19','Light/Dark/decorated asset URLs and all Theme pointer bytes re
 })
 test('CHORD-E20','fixed checkpoint freeze protects Sight/Interval/domain/MIDI/native/theme and only narrow Chord display may change',()=>{
   const allowed=new Set(['ChordModeSelectScreen','ChordGroupBadge','ChordSettingsDrawer','ChordPracticeScreen','ChordReportDetailScreen','ChordPersistenceErrorNotice','HistoryRecord','HistoryScreen'])
-  assert.deepEqual([...current.keys()],[...previous.keys()]);for(const [name,body]of current)if(!allowed.has(name))assert.equal(body,previous.get(name),name)
+  assert.deepEqual([...frozenCurrent.keys()],[...previous.keys()]);for(const [name,body]of frozenCurrent)if(!allowed.has(name))assert.equal(body,previous.get(name),name)
   const nonChord=body=>body.slice(body.indexOf("  if (item.module === 'interval')"))
   assert.equal(nonChord(current.get('HistoryRecord')),nonChord(previous.get('HistoryRecord')))
   const wiring='chordReport={chordHistory.records.find(record => record.recordId === item.recordId)} '
@@ -286,7 +286,10 @@ test('CHORD-E20','fixed checkpoint freeze protects Sight/Interval/domain/MIDI/na
   for(const file of files){if (native.allowedPaths.has(file)) continue
     if (file === 'src/renderer/src/components/MusicStaffRenderer.tsx') { assertRendererDisplayOnly(base); continue }
     const was=execFileSync('git',['show',base+':'+file],{cwd:root,maxBuffer:64*1024*1024}),now=fs.readFileSync(path.join(root,file))
-    if(/\.(ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh|html|css|txt)$/.test(file))assert.equal(now.toString().replaceAll('\r\n','\n'),was.toString().replaceAll('\r\n','\n'),file)
+    if(/\.(ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh|html|css|txt)$/.test(file)) {
+      const source = now.toString().replaceAll('\r\n','\n')
+      assert.equal(file.endsWith('/sightReadingIntegration.ts') ? require('./android-practice-early-exit-contract.cjs').normalizeEarlyExitRuntime(source) : source,was.toString().replaceAll('\r\n','\n'),file)
+    }
     else assert.equal(createHash('sha256').update(now).digest('hex'),createHash('sha256').update(was).digest('hex'),file)
   }
 })
@@ -313,7 +316,7 @@ test('CHORD-E23','AST freezes all Chord lifecycle/actions/notation props; only s
     function visit(n){if(ts.isCallExpression(n)&&['useEffect','useState','useRef','useChordPracticeRuntime'].includes(n.expression.getText(ast)))values.push(n.getText(ast))
       if(ts.isJsxAttribute(n)&&['onClick','onChange','onBack','disabled','pitches','symbol','arpeggioState','blockState'].includes(n.name.text))values.push(n.getText(ast));ts.forEachChild(n,visit)}
     visit(ast);return values}
-  for(const name of ['ChordModeSelectScreen','ChordSettingsDrawer','ChordPracticeScreen','ChordReportDetailScreen','ChordPersistenceErrorNotice'])assert.deepEqual(nodes(current.get(name)),nodes(previous.get(name)),name)
+  for(const name of ['ChordModeSelectScreen','ChordSettingsDrawer','ChordPracticeScreen','ChordReportDetailScreen','ChordPersistenceErrorNotice'])assert.deepEqual(nodes(frozenCurrent.get(name)),nodes(previous.get(name)),name)
   let renderer=read('prototype/android-tablet-v1/src/ChordGrandStaff.tsx')
   renderer=renderer.replace('  ariaLabel?: string\n','').replace('  symbol,\n  ariaLabel','  symbol').replace('aria-label={ariaLabel ?? ','aria-label={')
   renderer=renderer.replace('  fontErrorLabel?: string\n','').replace('  symbol,\n  fontErrorLabel','  symbol').replace('{fontErrorLabel ?? fontError}', '{fontError}')
@@ -330,7 +333,10 @@ test('CHORD-E24','wrong arpeggio/block and release gate keep same question/retry
 test('CHORD-E25','early End/save original handler persists exactly once and no-progress End creates no report',async()=>{
   for(const progressed of [false,true])await flow(async h=>{
     await start(h);if(progressed){await arpeggio(h);await block(h);await advance(h,800)}
-    await click(h.renderer.root.findAllByProps({className:'outline-action'}).at(-1));await act(async()=>h.persistence.flush())
+    await click(h.renderer.root.findAllByProps({className:'outline-action'}).at(-1))
+    await click(h.renderer.root.findByProps({className:'early-end-dialog__actions'}).findAllByType('button')[1])
+    assert.equal(h.persistence.snapshot.records.length,1);assert.equal(h.chord.snapshot.status,'SUSPENDED')
+    await click(h.renderer.root.findByProps({className:'early-end-dialog__actions'}).findAllByType('button')[0]);await act(async()=>h.persistence.flush())
     assert.equal(h.state().screen,'chord-mode-select');assert.equal(h.host.current,null);assert.equal(h.persistence.snapshot.records.length,progressed?2:1)
     await roundTrip(h)
   })
@@ -364,6 +370,7 @@ test('CHORD-E27','real renderer font failure is localized without rebuilding fon
     assert.match(current.get('ChordPracticeScreen'),/fontErrorLabel=\{t\('fontFailed'\)\}/)
   } finally {if(rendered)await act(async()=>rendered.unmount())}
 })
-void(async()=>{let passed=0;for(const item of tests){try{await item.run();passed++;console.log('PASS '+item.id+' '+item.title)}catch(error){console.error('FAIL '+item.id+' '+item.title+'\n'+error.stack)}}
+module.exports = { flow, start, arpeggio, block, advance, complete, note, click, roundTrip }
+if (require.main === module) void(async()=>{let passed=0;for(const item of tests){try{await item.run();passed++;console.log('PASS '+item.id+' '+item.title)}catch(error){console.error('FAIL '+item.id+' '+item.title+'\n'+error.stack)}}
   console.log('\n'+passed+'/'+tests.length+' B4.5 Complete Chord localization checks PASS');if(passed!==tests.length)process.exitCode=1
 })()
