@@ -81,7 +81,7 @@ const checks = [
     assert.match(intervalActive, /<MidiStatusButton compact/)
   }],
   ['DH03', 'Interval preparation contains only product settings and start action', () => {
-    for (const label of ['答案提示', '低音包含升降号', '练习题数', '开始练习']) assert.match(intervalReady, new RegExp(label))
+    for (const key of ['answerHint', 'bassAccidentals', 'questionCount', 'start']) assert.ok(intervalReady.includes(`t('${key}')`), key)
     assert.doesNotMatch(intervalReady, /练习方式|practiceMode/)
     assert.doesNotMatch(intervalReady, /DEBUG|NOTE ON|NOTE OFF|目标 MIDI|开发 MIDI|模拟 MIDI/)
   }],

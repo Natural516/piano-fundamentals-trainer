@@ -264,9 +264,9 @@ test('R2', 'theory/domain/query cores remain byte-frozen and contain no locale R
     for (const file of paths) assert.doesNotMatch(read(file), /(?:from|import\(|require\()\s*['"][^'"]*(?:react-i18next|i18next|LocaleProvider|localization)/)
   }
 })
-test('R3', 'only three detail pages and their pitch selector change; all other declarations are frozen', () => {
+test('R3', 'only Query/Interval presentation and necessary shared History chrome may change; other declarations are frozen', () => {
   const old = declarations(execFileSync('git', ['show', base + ':prototype/android-tablet-v1/src/main.tsx'], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n'))
-  const allowed = new Set(['ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalQueryToolScreen', 'IntervalPitchSelector'])
+  const allowed = new Set(['ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalQueryToolScreen', 'IntervalPitchSelector', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
   assert.deepEqual([...current.keys()], [...old.keys()])
   for (const [name, value] of current) if (!allowed.has(name)) assert.equal(value, old.get(name), name)
   execFileSync('git', ['diff', '--exit-code', base, '--', 'android', 'src', 'theme-packages', 'prototype/android-tablet-v1/src/theme', 'prototype/android-tablet-v1/src/intervalPractice', 'prototype/android-tablet-v1/src/chordPractice', 'prototype/android-tablet-v1/src/localization/hubResources.ts', 'prototype/android-tablet-v1/src/localization/homePresentation.ts', 'prototype/android-tablet-v1/src/localization/shellResources.ts', 'prototype/android-tablet-v1/src/localization/midiPresentation.ts'], { cwd: root })

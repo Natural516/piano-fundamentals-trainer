@@ -1,9 +1,12 @@
 import { shellResources } from './shellResources'
 import { hubResources } from './hubResources'
 import { theoryQueryResources } from './theoryQueryResources'
+import { intervalPreparationResources } from './intervalPreparationResources'
+import { intervalFlowResources } from './intervalFlowResources'
 
 export const localizationResources = {
   'zh-CN': {
+    intervalPractice: { ...intervalPreparationResources['zh-CN'], ...intervalFlowResources['zh-CN'] },
     theoryQuery: theoryQueryResources['zh-CN'],
     home: hubResources['zh-CN'].home,
     practice: hubResources['zh-CN'].practice,
@@ -41,6 +44,7 @@ export const localizationResources = {
     }
   },
   en: {
+    intervalPractice: { ...intervalPreparationResources.en, ...intervalFlowResources.en },
     theoryQuery: theoryQueryResources.en,
     home: hubResources.en.home,
     practice: hubResources.en.practice,

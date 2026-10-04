@@ -79,11 +79,11 @@ const tests = [
     assert.match(ui, /runtime\.updateSettings\(changes\)/)
   }],
   ['NAV07', 'History presentation offers All Sight Chord and Interval filters with factual empty states', () => {
-    for (const label of ["['all', '全部']", "['sight', '识谱']", "['chord', '和弦']", "['interval', '音程']", '暂无和弦练习记录', '暂无音程练习记录']) assert.ok(history.includes(label))
+    for (const label of ["['all', 'all']", "['sight', 'sightBadge']", "['chord', 'chordBadge']", "['interval', 'intervalBadge']", 'emptyChord', 'emptyInterval']) assert.ok(history.includes(label))
     assert.match(history, /filter === 'chord' \? chordItems : mixedItems/)
     assert.match(history, /filter === 'interval' \? intervalItems : nonSightItems/)
-    assert.match(history, /最近练习记录/)
-    assert.match(history, /练习趋势/)
+    assert.match(history, /t\('recent'\)/)
+    assert.match(history, /t\('trend'\)/)
     assert.match(ui, /history-module-badge">识谱/)
     assert.match(ui, /history-module-badge is-chord">和弦/)
     assert.doesNotMatch(history, /piano\.v1\.|Preferences\.|localStorage/)
@@ -103,8 +103,8 @@ const tests = [
     assert.match(fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/shellResources.ts'), 'utf8'), /qaUpdateDescription: '与正式版独立安装；正式更新通道已关闭'/)
   }],
   ['NAV10', 'Chord History empty state contains no Sight Reading or fabricated metric', () => {
-    assert.match(history, /filter === 'chord'[\s\S]*?'暂无和弦练习记录'/)
-    assert.match(history, /filter === 'chord'[\s\S]*?'完成和弦练习后，记录会显示在这里。'/)
+    assert.match(history, /filter === 'chord' \? 'emptyChord'/)
+    assert.match(history, /filter === 'chord' \? 'emptyChordDetail'/)
     assert.doesNotMatch(history, /平均反应|总体正确率|Accuracy|Block Errors|Arpeggio Errors/)
   }],
   ['NAV11', 'normal product copy exposes no storage key or implementation-contract wording', () => {

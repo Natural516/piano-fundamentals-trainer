@@ -385,7 +385,7 @@ test('APS21', 'Sight early-end confirmation exposes no internal completion contr
 
 test('APS22', 'compact interactive MIDI button has a stable action-oriented accessible name', () => {
   const status = mainSource.slice(mainSource.indexOf('function MidiStatusButton'), mainSource.indexOf('function ProductHeader'))
-  assert.match(status, /aria-label=\{compact \? '打开 MIDI 设备' : undefined\}/)
+  assert.match(status, /aria-label=\{compact \? t\('openMidi', \{ ns: 'navigation' \}\) : undefined\}/)
   assert.match(status, /onClick=\{\(\) => openAuxiliary\('midi'\)\}/)
 })
 

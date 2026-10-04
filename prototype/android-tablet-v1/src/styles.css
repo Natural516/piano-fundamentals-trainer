@@ -2169,6 +2169,26 @@ button:focus-visible {
   color: var(--ink-secondary);
 }
 
+/* Preparation-only wrapping; ACTIVE and notation geometry stay unchanged. */
+.interval-ready-layout .setting-row__copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.interval-ready-layout .setting-row__copy small {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.interval-ready-heading p {
+  line-height: 1.5;
+}
+
+.interval-ready-layout .setting-select-wrap {
+  min-width: 0;
+}
+
 .interval-ready-settings {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -7241,6 +7261,15 @@ button.tool-card {
   font-style: normal;
   font-weight: 760;
   text-align: right;
+}
+
+/* Interval report English wrapping only; ACTIVE/theme geometry is unchanged. */
+.interval-report-sections:lang(en) .interval-performance-list article {
+  grid-template-columns: minmax(92px, 1fr) repeat(4, minmax(0, 1fr)) 58px;
+}
+.interval-report-sections:lang(en) .interval-performance-list article span {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .interval-result-actions {

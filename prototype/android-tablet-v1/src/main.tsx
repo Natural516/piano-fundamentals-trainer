@@ -65,6 +65,8 @@ import { LanguageSetting } from './localization/LanguageSetting'
 import { IntervalDisplayName, SightNoteValue } from './localization/LegacyDisplayValues'
 import { getSettingsThemeDisplayName, presentLocalizedMidiStatus } from './localization/midiPresentation'
 import { presentHomeRecentPractice } from './localization/homePresentation'
+import { useAppLocale } from './localization/LocaleProvider'
+import { presentLocalizedIntervalPractice, formatIntervalReportAccuracy, formatIntervalHistoryTimestamp } from './localization/intervalPracticePresentation'
 import { presentChordTypeOption, presentIntervalName, presentIntervalQuery, presentQueryAccidental } from './localization/theoryQueryPresentation'
 import {
   DEFAULT_INTERVAL_PRACTICE_SETTINGS,
@@ -860,39 +862,40 @@ function IntervalPracticeSetupScreen({
   onStart: () => void
   settings: IntervalPracticeSettings
 }): JSX.Element {
+  const { t } = useTranslation('intervalPractice')
   const questionCountOptions = INTERVAL_QUESTION_COUNT_OPTIONS.map((value) => ({
-    label: value === 'endless' ? '无限练习' : `${value} 题`,
+    label: value === 'endless' ? t('unlimited') : t('questions', { count: value }),
     value
   }))
   return (
-    <ProductFrame active="practice" onBack={() => navigate('practice')} title="音程练习">
+    <ProductFrame active="practice" onBack={() => navigate('practice')} title={t('title')}>
       <section className="interval-ready-layout" aria-labelledby="interval-ready-title">
         <div className="interval-ready-heading">
-          <span className="eyebrow">练习准备</span>
-          <h1 id="interval-ready-title">设置本轮音程练习</h1>
-          <p>覆盖 26 种向上音程，范围 F1 – G6；开始后将进入无底部导航的专注练习页。</p>
+          <span className="eyebrow">{t('preparation')}</span>
+          <h1 id="interval-ready-title">{t('heading')}</h1>
+          <p>{t('description')}</p>
         </div>
         <div className="module-settings-rows settings-group--interval interval-ready-settings">
           <SettingRow
-            action={<button aria-label={`答案提示已${settings.answerHint ? '开启' : '关闭'}`} className={`mock-switch ${settings.answerHint ? 'is-on' : ''}`} type="button" onClick={() => onSettingsChange({ answerHint: !settings.answerHint })}><small>{settings.answerHint ? 'On' : 'Off'}</small><i /></button>}
-            description="关闭时仍显示固定大谱表和根音，只隐藏目标音"
+            action={<button aria-checked={settings.answerHint} aria-label={t('switchLabel', { setting: t('answerHint'), state: t(settings.answerHint ? 'enabled' : 'disabled') })} role="switch" className={`mock-switch ${settings.answerHint ? 'is-on' : ''}`} type="button" onClick={() => onSettingsChange({ answerHint: !settings.answerHint })}><small>{t(settings.answerHint ? 'on' : 'off')}</small><i /></button>}
+            description={t('answerHintDescription')}
             icon="info"
-            title="答案提示"
+            title={t('answerHint')}
           />
           <SettingRow
-            action={<button aria-label={`低音包含升降号已${settings.includeAccidentalRoots ? '开启' : '关闭'}`} className={`mock-switch ${settings.includeAccidentalRoots ? 'is-on' : ''}`} type="button" onClick={() => onSettingsChange({ includeAccidentalRoots: !settings.includeAccidentalRoots })}><small>{settings.includeAccidentalRoots ? 'On' : 'Off'}</small><i /></button>}
-            description="关闭时低音只用自然音；目标音仍按正确拼写使用升降号"
+            action={<button aria-checked={settings.includeAccidentalRoots} aria-label={t('switchLabel', { setting: t('bassAccidentals'), state: t(settings.includeAccidentalRoots ? 'enabled' : 'disabled') })} role="switch" className={`mock-switch ${settings.includeAccidentalRoots ? 'is-on' : ''}`} type="button" onClick={() => onSettingsChange({ includeAccidentalRoots: !settings.includeAccidentalRoots })}><small>{t(settings.includeAccidentalRoots ? 'on' : 'off')}</small><i /></button>}
+            description={t('bassAccidentalsDescription')}
             icon="chart"
-            title="低音包含升降号"
+            title={t('bassAccidentals')}
           />
           <SettingRow
-            action={<SettingSelect<IntervalQuestionCount> ariaLabel="音程练习题数" value={settings.questionCount} options={questionCountOptions} onChange={(questionCount) => onSettingsChange({ questionCount })} />}
-            description="固定题数完成后自动结束；无限练习需主动结束"
+            action={<SettingSelect<IntervalQuestionCount> ariaLabel={t('questionCountLabel')} value={settings.questionCount} options={questionCountOptions} onChange={(questionCount) => onSettingsChange({ questionCount })} />}
+            description={t('questionCountDescription')}
             icon="grid"
-            title="练习题数"
+            title={t('questionCount')}
           />
         </div>
-        <button className="primary-action is-wide interval-start-button" type="button" onClick={onStart}><Icon name="play" />开始练习</button>
+        <button className="primary-action is-wide interval-start-button" type="button" onClick={onStart}><Icon name="play" />{t('start')}</button>
       </section>
     </ProductFrame>
   )
@@ -913,6 +916,8 @@ function IntervalPracticeActiveScreen({
   snapshot: IntervalSessionSnapshot
   theme: ThemeDefinition
 }): JSX.Element {
+  const { t } = useTranslation('intervalPractice')
+  const { t: music } = useTranslation('music')
   const intervalVisual = theme.capabilities.intervalPracticeVisual
   const activeBorder = intervalVisual?.kind === 'blue-notebook' ? intervalVisual.assets.activeBorder : undefined
   const frameRef = useRef<HTMLDivElement>(null)
@@ -1006,8 +1011,8 @@ function IntervalPracticeActiveScreen({
     return () => window.removeEventListener('interval-request-end', handleBackRequest)
   }, [runtime])
 
-  if (!practiceState) return <main className="persistence-loading"><h1>正在准备音程练习…</h1></main>
-  const page = presentIntervalPractice(practiceState)
+  if (!practiceState) return <main className="persistence-loading"><h1>{t('preparing')}</h1></main>
+  const page = presentLocalizedIntervalPractice(practiceState, t, music)
   const judgementState = snapshot.judgement?.state ?? { phase: 'READY' as const }
   const judgementPhase = judgementState.phase
   const paused = snapshot.status === 'SUSPENDED'
@@ -1015,17 +1020,17 @@ function IntervalPracticeActiveScreen({
     ? 'correct'
     : judgementPhase === 'WRONG_WAIT_RELEASE' ? 'wrong_note' : null
   const judgementMessage = paused
-    ? !transportReady ? 'MIDI 已断开，练习已安全暂停' : '练习已暂停'
+    ? !transportReady ? t('midiPaused') : t('paused')
     : judgementPhase === 'COLLECTING'
-      ? '正在接收弹奏…'
+      ? t('receiving')
       : judgementPhase === 'WRONG_WAIT_RELEASE'
-        ? '错误，请松开全部按键后重试原题'
+        ? t('wrongRelease')
         : judgementPhase === 'SUCCESS'
-          ? judgementState.feedbackElapsed ? '正确，请松开全部按键' : '正确'
+          ? judgementState.feedbackElapsed ? t('correctRelease') : t('correct')
           : ''
   const progressLabel = snapshot.questionCount === 'endless'
-    ? `已完成 ${snapshot.completedQuestions}`
-    : `已完成 ${snapshot.completedQuestions} / ${snapshot.questionCount}`
+    ? t('progressEndless', { completed: snapshot.completedQuestions })
+    : t('progressFixed', { completed: snapshot.completedQuestions, total: snapshot.questionCount })
   const requestEnd = (): void => {
     runtime.pause()
     setShowEarlyEnd(true)
@@ -1055,13 +1060,13 @@ function IntervalPracticeActiveScreen({
       ) : null}
       <header className="chord-focus-header interval-focus-header">
         <div className="chord-focus-header__left">
-          <button aria-label="返回练习" className="icon-button subtle" type="button" onClick={requestEnd}><Icon name="arrow-left" /></button>
-          <div><small>PIANO FUNDAMENTALS</small><strong>音程练习</strong></div>
+          <button aria-label={t('backPractice')} className="icon-button subtle" type="button" onClick={requestEnd}><Icon name="arrow-left" /></button>
+          <div><small>PIANO FUNDAMENTALS</small><strong>{t('title')}</strong></div>
         </div>
         <div className="focus-actions">
           <MidiStatusButton compact />
-          <button className="outline-action" disabled={paused && !transportReady} type="button" onClick={() => paused ? runtime.resume() : runtime.pause()}><Icon name={paused ? 'play' : 'pause'} /><span>{paused ? '继续' : '暂停'}</span></button>
-          <button className="outline-action" type="button" onClick={requestEnd}><Icon name="stop" /><span>提前结束</span></button>
+          <button className="outline-action" disabled={paused && !transportReady} type="button" onClick={() => paused ? runtime.resume() : runtime.pause()}><Icon name={paused ? 'play' : 'pause'} /><span>{t(paused ? 'resume' : 'pause')}</span></button>
+          <button className="outline-action" type="button" onClick={requestEnd}><Icon name="stop" /><span>{t('endEarly')}</span></button>
         </div>
       </header>
       <main className="interval-focus-content">
@@ -1070,7 +1075,7 @@ function IntervalPracticeActiveScreen({
           <strong>{page.prompt}</strong>
           <span className={`interval-focus-feedback is-${paused ? 'paused' : judgementPhase === 'SUCCESS' ? 'success' : judgementPhase === 'WRONG_WAIT_RELEASE' ? 'danger' : 'neutral'}`} role="status" aria-live="polite">{judgementMessage}</span>
         </div>
-        <section ref={stageRef} className={`interval-focus-stage has-${notationFeedback ?? 'neutral'}`} aria-label="音程谱面">
+        <section ref={stageRef} className={`interval-focus-stage has-${notationFeedback ?? 'neutral'}`} aria-label={t('notation')}>
           <NotationPaper keySignature="C" label={page.notation.ariaLabel} notes={page.notation.notes} staffMode="grand" feedback={notationFeedback} />
           <div className="interval-answer-caption">
             <span>{page.notation.answerLabel ?? page.rootLabel}</span>
@@ -1082,8 +1087,8 @@ function IntervalPracticeActiveScreen({
         <div className="early-end-backdrop">
           <section aria-labelledby="interval-early-end-title" aria-modal="true" className="early-end-dialog" role="dialog">
             <span className="early-end-dialog__icon"><Icon name="stop" /></span>
-            <div><span className="eyebrow">音程练习</span><h1 id="interval-early-end-title">结束本轮？</h1><p>已完成 {snapshot.completedQuestions}{snapshot.questionCount === 'endless' ? ' 题' : ` / ${snapshot.questionCount}`}。结束后，本轮结果会保存到练习记录。</p></div>
-            <div className="early-end-dialog__actions"><button className="secondary-action" type="button" onClick={continuePractice}>继续练习</button><button className="primary-action" type="button" onClick={onRequestEnd}>结束并查看结果</button></div>
+            <div><span className="eyebrow">{t('title')}</span><h1 id="interval-early-end-title">{t('endTitle')}</h1><p>{snapshot.questionCount === 'endless' ? t('endEndless', { count: snapshot.completedQuestions }) : t('endFixed', { completed: snapshot.completedQuestions, total: snapshot.questionCount })}</p></div>
+            <div className="early-end-dialog__actions"><button className="secondary-action" type="button" onClick={continuePractice}>{t('continuePractice')}</button><button className="primary-action" type="button" onClick={onRequestEnd}>{t('endViewResult')}</button></div>
           </section>
         </div>
       ) : null}
@@ -2516,53 +2521,55 @@ function formatIntervalAccuracy(value: number | null): string {
 }
 
 function IntervalReportFacts({ report }: { report: IntervalPracticeReportDraft }): JSX.Element {
+  const { t } = useTranslation('intervalPractice')
+  const { resolvedLocale } = useAppLocale()
   const difficult = getDifficultIntervals(report)
   const settingCount = report.settings.questionCountMode === 'infinite'
-    ? '无限练习'
-    : `固定 ${report.settings.configuredQuestionCount} 题`
+    ? t('unlimited')
+    : t('fixedQuestions', { count: report.settings.configuredQuestionCount ?? 0 })
   return (
     <div className="interval-report-sections">
       <section className="chord-report-card chord-report-overview" aria-labelledby="interval-report-overview-title">
-        <div className="chord-report-card__heading"><div><span className="eyebrow">本轮概览</span><h2 id="interval-report-overview-title">练习结果</h2></div></div>
+        <div className="chord-report-card__heading"><div><span className="eyebrow">{t('overview')}</span><h2 id="interval-report-overview-title">{t('result')}</h2></div></div>
         <dl className="chord-report-metrics interval-report-metrics">
-          <div><dt>完成题数</dt><dd>{report.completedQuestions}</dd></div>
-          <div className="is-primary"><dt>首次正确率</dt><dd>{formatIntervalAccuracy(report.firstTryAccuracy)}</dd></div>
-          <div><dt>重试后答对</dt><dd>{report.retriedCorrectCount}</dd></div>
-          <div><dt>错误尝试</dt><dd>{report.totalWrongAttempts}</dd></div>
+          <div><dt>{t('completedQuestions')}</dt><dd>{report.completedQuestions}</dd></div>
+          <div className="is-primary"><dt>{t('firstTryAccuracy')}</dt><dd>{formatIntervalReportAccuracy(report.firstTryAccuracy, resolvedLocale)}</dd></div>
+          <div><dt>{t('retriedCorrect')}</dt><dd>{report.retriedCorrectCount}</dd></div>
+          <div><dt>{t('wrongAttempts')}</dt><dd>{report.totalWrongAttempts}</dd></div>
         </dl>
-        <p className="chord-report-explanation">首次正确率只统计未发生完整错误尝试便答对的题目。</p>
+        <p className="chord-report-explanation">{t('accuracyExplanation')}</p>
       </section>
       <section className="chord-report-card" aria-labelledby="interval-report-difficult-title">
-        <div className="chord-report-card__heading"><div><span className="eyebrow">学习重点</span><h2 id="interval-report-difficult-title">易错音程</h2></div></div>
-        {report.completedQuestions === 0 ? <p className="interval-report-empty">暂无数据</p>
-          : difficult.length === 0 ? <p className="interval-report-empty">本轮没有明显易错音程</p>
+        <div className="chord-report-card__heading"><div><span className="eyebrow">{t('learningFocus')}</span><h2 id="interval-report-difficult-title">{t('difficultIntervals')}</h2></div></div>
+        {report.completedQuestions === 0 ? <p className="interval-report-empty">{t('noData')}</p>
+          : difficult.length === 0 ? <p className="interval-report-empty">{t('noDifficult')}</p>
             : <ol className="interval-difficult-list">{difficult.map((entry) => (
-              <li key={entry.intervalId}><strong><IntervalDisplayName intervalId={entry.intervalId} /></strong><span>首次失误 {entry.presentedCount - entry.firstTryCorrectCount} 题 · 错误尝试 {entry.wrongAttemptCount} 次</span></li>
+              <li key={entry.intervalId}><strong><IntervalDisplayName intervalId={entry.intervalId} /></strong><span>{t('difficultSummary', { misses: entry.presentedCount - entry.firstTryCorrectCount, attempts: entry.wrongAttemptCount })}</span></li>
             ))}</ol>}
       </section>
       <section className="chord-report-card interval-performance-card" aria-labelledby="interval-performance-title">
-        <div className="chord-report-card__heading"><div><span className="eyebrow">分类统计</span><h2 id="interval-performance-title">本轮音程表现</h2></div><small>仅显示本轮出现过的音程</small></div>
-        {report.perIntervalStats.length === 0 ? <p className="interval-report-empty">暂无数据</p> : (
+        <div className="chord-report-card__heading"><div><span className="eyebrow">{t('categoryStats')}</span><h2 id="interval-performance-title">{t('performance')}</h2></div><small>{t('presentedOnly')}</small></div>
+        {report.perIntervalStats.length === 0 ? <p className="interval-report-empty">{t('noData')}</p> : (
           <div className="interval-performance-list">
             {report.perIntervalStats.map((entry) => (
               <article key={entry.intervalId}>
                 <strong><IntervalDisplayName intervalId={entry.intervalId} /></strong>
-                <span>出现 {entry.presentedCount} 次</span>
-                <span>首次正确 {entry.firstTryCorrectCount}</span>
-                <span>重试后正确 {entry.retriedCorrectCount}</span>
-                <span>错误尝试 {entry.wrongAttemptCount}</span>
-                <em>{formatIntervalAccuracy(entry.firstTryAccuracy)}</em>
+                <span>{t('presented', { count: entry.presentedCount })}</span>
+                <span>{t('firstTryCorrect', { count: entry.firstTryCorrectCount })}</span>
+                <span>{t('retriedStat', { count: entry.retriedCorrectCount })}</span>
+                <span>{t('wrongStat', { count: entry.wrongAttemptCount })}</span>
+                <em>{formatIntervalReportAccuracy(entry.firstTryAccuracy, resolvedLocale)}</em>
               </article>
             ))}
           </div>
         )}
       </section>
       <section className="chord-report-card" aria-labelledby="interval-report-settings-title">
-        <div className="chord-report-card__heading"><div><span className="eyebrow">历史快照</span><h2 id="interval-report-settings-title">本轮设置</h2></div></div>
+        <div className="chord-report-card__heading"><div><span className="eyebrow">{t('snapshot')}</span><h2 id="interval-report-settings-title">{t('sessionSettings')}</h2></div></div>
         <dl className="chord-report-rows chord-report-session">
-          <div><dt>答案提示</dt><dd>{report.settings.answerHint ? '开启' : '关闭'}</dd></div>
-          <div><dt>低音包含升降号</dt><dd>{report.settings.includeAccidentalRoots ? '开启' : '关闭'}</dd></div>
-          <div><dt>练习题数</dt><dd>{settingCount}</dd></div>
+          <div><dt>{t('answerHint')}</dt><dd>{t(report.settings.answerHint ? 'enabled' : 'disabled')}</dd></div>
+          <div><dt>{t('bassAccidentals')}</dt><dd>{t(report.settings.includeAccidentalRoots ? 'enabled' : 'disabled')}</dd></div>
+          <div><dt>{t('questionCount')}</dt><dd>{settingCount}</dd></div>
         </dl>
       </section>
     </div>
@@ -2570,19 +2577,20 @@ function IntervalReportFacts({ report }: { report: IntervalPracticeReportDraft }
 }
 
 function IntervalResultScreen({ report }: { report: IntervalPracticeReportDraft }): JSX.Element {
+  const { t } = useTranslation('intervalPractice')
   const completed = report.completionStatus === 'COMPLETED'
   return (
-    <ProductFrame active="practice" onBack={() => navigate('interval-practice')} title={completed ? '练习完成' : '本轮已结束'}>
+    <ProductFrame active="practice" onBack={() => navigate('interval-practice')} title={t(completed ? 'practiceCompleted' : 'sessionEnded')}>
       <section className="chord-report-detail interval-result-page">
         <div className="chord-report-detail__body">
           <header className="chord-report-identity">
-            <div><span className="eyebrow">音程练习结果</span><h1>{completed ? '练习完成' : '本轮已结束'}</h1><p>{completed ? '已完成本轮设定题数。' : '已保存本轮真正完成的题目与统计。'}</p></div>
-            <span className={`chord-report-status is-${completed ? 'completed' : 'stopped'}`}>{completed ? '已完成' : '提前结束'}</span>
+            <div><span className="eyebrow">{t('resultTitle')}</span><h1>{t(completed ? 'practiceCompleted' : 'sessionEnded')}</h1><p>{t(completed ? 'completedDescription' : 'stoppedDescription')}</p></div>
+            <span className={`chord-report-status is-${completed ? 'completed' : 'stopped'}`}>{t(completed ? 'completed' : 'endEarly')}</span>
           </header>
           <IntervalReportFacts report={report} />
           <div className="result-actions interval-result-actions">
-            <button className="secondary-action" type="button" onClick={() => navigate('interval-practice')}>再练一轮</button>
-            <button className="primary-action" type="button" onClick={() => navigate('history')}><Icon name="history" />查看练习记录</button>
+            <button className="secondary-action" type="button" onClick={() => navigate('interval-practice')}>{t('again')}</button>
+            <button className="primary-action" type="button" onClick={() => navigate('history')}><Icon name="history" />{t('viewHistory')}</button>
           </div>
         </div>
       </section>
@@ -2591,16 +2599,17 @@ function IntervalResultScreen({ report }: { report: IntervalPracticeReportDraft 
 }
 
 function IntervalReportDetailScreen({ onBack, report }: { onBack: () => void; report: IntervalPracticeReportV1 | null }): JSX.Element {
+  const { t } = useTranslation('intervalPractice')
   if (!report) return (
-    <ProductFrame active="history" onBack={onBack} title="音程练习报告">
-      <section className="chord-report-detail is-unavailable"><div className="chord-report-unavailable" role="status"><span className="history-row__mark"><Icon name="info" /></span><div><h1>记录不可用</h1><p>这条练习记录无法读取。</p></div><button className="primary-action" type="button" onClick={onBack}>返回记录</button></div></section>
+    <ProductFrame active="history" onBack={onBack} title={t('reportTitle')}>
+      <section className="chord-report-detail is-unavailable"><div className="chord-report-unavailable" role="status"><span className="history-row__mark"><Icon name="info" /></span><div><h1>{t('unavailable')}</h1><p>{t('unavailableDescription')}</p></div><button className="primary-action" type="button" onClick={onBack}>{t('backHistory')}</button></div></section>
     </ProductFrame>
   )
   return (
-    <ProductFrame active="history" onBack={onBack} title="音程练习报告">
+    <ProductFrame active="history" onBack={onBack} title={t('reportTitle')}>
       <section className="chord-report-detail">
         <div className="chord-report-detail__body">
-          <header className="chord-report-identity"><div><span className="eyebrow">练习记录</span><h1>音程练习</h1><p>以下内容来自本轮已保存的练习事实。</p></div><span className={`chord-report-status is-${report.completionStatus === 'COMPLETED' ? 'completed' : 'stopped'}`}>{report.completionStatus === 'COMPLETED' ? '已完成' : '提前结束'}</span></header>
+          <header className="chord-report-identity"><div><span className="eyebrow">{t('historyTitle')}</span><h1>{t('title')}</h1><p>{t('savedFacts')}</p></div><span className={`chord-report-status is-${report.completionStatus === 'COMPLETED' ? 'completed' : 'stopped'}`}>{t(report.completionStatus === 'COMPLETED' ? 'completed' : 'endEarly')}</span></header>
           <IntervalReportFacts report={report} />
         </div>
       </section>
@@ -2611,6 +2620,7 @@ function IntervalReportDetailScreen({ onBack, report }: { onBack: () => void; re
 type HistoryFilter = HistoryDashboardFilter
 
 function HistoryTrendChart({ buckets }: { buckets: readonly HistoryDailyBucket[] }): JSX.Element {
+  const { t } = useTranslation('intervalPractice')
   const width = 560
   const height = 152
   const plotLeft = 30
@@ -2633,7 +2643,7 @@ function HistoryTrendChart({ buckets }: { buckets: readonly HistoryDailyBucket[]
   const labelStep = buckets.length <= 8 ? 1 : Math.ceil(buckets.length / 6)
 
   return (
-    <div className="history-trend-chart" aria-label="按本地自然日统计的练习趋势" role="img">
+    <div className="history-trend-chart" aria-label={t('trendAria')} role="img">
       <svg viewBox={`0 0 ${width} ${height}`}>
         {[0, 0.5, 1].map((ratio) => {
           const y = plotTop + ratio * plotHeight
@@ -2653,7 +2663,7 @@ function HistoryTrendChart({ buckets }: { buckets: readonly HistoryDailyBucket[]
             : null
         ))}
       </svg>
-      {!hasActivity ? <span className="history-trend-chart__empty">当前范围内暂无练习记录</span> : null}
+      {!hasActivity ? <span className="history-trend-chart__empty">{t('trendEmpty')}</span> : null}
     </div>
   )
 }
@@ -2667,6 +2677,8 @@ function HistoryRecord({
   onOpenChordReport: (recordId: string) => void
   onOpenIntervalReport: (recordId: string) => void
 }): JSX.Element {
+  const { t } = useTranslation('intervalPractice')
+  const { resolvedLocale } = useAppLocale()
   if (item.module === 'chord') {
     const completed = item.plannedQuestionCount === null
       ? `完成 ${item.completedQuestions}`
@@ -2690,13 +2702,13 @@ function HistoryRecord({
   }
   if (item.module === 'interval') {
     const completed = item.configuredQuestionCount === null
-      ? `完成 ${item.completedQuestions} 题`
-      : `完成 ${item.completedQuestions}/${item.configuredQuestionCount}`
+      ? t('recordCompletedEndless', { count: item.completedQuestions })
+      : t('recordCompletedFixed', { completed: item.completedQuestions, total: item.configuredQuestionCount })
     return (
-      <button aria-label={`打开${item.modeSummary}练习报告`} className={`history-row is-${item.completionStatus.toLowerCase()} is-interactive`} type="button" onClick={() => onOpenIntervalReport(item.recordId)}>
+      <button aria-label={t('openReport', { module: t('title') })} className={`history-row is-${item.completionStatus.toLowerCase()} is-interactive`} type="button" onClick={() => onOpenIntervalReport(item.recordId)}>
         <span className="history-row__mark"><Icon name="grid" /></span>
-        <span className="history-row__copy"><small><b className="history-module-badge is-interval">音程</b>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small><strong>{item.modeSummary}</strong><em>{completed} · 重试后答对 {item.retriedCorrectCount} · 错误尝试 {item.totalWrongAttempts}</em></span>
-        <span className="history-row__score"><strong>{formatIntervalAccuracy(item.firstTryAccuracy)}</strong><small>首次正确率 <Icon name="chevron" size={13} /></small></span>
+        <span className="history-row__copy"><small><b className="history-module-badge is-interval">{t('intervalBadge')}</b>{formatIntervalHistoryTimestamp(item.endedAt, resolvedLocale)} · {t(item.completionStatus === 'COMPLETED' ? 'completed' : 'endEarly')}</small><strong>{t('title')}</strong><em>{t('recordSummary', { progress: completed, retried: item.retriedCorrectCount, wrong: item.totalWrongAttempts })}</em></span>
+        <span className="history-row__score"><strong>{formatIntervalReportAccuracy(item.firstTryAccuracy, resolvedLocale)}</strong><small>{t('firstTryAccuracy')} <Icon name="chevron" size={13} /></small></span>
       </button>
     )
   }
@@ -2736,6 +2748,7 @@ function HistoryScreen({
   runtime: AndroidSightReadingRuntime
   theme: ThemeDefinition
 }): JSX.Element {
+  const { t } = useTranslation('intervalPractice')
   const history = runtime.historySnapshot
   const sightProjection = projectSightReadingHistory(history.records)
   const chordItems = projectChordHistory(chordHistory.records)
@@ -2759,46 +2772,42 @@ function HistoryScreen({
   const anyError = history.status === 'error' || chordHistory.status === 'error' || intervalHistory.status === 'error'
   const anyWarning = Boolean(history.warning || chordHistory.warning || intervalHistory.warning)
   const listStatus = anyLoading
-    ? '正在同步本地记录'
+    ? t('syncing')
     : anyError
-      ? `共 ${visibleItems.length} 条 · 读取异常`
+      ? t('recordsError', { count: visibleItems.length })
       : anyWarning
-        ? `共 ${visibleItems.length} 条 · 部分记录不可用`
-        : `共 ${visibleItems.length} 条记录`
-  const emptyTitle = filter === 'interval' ? '暂无音程练习记录' : filter === 'chord'
-    ? '暂无和弦练习记录'
-    : filter === 'sight' ? '暂无识谱练习记录' : '暂无练习记录'
-  const emptyDetail = filter === 'interval' ? '完成音程练习后，结果会显示在这里。' : filter === 'chord'
-    ? '完成和弦练习后，记录会显示在这里。'
-    : filter === 'sight' ? '完成一轮识谱练习后，结果会显示在这里。' : '完成一轮练习后，结果会显示在这里。'
+        ? t('recordsWarning', { count: visibleItems.length })
+        : t('recordsCount', { count: visibleItems.length })
+  const emptyTitle = t(filter === 'interval' ? 'emptyInterval' : filter === 'chord' ? 'emptyChord' : filter === 'sight' ? 'emptySight' : 'emptyAll')
+  const emptyDetail = t(filter === 'interval' ? 'emptyIntervalDetail' : filter === 'chord' ? 'emptyChordDetail' : filter === 'sight' ? 'emptySightDetail' : 'emptyAllDetail')
   return (
-    <ProductFrame active="history" className={composedHistory?.frameClassName} title="练习记录">
+    <ProductFrame active="history" className={composedHistory?.frameClassName} title={t('historyTitle')}>
       <section className={`history-screen history-dashboard${composedHistory ? ' themed-history-dashboard' : ''}`}>
         <section className="history-dashboard__hero" aria-labelledby="history-dashboard-title">
           {composedHistory ? <img className="history-dashboard__hero-art" src={composedHistory.assets.hero} alt="" aria-hidden="true" /> : null}
           <div className="history-dashboard__hero-copy">
             <span className="eyebrow">PRACTICE JOURNAL</span>
             <h1 id="history-dashboard-title">每一次坚持，<br />都让梦想更靠近。</h1>
-            <p>{dashboard.summary.totalSessions > 0 ? `这里保存着 ${dashboard.summary.totalSessions} 次练习。` : '完成一次练习后，这里会留下你的进步。'}</p>
+            <p>{dashboard.summary.totalSessions > 0 ? t('savedSessions', { count: dashboard.summary.totalSessions }) : t('journalEmpty')}</p>
           </div>
           {composedHistory ? <img className="history-dashboard__hero-memo" src={composedHistory.assets.memo} alt="" aria-hidden="true" /> : null}
         </section>
 
-        <section className="history-dashboard__summary" aria-label="练习汇总">
-          <article className="history-stat-card is-sessions"><span><Icon name="chart" /></span><div><small>已保存练习</small><strong>{dashboard.summary.totalSessions}<b>次</b></strong><p>识谱、和弦与音程练习记录</p></div></article>
-          <article className="history-stat-card is-streak"><span><Icon name="grid" /></span><div><small>连续练习天数</small><strong>{dashboard.summary.currentStreakDays}<b>天</b></strong><p>按本地日期统计</p></div></article>
-          <article className="history-stat-card is-questions"><span><Icon name="book" /></span><div><small>累计完成题数</small><strong>{dashboard.summary.totalCompletedQuestions}<b>题</b></strong><p>包含已保存的练习</p></div></article>
+        <section className="history-dashboard__summary" aria-label={t('summary')}>
+          <article className="history-stat-card is-sessions"><span><Icon name="chart" /></span><div><small>{t('savedPractice')}</small><strong>{dashboard.summary.totalSessions}<b>{t('sessionsUnit', { count: dashboard.summary.totalSessions })}</b></strong><p>{t('modulesCaption')}</p></div></article>
+          <article className="history-stat-card is-streak"><span><Icon name="grid" /></span><div><small>{t('streak')}</small><strong>{dashboard.summary.currentStreakDays}<b>{t('daysUnit', { count: dashboard.summary.currentStreakDays })}</b></strong><p>{t('localDates')}</p></div></article>
+          <article className="history-stat-card is-questions"><span><Icon name="book" /></span><div><small>{t('totalQuestions')}</small><strong>{dashboard.summary.totalCompletedQuestions}<b>{t('questionsUnit', { count: dashboard.summary.totalCompletedQuestions })}</b></strong><p>{t('savedCaption')}</p></div></article>
         </section>
 
         <div className="history-dashboard__workspace">
           <section className="history-list history-dashboard__recent">
             <div className="history-dashboard__section-heading">
-              <div><span className="eyebrow">RECENT PRACTICE</span><h2>最近练习记录</h2></div>
+              <div><span className="eyebrow">RECENT PRACTICE</span><h2>{t('recent')}</h2></div>
               <span>{listStatus}</span>
             </div>
-            <div className="history-filter" aria-label="练习模块筛选" role="group">
-              {([['all', '全部'], ['sight', '识谱'], ['chord', '和弦'], ['interval', '音程']] as const).map(([value, label]) => (
-                <button className={filter === value ? 'is-active' : ''} key={value} type="button" onClick={() => onFilterChange(value)}>{label}</button>
+            <div className="history-filter" aria-label={t('filterLabel')} role="group">
+              {([['all', 'all'], ['sight', 'sightBadge'], ['chord', 'chordBadge'], ['interval', 'intervalBadge']] as const).map(([value, label]) => (
+                <button className={filter === value ? 'is-active' : ''} key={value} type="button" onClick={() => onFilterChange(value)}>{t(label)}</button>
               ))}
             </div>
             <div className="history-list__rows">
@@ -2807,7 +2816,7 @@ function HistoryScreen({
                 : (
                   <div className="history-empty" role={anyError ? 'alert' : 'status'}>
                     <span className="history-row__mark"><Icon name={anyError ? 'info' : 'history'} /></span>
-                    <div><strong>{anyLoading ? '正在读取本地记录…' : anyError ? '暂时无法读取练习记录' : emptyTitle}</strong><p>{anyError ? '已保存的数据不会被替换；稍后重新进入记录页可再次读取。' : emptyDetail}</p></div>
+                    <div><strong>{anyLoading ? t('reading') : anyError ? t('historyReadFailed') : emptyTitle}</strong><p>{anyError ? t('preservedData') : emptyDetail}</p></div>
                   </div>
                 )}
             </div>
@@ -2816,16 +2825,16 @@ function HistoryScreen({
 
           <section className="history-dashboard__trend">
             <div className="history-dashboard__section-heading">
-              <div><span className="eyebrow">PRACTICE TREND</span><h2>练习趋势</h2></div>
-              <div className="history-range-filter" aria-label="趋势时间范围" role="group">
-                {([['7d', '近7天'], ['30d', '近30天'], ['all', '全部']] as const).map(([value, label]) => (
-                  <button className={trendRange === value ? 'is-active' : ''} key={value} type="button" onClick={() => setTrendRange(value)}>{label}</button>
+              <div><span className="eyebrow">PRACTICE TREND</span><h2>{t('trend')}</h2></div>
+              <div className="history-range-filter" aria-label={t('rangeLabel')} role="group">
+                {([['7d', 'last7'], ['30d', 'last30'], ['all', 'all']] as const).map(([value, label]) => (
+                  <button className={trendRange === value ? 'is-active' : ''} key={value} type="button" onClick={() => setTrendRange(value)}>{t(label)}</button>
                 ))}
               </div>
             </div>
             <HistoryTrendChart buckets={dashboard.trend} />
-            <div className="history-trend-legend"><span className="is-line"><i />完成题数</span><span className="is-bar"><i />练习次数</span></div>
-            <p className="history-trend-note">{filter === 'all' ? '展示识谱与和弦的练习次数和完成题数，并包含音程练习。' : filter === 'sight' ? '当前仅显示识谱练习活动量。' : filter === 'chord' ? '当前仅显示和弦练习活动量。' : '当前仅显示音程练习活动量。'}</p>
+            <div className="history-trend-legend"><span className="is-line"><i />{t('trendQuestions')}</span><span className="is-bar"><i />{t('trendSessions')}</span></div>
+            <p className="history-trend-note">{t(filter === 'all' ? 'trendAll' : filter === 'sight' ? 'trendSight' : filter === 'chord' ? 'trendChord' : 'trendInterval')}</p>
             {composedHistory ? <img className="history-dashboard__trend-decor" src={composedHistory.assets.trend} alt="" aria-hidden="true" /> : null}
           </section>
         </div>
@@ -3581,13 +3590,14 @@ function IntervalPersistenceErrorNotice({
   coordinator: IntervalReportPersistenceCoordinator
   persistence: IntervalPersistenceSnapshot
 }): JSX.Element | null {
+  const { t } = useTranslation('intervalPractice')
   if (persistence.status !== 'error') return null
   return (
     <aside className="persistence-error" role="alert">
       {persistence.errorContext === 'save'
-        ? <span><strong>练习已结束，但记录保存失败。</strong><small>音程练习结果仍保留，可重试写入此设备。</small></span>
-        : <span><strong>暂时无法读取音程练习记录。</strong><small>其他练习功能仍可正常使用。</small></span>}
-      <button type="button" onClick={() => { void coordinator.retryPending() }}>重试</button>
+        ? <span><strong>{t('saveFailed')}</strong><small>{t('saveFailedDetail')}</small></span>
+        : <span><strong>{t('readFailed')}</strong><small>{t('readFailedDetail')}</small></span>}
+      <button type="button" onClick={() => { void coordinator.retryPending() }}>{t('retry')}</button>
     </aside>
   )
 }

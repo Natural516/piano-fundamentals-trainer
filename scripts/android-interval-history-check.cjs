@@ -115,7 +115,7 @@ test('IH05', 'History list projection distinguishes Interval mode and stopped/co
 test('IH06', 'Result and History detail expose shared facts without timing or debug artifacts', () => {
   const source = fs.readFileSync(path.resolve(__dirname, '../prototype/android-tablet-v1/src/main.tsx'), 'utf8')
   const result = source.slice(source.indexOf('function IntervalReportFacts'), source.indexOf('type HistoryFilter'))
-  for (const label of ['完成题数', '首次正确率', '重试后答对', '错误尝试', '易错音程', '本轮音程表现', '本轮设置']) assert.match(result, new RegExp(label))
+  for (const key of ['completedQuestions', 'firstTryAccuracy', 'retriedCorrect', 'wrongAttempts', 'difficultIntervals', 'performance', 'sessionSettings']) assert.ok(result.includes(`t('${key}')`), key)
   assert.match(result, /<IntervalReportFacts report=\{report\}/)
   assert.doesNotMatch(result, /reaction|responseTime|fastest|slowest|timeout|raw MIDI|session id/i)
   assert.doesNotMatch(result, /<dd>\{entry\.intervalId\}|<span>\{entry\.intervalId\}/)
