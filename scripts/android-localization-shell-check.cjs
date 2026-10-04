@@ -23,7 +23,7 @@ const { LocaleProvider } = require(loc + 'LocaleProvider.tsx')
 const { localizationResources } = require(loc + 'resources.ts')
 const { presentLocalizedMidiStatus, getSettingsThemeDisplayName } = require(loc + 'midiPresentation.ts')
 const { AndroidSightReadingRuntime } = require('../prototype/android-tablet-v1/src/sightReadingIntegration.ts')
-const { AndroidPersistenceStore, SightReadingReportRepository, ANDROID_PERSISTENCE_KEYS } = require('../prototype/android-tablet-v1/src/androidPersistenceCore.ts')
+const { AndroidPersistenceStore, SightReadingReportRepository, SightReadingSettingsRepository, createSettingsDocument, ANDROID_PERSISTENCE_KEYS } = require('../prototype/android-tablet-v1/src/androidPersistenceCore.ts')
 
 // Compile the actual production component declarations in memory, not a rewritten mock UI.
 // This is a React/DOM contract; it does not claim browser pixels or physical device evidence.
@@ -38,7 +38,7 @@ function declarations(source) {
   return result
 }
 const current = declarations(main), old = declarations(baseline(mainPath))
-const componentNames = ['MidiUiContext', 'UpdaterUiContext', 'AppNavigationContext', 'useMidiUi', 'useUpdaterUi', 'useAppNavigation', 'productNavigation', 'SETTINGS_THEME_OPTIONS', 'Icon', 'navigate', 'presentMidiStatus', 'MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'SettingRow', 'SettingSelect', 'SettingsThemeOption', 'useThemeRuntime', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'THEORY_TOOLS', 'ToolsHubScreen', 'ScaleNoteToken', 'parseChordAccidentalGroup', 'ChordAccidentalGlyph', 'ChordAccidentalGroup', 'ChordSymbol', 'ChordTheoreticalNoteToken', 'ToolDetailShell', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalPitchToken', 'IntervalPitchSelector', 'IntervalQueryToolScreen', 'IntervalPracticeSetupScreen', 'NotationPaper', 'useIntervalPracticeRuntime', 'useIntervalPersistence', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice']
+const componentNames = ['MidiUiContext', 'UpdaterUiContext', 'AppNavigationContext', 'useMidiUi', 'useUpdaterUi', 'useAppNavigation', 'productNavigation', 'SETTINGS_THEME_OPTIONS', 'Icon', 'navigate', 'presentMidiStatus', 'MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'SettingRow', 'SettingSelect', 'SettingsThemeOption', 'useThemeRuntime', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'THEORY_TOOLS', 'ToolsHubScreen', 'ScaleNoteToken', 'parseChordAccidentalGroup', 'ChordAccidentalGlyph', 'ChordAccidentalGroup', 'ChordSymbol', 'ChordTheoreticalNoteToken', 'ToolDetailShell', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalPitchToken', 'IntervalPitchSelector', 'IntervalQueryToolScreen', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'useRemainingTime', 'PracticeMetric', 'getPracticeScreen', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'NotationPaper', 'useIntervalPracticeRuntime', 'useIntervalPersistence', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice']
 const componentSource = `
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -56,6 +56,12 @@ import { INTERVAL_QUESTION_COUNT_OPTIONS } from './intervalPractice/settings'
 import { presentLocalizedIntervalPractice, formatIntervalReportAccuracy, formatIntervalHistoryTimestamp } from './localization/intervalPracticePresentation'
 import { useAppLocale } from './localization/LocaleProvider'
 import { IntervalDisplayName } from './localization/LegacyDisplayValues'
+import { SightNoteValue } from './localization/LegacyDisplayValues'
+import { presentSightKey, presentSightPrompt, presentSightReaction, presentSightHistory, presentSightDuration } from './localization/sightReadingPresentation'
+import { getSightReadingAnswerTimeoutMs } from '../../../src/sightReading/sightReadingSettings'
+import { getMajorKeySignature, MAJOR_KEY_DISPLAY_SIGNATURES } from '../../../src/sightReading/musicKeySignatures'
+import { getPrimaryErrorNote } from './sightReadingIntegration'
+import { presentSightReadingFeedback } from './sightReadingFeedbackPresentation'
 import { getDifficultIntervals, projectIntervalHistory } from './intervalPractice'
 import { projectSightReadingHistory, formatHistoryTimestamp, formatHistoryPercentage, formatHistoryDuration } from './historyProjection'
 import { projectChordHistory } from './chordPractice/historyProjection'
@@ -140,26 +146,32 @@ const test = (id, description, run) => tests.push({ id, description, run })
 
 async function mounted(page, run, options = {}) {
   const oldWindow = global.window, oldDocument = global.document
-  global.window = { ...events(), location: { hash: '#' + page } }
+  global.window = { ...events(), location: { hash: '#' + page }, ...(options.windowTimers ?? {}) }
   global.document = { ...events(), documentElement: { lang: '' }, title: '', visibilityState: 'visible' }
   const backend = new MemoryBackend()
   const service = new LocalizationService(new AppPreferencesRepository(backend), () => ['zh-CN'])
   const plugin = new NativeFixture()
-  let reportRepository
+  let reportRepository, settingsRepository
   if (options.sightRecords) {
     const keys = ANDROID_PERSISTENCE_KEYS
     backend.values.set(keys.schemaVersion, '1')
-    backend.values.set(keys.sightReadingReportIndex, JSON.stringify({ schemaVersion: 1, recordIds: options.sightRecords.map(record => record.recordId) }))
-    for (const record of options.sightRecords) backend.values.set(keys.sightReadingReportPrefix + record.recordId, JSON.stringify(record))
+    const encode = value => options.rawSightEvidence ? JSON.stringify(value, null, 2) + '\n' : JSON.stringify(value)
+    backend.values.set(keys.sightReadingReportIndex, encode({ schemaVersion: 1, recordIds: options.sightRecords.map(record => record.recordId) }))
+    for (const record of options.sightRecords) backend.values.set(keys.sightReadingReportPrefix + record.recordId, encode(record))
     const store = new AndroidPersistenceStore(backend)
     assert.equal((await store.ensureSchema()).success, true)
     reportRepository = new SightReadingReportRepository(store)
     assert.equal((await reportRepository.initialize()).success, true)
+    if (options.rawSightEvidence) {
+      backend.values.set(keys.sightReadingSettings, encode(createSettingsDocument(options.runtimeDependencies.initialSettings)))
+      settingsRepository = new SightReadingSettingsRepository(store)
+      assert.equal((await settingsRepository.load()).success, true)
+    }
   }
-  const runtime = new AndroidSightReadingRuntime({ clock: { now: () => 1000 }, scheduler: { schedule: () => 1, cancel() {} }, random: () => 0.42, bluetoothPlugin: plugin, requireMidiIdentity: true, initialMidiSource: 'bluetooth', reportRepository })
+  const runtime = new AndroidSightReadingRuntime({ clock: { now: () => 1000 }, scheduler: { schedule: () => 1, cancel() {} }, random: () => 0.42, bluetoothPlugin: plugin, requireMidiIdentity: true, initialMidiSource: 'bluetooth', reportRepository, settingsRepository, ...(options.runtimeDependencies ?? {}) })
   await runtime.startMidi()
   await runtime.midiInput.connect('usb-identity', 3)
-  if (!['interval-practice', 'interval-flow'].includes(page)) {
+  if (!['interval-practice', 'interval-flow', 'sight-flow'].includes(page)) {
     runtime.start(); runtime.pause()
     assert.equal(runtime.snapshot.isPaused, true)
   }
@@ -184,7 +196,7 @@ async function mounted(page, run, options = {}) {
     return React.createElement(ui.MidiUiContext.Provider, { value: { runtime: ownedRuntime } },
       React.createElement(ui.UpdaterUiContext.Provider, { value: updaterValue },
         React.createElement(ui.AppNavigationContext.Provider, { value: navValue },
-          ['interval-practice', 'interval-flow'].includes(page) ? options.render({ backend, runtime, theme, ui }) : React.createElement({ settings: ui.SettingsScreen, midi: ui.MidiScreen, home: ui.HomeScreen, practice: ui.PracticeHubScreen, tools: ui.ToolsHubScreen, 'chord-query-tool': ui.ChordQueryToolScreen, 'interval-query-tool': ui.IntervalQueryToolScreen, 'scale-key-signature-tool': ui.ScaleKeySignatureToolScreen }[page],
+          ['interval-practice', 'interval-flow', 'sight-flow'].includes(page) ? options.render({ backend, runtime, theme, ui }) : React.createElement({ settings: ui.SettingsScreen, midi: ui.MidiScreen, home: ui.HomeScreen, practice: ui.PracticeHubScreen, tools: ui.ToolsHubScreen, 'chord-query-tool': ui.ChordQueryToolScreen, 'interval-query-tool': ui.IntervalQueryToolScreen, 'scale-key-signature-tool': ui.ScaleKeySignatureToolScreen }[page],
             page === 'settings' ? { theme, themeManager } : page === 'midi' ? {} : { ...hubProps, theme }))))
   }
   try {
@@ -399,7 +411,7 @@ test('M12', 'actual full-row candidates and multi-port selector preserve identit
 }))
 
 test('B41R1', 'all out-of-scope main declarations and Bocchi headline/dialogs stay byte frozen', () => {
-  const permitted = new Set(['MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'ToolsHubScreen', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalQueryToolScreen', 'IntervalPitchSelector', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
+  const permitted = new Set(['MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'ToolsHubScreen', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalQueryToolScreen', 'IntervalPitchSelector', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
   assert.deepEqual([...current.keys()], [...old.keys()])
   for (const [name, source] of current) if (!permitted.has(name)) assert.equal(source, old.get(name), name)
   const caption = source => source.match(/<div className="settings-hero__caption">[\s\S]*?<\/div>/)[0]

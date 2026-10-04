@@ -185,7 +185,7 @@ test('IP11', 'locale round trip keeps exact Start handler identity and cannot cr
 }))
 test('IP12', 'B4.3 permits Interval flow/shared History presentation only; all other declarations remain frozen', () => {
   assert.deepEqual([...current.keys()], [...previous.keys()])
-  const allowed = new Set(['IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
+  const allowed = new Set(['SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
   for (const [name, source] of current) if (!allowed.has(name)) assert.equal(source, previous.get(name), name)
 })
 test('IP13', 'all twenty setting combinations survive mounted locale round trips with zero business writes', async () => {
@@ -278,7 +278,30 @@ test('IP21', 'only Preparation and English Interval report wrapping is added; pr
   assert.ok(addition)
   const reportWrapping = css.match(/\n\/\* Interval report English wrapping only; ACTIVE\/theme geometry is unchanged\. \*\/[\s\S]*?overflow-wrap: anywhere;\n\}/)
   assert.ok(reportWrapping)
-  assert.equal(css.replace(addition[0], '').replace(reportWrapping[0] + '\n', ''), oldCss)
+  // B4.4 adds exactly this Sight-only display wrapping; no Interval style changes are permitted.
+  const sightWrapping = `:where(.sight-ready-layout, .sight-result-layout) h1,
+:where(.sight-ready-layout, .sight-result-layout) h2,
+.sight-focus-frame .focus-prompt {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.sight-focus-frame .focus-progress,
+.sight-focus-frame .focus-actions,
+.sight-result-layout .result-actions > button {
+  min-width: 0;
+}
+.sight-ready-layout .ready-controls p,
+.sight-result-layout .result-note p {
+  line-height: 1.6;
+}
+.settings-group--sight .setting-row__copy small {
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.5;
+}
+`
+  assert.ok(css.endsWith(sightWrapping))
+  assert.equal(css.replace(addition[0], '').replace(reportWrapping[0] + '\n', '').slice(0, -sightWrapping.length), oldCss)
   assert.match(addition[0], /\.interval-ready-layout \.setting-row__copy small \{\s*white-space: normal;/)
 })
 test('IP22', 'runtime device name remains verbatim in reused B4.1 MIDI header without extra badge or native effects', async () => page(async h => {

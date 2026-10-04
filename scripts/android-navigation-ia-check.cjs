@@ -84,7 +84,10 @@ const tests = [
     assert.match(history, /filter === 'interval' \? intervalItems : nonSightItems/)
     assert.match(history, /t\('recent'\)/)
     assert.match(history, /t\('trend'\)/)
-    assert.match(ui, /history-module-badge">识谱/)
+    assert.match(ui, /history-module-badge">\{sightT\('historyModule'\)\}/)
+    const sightResources = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/sightReadingResources.ts'), 'utf8')
+    assert.match(sightResources, /historyModule: '识谱'/)
+    assert.match(sightResources, /historyModule: 'Sight Reading'/)
     assert.match(ui, /history-module-badge is-chord">和弦/)
     assert.doesNotMatch(history, /piano\.v1\.|Preferences\.|localStorage/)
   }],
@@ -109,7 +112,10 @@ const tests = [
   }],
   ['NAV11', 'normal product copy exposes no storage key or implementation-contract wording', () => {
     assert.doesNotMatch(productUi, /piano\.v1\.sightReading\.settings|persistence\/history|仅调整设置入口位置|不会在这里伪造记录|QA Static UI/)
-    assert.match(productUi, /下一轮生效/)
+    assert.match(productUi, /t\('nextSession'\)/)
+    const sightResources = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/sightReadingResources.ts'), 'utf8')
+    assert.match(sightResources, /nextSession: '下一轮生效'/)
+    assert.match(sightResources, /nextSession: 'Applies to the next session'/)
     assert.doesNotMatch(productUi, /下一轮生效 · 使用默认设置/)
   }],
   ['NAV12', 'all Sight Reading selects share one custom chevron centered 16.5px from the right edge', () => {

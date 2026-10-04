@@ -63,6 +63,7 @@ import { LocalizationService } from './localization/localizationService'
 import { LocaleProvider } from './localization/LocaleProvider'
 import { LanguageSetting } from './localization/LanguageSetting'
 import { IntervalDisplayName, SightNoteValue } from './localization/LegacyDisplayValues'
+import { presentSightKey, presentSightPrompt, presentSightReaction, presentSightHistory, presentSightDuration } from './localization/sightReadingPresentation'
 import { getSettingsThemeDisplayName, presentLocalizedMidiStatus } from './localization/midiPresentation'
 import { presentHomeRecentPractice } from './localization/homePresentation'
 import { useAppLocale } from './localization/LocaleProvider'
@@ -1880,84 +1881,85 @@ function SightSettingsRows({
   onSettingsChange: (changes: Partial<SightReadingSettings>) => void
   settings: SightReadingSettings
 }): JSX.Element {
+  const { t } = useTranslation('sightReading')
   const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
   return (
     <>
       <SettingRow
-        description="高音谱表、低音谱表或大谱表"
+        description={t('staffHelp')}
         icon="book"
-        title="默认谱表"
+        title={t('defaultStaff')}
         action={<SettingSelect
-          ariaLabel="默认谱表"
+          ariaLabel={t('defaultStaff')}
           value={settings.staffMode}
           onChange={(staffMode: SightReadingStaffMode) => onSettingsChange({ staffMode })}
           options={[
-            { value: 'treble', label: '高音谱表' },
-            { value: 'bass', label: '低音谱表' },
-            { value: 'grand', label: '大谱表' }
+            { value: 'treble', label: t('staffs.treble') },
+            { value: 'bass', label: t('staffs.bass') },
+            { value: 'grand', label: t('staffs.grand') }
           ]}
         />}
       />
       <SettingRow
-        description="支持现有 15 个大调"
+        description={t('keyHelp')}
         icon="book"
-        title="调性"
+        title={t('key')}
         action={<SettingSelect
-          ariaLabel="调性"
+          ariaLabel={t('key')}
           value={settings.keySignature}
           onChange={(keySignature: MajorKeyId) => onSettingsChange({ keySignature })}
-          options={MAJOR_KEY_DISPLAY_SIGNATURES.map((key) => ({ value: key.id, label: key.displayName }))}
+          options={MAJOR_KEY_DISPLAY_SIGNATURES.map((key) => ({ value: key.id, label: presentSightKey(key.id, t) }))}
         />}
       />
       <SettingRow
-        description="单音保持原有首音判定；双音使用 150ms 同时音捕获"
+        description={t('noteCountHelp')}
         icon="book"
-        title="音符数量"
+        title={t('noteCount')}
         action={<SettingSelect
-          ariaLabel="音符数量"
+          ariaLabel={t('noteCount')}
           value={settings.noteMode}
           onChange={(noteMode: SightReadingNoteMode) => onSettingsChange({ noteMode })}
           options={[
-            { value: 'single', label: '单音' },
-            { value: 'double', label: '双音' }
+            { value: 'single', label: t('modes.single') },
+            { value: 'double', label: t('modes.double') }
           ]}
         />}
       />
       <SettingRow
-        description="调内音或包含临时变音"
+        description={t('notePoolHelp')}
         icon="chart"
-        title="音符内容"
+        title={t('notePool')}
         action={settings.noteMode === 'double'
-          ? <strong>双音固定调内</strong>
+          ? <strong>{t('doublePool')}</strong>
           : <SettingSelect
-              ariaLabel="音符内容"
+              ariaLabel={t('notePool')}
               value={settings.notePoolMode}
               onChange={(notePoolMode: SightReadingNotePoolMode) => onSettingsChange({ notePoolMode })}
               options={[
-                { value: 'diatonic', label: '调内音' },
-                { value: 'chromatic', label: '含临时变音' }
+                { value: 'diatonic', label: t('pools.diatonic') },
+                { value: 'chromatic', label: t('pools.chromatic') }
               ]}
             />}
       />
       <SettingRow
-        description="10、20、50 或 100 题"
+        description={t('questionCountHelp')}
         icon="chart"
-        title="默认题数"
+        title={t('defaultQuestionCount')}
         action={<SettingSelect
-          ariaLabel="默认题数"
+          ariaLabel={t('defaultQuestionCount')}
           value={String(settings.questionCount)}
           onChange={(value: string) => onSettingsChange({ questionCount: Number(value) as SightReadingQuestionCount })}
           options={[10, 20, 50, 100].map((value) => ({ value: String(value), label: String(value) }))}
         />}
       />
-      <SettingRow description={`当前模式固定为 ${answerTimeLimitSeconds} 秒`} icon="clock" title="每题时限" action={<strong>{answerTimeLimitSeconds} 秒</strong>} />
+      <SettingRow description={t('timeHelp', { count: answerTimeLimitSeconds })} icon="clock" title={t('timeLimit')} action={<strong>{t('seconds', { count: answerTimeLimitSeconds })}</strong>} />
       <SettingRow
-        description={settings.noteNameVisible ? '答题前显示目标音名' : '答题前不显示目标音名'}
+        description={t(settings.noteNameVisible ? 'namesVisibleHelp' : 'namesHiddenHelp')}
         icon="info"
-        title="显示音名"
+        title={t('noteNames')}
         action={(
           <button
-            aria-label={`显示音名已${settings.noteNameVisible ? '开启' : '关闭'}`}
+            aria-label={t(settings.noteNameVisible ? 'namesVisible' : 'namesHidden')}
             className={`mock-switch ${settings.noteNameVisible ? 'is-on' : ''}`}
             type="button"
             onClick={() => onSettingsChange({ noteNameVisible: !settings.noteNameVisible })}
@@ -1979,12 +1981,13 @@ function SightSettingsDrawer({
   onSettingsChange: (changes: Partial<SightReadingSettings>) => void
   settings: SightReadingSettings
 }): JSX.Element {
+  const { t } = useTranslation('sightReading')
   return (
     <div className="module-settings-backdrop" onClick={onClose}>
       <aside aria-labelledby="sight-settings-title" aria-modal="true" className="module-settings-drawer" role="dialog" onClick={(event) => event.stopPropagation()}>
         <div className="module-settings-drawer__header">
-          <div><span className="eyebrow">下一轮生效</span><h2 id="sight-settings-title">识谱练习设置</h2></div>
-          <button aria-label="关闭识谱练习设置" className="icon-button subtle" type="button" onClick={onClose}><Icon name="close" /></button>
+          <div><span className="eyebrow">{t('nextSession')}</span><h2 id="sight-settings-title">{t('settings')}</h2></div>
+          <button aria-label={t('closeSettings')} className="icon-button subtle" type="button" onClick={onClose}><Icon name="close" /></button>
         </div>
         <div className="module-settings-rows settings-group--sight">
           <SightSettingsRows onSettingsChange={onSettingsChange} settings={settings} />
@@ -2210,49 +2213,51 @@ function SightReadyScreen({
   onSettingsChange: (changes: Partial<SightReadingSettings>) => void
   settings: SightReadingSettings
 }): JSX.Element {
+  const { t } = useTranslation('sightReading')
+  const { t: midiT } = useTranslation('midi')
   const { runtime } = useMidiUi()
   const { openAuxiliary } = useAppNavigation()
-  const midiStatus = presentMidiStatus(runtime)
+  const midiStatus = presentLocalizedMidiStatus(runtime, midiT)
   const answerTimeLimitSeconds = getSightReadingAnswerTimeoutMs(settings) / 1000
   const [settingsOpen, setSettingsOpen] = useState(false)
   return (
-    <ProductFrame active="practice" onBack={() => navigate('practice')} title="识谱练习">
-      <section className="ready-layout">
+    <ProductFrame active="practice" onBack={() => navigate('practice')} title={t('title')}>
+      <section className="ready-layout sight-ready-layout">
         <div className="ready-stage">
           <div className="section-heading">
-            <div><span className="eyebrow">练习预览</span><h1>{STAFF_MODE_LABELS[settings.staffMode]}识谱</h1></div>
+            <div><span className="eyebrow">{t('preview')}</span><h1>{t('previewTitle', { staff: t(`staffs.${settings.staffMode}`) })}</h1></div>
             <div className="ready-heading-actions">
-              <span className="ready-badge">准备就绪</span>
-              <button aria-label="识谱练习设置" className="icon-button" type="button" onClick={() => setSettingsOpen(true)}><Icon name="settings" /></button>
+              <span className="ready-badge">{t('ready')}</span>
+              <button aria-label={t('settings')} className="icon-button" type="button" onClick={() => setSettingsOpen(true)}><Icon name="settings" /></button>
             </div>
           </div>
           <NotationPaper
             empty
             keySignature={settings.keySignature}
-            label={`${STAFF_MODE_LABELS[settings.staffMode]}练习预览`}
+            label={t('previewNotation', { staff: t(`staffs.${settings.staffMode}`) })}
             staffMode={settings.staffMode}
           />
         </div>
 
         <aside className="ready-controls">
           <div>
-            <span className="eyebrow">本轮设置</span>
-            <h2>{settings.noteMode === 'double' ? `${settings.questionCount} 道双音题` : `${settings.questionCount} 个音符`}</h2>
+            <span className="eyebrow">{t('sessionSettings')}</span>
+            <h2>{t(settings.noteMode === 'double' ? 'pairQuestions' : 'singleQuestions', { count: settings.questionCount })}</h2>
             <p>{midiStatus.tone === 'connected'
-              ? `${midiStatus.label}，可以直接弹奏目标音。`
-              : '开始前请打开 MIDI 页面，连接 MIDI 设备。'}</p>
+              ? t('connectedHelp', { device: midiStatus.label })
+              : t('connectHelp')}</p>
           </div>
           <div className="setting-summary">
-            <div><small>谱表</small><strong>{STAFF_MODE_LABELS[settings.staffMode]}</strong></div>
-            <div><small>调性</small><strong>{getMajorKeySignature(settings.keySignature).displayName}</strong></div>
-            <div><small>题数</small><strong>{settings.questionCount}</strong></div>
-            <div><small>每题时限</small><strong>固定 {answerTimeLimitSeconds} 秒</strong></div>
+            <div><small>{t('staff')}</small><strong>{t(`staffs.${settings.staffMode}`)}</strong></div>
+            <div><small>{t('key')}</small><strong>{presentSightKey(settings.keySignature, t)}</strong></div>
+            <div><small>{t('questionCount')}</small><strong>{settings.questionCount}</strong></div>
+            <div><small>{t('timeLimit')}</small><strong>{t('fixedSeconds', { count: answerTimeLimitSeconds })}</strong></div>
           </div>
           <button className="ready-device" type="button" onClick={() => openAuxiliary('midi')}>
             <span><Icon name="bluetooth" /></span><div><strong>{midiStatus.label}</strong><small>{midiStatus.detail}</small></div><i className={`is-${midiStatus.tone}`} />
           </button>
           <button className="primary-action is-wide" type="button" onClick={onStart}>
-            <Icon name="play" />开始练习
+            <Icon name="play" />{t('start')}
           </button>
         </aside>
       </section>
@@ -2292,6 +2297,7 @@ function PracticeFocusHeader({
   settings: SightReadingSettings
   snapshot: SightRuntimeSnapshot
 }): JSX.Element {
+  const { t } = useTranslation('sightReading')
   const questionIndex = snapshot.phase === 'feedback'
     ? snapshot.completedQuestions
     : Math.min(settings.questionCount, snapshot.completedQuestions + 1)
@@ -2301,20 +2307,20 @@ function PracticeFocusHeader({
   return (
     <header className="focus-header">
       <button className="focus-back" type="button" onClick={onRequestEnd}>
-        <Icon name="arrow-left" /><span>结束本轮</span>
+        <Icon name="arrow-left" /><span>{t('end')}</span>
       </button>
       <div className="focus-progress">
-        <span>识谱练习</span>
-        <strong>第 {questionIndex} 题 <em>/ {settings.questionCount}</em></strong>
+        <span>{t('title')}</span>
+        <strong>{t('question', { index: questionIndex })} <em>/ {settings.questionCount}</em></strong>
       </div>
       <div className="focus-actions">
         <MidiStatusButton compact />
         <button className="outline-action" disabled={resumeBlocked} type="button" onClick={onPauseToggle}>
           <Icon name={snapshot.isPaused ? 'play' : 'pause'} />
-          <span>{snapshot.isPaused ? resumeBlocked ? '等待 MIDI' : '继续' : '暂停'}</span>
+          <span>{t(snapshot.isPaused ? resumeBlocked ? 'waitingMidi' : 'resume' : 'pause')}</span>
         </button>
       </div>
-      <div className="focus-time-track" aria-label="本题剩余时间">
+      <div className="focus-time-track" aria-label={t('remainingTime')}>
         <span
           className={screen === 'sight-wrong' || screen === 'sight-timeout' ? 'is-warning' : ''}
           style={{ width: `${progress}%` }}
@@ -2343,6 +2349,9 @@ function SightFocusScreen({
   snapshot: SightRuntimeSnapshot
   theme: ThemeDefinition
 }): JSX.Element {
+  const { t } = useTranslation('sightReading')
+  const { t: music } = useTranslation('music')
+  const { t: midiT } = useTranslation('midi')
   const practiceActiveVisual = theme.capabilities.practiceActiveVisual
   const decoratedFocus = practiceActiveVisual.kind === 'decorated-focus' ? practiceActiveVisual : null
   const showEarlyEndConfirm = screen === 'sight-early-end'
@@ -2352,13 +2361,12 @@ function SightFocusScreen({
   const isTimeout = feedbackPresentation.semantic === 'warning'
   const feedback = feedbackPresentation.noteFeedback
   const targetName = snapshot.currentTargetNotes.map((note) => note.noteName).join(' + ') || '—'
-  const intervalLabel = snapshot.currentIntervalLabel
-  const midiStatus = presentMidiStatus(runtime)
+  const midiStatus = presentLocalizedMidiStatus(runtime, midiT)
   const transportPause = runtime.midiSource !== 'development' && runtime.midiResumeRequired
   const resumeBlocked = transportPause && !runtime.midiReady
   const pausedPrompt = transportPause
-    ? resumeBlocked ? 'MIDI 已断开，练习已安全暂停' : 'MIDI 已恢复，请点击继续'
-    : '练习已暂停'
+    ? t(resumeBlocked ? 'disconnectedPrompt' : 'recoveredPrompt')
+    : t('pausedPrompt')
   const remainingTimeMs = useRemainingTime(runtime, snapshot)
   const requestEnd = (): void => {
     runtime.pause()
@@ -2374,7 +2382,7 @@ function SightFocusScreen({
 
   return (
     <div
-      className={`focus-frame ${isCorrect ? 'is-correct' : ''} ${isWrong ? 'is-wrong' : ''} ${isTimeout ? 'is-timeout' : ''} ${snapshot.isPaused ? 'is-paused' : ''} ${decoratedFocus?.frameClassName ?? ''}`}
+      className={`focus-frame sight-focus-frame ${isCorrect ? 'is-correct' : ''} ${isWrong ? 'is-wrong' : ''} ${isTimeout ? 'is-timeout' : ''} ${snapshot.isPaused ? 'is-paused' : ''} ${decoratedFocus?.frameClassName ?? ''}`}
       data-active-visual={practiceActiveVisual.kind}
       data-feedback-semantic={feedbackPresentation.semantic}
     >
@@ -2389,25 +2397,25 @@ function SightFocusScreen({
       />
       <main className="focus-content">
         <div className="focus-prompt">
-          <span>{getSightReadingPrompt({
-            intervalLabel,
+          <span>{presentSightPrompt({
+            notes: snapshot.currentTargetNotes,
             noteMode: settings.noteMode,
             outcome: snapshot.result,
             paused: snapshot.isPaused,
             pausedPrompt
-          })}</span>
+          }, t, music)}</span>
           {!snapshot.isPaused && !isCorrect && !isWrong && !isTimeout && settings.noteNameVisible
             ? <strong>{targetName}</strong>
             : null}
           {!snapshot.isPaused && isCorrect ? <strong><Icon name="check" /> {targetName}</strong> : null}
-          {!snapshot.isPaused && isWrong ? <strong><Icon name="close" /> 目标 {targetName} · 弹成 {snapshot.currentInput || '—'}</strong> : null}
-          {!snapshot.isPaused && isTimeout ? <strong><Icon name="clock" /> 本题超时 · {targetName}</strong> : null}
+          {!snapshot.isPaused && isWrong ? <strong><Icon name="close" /> {t('wrongNotes', { target: targetName, input: snapshot.currentInput || '—' })}</strong> : null}
+          {!snapshot.isPaused && isTimeout ? <strong><Icon name="clock" /> {t('timeoutNotes', { target: targetName })}</strong> : null}
         </div>
         <section className="focus-stage">
           <NotationPaper
             feedback={feedback}
             keySignature={settings.keySignature}
-            label={settings.noteNameVisible || isCorrect || isWrong || isTimeout ? `当前题目 ${targetName}` : '当前识谱题目'}
+            label={settings.noteNameVisible || isCorrect || isWrong || isTimeout ? t('questionNotes', { target: targetName }) : t('currentQuestion')}
             note={snapshot.currentNote?.notation}
             notes={snapshot.currentTargetNotes.map((note) => note.notation)}
             noteFeedback={feedback}
@@ -2433,18 +2441,18 @@ function SightFocusScreen({
           {snapshot.isPaused ? (
             <div className="focus-paused-state">
               <Icon name="pause" size={32} />
-              <strong>{transportPause ? midiStatus.label : '已暂停'}</strong>
-              {transportPause ? <small>{resumeBlocked ? '重新连接后再继续' : '连接已恢复，需明确继续'}</small> : null}
+              <strong>{transportPause ? midiStatus.label : t('paused')}</strong>
+              {transportPause ? <small>{t(resumeBlocked ? 'reconnectHelp' : 'recoveredHelp')}</small> : null}
             </div>
           ) : null}
         </section>
         <div className="focus-footer">
-          <PracticeMetric label="完成" value={String(snapshot.completedQuestions)} />
-          <PracticeMetric label="正确" value={String(snapshot.correctCount)} tone="success" />
-          <PracticeMetric label="错误" value={String(snapshot.wrongCount)} tone={isWrong ? 'danger' : undefined} />
-          <PracticeMetric label="超时" value={String(snapshot.timeoutCount)} tone={isTimeout ? 'warning' : undefined} />
-          <PracticeMetric label="当前连对" value={String(snapshot.currentStreak)} />
-          <PracticeMetric label="正确率" value={`${snapshot.accuracy}%`} />
+          <PracticeMetric label={t('completed')} value={String(snapshot.completedQuestions)} />
+          <PracticeMetric label={t('correct')} value={String(snapshot.correctCount)} tone="success" />
+          <PracticeMetric label={t('wrong')} value={String(snapshot.wrongCount)} tone={isWrong ? 'danger' : undefined} />
+          <PracticeMetric label={t('timeout')} value={String(snapshot.timeoutCount)} tone={isTimeout ? 'warning' : undefined} />
+          <PracticeMetric label={t('currentStreak')} value={String(snapshot.currentStreak)} />
+          <PracticeMetric label={t('accuracy')} value={`${snapshot.accuracy}%`} />
         </div>
       </main>
       {showEarlyEndConfirm ? (
@@ -2452,13 +2460,13 @@ function SightFocusScreen({
           <section aria-labelledby="early-end-title" aria-modal="true" className="early-end-dialog" role="dialog">
             <span className="early-end-dialog__icon"><Icon name="stop" /></span>
             <div>
-              <span className="eyebrow">识谱练习</span>
-              <h1 id="early-end-title">结束本轮？</h1>
-              <p>已完成 {snapshot.completedQuestions} / {settings.questionCount}。<br />结束后，已完成部分会保存到此设备。</p>
+              <span className="eyebrow">{t('title')}</span>
+              <h1 id="early-end-title">{t('endTitle')}</h1>
+              <p>{t('endProgress', { completed: snapshot.completedQuestions, total: settings.questionCount })}<br />{t('endHelp')}</p>
             </div>
             <div className="early-end-dialog__actions">
-              <button className="secondary-action" type="button" onClick={continuePractice}>继续练习</button>
-              <button className="primary-action" type="button" onClick={stopAndSave}>结束并保存</button>
+              <button className="secondary-action" type="button" onClick={continuePractice}>{t('continuePractice')}</button>
+              <button className="primary-action" type="button" onClick={stopAndSave}>{t('endSave')}</button>
             </div>
           </section>
         </div>
@@ -2472,6 +2480,7 @@ function SightResultScreen({
 }: {
   report: SightReadingSessionReport
 }): JSX.Element {
+  const { t } = useTranslation('sightReading')
   const primaryError = getPrimaryErrorNote(report)
   const primaryErrorCount = primaryError
     ? (report.wrongNoteCounts.find((entry) => entry.noteName === primaryError)?.count ?? 0)
@@ -2479,36 +2488,36 @@ function SightResultScreen({
     : 0
 
   return (
-    <ProductFrame active="practice" onBack={() => navigate('practice')} title="本轮完成">
-      <section className="result-layout">
+    <ProductFrame active="practice" onBack={() => navigate('practice')} title={t('resultTitle')}>
+      <section className="result-layout sight-result-layout">
         <div className="result-score">
-          <span className="eyebrow">识谱练习结果</span>
-          <div className="score-ring"><strong>{report.accuracy}</strong><span>%</span><small>正确率</small></div>
+          <span className="eyebrow">{t('result')}</span>
+          <div className="score-ring"><strong>{report.accuracy}</strong><span>%</span><small>{t('accuracy')}</small></div>
           <h1>{primaryError
-            ? <>本轮正确率 {report.accuracy}%，<br />再留意这个易错音。</>
-            : <>本轮练习已完成，<br />没有需要优先处理的音符错误。</>}</h1>
-          <p>{STAFF_MODE_LABELS[report.staffMode]} · {report.keyName} · {report.totalQuestions} 题 · 固定 {report.answerTimeLimitSeconds} 秒</p>
+            ? <>{t('resultAccuracy', { accuracy: report.accuracy })}<br />{t('errorHeadline')}</>
+            : <>{t('resultFinished')}<br />{t('noErrorHeadline')}</>}</h1>
+          <p>{t('resultSummary', { staff: t(`staffs.${report.staffMode}`), key: presentSightKey(report.keySignature, t), count: report.totalQuestions, seconds: report.answerTimeLimitSeconds })}</p>
         </div>
         <div className="result-details">
           <div className="result-metrics">
-            <div><span>完成</span><strong>{report.completedQuestions}</strong></div>
-            <div><span>正确</span><strong className="success-text">{report.correct}</strong></div>
-            <div><span>错误</span><strong className="danger-text">{report.wrong}</strong></div>
-            <div><span>超时</span><strong>{report.timeout}</strong></div>
-            <div><span>平均反应</span><strong>{formatReactionTime(report.averageReactionMs)}</strong></div>
-            <div><span>最高连对</span><strong>{report.bestStreak}</strong></div>
+            <div><span>{t('completed')}</span><strong>{report.completedQuestions}</strong></div>
+            <div><span>{t('correct')}</span><strong className="success-text">{report.correct}</strong></div>
+            <div><span>{t('wrong')}</span><strong className="danger-text">{report.wrong}</strong></div>
+            <div><span>{t('timeout')}</span><strong>{report.timeout}</strong></div>
+            <div><span>{t('averageReaction')}</span><strong>{presentSightReaction(report.averageReactionMs, t)}</strong></div>
+            <div><span>{t('bestStreak')}</span><strong>{report.bestStreak}</strong></div>
           </div>
           <div className="result-note">
             <span className="result-note__icon"><Icon name="info" /></span>
             <div>{primaryError ? (
-              <><small>本轮最需留意</small><strong><SightNoteValue value={primaryError} /></strong><p>这个目标音在本轮出现了 {primaryErrorCount} 次错误或超时。</p></>
+              <><small>{t('attention')}</small><strong><SightNoteValue value={primaryError} /></strong><p>{t('errorCount', { count: primaryErrorCount })}</p></>
             ) : (
-              <><small>本轮最需留意</small><strong><SightNoteValue value={primaryError} /></strong><p>本轮没有发现需要优先处理的目标音。</p></>
+              <><small>{t('attention')}</small><strong><SightNoteValue value={primaryError} /></strong><p>{t('noErrors')}</p></>
             )}</div>
           </div>
           <div className="result-actions">
-            <button className="secondary-action" type="button" onClick={() => navigate('sight-ready')}>再练一轮</button>
-            <button className="primary-action" type="button" onClick={() => navigate('practice')}><Icon name="check" />完成</button>
+            <button className="secondary-action" type="button" onClick={() => navigate('sight-ready')}>{t('again')}</button>
+            <button className="primary-action" type="button" onClick={() => navigate('practice')}><Icon name="check" />{t('done')}</button>
           </div>
         </div>
       </section>
@@ -2678,6 +2687,8 @@ function HistoryRecord({
   onOpenIntervalReport: (recordId: string) => void
 }): JSX.Element {
   const { t } = useTranslation('intervalPractice')
+  const { t: sightT } = useTranslation('sightReading')
+  const { runtime } = useMidiUi()
   const { resolvedLocale } = useAppLocale()
   if (item.module === 'chord') {
     const completed = item.plannedQuestionCount === null
@@ -2712,15 +2723,16 @@ function HistoryRecord({
       </button>
     )
   }
+  const sightPresentation = presentSightHistory(runtime.historySnapshot.records.find(record => record.recordId === item.recordId), sightT)
   return (
     <article className={`history-row is-${item.completionState}`}>
       <span className="history-row__mark"><Icon name="book" /></span>
       <span className="history-row__copy">
-        <small><b className="history-module-badge">识谱</b>{formatHistoryTimestamp(item.endedAt)} · {item.statusLabel}</small>
-        <strong>{item.title}</strong>
-        <em>{item.settingsSummary} · 完成 {item.completed}/{item.plannedQuestionCount} · 正确 {item.correct} / 错误 {item.wrong} / 超时 {item.timeout} · {formatHistoryDuration(item.durationMs)}</em>
+        <small><b className="history-module-badge">{sightT('historyModule')}</b>{formatIntervalHistoryTimestamp(item.endedAt, resolvedLocale)} · {sightT(item.completionState === 'completed' ? 'completedStatus' : 'stoppedStatus')}</small>
+        <strong>{sightPresentation.title}</strong>
+        <em>{sightT('historyFacts', { settings: sightPresentation.settings, completed: item.completed, total: item.plannedQuestionCount, correct: item.correct, wrong: item.wrong, timeout: item.timeout, duration: presentSightDuration(item.durationMs, sightT) })}</em>
       </span>
-      <span className="history-row__score"><strong>{formatHistoryPercentage(item.accuracy)}%</strong><small>正确率</small></span>
+      <span className="history-row__score"><strong>{formatHistoryPercentage(item.accuracy)}%</strong><small>{sightT('accuracy')}</small></span>
     </article>
   )
 }
@@ -3558,6 +3570,7 @@ function OrientationNotice(): JSX.Element {
 }
 
 function PersistenceErrorNotice({ runtime }: { runtime: AndroidSightReadingRuntime }): JSX.Element | null {
+  const { t } = useTranslation('sightReading')
   const persistence = runtime.persistenceSnapshot
   if (persistence.settingsStatus !== 'error' && persistence.reportStatus !== 'error') return null
   const retry = async (): Promise<void> => {
@@ -3566,8 +3579,8 @@ function PersistenceErrorNotice({ runtime }: { runtime: AndroidSightReadingRunti
   }
   return (
     <aside className="persistence-error" role="alert">
-      <span><strong>本地保存失败</strong><small>当前练习事实仍保留，可重试写入此设备。</small></span>
-      <button type="button" onClick={() => { void retry() }}>重试</button>
+      <span><strong>{t('saveFailed')}</strong><small>{t('saveFailedHelp')}</small></span>
+      <button type="button" onClick={() => { void retry() }}>{t('retry')}</button>
     </aside>
   )
 }

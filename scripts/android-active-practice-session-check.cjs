@@ -378,9 +378,16 @@ test('APS21', 'Sight early-end confirmation exposes no internal completion contr
   const sightFocus = mainSource.slice(mainSource.indexOf('function SightFocusScreen'), mainSource.indexOf('function SightResultScreen'))
   assert.doesNotMatch(sightFocus, /completionState\s*=/)
   assert.doesNotMatch(sightFocus, /partialEvidence\s*=/)
-  assert.match(sightFocus, /结束本轮？/)
-  assert.match(sightFocus, /继续练习/)
-  assert.match(sightFocus, /结束并保存/)
+  assert.match(sightFocus, /t\('endTitle'\)/)
+  assert.match(sightFocus, /t\('continuePractice'\)/)
+  assert.match(sightFocus, /t\('endSave'\)/)
+  const resources = require('../prototype/android-tablet-v1/src/localization/sightReadingResources.ts').sightReadingResources
+  assert.equal(resources['zh-CN'].endTitle, '结束本轮？')
+  assert.equal(resources['zh-CN'].continuePractice, '继续练习')
+  assert.equal(resources['zh-CN'].endSave, '结束并保存')
+  assert.equal(resources.en.endTitle, 'End this session?')
+  assert.equal(resources.en.continuePractice, 'Continue practice')
+  assert.equal(resources.en.endSave, 'End and save')
 })
 
 test('APS22', 'compact interactive MIDI button has a stable action-oriented accessible name', () => {

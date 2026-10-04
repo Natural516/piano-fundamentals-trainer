@@ -190,8 +190,8 @@ test('LOC15', 'all migrated resource namespaces have identical nonempty key shap
   assert.deepEqual(keys(zh), keys(en))
   assert.deepEqual(Object.keys(localizationResources.en.midi).filter(key => key.startsWith('devicesFound')), ['devicesFound_one', 'devicesFound_other'])
   assert.equal(localizationResources['zh-CN'].midi.devicesFound, '{{count}} 个候选')
-  assert.equal(zh.length, 150 + 58 + 121 + 19 + 112) // Existing stages + Preparation + actual B4.3 flow/shared History keys.
-  assert.equal(en.length, zh.length + 16) // Existing five plural differences plus eleven B4.3 English plurals.
+  assert.equal(zh.length, 150 + 58 + 121 + 19 + 112 + 107) // Existing stages + actual B4.4 Sight keys.
+  assert.equal(en.length, zh.length + 25) // Existing plural differences plus nine Sight English plurals.
   for (const [, value] of [...zh, ...en]) assert.ok(value.trim())
   for (const [key] of en) {
     const [ns, ...parts] = key.split('.')

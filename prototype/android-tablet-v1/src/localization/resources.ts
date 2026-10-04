@@ -3,9 +3,11 @@ import { hubResources } from './hubResources'
 import { theoryQueryResources } from './theoryQueryResources'
 import { intervalPreparationResources } from './intervalPreparationResources'
 import { intervalFlowResources } from './intervalFlowResources'
+import { sightReadingResources } from './sightReadingResources'
 
 export const localizationResources = {
   'zh-CN': {
+    sightReading: sightReadingResources['zh-CN'],
     intervalPractice: { ...intervalPreparationResources['zh-CN'], ...intervalFlowResources['zh-CN'] },
     theoryQuery: theoryQueryResources['zh-CN'],
     home: hubResources['zh-CN'].home,
@@ -44,6 +46,7 @@ export const localizationResources = {
     }
   },
   en: {
+    sightReading: sightReadingResources.en,
     intervalPractice: { ...intervalPreparationResources.en, ...intervalFlowResources.en },
     theoryQuery: theoryQueryResources.en,
     home: hubResources.en.home,

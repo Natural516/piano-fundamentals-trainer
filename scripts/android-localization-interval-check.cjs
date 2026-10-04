@@ -254,7 +254,7 @@ test('E18', 'no skip/next/retry button; original Back confirmation/cancel/end ha
   assert.equal(h.renderer.root.findAllByProps({ role: 'dialog' }).length, 0)
 }))
 test('E19', 'scope freeze preserves Preparation and all unrelated main declarations/events/effects and legacy record branches', () => {
-  const allowed = new Set(['IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
+  const allowed = new Set(['SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
   assert.deepEqual([...current.keys()], [...previous.keys()])
   for (const [name, body] of current) if (!allowed.has(name)) assert.equal(body, previous.get(name), name)
   assert.equal(createHash('sha256').update(current.get('IntervalPracticeSetupScreen')).digest('hex'), '75ed16732bfdc17dfdfca0d0e714f2f15f6d75fdca83c15405c0c35ee6038918')
@@ -270,8 +270,9 @@ test('E19', 'scope freeze preserves Preparation and all unrelated main declarati
   for (const name of ['IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice']) assert.deepEqual(lifecycle(current.get(name)), lifecycle(previous.get(name)), name)
   const branch = body => body.slice(body.indexOf("if (item.module === 'chord')"), body.indexOf("if (item.module === 'interval')"))
   assert.equal(branch(current.get('HistoryRecord')), branch(previous.get('HistoryRecord')))
+  // B4.4 authorizes the Sight row's display only; preserve its actions/keys/notation lifecycle.
   const sight = body => body.slice(body.lastIndexOf('return ('))
-  assert.equal(sight(current.get('HistoryRecord')), sight(previous.get('HistoryRecord')))
+  assert.deepEqual(lifecycle(sight(current.get('HistoryRecord'))), lifecycle(sight(previous.get('HistoryRecord'))))
   // Preparation resources were added in B4.3: freeze the reviewed checkpoint content, not their absence in the old base.
   const preparationPath = 'prototype/android-tablet-v1/src/localization/intervalPreparationResources.ts'
   const preparationSnapshot = execFileSync('git', ['show', '1024a9f43b6e1a9401e2627eec98ca6e8d13d246:' + preparationPath], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')

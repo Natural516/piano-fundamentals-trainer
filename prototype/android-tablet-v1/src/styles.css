@@ -8843,3 +8843,23 @@ button.setting-row {
     font-size: 44px;
   }
 }
+:where(.sight-ready-layout, .sight-result-layout) h1,
+:where(.sight-ready-layout, .sight-result-layout) h2,
+.sight-focus-frame .focus-prompt {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.sight-focus-frame .focus-progress,
+.sight-focus-frame .focus-actions,
+.sight-result-layout .result-actions > button {
+  min-width: 0;
+}
+.sight-ready-layout .ready-controls p,
+.sight-result-layout .result-note p {
+  line-height: 1.6;
+}
+.settings-group--sight .setting-row__copy small {
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.5;
+}
