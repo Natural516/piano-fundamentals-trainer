@@ -9,9 +9,9 @@ A focused Android tablet trainer for sight reading, chords, intervals, and pract
 
 [中文](#zh) · [English](#en) · [Latest Release](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest) · [Changelog](CHANGELOG.md) · [Themes](https://github.com/Natural516/piano-fundamentals-trainer-themes)
 
-Android 1.6.0 · versionCode 14
+Android 1.7.0 · versionCode 15
 
-> Latest stable release: **Android 1.6.0**.  
+> Latest stable release: **Android 1.7.0**.<br>
 > Release artifacts are the source of truth for what is currently installable; repository documentation and development work may move ahead of the latest packaged release.
 
 ---
@@ -93,7 +93,9 @@ MIDI 判定不等于完整演奏评价：应用不声称能够判断手型、身
 
 ### MIDI 与设备
 
-当前正式版本主要通过兼容的 **Bluetooth MIDI** 设备进行真实输入。
+当前正式版本支持兼容的 **Bluetooth MIDI 与 USB MIDI** 设备进行真实输入；一次连接一个输入设备。
+
+在设置中点击选择中文或 English。练习中提前结束时，可以选择保存或放弃本次记录；首页提供识谱、和弦和音程入口，具体训练设置在练习准备页配置。
 
 已实测：
 
@@ -108,14 +110,14 @@ MIDI 判定不等于完整演奏评价：应用不声称能够判断手型、身
 
 ### 下载与安装
 
-当前稳定版本：**Android 1.6.0**，主要面向横屏 Android 平板。
+当前稳定版本：**Android 1.7.0**，主要面向横屏 Android 平板。
 
 **[前往 Latest Release 下载 APK](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest)**
 
 - 在 Release 的 Assets 中下载正式 `.apk`，按 Android 系统提示安装。
 - 正式应用提供用户主动触发的“检查更新”流程；下载后仍由 Android 系统确认安装。
 - 兼容的正式旧版本可以覆盖安装并保留兼容的历史记录与主要设置。
-- 已在 Lenovo TB375FC 上验证从 1.5.3 升级到 1.6.0 的数据保留。
+- 已在 Lenovo TB375FC 上验证从 1.5.3 升级到 1.6.0，以及从 1.6.0 同签名覆盖升级到 1.7.0 的 History、主要设置与主题保留。
 - 不要为了升级先卸载应用或清除数据；其它设备的兼容性与数据保留应以实际情况为准。
 
 ### 个性化主题
@@ -195,7 +197,7 @@ The first version covers **26 interval types within the octave**, with fixed-cou
 
 ### Screenshots
 
-> **Development preview:** the English interface shown below comes from the current development build and is newer than the stable Android 1.6.0 release artifact.
+> **Development preview:** these English screenshots were captured from a pre-release development build on a real Lenovo tablet with the built-in Light theme. They are not captures of the final Android 1.7.0 Production APK.
 
 #### Home
 
@@ -225,7 +227,9 @@ MIDI judgement is not a complete performance assessment. The app does not claim 
 
 ### MIDI and device scope
 
-The current stable release primarily uses compatible **Bluetooth MIDI** devices for real input.
+The current stable release supports compatible **Bluetooth MIDI and USB MIDI** devices for real input, with one active input device at a time.
+
+Choose Chinese or English in Settings. When ending a practice early, choose whether to save the record. Home provides Sight Reading, Chord Practice, and Interval Practice entries; configure training on each preparation page.
 
 Validated hardware includes:
 
@@ -240,14 +244,14 @@ When the operating system provides real device or port names, the app preserves 
 
 ### Download and installation
 
-Latest stable version: **Android 1.6.0**, primarily targeting landscape Android tablets.
+Latest stable version: **Android 1.7.0**, primarily targeting landscape Android tablets.
 
 **[Download the latest APK from GitHub Releases](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest)**
 
 - Download the production `.apk` from the Release assets and install it through Android's normal installer.
 - The production app also provides a user-triggered update check; Android still asks for confirmation before installation.
 - Compatible production releases can be installed over older versions while preserving compatible history and major settings.
-- Data retention from 1.5.3 to 1.6.0 has been validated on the Lenovo TB375FC.
+- History, major settings, and theme retention have been verified on the Lenovo TB375FC for 1.5.3 to 1.6.0 and for a same-signer in-place upgrade from 1.6.0 to 1.7.0.
 - Do not uninstall the app or clear its data just to update it; behavior on other devices should be verified in practice.
 
 ### Themes

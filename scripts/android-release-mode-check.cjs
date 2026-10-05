@@ -5,7 +5,11 @@ const path = require('node:path')
 const { spawnSync } = require('node:child_process')
 
 const repositoryRoot = path.resolve(__dirname, '..')
-const apkPath = path.join(repositoryRoot, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk')
+const args = process.argv.slice(2)
+assert.ok(args.length === 0 || (args.length === 1 && /^--apk=.+$/.test(args[0])), 'usage: android-release-mode-check.cjs [--apk=<explicit-apk-path>]')
+const explicitApk = args.length === 1
+const apkPath = explicitApk ? path.resolve(repositoryRoot, args[0].slice('--apk='.length)) : path.join(repositoryRoot, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk')
+if (explicitApk) assert.ok(fs.existsSync(apkPath) && fs.statSync(apkPath).isFile(), 'explicit APK must exist; do not fall back to a web rebuild')
 const releaseWebAssets = path.join(repositoryRoot, 'dist', 'android-tablet-prototype')
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'piano-release-audit-'))
 
@@ -22,6 +26,7 @@ const readTree = (directory) => {
 try {
   let publicAssets = releaseWebAssets
   if (fs.existsSync(apkPath) && fs.statSync(apkPath).isFile()) {
+    process.stdout.write(`RELEASE_MODE_APK_INPUT=${apkPath}\n`)
     const jarName = process.platform === 'win32' ? 'jar.exe' : 'jar'
     const jarPath = process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME, 'bin', jarName) : jarName
     const extraction = spawnSync(jarPath, ['xf', apkPath], { cwd: tempRoot, encoding: 'utf8', windowsHide: true })

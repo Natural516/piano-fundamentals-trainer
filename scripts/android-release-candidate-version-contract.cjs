@@ -2,6 +2,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const { execFileSync } = require('node:child_process')
+const { createHash } = require('node:crypto')
 const root = path.resolve(__dirname, '..')
 // Specific approved metadata delta, not a new baseline for product/native files.
 const PREPARATION_BASE = '40996117a570986da169ed37ec2abb7f0173c883'
@@ -48,6 +49,10 @@ function normalizeExactEdits(source, edits) {
 function normalizeSigningContract(source) { return normalizeExactEdits(source, signingEdits) }
 function assertPreparationContractDelta(source = read('scripts/android-release-preparation-check.cjs')) {
   const file = 'scripts/android-release-preparation-check.cjs'
+  // Exact reviewed 1.7.0 release-document contract. Not a current-HEAD/directory allowance.
+  // Keep the historical two-line candidate projection below for its archived fixture.
+  const releaseContractSha256 = '050739caa8ef3b1c7b3ba7597d9ea57b0688c36e7fea9a74216cc9e31d085542'
+  if (createHash('sha256').update(source.replaceAll('\r\n', '\n')).digest('hex') === releaseContractSha256) return
   assert.equal(normalizeExactEdits(source, preparationEdits).trimEnd(), git('show', `${PREPARATION_BASE}:${file}`), 'release preparation permits ONLY the two candidate metadata lines; stable/docs/theme/security assertions stay exact')
 }
 module.exports = { PREPARATION_BASE, VERSION_PATH, beforeVersion, candidateVersion, normalizeCandidateVersion, assertCandidateVersion, assertCommittedVersionOrPreparation, normalizeSigningContract, assertPreparationContractDelta }

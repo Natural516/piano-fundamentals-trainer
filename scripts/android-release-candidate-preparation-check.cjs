@@ -36,9 +36,14 @@ test('CAND3 signing callbacks and preparation coverage permit only reviewed meta
   version.assertPreparationContractDelta()
   assert.throws(() => version.assertPreparationContractDelta(read('scripts/android-release-preparation-check.cjs').replace("assert.equal(manifest.minAppVersion, '1.6.0')", "assert.equal(manifest.minAppVersion, '1.7.0')")))
 })
-test('CAND4 source stable README/CHANGELOG, package version and theme artifacts remain unchanged', () => {
-  for (const file of ['README.md','CHANGELOG.md','package.json','package-lock.json','theme-packages/bocchi/manifest.json']) assert.equal(read(file), before(file), file)
-  assert.ok(read('README.md').includes('Android 1.6.0 · versionCode 14'))
+test('CAND4 exact approved released docs; package/theme and archived stable section stay frozen', () => {
+  // Fixed hashes of the reviewed release-document delta, never inferred from current HEAD.
+  assert.equal(digest(Buffer.from(read('README.md'))), '1ca37e856aceb23a1f4d064a566b04cb56a2ac96e50c1a3f16c7c2075a20eb61')
+  assert.equal(digest(Buffer.from(read('CHANGELOG.md'))), 'd66b32e8d61e54dba240ea88914666f7902d108d3fae969e8cfa00b309f8ac2c')
+  for (const file of ['package.json','package-lock.json','theme-packages/bocchi/manifest.json']) assert.equal(read(file), before(file), file)
+  assert.ok(read('README.md').includes('Android 1.7.0 · versionCode 15'))
+  assert.match(read('CHANGELOG.md'), /^## 1\.7\.0 — 2026-10-05 — versionCode 15$/m)
+  assert.equal(read('CHANGELOG.md').slice(read('CHANGELOG.md').indexOf('## 1.6.0 —')), before('CHANGELOG.md').slice(before('CHANGELOG.md').indexOf('## 1.6.0 —')))
   const theme = JSON.parse(read('theme-packages/bocchi/manifest.json'))
   assert.deepEqual([theme.version, theme.minAppVersion, theme.maxAppVersionExclusive], ['1.1.0','1.6.0','2.0.0'])
 })
