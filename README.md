@@ -197,19 +197,19 @@ The first version covers **26 interval types within the octave**, with fixed-cou
 
 #### Home
 
-![English development preview — Home](docs/screenshots/android-development-en-home.webp)
+![English development preview — Home](docs/screenshots/android-development-en-home.png)
 
 #### Sight Reading
 
-![English development preview — Sight Reading](docs/screenshots/android-development-en-sight-reading.webp)
+![English development preview — Sight Reading](docs/screenshots/android-development-en-sight-reading.png)
 
 #### Chord Practice
 
-![English development preview — Chord Practice](docs/screenshots/android-development-en-chord-practice.webp)
+![English development preview — Chord Practice](docs/screenshots/android-development-en-chord-practice.png)
 
 #### Practice History
 
-![English development preview — Practice History](docs/screenshots/android-development-en-history.webp)
+![English development preview — Practice History](docs/screenshots/android-development-en-history.png)
 
 ### Why use it
 
