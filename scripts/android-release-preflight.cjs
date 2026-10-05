@@ -182,12 +182,30 @@ async function loadRemotePublicSource(repository, ref) {
 
 function loadLocalPublicSource(publicRoot) {
   const resolved = path.resolve(publicRoot)
-  if (!fs.statSync(resolved).isDirectory()) fail(`Public root is not a directory: ${resolved}`)
-  const paths = run(resolved, 'git', ['ls-files', '-z']).split('\0').filter(Boolean).map((entry) => entry.replace(/\\/g, '/'))
+  const rootStat = fs.lstatSync(resolved)
+  if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) fail(`Public root must be a real directory: ${resolved}`)
+  // Existing Git inputs keep their tracked-path audit. Explicit repo-external candidate
+  // projections have no Git index: inspect EVERY real file, with no ignore/allowlist bypass.
+  const paths = fs.existsSync(path.join(resolved, '.git'))
+    ? run(resolved, 'git', ['ls-files', '-z']).split('\0').filter(Boolean).map((entry) => entry.replace(/\\/g, '/'))
+    : listCandidatePublicPaths(resolved)
   const documents = new Map(paths
     .filter((entry) => /\.md$/i.test(entry))
     .map((entry) => [entry, fs.readFileSync(path.join(resolved, entry), 'utf8')]))
   return { paths, documents, description: resolved }
+}
+
+function listCandidatePublicPaths(root, relative = '') {
+  const paths = []
+  for (const name of fs.readdirSync(path.join(root, relative)).sort()) {
+    const entry = path.join(relative, name)
+    const stat = fs.lstatSync(path.join(root, entry))
+    if (stat.isSymbolicLink()) fail(`Candidate public root must not contain links: ${entry}`)
+    if (stat.isDirectory()) paths.push(...listCandidatePublicPaths(root, entry))
+    else if (stat.isFile()) paths.push(entry.replace(/\\/g, '/'))
+    else fail(`Candidate public root contains a non-file entry: ${entry}`)
+  }
+  return paths
 }
 
 function assertPublicReleaseFacts(publicSource, versionCode, versionName) {
@@ -348,6 +366,7 @@ module.exports = {
   LEGACY_RELEASE_REPOSITORY_URL,
   assertNoLegacyRepositoryReferences,
   assertPublicReleaseFacts,
+  loadLocalPublicSource,
   parseArguments,
   publicPathAudit
 }

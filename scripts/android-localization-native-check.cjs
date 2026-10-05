@@ -71,13 +71,13 @@ test('NATIVE-L13', 'Updater native/network/installer behavior frozen and system 
 })
 test('NATIVE-L14', 'native business/signing/version/permissions/assets frozen beyond exact display delta', () => {
   c.assertNativePresentationOnly()
-  assert.deepEqual([...c.read('android/version.properties').matchAll(/^(versionCode|versionName)=([^\n]+)$/gm)].map(m => [m[1], m[2]]), [['versionCode', '14'], ['versionName', '1.6.0']])
+  assert.deepEqual([...c.read('android/version.properties').matchAll(/^(versionCode|versionName)=([^\n]+)$/gm)].map(m => [m[1], m[2]]), [['versionCode', '15'], ['versionName', '1.7.0']])
   assert.equal(c.git(['rev-parse', 'v1.6.0^{}']).trim(), '1cc465afad7fae7d00508fb20a0e36e176c8fb90')
   const file = 'scripts/android-signing-foundation-check.cjs'
   const before = '  assert.match(strings, /<string name="app_name">钢琴基本功训练器<\\/string>/)'
   const after = '  assert.match(strings, /<string name="app_name">Piano Fundamentals Trainer<\\/string>/)\n' +
     '  assert.match(read(\'android/app/src/main/res/values-zh/strings.xml\'), /<string name="app_name">钢琴基本功训练器<\\/string>/)'
-  assert.equal(c.read(file), c.old(file).replace(before, after), 'explicit user exception changes ONLY the app-label assertion; all 14 signing callbacks otherwise exact')
+  assert.equal(require('./android-release-candidate-version-contract.cjs').normalizeSigningContract(c.read(file)), c.old(file).replace(before, after), 'only exact candidate metadata and app-label assertion delta; signing security callbacks remain frozen')
 })
 test('NATIVE-L15', 'all native production source literals classified; no direct UI literals remain', () => {
   const inventory = c.literalInventory(); assert.ok(inventory.length > 0)

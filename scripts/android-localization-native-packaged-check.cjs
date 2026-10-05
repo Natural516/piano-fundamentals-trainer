@@ -51,9 +51,9 @@ for (const [id, locale, qualifier, description] of [
     assert.equal(values(raw, key)[qualifier], c.display[qualifier ? 'zh' : 'en'][key] + suffix)
   }
 })
-test('PACK3', 'APK stays QA/debuggable channel with isolated package and frozen version', () => {
+test('PACK3', 'APK stays QA/debuggable channel with isolated package and exact candidate version', () => {
   const badging = execFileSync(aapt, ['dump', 'badging', qaApk], { encoding: 'utf8' })
-  assert.match(badging, /package: name='com\.pianofundamentals\.trainer\.qa' versionCode='14' versionName='1\.6\.0'/)
+  assert.match(badging, /package: name='com\.pianofundamentals\.trainer\.qa' versionCode='15' versionName='1\.7\.0'/)
   assert.match(badging, /^application-debuggable$/m)
   assert.match(badging, /^application-label:'Piano Fundamentals Trainer QA'$/m)
 })

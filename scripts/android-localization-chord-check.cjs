@@ -288,7 +288,8 @@ test('CHORD-E20','fixed checkpoint freeze protects Sight/Interval/domain/MIDI/na
     if (file === 'src/renderer/src/components/MusicStaffRenderer.tsx') { assertRendererDisplayOnly(base); continue }
     const was=execFileSync('git',['show',base+':'+file],{cwd:root,maxBuffer:64*1024*1024}),now=fs.readFileSync(path.join(root,file))
     if(/\.(ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh|html|css|txt)$/.test(file)) {
-      const source = screenshot.normalize(file, now.toString().replaceAll('\r\n','\n'))
+      let source = screenshot.normalize(file, now.toString().replaceAll('\r\n','\n'))
+      if (file === 'android/version.properties') source = require('./android-release-candidate-version-contract.cjs').normalizeCandidateVersion(source)
       assert.equal(file.endsWith('/sightReadingIntegration.ts') ? require('./android-practice-early-exit-contract.cjs').normalizeEarlyExitRuntime(source) : source,was.toString().replaceAll('\r\n','\n'),file)
     }
     else assert.equal(createHash('sha256').update(now).digest('hex'),createHash('sha256').update(was).digest('hex'),file)

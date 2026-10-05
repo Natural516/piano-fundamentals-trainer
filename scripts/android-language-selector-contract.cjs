@@ -111,7 +111,9 @@ function assertB6ScopeFrozen() {
   english.assertReadmeEnglishDelta()
   const englishPaths = ['prototype/android-tablet-v1/src/localization/homePresentation.ts', 'prototype/android-tablet-v1/src/localization/intervalFlowResources.ts']
   for (const file of englishPaths) assert.equal(english.normalize(file, read(file)), old(file), file + ': exact reviewed English presentation delta only')
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages', 'capacitor.config.ts', 'package-lock.json',
+  const candidate = require('./android-release-candidate-version-contract.cjs')
+  assert.equal(candidate.normalizeCandidateVersion(read(candidate.VERSION_PATH)), old(candidate.VERSION_PATH), 'only the exact candidate version delta is allowed')
+  execFileSync('git', ['diff', '--exit-code', base, '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages', 'capacitor.config.ts', 'package-lock.json', ':(exclude)' + candidate.VERSION_PATH,
     ':(exclude)' + selectorPath, ':(exclude)' + resourcesPath, ':(exclude)' + stylesPath, ...exitPaths.map(file => ':(exclude)' + file), ...englishPaths.map(file => ':(exclude)' + file), ...exit.reviewedAdditionPaths.map(file => ':(exclude)' + file)], { cwd: root })
   const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages'], { cwd: root, encoding: 'utf8' }).trim()
   const reviewedAdditions = new Set(exit.reviewedAdditionPaths)

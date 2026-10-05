@@ -57,7 +57,9 @@ function assertFrozenDiff(ref, paths) {
     assert.equal(english.normalize(homePresentation, read(homePresentation)), english.normalize(homePresentation, oldFile(homePresentation, ref)), 'only the exact reviewed English Home presentation delta is allowed')
     englishExclusions.push(':(exclude)' + homePresentation)
   }
-  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+rendererPath,':(exclude)'+sightRuntime,...englishExclusions,...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
+  const candidate = require('./android-release-candidate-version-contract.cjs')
+  assert.equal(candidate.normalizeCandidateVersion(read(candidate.VERSION_PATH)), oldFile(candidate.VERSION_PATH, ref), 'candidate metadata is the only version-file delta')
+  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+candidate.VERSION_PATH,':(exclude)'+rendererPath,':(exclude)'+sightRuntime,...englishExclusions,...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
   assertRendererDisplayOnly(ref)
 }
 const cssSuffix = "/* Theme/update English wrapping only; practice and artwork geometry stay frozen. */\n.theme-manager-modal__card header > span,\n.theme-manager-modal__card dd,\n.update-card .version-line strong,\n.update-release-notes {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n.theme-manager-modal__card footer {\n  flex-wrap: wrap;\n}\n.theme-manager-modal__card small,\n.update-card p,\n.update-security-note {\n  white-space: normal;\n  line-height: 1.6;\n}";

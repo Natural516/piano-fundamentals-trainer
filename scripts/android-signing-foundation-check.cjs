@@ -4,6 +4,7 @@ const path = require('node:path')
 const { execFileSync } = require('node:child_process')
 const { loadUpdaterCore } = require('./android-updater-contract-loader.cjs')
 const { assertExactReleaseSigner } = require('./android-apk-verification-core.cjs')
+const { assertCommittedVersionOrPreparation } = require('./android-release-candidate-version-contract.cjs')
 const {
   LEGACY_RELEASE_REPOSITORY_URL,
   assertNoLegacyRepositoryReferences,
@@ -12,10 +13,10 @@ const {
 
 const repositoryRoot = path.resolve(__dirname, '..')
 const read = (relativePath) => fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8')
-// Frozen V1.6.0 production release contract, not values inferred from an APK.
+// Exact V1.7.0 candidate metadata contract; published V1.6.0 artifacts remain frozen.
 // version.properties remains the authoritative source used by Gradle and verification.
-const EXPECTED_VERSION_NAME = '1.6.0'
-const EXPECTED_VERSION_CODE = 14
+const EXPECTED_VERSION_NAME = '1.7.0'
+const EXPECTED_VERSION_CODE = 15
 const checks = []
 const check = (name, callback) => checks.push({ name, callback })
 
@@ -40,7 +41,9 @@ check('Android version has one explicit committed source', () => {
     versionName: EXPECTED_VERSION_NAME
   })
   const committed = execFileSync('git', ['show', 'HEAD:android/version.properties'], { cwd: repositoryRoot, encoding: 'utf8' })
-  assert.equal(version.replaceAll('\r\n', '\n'), committed.replaceAll('\r\n', '\n'))
+  assertCommittedVersionOrPreparation(committed, version,
+    execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }),
+    execFileSync('git', ['branch', '--show-current'], { cwd: repositoryRoot, encoding: 'utf8' }))
   assert.match(gradle, /rootProject\.file\('version\.properties'\)/)
   assert.match(gradle, /versionCode appVersionCode/)
   assert.match(gradle, /versionName appVersionName/)

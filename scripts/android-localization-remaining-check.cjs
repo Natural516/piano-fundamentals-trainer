@@ -112,7 +112,12 @@ test('R13', 'all stable Theme and Updater reasons have explicit English; unknown
   for (const ns of ['themeManagement','updater']) for (const code of Object.keys(localizationResources.en[ns].errors)) assert.equal((ns==='updater'?presentUpdaterError:presentThemeError)(code,translator('en',ns)), localizationResources.en[ns].errors[code])
   assert.equal(presentThemeError('RAW_SECRET',translator('en','themeManagement')), translator('en','themeManagement')('failed'))
 })
-test('R14', 'version/signing/updater release contracts and production source are frozen', () => execFileSync('git',['diff','--exit-code',guard.base,'--','android/version.properties','scripts/android-release-preparation-check.cjs','prototype/android-tablet-v1/src/updaterCore.ts','prototype/android-tablet-v1/src/androidUpdater.ts','prototype/android-tablet-v1/src/updaterManifestSource.ts'],{cwd:root}))
+test('R14', 'only exact candidate metadata changes; signing/updater production source stays frozen', () => {
+  const candidate = require('./android-release-candidate-version-contract.cjs')
+  assert.equal(candidate.normalizeCandidateVersion(guard.read(candidate.VERSION_PATH)), guard.oldFile(candidate.VERSION_PATH))
+  candidate.assertPreparationContractDelta()
+  execFileSync('git',['diff','--exit-code',guard.base,'--','prototype/android-tablet-v1/src/updaterCore.ts','prototype/android-tablet-v1/src/androidUpdater.ts','prototype/android-tablet-v1/src/updaterManifestSource.ts'],{cwd:root})
+})
 test('R15', 'Android Web TS/TSX Chinese inventory and visible fixed English JSX are classified', () => { const evidence = [...audit(),...auditEnglish()]; assert.ok(evidence.length > 100); for (const e of evidence) assert.ok(e.category && e.reason && e.line) })
 test('R16', 'no unclassified user-owned Chinese literal remains in migrated UI', () => { for (const name of guard.changed) assert.doesNotMatch(declaration(name), /[\u3400-\u9fff]/); audit() })
 test('R17', 'allowlist preserves approved literals exactly, with per-item reasons instead of grep zero', () => { const evidence = audit(); for (const category of ['A','B','D','E']) assert.ok(evidence.some(e=>e.category===category)); assert.ok(evidence.some(e=>e.value.includes('暂无'))) })

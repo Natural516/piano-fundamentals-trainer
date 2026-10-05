@@ -78,8 +78,8 @@ import { projectHistoryDashboard } from './historyDashboardProjection'
 function MusicStaffRenderer(props) { return <div data-test-staff="wiring-only" aria-label={props.ariaLabel} /> }
 function ChordGrandStaff(props) { return <div data-test-chord-staff="wiring-only" aria-label={props.ariaLabel} /> }
 const __QA_BUILD__ = false
-const __ANDROID_VERSION_NAME__ = '1.6.0'
-const __ANDROID_VERSION_CODE__ = 14
+const __ANDROID_VERSION_NAME__ = '1.7.0'
+const __ANDROID_VERSION_CODE__ = 15
 function ThemePackageDialog() { throw new Error('OUT_OF_SCOPE_DIALOG') }
 function ThemeInfoDialog() { throw new Error('OUT_OF_SCOPE_DIALOG') }
 function openSourceRepository() { throw new Error('NOT_A_LOCALE_ACTION') }
@@ -198,7 +198,7 @@ async function mounted(page, run, options = {}) {
   const themeSnapshot = { installed: options.installed ?? [], theme }
   const themeManager = { snapshot: themeSnapshot, subscribe: () => () => {}, selectThemeId: id => pointerCalls.push(id), activateExternal: record => pointerCalls.push(record.themeId) }
   let mounts = 0, unmounts = 0, renderer
-  const updaterValue = { controller: {}, snapshot: { installed: { versionName: '1.6.0', versionCode: 14 }, status: 'upToDate' } }
+  const updaterValue = { controller: {}, snapshot: { installed: { versionName: '1.7.0', versionCode: 15 }, status: 'upToDate' } }
   const navValue = { openAuxiliary: destination => { global.window.location.hash = '#' + destination }, returnFromAuxiliary: fallback => { global.window.location.hash = '#' + fallback } }
   function Owner() {
     const [ownedRuntime] = React.useState(() => runtime)
@@ -251,7 +251,7 @@ test('N5', 'Home/Hub B4.2A presentation retains removed summaries/pills and orig
 test('ST1', 'Settings Device Appearance About and real entry copy render in both locales', async () => mounted('settings', async h => {
   for (const label of ['设备', '外观', '关于', '当前版本', '检查更新', '开源项目']) contains(h.getText(), label)
   await h.switchTo('en')
-  for (const label of ['Device', 'Appearance', 'About', 'Current version', 'Check for updates', 'Open source', 'V1.6.0', 'versionCode 14']) contains(h.getText(), label)
+  for (const label of ['Device', 'Appearance', 'About', 'Current version', 'Check for updates', 'Open source', 'V1.7.0', 'versionCode 15']) contains(h.getText(), label)
   const language = h.renderer.root.findByProps({ id: 'app-language-preference' })
   assert.equal(text(language.findByProps({ value: 'zh-CN' }).findByType('strong')), '中文')
   // Only the one approved option autonym remains Chinese, not any other English Settings copy.
@@ -431,7 +431,8 @@ test('B41R1', 'all out-of-scope main declarations and Bocchi headline/dialogs st
   for (const [name, source] of frozenCurrent) if (!permitted.has(name)) assert.equal(source, old.get(name), name)
   const caption = source => source.match(/<div className="settings-hero__caption">[\s\S]*?<\/div>/)[0]
   assert.equal(caption(current.get('SettingsScreen')), caption(old.get('SettingsScreen')))
-  for (const file of ['android/version.properties', 'android/updater.properties', 'android/app/build.gradle', 'prototype/android-tablet-v1/src/theme/themePackageRuntime.ts']) assert.equal(read(file), baseline(file), file)
+  const candidate = require('./android-release-candidate-version-contract.cjs')
+  for (const file of ['android/version.properties', 'android/updater.properties', 'android/app/build.gradle', 'prototype/android-tablet-v1/src/theme/themePackageRuntime.ts']) assert.equal(file === candidate.VERSION_PATH ? candidate.normalizeCandidateVersion(read(file)) : read(file), baseline(file), file)
 })
 test('B41R2', 'local CSS keeps full-row/touch contracts and constrains long English/device copy', () => {
   const css = stripB46Css(read('prototype/android-tablet-v1/src/styles.css'))
@@ -506,7 +507,7 @@ test('B41R7', 'native-gated Settings import CTA is bilingual without opening a t
     for (const [locale, label] of [['en', 'Import theme package'], ['zh-CN', '导入主题包']]) {
       await h.switchTo(locale)
       contains(text(h.renderer.root.findByProps({ className: 'settings-import-theme' })), label)
-      contains(h.getText(), 'versionCode 14'); contains(h.getText(), 'V1.6.0')
+      contains(h.getText(), 'versionCode 15'); contains(h.getText(), 'V1.7.0')
       assert.equal(h.renderer.root.findAllByProps({ role: 'dialog' }).length, 0)
       assert.deepEqual(h.plugin.calls, calls)
     }

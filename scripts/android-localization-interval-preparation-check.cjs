@@ -138,7 +138,7 @@ test('IP5', '10/20/50/100/endless remain exact number/sentinel identities throug
     await h.switchTo('zh-CN'); assert.equal(countSelect(h).props.value, value)
   }
 }))
-test('IP6', 'production Start/Back/control event expressions and selected values remain identical', () => {
+test('IP6', 'Start/Back controls stay frozen; reviewed early-exit saves exactly once or discards with zero writes', async () => {
   function events(source) {
     const ast = ts.createSourceFile('prep.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX), result = []
     function visit(node) {
@@ -148,7 +148,52 @@ test('IP6', 'production Start/Back/control event expressions and selected values
     visit(ast); return result
   }
   assert.deepEqual(events(current.get('IntervalPracticeSetupScreen')), events(previous.get('IntervalPracticeSetupScreen')))
-  assert.equal(current.get('App'), previous.get('App'))
+  const exit = require('./android-practice-early-exit-contract.cjs')
+  exit.assertEarlyExitDelta()
+  assert.equal(exit.normalizeEarlyExitMain(current.get('App')), previous.get('App'))
+  const noSaveGate = current.get('App').replace("if (saveReport) { finalizeIntervalPractice('STOPPED'); return }", "finalizeIntervalPractice('STOPPED')")
+  assert.notEqual(noSaveGate, current.get('App'))
+  assert.throws(() => assert.equal(exit.normalizeEarlyExitMain(noSaveGate), previous.get('App')))
+
+  // Execute the existing AST-extracted production actions against real runtime/repository fixtures.
+  const interval = require('./android-localization-interval-check.cjs')
+  for (const progressed of [false, true]) for (const saveReport of [undefined, true, false]) {
+    await interval.flow(async h => {
+      await interval.start(h)
+      if (progressed) { await interval.correct(h); await interval.release(h); await interval.advance(h, 800) }
+      const bytes = businessBytes(h.backend), writes = h.backend.writes.length
+      const count = h.interval.snapshot.completedQuestions
+      const raw = h.backend.values.get(practice.INTERVAL_REPORT_STORAGE_KEYS.reportPrefix + h.record.recordId)
+      let finalizations = 0
+      const finalize = h.persistence.finalize.bind(h.persistence)
+      h.persistence.finalize = (...args) => { finalizations++; return finalize(...args) }
+      await act(async () => {
+        h.actions.endIntervalPractice(saveReport)
+        h.actions.endIntervalPractice(saveReport)
+        await h.persistence.flush()
+      })
+      assert.equal(h.host.current, null)
+      assert.equal(h.backend.values.get(practice.INTERVAL_REPORT_STORAGE_KEYS.reportPrefix + h.record.recordId), raw)
+      assert.equal(h.interval.snapshot.completedQuestions, count)
+      if (saveReport === false) {
+        assert.equal(finalizations, 0)
+        assert.equal(h.state().screen, 'interval-practice')
+        assert.equal(h.persistence.snapshot.records.length, 1)
+        assert.deepEqual(businessBytes(h.backend), bytes)
+        assert.equal(h.backend.writes.length, writes)
+      } else {
+        assert.equal(finalizations, 1)
+        assert.equal(h.state().screen, 'interval-result')
+        assert.equal(h.persistence.snapshot.records.length, 2)
+        const report = h.persistence.snapshot.records.find(record => record.recordId !== h.record.recordId)
+        assert.ok(report, 'validate the saved V1 record, not the unpersisted latestReport draft')
+        assert.equal(practice.isIntervalPracticeReportV1(report), true)
+        assert.equal(report.completionStatus, 'STOPPED')
+        assert.equal(report.completedQuestions, progressed ? 1 : 0)
+        assert.equal(report.totalWrongAttempts, 0, 'incomplete current question must not become Wrong')
+      }
+    })
+  }
 })
 test('IP7', 'single-mode Preparation has exactly two switches/one count selector/one CTA and no practice state controls', async () => page(async h => {
   assert.equal(switches(h).length, 2); assert.equal(h.renderer.root.findAllByType('select').length, 1)
@@ -184,10 +229,21 @@ test('IP11', 'locale round trip keeps exact Start handler identity and cannot cr
   await roundTrip(h); assert.equal(h.host.current, null); assert.equal(h.intervalRuntime.snapshot.status, 'IDLE')
   assert.equal(h.runtime.snapshot.status, 'idle')
 }))
-test('IP12', 'B4.3 permits Interval flow/shared History presentation only; all other declarations remain frozen', () => {
+test('IP12', 'original declaration freeze permits only the reviewed early-exit and English Home deltas', () => {
   assert.deepEqual([...current.keys()], [...previous.keys()])
+  const english = require('./android-readme-english-presentation-contract.cjs')
+  const exit = require('./android-practice-early-exit-contract.cjs')
+  english.assertReadmeEnglishDelta()
+  exit.assertEarlyExitDelta()
   const allowed = new Set(['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
-  for (const [name, source] of current) if (!allowed.has(name)) assert.equal(source, previous.get(name), name)
+  for (const [name, source] of current) if (!allowed.has(name)) {
+    const normalize = value => name === 'App' ? exit.normalizeEarlyExitMain(value)
+      : name === 'HomeScreen' ? english.normalize(mainPath, value) : value
+    assert.equal(normalize(source), previous.get(name), name)
+    if (name === 'App' || name === 'HomeScreen') {
+      assert.throws(() => assert.equal(normalize(source + '\n// unauthorized mutation\n'), previous.get(name)))
+    }
+  }
 })
 test('IP13', 'all twenty setting combinations survive mounted locale round trips with zero business writes', async () => {
   for (const answerHint of [false, true]) for (const includeAccidentalRoots of [false, true]) for (const questionCount of practice.INTERVAL_QUESTION_COUNT_OPTIONS) {

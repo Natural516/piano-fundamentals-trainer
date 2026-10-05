@@ -298,6 +298,7 @@ test('SIGHT-E25', 'scope freeze: domain/native/runtime/Interval and Chord branch
     // Source checkout line endings are not domain facts. Binary theme files remain byte-exact.
     if (/\.(?:ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh)$/.test(file)) {
       let source = now.toString().replaceAll('\r\n', '\n')
+      if (file === 'android/version.properties') source = require('./android-release-candidate-version-contract.cjs').normalizeCandidateVersion(source)
       if (file.endsWith('/localization/intervalFlowResources.ts')) {
         const english = require('./android-readme-english-presentation-contract.cjs')
         english.assertReadmeEnglishDelta()

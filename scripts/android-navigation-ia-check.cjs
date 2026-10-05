@@ -65,7 +65,11 @@ const tests = [
     assert.doesNotMatch(home, /85% 正确率|今天 09:42|· 20 题/)
     assert.match(home, /projectMixedPracticeHistory\(history\.records, chordHistory\.records\)\[0\]/)
     assert.match(home, /runtime\.refreshHistory\(\)/)
-    assert.match(home, /presentHomeRecentPractice\(recentPractice, t\)/)
+    const recentCall = /const recentDisplay = presentHomeRecentPractice\(recentPractice, t, recentChordDisplay\)\r?\n/
+    assert.match(home, recentCall)
+    for (const invalid of ['recentPractice, t', 'recentPractice, t, otherDisplay', 'recentPractice, t, recentChordDisplay, extra']) {
+      assert.doesNotMatch(`const recentDisplay = presentHomeRecentPractice(${invalid})\n`, recentCall)
+    }
     assert.match(fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/hubResources.ts'), 'utf8'), /empty: '暂无练习记录'/)
   }],
   ['NAV05', 'global Settings contains only Device Appearance and About group headings', () => {
@@ -104,8 +108,8 @@ const tests = [
     assert.match(chordResources, /backPractice: 'Back to practice'/)
   }],
   ['NAV09', 'QA channel and production version identities remain frozen', () => {
-    assert.match(version, /^versionCode=14$/m)
-    assert.match(version, /^versionName=1\.6\.0$/m)
+    assert.match(version, /^versionCode=15$/m)
+    assert.match(version, /^versionName=1\.7\.0$/m)
     assert.match(ui, /if \(!__QA_BUILD__\) void updater\.initialize\(\)/)
     assert.match(settings, /description=\{t\('qaUpdateDescription'\)\}/)
     assert.match(fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/shellResources.ts'), 'utf8'), /qaUpdateDescription: '与正式版独立安装；正式更新通道已关闭'/)

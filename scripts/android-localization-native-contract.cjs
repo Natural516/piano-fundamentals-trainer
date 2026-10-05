@@ -49,7 +49,9 @@ function normalizeMidi(source) {
 function assertNativePresentationOnly() {
   assertResources()
   assert.equal(normalizeMidi(read(midiPath)), old(midiPath), 'MIDI only permits the two unnamed display fallbacks, no operational change')
-  git(['diff', '--exit-code', base, '--', 'android', ...[...allowedPaths].map(f => ':(exclude)' + f)])
+  const candidate = require('./android-release-candidate-version-contract.cjs')
+  assert.equal(candidate.normalizeCandidateVersion(read(candidate.VERSION_PATH)), old(candidate.VERSION_PATH), 'only exact candidate version metadata differs')
+  git(['diff', '--exit-code', base, '--', 'android', ':(exclude)' + candidate.VERSION_PATH, ...[...allowedPaths].map(f => ':(exclude)' + f)])
   for (const file of git(['ls-files', '--others', '--exclude-standard', '--', 'android']).trim().split('\n').filter(Boolean)) assert.ok(allowedPaths.has(file), 'unreviewed native file: ' + file)
 }
 // Reviewed ownership: no file in this list directly renders a native dialog/toast/notification.
