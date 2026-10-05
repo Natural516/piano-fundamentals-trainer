@@ -193,9 +193,23 @@ The first version covers **26 interval types within the octave**, with fixed-cou
 
 ### Screenshots
 
-The stable 1.6.0 screenshots in the Chinese section reflect the currently published release UI. They are intentionally **not reused here as English-interface screenshots**.
+> **Development preview:** the English interface shown below comes from the current development build and is newer than the stable Android 1.6.0 release artifact.
 
-English UI localization exists in current repository development, but it is newer than the 1.6.0 release artifact. English screenshots will be added here from a build that actually contains the English interface rather than presenting Chinese screenshots as English UI evidence.
+#### Home
+
+![English development preview — Home](docs/screenshots/android-development-en-home.webp)
+
+#### Sight Reading
+
+![English development preview — Sight Reading](docs/screenshots/android-development-en-sight-reading.webp)
+
+#### Chord Practice
+
+![English development preview — Chord Practice](docs/screenshots/android-development-en-chord-practice.webp)
+
+#### Practice History
+
+![English development preview — Practice History](docs/screenshots/android-development-en-history.webp)
 
 ### Why use it
 
