@@ -12,6 +12,10 @@ const {
 
 const repositoryRoot = path.resolve(__dirname, '..')
 const read = (relativePath) => fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8')
+// Frozen V1.6.0 production release contract, not values inferred from an APK.
+// version.properties remains the authoritative source used by Gradle and verification.
+const EXPECTED_VERSION_NAME = '1.6.0'
+const EXPECTED_VERSION_CODE = 14
 const checks = []
 const check = (name, callback) => checks.push({ name, callback })
 
@@ -22,14 +26,21 @@ check('permanent Android identity remains frozen', () => {
   assert.match(gradle, /applicationId "com\.pianofundamentals\.trainer"/)
   assert.match(capacitor, /appId: 'com\.pianofundamentals\.trainer'/)
   assert.match(capacitor, /appName: '钢琴基本功训练器'/)
-  assert.match(strings, /<string name="app_name">钢琴基本功训练器<\/string>/)
+  assert.match(strings, /<string name="app_name">Piano Fundamentals Trainer<\/string>/)
+  assert.match(read('android/app/src/main/res/values-zh/strings.xml'), /<string name="app_name">钢琴基本功训练器<\/string>/)
 })
 
 check('Android version has one explicit committed source', () => {
   const version = read('android/version.properties')
   const gradle = read('android/app/build.gradle')
-  assert.match(version, /^versionCode=13$/m)
-  assert.match(version, /^versionName=1\.5\.3$/m)
+  const entries = [...version.matchAll(/^(versionCode|versionName)=([^\r\n]*)$/gm)]
+  assert.equal(entries.length, 2, 'version source must declare each release field exactly once')
+  assert.deepEqual(Object.fromEntries(entries.map(([, key, value]) => [key, value])), {
+    versionCode: String(EXPECTED_VERSION_CODE),
+    versionName: EXPECTED_VERSION_NAME
+  })
+  const committed = execFileSync('git', ['show', 'HEAD:android/version.properties'], { cwd: repositoryRoot, encoding: 'utf8' })
+  assert.equal(version.replaceAll('\r\n', '\n'), committed.replaceAll('\r\n', '\n'))
   assert.match(gradle, /rootProject\.file\('version\.properties'\)/)
   assert.match(gradle, /versionCode appVersionCode/)
   assert.match(gradle, /versionName appVersionName/)
@@ -146,12 +157,21 @@ check('release preflight is read-only and requires explicit artifact/public inpu
 
 check('current-state files reject the retired repository while historical provenance remains', () => {
   const current = new Map([
-    ['docs/agent/OPEN_RISKS.md', read('docs/agent/OPEN_RISKS.md')],
-    ['docs/agent/ANDROID_PROJECT_STATE.md', read('docs/agent/ANDROID_PROJECT_STATE.md')],
+    ['SECURITY.md', read('SECURITY.md')],
+    ['BUILDING.md', read('BUILDING.md')],
+    ['DEVELOPMENT.md', read('DEVELOPMENT.md')],
+    ['android/RELEASE_SIGNING.md', read('android/RELEASE_SIGNING.md')],
     ['android/updater.properties', read('android/updater.properties')]
   ])
   assertNoLegacyRepositoryReferences(current, 'current-state files')
-  assert.match(read('docs/agent/ANDROID_V1_FINAL_ACCEPTANCE.md'), new RegExp(LEGACY_RELEASE_REPOSITORY_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  // SECURITY.md now owns the maintained signing/update guidance; removed agent docs are history.
+  assert.ok(current.get('SECURITY.md').includes(canonicalUpdater.UPDATER_PACKAGE_ID))
+  assert.ok(current.get('SECURITY.md').includes(canonicalUpdater.UPDATER_PINNED_SIGNER_SHA256))
+  const manifestUrl = current.get('android/updater.properties').match(/^manifestUrl=(.+)$/m)?.[1]?.trim()
+  assert.equal(manifestUrl, 'https://github.com/Natural516/piano-fundamentals-trainer/releases/latest/download/latest.json')
+  assert.ok(current.get('SECURITY.md').includes(manifestUrl))
+  const historical = execFileSync('git', ['show', '09396e9:docs/agent/ANDROID_V1_FINAL_ACCEPTANCE.md'], { cwd: repositoryRoot, encoding: 'utf8' })
+  assert.match(historical, new RegExp(LEGACY_RELEASE_REPOSITORY_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   assert.throws(
     () => assertNoLegacyRepositoryReferences(new Map([['current.md', LEGACY_RELEASE_REPOSITORY_URL]]), 'fixture'),
     /retired release-repository URL/

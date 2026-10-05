@@ -101,7 +101,7 @@ test('SK33 Relative Key is no longer a standalone sibling card', () => {
 test('SK34 Relative Key is integrated inside the scale information card', () => {
   const scaleCard = screenSource.slice(screenSource.indexOf('scale-tool-card scale-tool-scale-card'), screenSource.indexOf('scale-tool-card scale-tool-signature-card'))
   assert.match(scaleCard, /scale-tool-relative-section/)
-  assert.match(scaleCard, />关系调</)
+  assert.match(scaleCard, /t\('scale.relatedKeys'\)/)
 })
 test('SK35 note labels use atomic non-wrapping token markup', () => {
   assert.match(mainSource, /function ScaleNoteToken/)
@@ -133,12 +133,12 @@ test('SK42 consolidation adds no persistence History MIDI or keep-awake behavior
 })
 test('SK43 selected scale identity appears before the Scale Composition label', () => {
   const scaleCard = screenSource.slice(screenSource.indexOf('scale-tool-card scale-tool-scale-card'), screenSource.indexOf('scale-tool-card scale-tool-signature-card'))
-  assert.ok(scaleCard.indexOf('<h2><ScaleNoteToken') < scaleCard.indexOf('>音阶构成</'))
+  assert.ok(scaleCard.indexOf('<h2><ScaleNoteToken') < scaleCard.indexOf("t('scale.composition')"))
 })
 test('SK44 Relative Key row keeps its factual label and projected written result', () => {
-  assert.match(screenSource, /<small>相对小调<\/small>/)
+  assert.match(screenSource, /<small>\{t\('scale.relativeMinor'\)\}<\/small>/)
   assert.match(screenSource, /<ScaleNoteToken value=\{result\.relativeMinorTonicLabel\}/)
-  assert.match(screenSource, /<span>小调<\/span>/)
+  assert.match(screenSource, /<span>\{t\('scale.minor'\)\}<\/span>/)
 })
 test('SK45 all 15 Natural Major note and relative-minor facts remain exact', () => {
   const expected = {

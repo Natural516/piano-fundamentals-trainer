@@ -1,4 +1,4 @@
-import { getIntervalNumber, getIntervalQueryResult } from '../../intervalQueryTool'
+import { getIntervalNumber, getIntervalPitchSemitone, getIntervalQueryResult } from '../../intervalQueryTool'
 import { NOTE_LETTERS } from '../chords/types'
 import type { NoteLetter, WrittenPitchClass } from '../chords/types'
 import { INTERVAL_TYPES, getIntervalType } from './catalog'
@@ -59,7 +59,15 @@ export function validateIntervalPracticeQuestion(question: IntervalPracticeQuest
   if (targetMidi - rootMidi !== intervalType.semitones) errors.push('semitone distance mismatch')
   if (getIntervalNumber(root, target) !== intervalType.degree) errors.push('diatonic degree mismatch')
   const queryResult = getIntervalQueryResult(root, target)
-  if (queryResult.intervalName !== intervalType.chineseName) errors.push('Interval Query identity mismatch')
+  const catalogType = getIntervalType(intervalType.id)
+  // Degree + semitones uniquely distinguish the 26 types, including enharmonic spellings.
+  // Verify actual pitch coordinates/direction too; display names and quality text are irrelevant.
+  if (intervalType.degree !== catalogType.degree || intervalType.semitones !== catalogType.semitones
+    || queryResult.intervalNumber !== catalogType.degree || queryResult.semitoneDistance !== catalogType.semitones
+    || queryResult.direction !== (catalogType.semitones === 0 ? 'same' : 'ascending')
+    || getIntervalPitchSemitone(root) !== rootMidi || getIntervalPitchSemitone(target) !== targetMidi) {
+    errors.push('Interval Query identity mismatch')
+  }
   if (question.zone !== getIntervalPracticeZone(rootMidi)) errors.push('root zone mismatch')
   return Object.freeze(errors)
 }

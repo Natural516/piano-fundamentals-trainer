@@ -21,6 +21,8 @@ for (const extension of ['.ts', '.tsx']) {
 const { projectPracticeHubRecentSummary } = require('../prototype/android-tablet-v1/src/practiceHubProjection.ts')
 const React = require('react')
 const { renderToStaticMarkup } = require('react-dom/server')
+const { I18nextProvider, useTranslation } = require('react-i18next')
+const { createLocalizationInstance } = require('../prototype/android-tablet-v1/src/localization/localizationService.ts')
 const main = fs.readFileSync(path.join(__dirname, '../prototype/android-tablet-v1/src/main.tsx'), 'utf8')
 const hub = main.slice(main.indexOf('function PracticeHubScreen'), main.indexOf('type IntervalPracticeSettingChanges'))
 const css = fs.readFileSync(path.join(__dirname, '../prototype/android-tablet-v1/src/styles.css'), 'utf8')
@@ -31,21 +33,21 @@ const hubCode = ts.transpileModule(`${hub}\nexports.Hub = PracticeHubScreen`, {
 }).outputText
 function renderHub({ themed = true, collage = true, historyStatus = 'ready', ready = true } = {}) {
   const exports = {}
-  new Function('require', 'exports', 'useMidiUi', 'useEffect', 'STAFF_MODE_LABELS', 'ProductFrame', 'Icon', 'navigate', hubCode)(
+  new Function('require', 'exports', 'useMidiUi', 'useEffect', 'STAFF_MODE_LABELS', 'ProductFrame', 'Icon', 'navigate', 'useTranslation', hubCode)(
     require, exports,
     () => ({ runtime: { historySnapshot: { status: historyStatus, records: [sightRecord()] }, refreshHistory() {} } }),
     React.useEffect, { grand: '大谱表' },
     ({ children }) => React.createElement('main', null, children),
-    ({ name }) => React.createElement('svg', { 'data-icon': name }), () => {}
+    ({ name }) => React.createElement('svg', { 'data-icon': name }), () => {}, useTranslation
   )
-  return renderToStaticMarkup(React.createElement(exports.Hub, {
+  return renderToStaticMarkup(React.createElement(I18nextProvider, { i18n: createLocalizationInstance('zh-CN') }, React.createElement(exports.Hub, {
     chordHistory: { status: historyStatus, records: [chordRecord()] }, chordPersistence: { refresh() {} },
     intervalSettingsReady: ready, settings: { noteMode: 'single', staffMode: 'grand', questionCount: 20 },
     theme: { capabilities: {
       practiceVisual: themed ? { kind: 'hero-cards', assets: { hero: 'hero.png', sight: 'sight.png', chord: 'chord.png' } } : { kind: 'standard' },
       intervalPracticeVisual: collage ? { kind: 'blue-notebook', assets: { hubCardCollage: 'hub-collage.png' } } : undefined
     } }
-  }))
+  })))
 }
 const renderedCards = (markup) => [...markup.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(m => m[0])
 

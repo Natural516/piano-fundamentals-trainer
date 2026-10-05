@@ -22,6 +22,12 @@ const sequentialSource = fs.readFileSync(path.join(root, 'prototype/android-tabl
 const runtimeSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/chordPractice/runtime/core.ts'), 'utf8')
 
 const tests = []
+const { chordPracticeResources } = require('../prototype/android-tablet-v1/src/localization/chordPracticeResources.ts')
+function displayBinding(key, zh, en) {
+  assert.ok(mainSource.includes("t('" + key + "'"), key + ' resource binding')
+  assert.equal(chordPracticeResources['zh-CN'][key], zh)
+  assert.equal(chordPracticeResources.en[key], en)
+}
 const test = (id, title, callback) => tests.push({ id, title, callback })
 const identityKey = theory.chordQuestionIdentityKey
 const zeroRng = () => 0
@@ -150,19 +156,19 @@ test('CSEQ11', 'Chord settings default, corruption fallback and isolated key are
 
 test('CSEQ12', 'Mode Select navigation, cards and modal copy are present without Sight navigation mutation', () => {
   assert.match(mainSource, /navigate\('chord-mode-select'\)/)
-  assert.match(mainSource, /选择和弦练习方式/)
-  assert.match(mainSource, /围绕单一大调，逐步扩展练习内容/)
-  assert.match(mainSource, /从完整和弦范围中综合随机出题/)
-  assert.match(mainSource, /练习方式说明/)
-  assert.match(mainSource, /题目采用均衡题袋方式安排/)
+  displayBinding('selectTitle', '选择和弦练习方式', 'Choose your chord practice mode')
+  displayBinding('sequentialDescription', '围绕单一大调，逐步扩展练习内容', 'Build your practice step by step within one major key')
+  displayBinding('mixedDescription', '从完整和弦范围中综合随机出题', 'Random questions from the full chord range')
+  displayBinding('helpTitle', '练习方式说明', 'Practice modes')
+  displayBinding('balancedHelp', '题目采用均衡题袋方式安排，尽量让当前范围内的和弦获得均匀练习机会。', 'Balanced question bags give the chords in the selected range even practice opportunities.')
   assert.match(mainSource, /'chord-mode-select': 'practice'/)
 })
 
 test('CSEQ13', 'Sequential-only key controls and common chord-tone switch stay in one Chord drawer', () => {
   assert.match(mainSource, /mode === 'sequential'/)
-  assert.match(mainSource, /选择循序练习当前调/)
-  assert.match(mainSource, /显示构成音/)
-  assert.match(mainSource, /按当前转位顺序显示/)
+  displayBinding('selectKey', '选择循序练习当前调', 'Choose the key for progressive practice')
+  displayBinding('showTones', '显示构成音', 'Show chord tones')
+  displayBinding('tonesHelp', '按当前转位顺序显示', 'Shown in the current inversion order')
   assert.match(mainSource, /showChordTones/)
   assert.match(mainSource, /liveQuestion\?\.blockNotes\.map\(formatWrittenPitchClass\)/)
   assert.doesNotMatch(mainSource, /piano\.v1\.sightReading\.settings/)

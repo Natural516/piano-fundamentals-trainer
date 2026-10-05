@@ -74,11 +74,12 @@ test('I05', 'release manifest references valid normal and round launcher resourc
   assert.match(manifest, /android:icon="@mipmap\/ic_launcher"/)
   assert.match(manifest, /android:roundIcon="@mipmap\/ic_launcher_round"/)
 })
-test('I06', 'application package and name remain frozen', () => {
+test('I06', 'application package stays frozen and approved bilingual names resolve from resources', () => {
   const build = fs.readFileSync(path.join(root, 'android', 'app', 'build.gradle'), 'utf8')
   const strings = fs.readFileSync(path.join(res, 'values', 'strings.xml'), 'utf8')
   assert.match(build, /applicationId "com\.pianofundamentals\.trainer"/)
-  assert.match(strings, /钢琴基本功训练器/)
+  assert.match(strings, /<string name="app_name">Piano Fundamentals Trainer<\/string>/)
+  assert.match(fs.readFileSync(path.join(res, 'values-zh', 'strings.xml'), 'utf8'), /<string name="app_name">钢琴基本功训练器<\/string>/)
 })
 test('I07', 'circle squircle and full-square QA previews exist', () => {
   for (const name of ['circle.png', 'squircle.png', 'full-square.png']) {

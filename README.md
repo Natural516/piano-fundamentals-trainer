@@ -9,6 +9,8 @@ A focused Android tablet trainer for sight reading, chords, intervals, and pract
 
 [中文](#zh) · [English](#en) · [Latest Release](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest) · [Changelog](CHANGELOG.md) · [Themes](https://github.com/Natural516/piano-fundamentals-trainer-themes)
 
+Android 1.6.0 · versionCode 14
+
 > Latest stable release: **Android 1.6.0**.  
 > Release artifacts are the source of truth for what is currently installable; repository documentation and development work may move ahead of the latest packaged release.
 

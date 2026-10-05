@@ -4,6 +4,7 @@ import { spellMidiPitch } from './musicPitchSpelling'
 import type { MusicNotationPitch } from './musicNotationTypes'
 import type { SightReadingNotePoolMode } from './sightReadingSettings'
 import { getStaffPosition } from './staffPosition'
+import { LEGACY_SIGHT_EMPTY_NOTE_SENTINEL } from './legacyNoteSnapshot'
 
 export type SightReadingClef = 'treble' | 'bass'
 export type SightReadingStaffMode = SightReadingClef | 'grand'
@@ -159,7 +160,7 @@ export function getMostMissedNote(
     .filter((entry) => entry.count > 0)
     .sort((left, right) => right.count - left.count)
 
-  if (entries.length === 0) return '暂无'
+  if (entries.length === 0) return LEGACY_SIGHT_EMPTY_NOTE_SENTINEL
   if (!keySignature) return midiNumberToNoteName(entries[0].midiNumber)
   return spellMidiPitch(entries[0].midiNumber, keySignature, 'grand').spelling
 }

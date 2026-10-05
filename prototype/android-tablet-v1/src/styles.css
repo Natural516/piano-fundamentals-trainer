@@ -257,6 +257,8 @@ button:focus-visible {
   align-items: center;
   gap: 11px;
   min-height: 48px;
+  min-width: 0;
+  max-width: min(480px, 45vw);
   padding: 6px 14px 6px 7px;
   border: 1px solid var(--line);
   border-radius: 17px;
@@ -272,6 +274,7 @@ button:focus-visible {
 
 .midi-status__signal {
   display: grid;
+  flex: none;
   width: 34px;
   height: 34px;
   place-items: center;
@@ -282,6 +285,8 @@ button:focus-visible {
 
 .midi-status > span:nth-child(2) {
   display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
   gap: 0;
   text-align: left;
 }
@@ -403,8 +408,8 @@ button:focus-visible {
 .home-hero {
   display: grid;
   height: calc(100% - 154px);
-  min-height: 370px;
-  grid-template-columns: minmax(420px, 0.9fr) minmax(500px, 1.1fr);
+  min-height: min(370px, calc(100dvh - 320px));
+  grid-template-columns: minmax(0, 0.9fr) minmax(500px, 1.1fr);
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
@@ -437,12 +442,50 @@ button:focus-visible {
 
 .home-practice-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+  width: 100%;
 }
 
-.home-practice-actions .secondary-action {
-  min-width: 158px;
+.home-practice-actions button {
+  flex: 0 1 158px;
+  min-width: 0;
+  padding-inline: 12px;
+}
+
+/* Entry-page localization only: keep approved geometry/art, allow longer translated copy. */
+.home-hero__copy { min-width: 0; }
+.home-hero__copy h1, .home-glance .glance-item > span:nth-child(2) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.home-practice-actions .primary-action {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+.practice-module-grid .module-card__copy,
+.tools-hub .tool-card__copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.practice-module-grid .module-card__copy em { line-height: 1.45; }
+.tools-hub .tool-card em { flex-wrap: wrap; }
+
+.midi-candidate { min-width: 0; }
+.midi-port-selector { display: flex; align-items: center; gap: 12px; margin: 10px 0; color: var(--text-secondary); }
+.midi-port-selector { flex-wrap: wrap; }
+.midi-port-selector select { min-width: 0; max-width: 100%; padding: 8px; color: var(--text-primary); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+
+/* Home-only compact layout; notation rendering and other screens are unchanged. */
+@media (max-height: 700px) {
+  .home-hero { min-height: 0; }
+  .home-hero__copy { padding: 18px 28px; }
+  .home-hero__copy h1 { font-size: 38px; }
+  :root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-hero { min-height: 0; }
+  :root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .bocchi-home-preview .home-hero__copy { top: 3%; bottom: 3%; padding-block: 8px; }
+  :root[data-theme-recipe-home='home-scrapbook-single-hero-v1'] .themed-home-hero__headline img { max-width: 280px; }
 }
 
 .home-hero__notation {
@@ -676,7 +719,7 @@ button:focus-visible {
   position: relative;
   display: block;
   height: calc(100% - 126px);
-  min-height: 440px;
+  min-height: min(440px, calc(100dvh - 280px));
   overflow: hidden;
   border: 1px solid rgba(229, 205, 193, .95);
   border-radius: 26px;
@@ -2124,6 +2167,26 @@ button:focus-visible {
 .interval-ready-heading p {
   margin: 0;
   color: var(--ink-secondary);
+}
+
+/* Preparation-only wrapping; ACTIVE and notation geometry stay unchanged. */
+.interval-ready-layout .setting-row__copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.interval-ready-layout .setting-row__copy small {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.interval-ready-heading p {
+  line-height: 1.5;
+}
+
+.interval-ready-layout .setting-select-wrap {
+  min-width: 0;
 }
 
 .interval-ready-settings {
@@ -6522,11 +6585,11 @@ button.tool-card {
 }
 
 .history-dashboard__recent .history-filter {
-  position: absolute;
+  position: relative;
   z-index: 3;
-  top: 14px;
-  right: 126px;
-  grid-template-columns: repeat(3, 65px);
+  min-width: 0;
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   padding: 3px;
   border-radius: 12px;
 }
@@ -7200,6 +7263,15 @@ button.tool-card {
   text-align: right;
 }
 
+/* Interval report English wrapping only; ACTIVE/theme geometry is unchanged. */
+.interval-report-sections:lang(en) .interval-performance-list article {
+  grid-template-columns: minmax(92px, 1fr) repeat(4, minmax(0, 1fr)) 58px;
+}
+.interval-report-sections:lang(en) .interval-performance-list article span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .interval-result-actions {
   justify-content: flex-end;
   margin: 0;
@@ -7524,6 +7596,38 @@ button.setting-row {
   align-items: center;
   color: var(--ink-secondary);
   font-size: 13px;
+}
+
+.settings-language .setting-row__copy small {
+  overflow: visible;
+  white-space: normal;
+}
+
+/* B4.1: only Settings text columns; preserve row actions and touch targets. */
+.settings-panels .setting-row__copy strong,
+.settings-panels .setting-row__action {
+  overflow-wrap: anywhere;
+}
+
+.settings-panels .setting-row__action {
+  min-width: 0;
+  max-width: min(260px, 22vw);
+}
+
+.settings-panels .setting-row__action .connected-label {
+  white-space: normal;
+}
+
+.settings-language__status,
+.settings-language__error {
+  margin: 0;
+  padding: 4px 18px 10px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.settings-language__error {
+  color: var(--practice-feedback-danger);
 }
 
 .settings-card--about .setting-row {
@@ -7988,6 +8092,14 @@ button.setting-row {
   margin: 13px 0 8px;
   font-size: 34px;
   letter-spacing: -0.04em;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.device-hero > .connected-label {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .device-hero p {
@@ -8023,7 +8135,7 @@ button.setting-row {
 }
 
 .device-details div:nth-child(2n) { border-right: 0; }
-.device-details div:nth-last-child(-n + 2) { border-bottom: 0; }
+.device-details div:last-child { grid-column: 1 / -1; border-right: 0; border-bottom: 0; }
 .device-details small { color: var(--ink-muted); font-size: 11px; }
 .device-details strong { font-size: 15px; }
 
@@ -8041,11 +8153,12 @@ button.setting-row {
   gap: 8px;
 }
 
-.midi-device-list > div:last-child > button {
+.midi-device-list .midi-candidate > button {
   display: grid;
+  width: 100%;
   min-height: 58px;
   align-items: center;
-  grid-template-columns: 38px 1fr auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   gap: 10px;
   padding: 8px 12px;
   border: 1px solid var(--line);
@@ -8068,6 +8181,8 @@ button.setting-row {
 
 .midi-device-list button > span:nth-child(2) {
   display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
   gap: 2px;
 }
 
@@ -8662,6 +8777,28 @@ button.setting-row {
   font-weight: 700;
 }
 
+/* Query-detail text only: do not change notation or the shared shell geometry. */
+.tool-detail-shell .tool-detail-heading,
+.tool-detail-shell .chord-query-identity p,
+.tool-detail-shell .interval-query-identity h2,
+.tool-detail-shell .interval-query-facts dd,
+.tool-detail-shell .interval-query-references header p,
+.tool-detail-shell .scale-tool-relative-section {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tool-detail-shell .chord-query-identity p,
+.tool-detail-shell .scale-tool-relative-section strong {
+  flex-wrap: wrap;
+}
+
+.tool-detail-shell .interval-query-reference-list span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
 @media (orientation: portrait) {
   body {
     min-width: 0;
@@ -8704,5 +8841,97 @@ button.setting-row {
     border-radius: 18px;
     color: var(--accent);
     font-size: 44px;
+  }
+}
+:where(.sight-ready-layout, .sight-result-layout) h1,
+:where(.sight-ready-layout, .sight-result-layout) h2,
+.sight-focus-frame .focus-prompt {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.sight-focus-frame .focus-progress,
+.sight-focus-frame .focus-actions,
+.sight-result-layout .result-actions > button {
+  min-width: 0;
+}
+.sight-ready-layout .ready-controls p,
+.sight-result-layout .result-note p {
+  line-height: 1.6;
+}
+.settings-group--sight .setting-row__copy small {
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.5;
+}
+
+/* Chord English text wrapping only; notation and theme geometry stay unchanged. */
+.chord-mode-card .module-card__copy,
+.chord-settings-drawer .group-title,
+.chord-identity,
+.chord-stage-prompt > div,
+.chord-report-detail__body .chord-report-metrics dt {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.chord-settings-drawer .group-title,
+.chord-focus-header .focus-actions {
+  flex-wrap: wrap;
+}
+.chord-mode-help p,
+.chord-settings-note,
+.chord-report-detail__body .chord-report-explanation {
+  line-height: 1.6;
+}
+
+/* Theme/update English wrapping only; practice and artwork geometry stay frozen. */
+.theme-manager-modal__card header > span,
+.theme-manager-modal__card dd,
+.update-card .version-line strong,
+.update-release-notes {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.theme-manager-modal__card footer {
+  flex-wrap: wrap;
+}
+.theme-manager-modal__card small,
+.update-card p,
+.update-security-note {
+  white-space: normal;
+  line-height: 1.6;
+}
+
+/* Language choices reuse theme-card states; only this Settings row is affected. */
+.settings-language-row {
+  grid-template-columns: 44px minmax(0, 1fr) minmax(240px, .9fr);
+}
+.settings-language-options {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.settings-language-option {
+  min-height: 64px;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 12px 32px 12px 16px;
+}
+.settings-language-option strong {
+  font-size: 15px;
+}
+.settings-language-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.settings-language-option:disabled {
+  cursor: default;
+  opacity: .6;
+}
+@media (max-width: 1100px) {
+  .settings-language-row {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+  .settings-language-options {
+    grid-column: 2;
   }
 }

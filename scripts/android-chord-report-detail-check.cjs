@@ -14,6 +14,7 @@ for (const extension of ['.ts', '.tsx']) {
 }
 
 const root = path.resolve(__dirname, '..')
+const { chordPracticeResources } = require('../prototype/android-tablet-v1/src/localization/chordPracticeResources.ts')
 const mainSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/main.tsx'), 'utf8')
 const projectionSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/chordPractice/reportDetailProjection.ts'), 'utf8')
 const dashboardProjectionSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/historyDashboardProjection.ts'), 'utf8')
@@ -148,7 +149,9 @@ test('CRD16 switch-to-Block median is displayed in seconds with two decimals', (
 test('CRD17 Block landing spread median is displayed', () => assert.equal(projectChordReportDetail(report(), Date.now()).timingRows[3].value, '36 ms'))
 
 test('CRD18 timing UI explicitly identifies median aggregation', () => {
-  assert.match(detailSource, /<span className="eyebrow">中位数<\/span>/)
+  assert.match(detailSource, /<span className="eyebrow">\{t\('median'\)\}<\/span>/)
+  assert.equal(chordPracticeResources['zh-CN'].median, '中位数')
+  assert.equal(chordPracticeResources.en.median, 'Median')
 })
 
 test('CRD19 timing sample counts survive projection', () => {
@@ -188,14 +191,18 @@ test('CRD24 Sight History card remains a non-interactive article', () => {
 
 test('CRD25 Chord History card is a real accessible button', () => {
   assert.match(historyRecordSource, /item\.module === 'chord'[\s\S]*?<button/)
-  assert.match(historyRecordSource, /aria-label=\{`打开\$\{item\.modeSummary\}练习报告`\}/)
+  assert.match(historyRecordSource, /aria-label=\{chordT\('openReport', \{ summary: modeSummary \}\)\}/)
+  assert.equal(chordPracticeResources['zh-CN'].openReport, '打开{{summary}}练习报告')
+  assert.equal(chordPracticeResources.en.openReport, 'Open practice report: {{summary}}')
   assert.match(historyRecordSource, /type="button"/)
 })
 
 test('CRD26 missing selected report renders a safe unavailable state', () => {
-  assert.match(detailSource, /记录不可用/)
-  assert.match(detailSource, /这条练习记录无法读取。/)
-  assert.match(detailSource, /返回记录/)
+  for (const [key, zh, en] of [['unavailable', '记录不可用', 'Record unavailable'], ['unavailableHelp', '这条练习记录无法读取。', 'This practice record could not be read.'], ['backHistory', '返回记录', 'Back to history']]) {
+    assert.ok(detailSource.includes("t('" + key + "'"), key + ' resource binding')
+    assert.equal(chordPracticeResources['zh-CN'][key], zh)
+    assert.equal(chordPracticeResources.en[key], en)
+  }
   assert.doesNotMatch(detailSource, /repository|recordId|Preferences|schema/)
 })
 

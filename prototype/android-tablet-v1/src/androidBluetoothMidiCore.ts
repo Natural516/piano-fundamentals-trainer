@@ -4,7 +4,7 @@ import {
 } from '../../../src/sightReading/midi'
 import type { Clock } from '../../../src/sightReading/controller'
 
-export type AndroidMidiInputSource = 'bluetooth' | 'development'
+export type AndroidMidiInputSource = 'bluetooth' | 'usb' | 'development'
 
 export interface ParsedMidiMessage {
   status: number

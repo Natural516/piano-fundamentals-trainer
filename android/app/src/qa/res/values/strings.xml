@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">钢琴基本功训练器 QA</string>
-    <string name="title_activity_main">钢琴基本功训练器 QA</string>
-    <string name="package_name">com.pianofundamentals.trainer.qa</string>
-    <string name="custom_url_scheme">com.pianofundamentals.trainer.qa</string>
+    <string name="app_name">Piano Fundamentals Trainer QA</string>
+    <string name="title_activity_main">Piano Fundamentals Trainer QA</string>
+    <string name="package_name" translatable="false">com.pianofundamentals.trainer.qa</string>
+    <string name="custom_url_scheme" translatable="false">com.pianofundamentals.trainer.qa</string>
 </resources>

@@ -29,6 +29,9 @@ const {
 const { projectChordHistory } = require('../prototype/android-tablet-v1/src/chordPractice/historyProjection.ts')
 const { projectMixedPracticeHistory } = require('../prototype/android-tablet-v1/src/mixedHistoryProjection.ts')
 const { AndroidSightReadingRuntime } = require('../prototype/android-tablet-v1/src/sightReadingIntegration.ts')
+const { createLocalizationInstance } = require('../prototype/android-tablet-v1/src/localization/localizationService.ts')
+const { presentHomeRecentPractice } = require('../prototype/android-tablet-v1/src/localization/homePresentation.ts')
+const { chordPracticeResources } = require('../prototype/android-tablet-v1/src/localization/chordPracticeResources.ts')
 
 class FakePreferencesBackend {
   constructor(values = new Map()) {
@@ -161,7 +164,7 @@ test('HIS01 empty repository projects a real empty state with no Mock rows', () 
   const history = projectSightReadingHistory([])
   assert.equal(history.items.length, 0)
   assert.equal(history.summary.totalSessions, 0)
-  assert.match(historySource, /暂无练习记录/)
+  assert.match(historySource, /'emptyAll'/)
   assert.doesNotMatch(historySource, /今天 09:42|共 18 条记录|historyItems/)
 })
 
@@ -352,7 +355,7 @@ test('HIS23 History introduces no delete edit or session-recovery action', () =>
 
 test('HIS25 Chord empty state remains truthful when no durable Chord record exists', () => {
   assert.equal(projectChordHistory([]).length, 0)
-  assert.match(historySource, /暂无和弦练习记录/)
+  assert.match(historySource, /'emptyChord'/)
 })
 
 test('HIS26 one Chord record projects a real Chord-specific card', () => {
@@ -363,7 +366,9 @@ test('HIS26 one Chord record projects a real Chord-specific card', () => {
 test('HIS27 finite Chord completion projects 20/20 facts', () => {
   const [item] = projectChordHistory([chordRecord()])
   assert.deepEqual([item.completedQuestions, item.plannedQuestionCount], [20, 20])
-  assert.match(historyPresentationSource, /完成 \$\{item\.completedQuestions\}\/\$\{item\.plannedQuestionCount\}/)
+  assert.match(historyPresentationSource, /chordT\('recordCompleted', \{ completed: item\.completedQuestions, total: item\.plannedQuestionCount \}\)/)
+  assert.equal(chordPracticeResources['zh-CN'].recordCompleted, '完成 {{completed}}/{{total}}')
+  assert.equal(chordPracticeResources.en.recordCompleted, 'Completed {{completed}}/{{total}}')
 })
 
 test('HIS28 stopped finite Chord completion projects 7/20 and a neutral marker', () => {
@@ -385,14 +390,18 @@ test('HIS30 Chord completion rate derives from first-pass counters', () => {
 
 test('HIS31 Chord primary metric is called completion rate, not accuracy', () => {
   const chordBranch = historyPresentationSource.slice(historyPresentationSource.indexOf("if (item.module === 'chord')"), historyPresentationSource.indexOf("return (", historyPresentationSource.indexOf("if (item.module === 'chord')") + 100) + 1)
-  assert.match(historyPresentationSource, /<small>完成率(?: <Icon name="chevron" size=\{13\} \/>)?<\/small>/)
+  assert.match(historyPresentationSource, /<small>\{chordT\('metrics\.firstPassRate'\)\} <Icon name="chevron" size=\{13\} \/><\/small>/)
+  assert.equal(chordPracticeResources['zh-CN'].metrics.firstPassRate, '完成率')
+  assert.equal(chordPracticeResources.en.metrics.firstPassRate, 'First-pass success rate')
   assert.doesNotMatch(chordBranch, /准确率|总体正确率/)
 })
 
 test('HIS32 Chord card error count uses totalErrors', () => {
   const [item] = projectChordHistory([chordRecord({ arpeggioErrors: 4, blockErrors: 5, totalErrors: 9 })])
   assert.equal(item.totalErrors, 9)
-  assert.match(historyPresentationSource, /错误 \{item\.totalErrors\}/)
+  assert.match(historyPresentationSource, /chordT\('recordFacts', \{ completed, errors: item\.totalErrors, duration: presentSightDuration\(item\.practiceDurationMs, sightT\) \}\)/)
+  assert.equal(chordPracticeResources['zh-CN'].recordFacts, '{{completed}} · 错误 {{errors}} · 练习时长 {{duration}}')
+  assert.equal(chordPracticeResources.en.recordFacts, '{{completed}} · Errors {{errors}} · Practice duration {{duration}}')
 })
 
 test('HIS33 Sequential Chord mode displays its persisted key snapshot', () => {
@@ -427,7 +436,7 @@ test('HIS38 mixed History orders newest record first', () => {
 })
 
 test('HIS39 All History has no misleading combined accuracy aggregate', () => {
-  assert.match(historySource, /展示识谱与和弦的练习次数和完成题数/)
+  assert.match(historySource, /t\(filter === 'all' \? 'trendAll'/)
   assert.doesNotMatch(historySource, /combinedAccuracy|mixedAccuracy/)
   assert.doesNotMatch(projectionSource, /Chord|chord/)
 })
@@ -447,12 +456,14 @@ test('HIS41 Home newest-practice projection selects Sight when Sight is newer', 
 test('HIS42 Home newest-practice projection selects Chord when Chord is newer', () => {
   const [latest] = projectMixedPracticeHistory([record({ endedAt: 50_000 })], [chordRecord({ endedAtEpochMs: 60_000 })])
   assert.equal(latest.module, 'chord')
-  assert.match(homeSource, /% 完成率/)
+  assert.match(homeSource, /presentHomeRecentPractice\(recentPractice, t, recentChordDisplay\)/)
+  assert.equal(presentHomeRecentPractice(latest, createLocalizationInstance('zh-CN').getFixedT('zh-CN', 'home')).title, '85% 完成率')
 })
 
 test('HIS43 Home retains the truthful no-record state', () => {
   assert.equal(projectMixedPracticeHistory([], []).length, 0)
-  assert.match(homeSource, /暂无练习记录/)
+  assert.match(homeSource, /presentHomeRecentPractice\(recentPractice, t, recentChordDisplay\)/)
+  assert.equal(presentHomeRecentPractice(null, createLocalizationInstance('zh-CN').getFixedT('zh-CN', 'home')).title, '暂无练习记录')
 })
 
 test('HIS24 durable report and History projection semantics remain unchanged', () => {

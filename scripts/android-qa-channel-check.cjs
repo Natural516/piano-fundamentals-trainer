@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
+const { Module } = require('node:module')
+const ts = require('typescript')
 
 const root = path.resolve(__dirname, '..')
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8')
@@ -14,6 +16,13 @@ const vite = read('vite.android-prototype.config.ts')
 const ui = read('prototype', 'android-tablet-v1', 'src', 'main.tsx')
 const updaterPlugin = read('android', 'app', 'src', 'main', 'java', 'com', 'pianofundamentals', 'trainer', 'AndroidUpdaterPlugin.kt')
 const packageJson = JSON.parse(read('package.json'))
+// Read the actual static bilingual resources without mounting the app or invoking its updater.
+const shellResourcePath = path.join(root, 'prototype', 'android-tablet-v1', 'src', 'localization', 'shellResources.ts')
+const shellResourceModule = new Module(shellResourcePath, module)
+shellResourceModule._compile(ts.transpileModule(fs.readFileSync(shellResourcePath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+}).outputText, shellResourcePath)
+const { shellResources } = shellResourceModule.exports
 
 const checks = [
   ['Production applicationId remains fixed', () => assert.match(gradle, /applicationId\s+["']com\.pianofundamentals\.trainer["']/)],
@@ -26,11 +35,13 @@ const checks = [
     assert.match(version, /^versionName=1\.6\.0$/m)
   }],
   ['QA launcher name and package resources are distinct', () => {
-    assert.match(qaStrings, />钢琴基本功训练器 QA</)
+    assert.match(qaStrings, />Piano Fundamentals Trainer QA</)
+    assert.match(read('android', 'app', 'src', 'qa', 'res', 'values-zh', 'strings.xml'), />钢琴基本功训练器 QA</)
     assert.match(qaStrings, />com\.pianofundamentals\.trainer\.qa</)
   }],
-  ['Production launcher name remains unchanged', () => {
-    assert.match(productionStrings, />钢琴基本功训练器</)
+  ['Production approved bilingual launcher names have no QA marker', () => {
+    assert.match(productionStrings, />Piano Fundamentals Trainer</)
+    assert.match(read('android', 'app', 'src', 'main', 'res', 'values-zh', 'strings.xml'), />钢琴基本功训练器</)
     assert.doesNotMatch(productionStrings, /QA/)
   }],
   ['FileProvider authority is variant-safe', () => {
@@ -42,7 +53,10 @@ const checks = [
     assert.match(vite, /__QA_BUILD__:\s*JSON\.stringify\(isQaBuild\)/)
     assert.match(ui, /if \(!__QA_BUILD__\) void updater\.initialize\(\)/)
     assert.match(ui, /if \(__QA_BUILD__ && value === 'update'\) return 'settings'/)
-    assert.match(ui, /正式更新通道已关闭/)
+    assert.match(ui, /const \{ t \} = useTranslation\('settings'\)/)
+    assert.match(ui, /description=\{t\('qaUpdateDescription'\)\}/)
+    assert.equal(shellResources['zh-CN'].settings.qaUpdateDescription, '与正式版独立安装；正式更新通道已关闭')
+    assert.equal(shellResources.en.settings.qaUpdateDescription, 'Installed separately from production; the production update channel is disabled')
   }],
   ['QA retains development-only Human UI Review controls', () => {
     assert.match(ui, /SHOW_DEVELOPMENT_TOOLS[\s\S]*?__QA_BUILD__/)

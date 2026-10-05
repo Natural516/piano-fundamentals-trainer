@@ -8,6 +8,7 @@ const css = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/sty
 const persistence = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/androidPersistenceCore.ts'), 'utf8')
 const mainActivity = fs.readFileSync(path.join(root, 'android/app/src/main/java/com/pianofundamentals/trainer/MainActivity.java'), 'utf8')
 const version = fs.readFileSync(path.join(root, 'android/version.properties'), 'utf8')
+const chordResources = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/chordPracticeResources.ts'), 'utf8')
 
 function between(start, end) {
   const from = ui.indexOf(start)
@@ -35,9 +36,9 @@ const tests = [
     assert.doesNotMatch(navigation, /label: '识谱'/)
   }],
   ['NAV02', 'Practice Hub routes to Sight Reading and the Chord-internal Mode Select', () => {
-    assert.match(practice, /识谱练习/)
+    assert.match(practice, /t\('sightTitle'\)/)
     assert.match(practice, /navigate\('sight-ready'\)/)
-    assert.match(practice, /和弦练习/)
+    assert.match(practice, /t\('chordTitle'\)/)
     assert.match(practice, /navigate\('chord-mode-select'\)/)
     assert.match(practice, /function ChordModeSelectScreen/)
   }],
@@ -59,16 +60,17 @@ const tests = [
     )
   }],
   ['NAV04', 'Home glance cards are Last Practice MIDI Input and Theory Tools', () => {
-    for (const label of ['上次练习', 'MIDI 输入', '乐理工具']) assert.match(home, new RegExp(label))
+    for (const key of ['lastPractice', 'midiInput', 'theory']) assert.ok(home.includes(`t('${key}')`))
     assert.doesNotMatch(home, /<small>应用版本<\/small>/)
     assert.doesNotMatch(home, /85% 正确率|今天 09:42|· 20 题/)
     assert.match(home, /projectMixedPracticeHistory\(history\.records, chordHistory\.records\)\[0\]/)
     assert.match(home, /runtime\.refreshHistory\(\)/)
-    assert.match(home, /暂无练习记录/)
+    assert.match(home, /presentHomeRecentPractice\(recentPractice, t\)/)
+    assert.match(fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/hubResources.ts'), 'utf8'), /empty: '暂无练习记录'/)
   }],
   ['NAV05', 'global Settings contains only Device Appearance and About group headings', () => {
     const groups = [...settings.matchAll(/<div className="group-title"><span>([^<]+)<\/span>/g)].map((match) => match[1])
-    assert.deepEqual(groups, ['设备', '外观', '关于'])
+    assert.deepEqual(groups, ["{t('device')}", "{t('appearance')}", "{t('about')}"])
     assert.doesNotMatch(settings, /识谱练习设置|默认谱表|音符数量/)
   }],
   ['NAV06', 'Sight Reading owns its settings drawer while retaining the existing settings contract', () => {
@@ -78,13 +80,18 @@ const tests = [
     assert.match(ui, /runtime\.updateSettings\(changes\)/)
   }],
   ['NAV07', 'History presentation offers All Sight Chord and Interval filters with factual empty states', () => {
-    for (const label of ["['all', '全部']", "['sight', '识谱']", "['chord', '和弦']", "['interval', '音程']", '暂无和弦练习记录', '暂无音程练习记录']) assert.ok(history.includes(label))
+    for (const label of ["['all', 'all']", "['sight', 'sightBadge']", "['chord', 'chordBadge']", "['interval', 'intervalBadge']", 'emptyChord', 'emptyInterval']) assert.ok(history.includes(label))
     assert.match(history, /filter === 'chord' \? chordItems : mixedItems/)
     assert.match(history, /filter === 'interval' \? intervalItems : nonSightItems/)
-    assert.match(history, /最近练习记录/)
-    assert.match(history, /练习趋势/)
-    assert.match(ui, /history-module-badge">识谱/)
-    assert.match(ui, /history-module-badge is-chord">和弦/)
+    assert.match(history, /t\('recent'\)/)
+    assert.match(history, /t\('trend'\)/)
+    assert.match(ui, /history-module-badge">\{sightT\('historyModule'\)\}/)
+    const sightResources = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/sightReadingResources.ts'), 'utf8')
+    assert.match(sightResources, /historyModule: '识谱'/)
+    assert.match(sightResources, /historyModule: 'Sight Reading'/)
+    assert.match(ui, /history-module-badge is-chord">\{chordT\('badge'\)\}/)
+    assert.match(chordResources, /badge: '和弦'/)
+    assert.match(chordResources, /badge: 'Chords'/)
     assert.doesNotMatch(history, /piano\.v1\.|Preferences\.|localStorage/)
   }],
   ['NAV08', 'submodule and Android Back paths follow the frozen Chord-internal hierarchy', () => {
@@ -92,22 +99,28 @@ const tests = [
     assert.match(ui, /'sight-result': 'practice'/)
     assert.match(ui, /'chord-mode-select': 'practice'/)
     assert.match(ui, /'chord-practice': 'chord-mode-select'/)
-    assert.match(ui, /aria-label="返回练习"/)
+    assert.match(ui, /aria-label=\{t\('backPractice'\)\}/)
+    assert.match(chordResources, /backPractice: '返回练习'/)
+    assert.match(chordResources, /backPractice: 'Back to practice'/)
   }],
   ['NAV09', 'QA channel and production version identities remain frozen', () => {
     assert.match(version, /^versionCode=14$/m)
     assert.match(version, /^versionName=1\.6\.0$/m)
     assert.match(ui, /if \(!__QA_BUILD__\) void updater\.initialize\(\)/)
-    assert.match(settings, /正式更新通道已关闭/)
+    assert.match(settings, /description=\{t\('qaUpdateDescription'\)\}/)
+    assert.match(fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/shellResources.ts'), 'utf8'), /qaUpdateDescription: '与正式版独立安装；正式更新通道已关闭'/)
   }],
   ['NAV10', 'Chord History empty state contains no Sight Reading or fabricated metric', () => {
-    assert.match(history, /filter === 'chord'[\s\S]*?'暂无和弦练习记录'/)
-    assert.match(history, /filter === 'chord'[\s\S]*?'完成和弦练习后，记录会显示在这里。'/)
+    assert.match(history, /filter === 'chord' \? 'emptyChord'/)
+    assert.match(history, /filter === 'chord' \? 'emptyChordDetail'/)
     assert.doesNotMatch(history, /平均反应|总体正确率|Accuracy|Block Errors|Arpeggio Errors/)
   }],
   ['NAV11', 'normal product copy exposes no storage key or implementation-contract wording', () => {
     assert.doesNotMatch(productUi, /piano\.v1\.sightReading\.settings|persistence\/history|仅调整设置入口位置|不会在这里伪造记录|QA Static UI/)
-    assert.match(productUi, /下一轮生效/)
+    assert.match(productUi, /t\('nextSession'\)/)
+    const sightResources = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/sightReadingResources.ts'), 'utf8')
+    assert.match(sightResources, /nextSession: '下一轮生效'/)
+    assert.match(sightResources, /nextSession: 'Applies to the next session'/)
     assert.doesNotMatch(productUi, /下一轮生效 · 使用默认设置/)
   }],
   ['NAV12', 'all Sight Reading selects share one custom chevron centered 16.5px from the right edge', () => {
@@ -138,7 +151,9 @@ const tests = [
     assert.match(historyRecord, /<button[\s\S]*?onOpenChordReport\(item\.recordId\)/)
     assert.match(ui, /navigate\('chord-report-detail'\)/)
     assert.match(ui, /resolveChordReportById\(chordPersistenceSnapshot\.records, selectedChordRecordId\)/)
-    assert.match(chordReport, /title="和弦练习报告"/)
+    assert.match(chordReport, /title=\{t\('reportTitle'\)\}/)
+    assert.match(chordResources, /reportTitle: '和弦练习报告'/)
+    assert.match(chordResources, /reportTitle: 'Chord Practice report'/)
   }],
   ['NAV16', 'Chord report Back restores History while filter remains app-owned', () => {
     assert.match(ui, /const \[historyFilter, setHistoryFilter\] = useState<HistoryFilter>\('all'\)/)
@@ -155,8 +170,8 @@ const tests = [
   ['NAV18', 'Settings and Update share installed package metadata without fixed release copy', () => {
     assert.doesNotMatch(settings, /V\d+\.\d+\.\d+|versionCode \d+/)
     assert.match(settings, /updater\.installed \? `V\$\{updater\.installed\.versionName\}` : `V\$\{__ANDROID_VERSION_NAME__\}`/)
-    assert.match(settings, /updater\.installed[\s\S]*?`versionCode \$\{updater\.installed\.versionCode\}`[\s\S]*?`versionCode \$\{__ANDROID_VERSION_CODE__\}`/)
-    assert.match(updateScreen, /snapshot\.installed \? `V\$\{snapshot\.installed\.versionName\} · \$\{snapshot\.installed\.versionCode\}` : '正在读取'/)
+    assert.match(settings, /updater\.installed[\s\S]*?t\('versionCode', \{ code: updater\.installed\.versionCode \}\)[\s\S]*?t\('versionCode', \{ code: __ANDROID_VERSION_CODE__ \}\)/)
+    assert.match(updateScreen, /snapshot\.installed \? `V\$\{snapshot\.installed\.versionName\} · \$\{snapshot\.installed\.versionCode\}` : t\('reading'\)/)
   }]
 ]
 
