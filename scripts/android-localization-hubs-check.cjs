@@ -60,13 +60,14 @@ test('H3', 'English Home buttons retain all three stable destinations and Interv
   })
   await mounted('home', async h => { assert.equal(buttons(h)[2].props.disabled, true) }, { ready: false })
 })
-test('H4', 'actual latest history renders the same record, metric, count and original Chord mode', async () => mounted('home', async h => {
+test('H4', 'actual latest history localizes Chord mode from stable facts without changing record, metric or count', async () => mounted('home', async h => {
   const records = clone(h.runtime.historySnapshot.records), chords = clone(h.chordHistory.records)
   const before = projectMixedPracticeHistory(records, chords)
   assert.equal(before[0].recordId, chord.recordId)
   contains(h.getText(), '66.7% 完成率'); contains(h.getText(), '完成 3/20')
   await h.switchTo('en')
-  contains(h.getText(), '66.7% completion rate'); contains(h.getText(), '3/20 completed'); contains(h.getText(), '循序练习 · C 大调')
+  contains(h.getText(), '66.7% completion rate'); contains(h.getText(), '3/20 completed'); contains(h.getText(), 'Progressive practice · C Major')
+  assert.doesNotMatch(h.getText(), /[\u3400-\u9fff]/)
   assert.deepEqual(projectMixedPracticeHistory(h.runtime.historySnapshot.records, h.chordHistory.records), before)
   await h.switchTo('zh-CN'); contains(h.getText(), '完成 3/20')
 }, { sightRecords: [sight], chordRecords: [chord] }))

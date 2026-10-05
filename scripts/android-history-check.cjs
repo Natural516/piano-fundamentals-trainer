@@ -456,13 +456,13 @@ test('HIS41 Home newest-practice projection selects Sight when Sight is newer', 
 test('HIS42 Home newest-practice projection selects Chord when Chord is newer', () => {
   const [latest] = projectMixedPracticeHistory([record({ endedAt: 50_000 })], [chordRecord({ endedAtEpochMs: 60_000 })])
   assert.equal(latest.module, 'chord')
-  assert.match(homeSource, /presentHomeRecentPractice\(recentPractice, t\)/)
+  assert.match(homeSource, /presentHomeRecentPractice\(recentPractice, t, recentChordDisplay\)/)
   assert.equal(presentHomeRecentPractice(latest, createLocalizationInstance('zh-CN').getFixedT('zh-CN', 'home')).title, '85% 完成率')
 })
 
 test('HIS43 Home retains the truthful no-record state', () => {
   assert.equal(projectMixedPracticeHistory([], []).length, 0)
-  assert.match(homeSource, /presentHomeRecentPractice\(recentPractice, t\)/)
+  assert.match(homeSource, /presentHomeRecentPractice\(recentPractice, t, recentChordDisplay\)/)
   assert.equal(presentHomeRecentPractice(null, createLocalizationInstance('zh-CN').getFixedT('zh-CN', 'home')).title, '暂无练习记录')
 })
 

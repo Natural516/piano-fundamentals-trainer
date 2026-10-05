@@ -278,7 +278,8 @@ test('CHORD-E20','fixed checkpoint freeze protects Sight/Interval/domain/MIDI/na
   const nonChord=body=>body.slice(body.indexOf("  if (item.module === 'interval')"))
   assert.equal(nonChord(current.get('HistoryRecord')),nonChord(previous.get('HistoryRecord')))
   const wiring='chordReport={chordHistory.records.find(record => record.recordId === item.recordId)} '
-  assert.equal(current.get('HistoryScreen').replace(wiring,''),previous.get('HistoryScreen'))
+  const screenshot = require('./android-readme-english-presentation-contract.cjs'); screenshot.assertReadmeEnglishDelta()
+  assert.equal(screenshot.normalize('prototype/android-tablet-v1/src/main.tsx',current.get('HistoryScreen')).replace(wiring,''),previous.get('HistoryScreen'))
   const files=execFileSync('git',['ls-tree','-r','--name-only',base,'--','src','android','theme-packages','prototype/android-tablet-v1/src/chordPractice','prototype/android-tablet-v1/src/intervalPractice','prototype/android-tablet-v1/src/musicTheory','prototype/android-tablet-v1/src/theme'],{cwd:root,encoding:'utf8'}).trim().split('\n')
   files.push(...['sightReadingIntegration.ts','androidBluetoothMidi.ts','androidBluetoothMidiCore.ts','androidPersistenceCore.ts','activePracticeSession.ts','practiceKeepAwake.ts','historyProjection.ts','mixedHistoryProjection.ts'].map(n=>'prototype/android-tablet-v1/src/'+n))
   files.push(...['sightReadingPresentation.ts','sightReadingResources.ts','intervalPracticePresentation.ts','intervalPreparationResources.ts','intervalFlowResources.ts','theoryQueryResources.ts','legacyPresentation.ts'].map(n=>'prototype/android-tablet-v1/src/localization/'+n))
@@ -287,7 +288,7 @@ test('CHORD-E20','fixed checkpoint freeze protects Sight/Interval/domain/MIDI/na
     if (file === 'src/renderer/src/components/MusicStaffRenderer.tsx') { assertRendererDisplayOnly(base); continue }
     const was=execFileSync('git',['show',base+':'+file],{cwd:root,maxBuffer:64*1024*1024}),now=fs.readFileSync(path.join(root,file))
     if(/\.(ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh|html|css|txt)$/.test(file)) {
-      const source = now.toString().replaceAll('\r\n','\n')
+      const source = screenshot.normalize(file, now.toString().replaceAll('\r\n','\n'))
       assert.equal(file.endsWith('/sightReadingIntegration.ts') ? require('./android-practice-early-exit-contract.cjs').normalizeEarlyExitRuntime(source) : source,was.toString().replaceAll('\r\n','\n'),file)
     }
     else assert.equal(createHash('sha256').update(now).digest('hex'),createHash('sha256').update(was).digest('hex'),file)

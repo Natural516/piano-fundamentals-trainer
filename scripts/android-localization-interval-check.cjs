@@ -367,14 +367,14 @@ test('E28', 'all 26 stable names and accidental/octave spellings project from fa
     }
   }
 })
-test('E29', 'shared History filter/range remain selected across locale and chrome is bilingual without translating theme slogan', async () => flow(async h => {
+test('E29', 'shared History filter/range remain selected across locale and App-owned headline is bilingual', async () => flow(async h => {
   const filter = () => byClass(h, 'history-filter'), range = () => byClass(h, 'history-range-filter')
   await click(range().findAllByType('button')[1]); await click(filter().findAllByType('button')[0])
   const beforeFilter = h.state().filter, beforeRange = range().findAllByType('button').map(n => n.props.className)
   await roundTrip(h); assert.equal(h.state().filter, beforeFilter); assert.deepEqual(range().findAllByType('button').map(n => n.props.className), beforeRange)
   await h.switchTo('en'); contains(h.getText(), 'Recent practice'); contains(h.getText(), 'Practice trend'); contains(h.getText(), 'Last 30 days')
-  // The approved theme-specific headline deliberately remains Chinese in this batch.
-  contains(h.getText(), '每一次坚持')
+  // The screenshot follow-up explicitly authorizes translating this App-owned headline.
+  contains(h.getText(), 'Every practice session'); contains(h.getText(), 'brings your dreams closer.')
 }, { screen: 'history' }))
 
 test('E30', 'shared empty History states remain truthful for every stable filter in both locales', async () => flow(async h => {

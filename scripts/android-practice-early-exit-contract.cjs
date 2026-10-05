@@ -123,7 +123,7 @@ function reverse(source, edits) {
   }
   return source
 }
-const normalizeEarlyExitMain = source => reverse(source, mainEdits)
+const normalizeEarlyExitMain = source => reverse(require('./android-readme-english-presentation-contract.cjs').normalize('prototype/android-tablet-v1/src/main.tsx', source), mainEdits)
 const normalizeEarlyExitRuntime = source => reverse(source, runtimeEdits)
 const resourceEdits = [
   { old: "import { updaterResources } from './updaterResources'", value: "import { updaterResources } from './updaterResources'\nimport { practiceExitResources } from './practiceExitResources'" },
@@ -134,6 +134,8 @@ const serviceEdits = [{ old: "'updater'], defaultNS", value: "'updater', 'practi
 const normalizeEarlyExitResources = source => reverse(source, resourceEdits)
 const normalizeEarlyExitService = source => reverse(source, serviceEdits)
 function assertEarlyExitDelta() {
+  const screenshot = require('./android-readme-english-presentation-contract.cjs')
+  screenshot.assertReadmeEnglishDelta()
   assertReviewedAdditions()
   for (const [file, edits] of [
     ['prototype/android-tablet-v1/src/main.tsx', mainEdits],
@@ -141,7 +143,7 @@ function assertEarlyExitDelta() {
     ['prototype/android-tablet-v1/src/localization/resources.ts', resourceEdits],
     ['prototype/android-tablet-v1/src/localization/localizationService.ts', serviceEdits]
   ]) {
-    const actual = clean(fs.readFileSync(path.join(root,file),'utf8'))
+    const actual = screenshot.normalize(file, clean(fs.readFileSync(path.join(root,file),'utf8')))
     const previous = clean(execFileSync('git',['show',base+':'+file],{cwd:root,encoding:'utf8',maxBuffer:32*1024*1024}))
     let expected = previous
     for (const edit of edits) { assert.ok(expected.includes(edit.old),file+' exact baseline delta'); expected=expected.replace(edit.old,edit.value) }

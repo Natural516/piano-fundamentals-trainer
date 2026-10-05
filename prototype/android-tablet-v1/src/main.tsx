@@ -664,6 +664,7 @@ function HomeScreen({
   theme: ThemeDefinition
 }): JSX.Element {
   const { t } = useTranslation('home')
+  const { t: chordT } = useTranslation('chordPractice')
   const { t: practiceT } = useTranslation('practice')
   const { t: midiT } = useTranslation('midi')
   const { runtime } = useMidiUi()
@@ -675,7 +676,10 @@ function HomeScreen({
     void runtime.refreshHistory()
     void chordPersistence.refresh()
   }, [chordPersistence, runtime])
-  const recentDisplay = presentHomeRecentPractice(recentPractice, t)
+  const recentChordDisplay = recentPractice?.module === 'chord'
+    ? presentChordHistorySummary(chordHistory.records.find(record => record.recordId === recentPractice.recordId), recentPractice.modeSummary, chordT)
+    : undefined
+  const recentDisplay = presentHomeRecentPractice(recentPractice, t, recentChordDisplay)
   const homeVisual = theme.capabilities.homeVisual
   const composedHome = homeVisual.kind === 'single-image-hero' ? homeVisual : null
   return (
@@ -2794,7 +2798,7 @@ function HistoryScreen({
           {composedHistory ? <img className="history-dashboard__hero-art" src={composedHistory.assets.hero} alt="" aria-hidden="true" /> : null}
           <div className="history-dashboard__hero-copy">
             <span className="eyebrow">PRACTICE JOURNAL</span>
-            <h1 id="history-dashboard-title">每一次坚持，<br />都让梦想更靠近。</h1>
+            <h1 id="history-dashboard-title">{t('journalHeadlineFirst')}<br />{t('journalHeadlineSecond')}</h1>
             <p>{dashboard.summary.totalSessions > 0 ? t('savedSessions', { count: dashboard.summary.totalSessions }) : t('journalEmpty')}</p>
           </div>
           {composedHistory ? <img className="history-dashboard__hero-memo" src={composedHistory.assets.memo} alt="" aria-hidden="true" /> : null}

@@ -15,7 +15,7 @@ export function formatHomeTimestamp(endedAt: number, t: MidiTranslator, now = Da
   return t(date.getFullYear() === current.getFullYear() ? 'dateTime' : 'yearDateTime', values)
 }
 
-export function presentHomeRecentPractice(item: MixedPracticeHistoryItem | null, t: MidiTranslator): { title: string; detail: string } {
+export function presentHomeRecentPractice(item: MixedPracticeHistoryItem | null, t: MidiTranslator, chordModeDisplay?: string): { title: string; detail: string } {
   if (!item) return { title: t('empty'), detail: t('emptyDetail') }
   const completed = item.module === 'sight' ? item.completed : item.completedQuestions
   const total = item.module === 'interval' ? item.configuredQuestionCount : item.plannedQuestionCount
@@ -25,10 +25,10 @@ export function presentHomeRecentPractice(item: MixedPracticeHistoryItem | null,
   const value = item.module === 'interval' ? (metric === null ? '—' : `${formatHistoryPercentage(metric)}%`) : formatHistoryPercentage(metric)
   const title = t(item.module === 'chord' ? 'completionRate' : item.module === 'interval' ? 'firstTryAccuracy' : 'accuracy', { value })
   const date = formatHomeTimestamp(item.endedAt, t)
-  // Chord modeSummary has no stable mode identity in this projection. Keep its original text,
-  // rather than parse Chinese display text or expand this batch into Chord/History localization.
+  // Use display derived from the matching report's stable facts when available.
+  // A caller with only a legacy projection retains its text; never parse or rewrite it.
   const detail = item.module === 'chord'
-    ? t('recentModeDetail', { date, mode: item.modeSummary, progress })
+    ? t('recentModeDetail', { date, mode: chordModeDisplay ?? item.modeSummary, progress })
     : t('recentDetail', { date, module: t(item.module), progress })
   return { title, detail }
 }
