@@ -6585,11 +6585,11 @@ button.tool-card {
 }
 
 .history-dashboard__recent .history-filter {
-  position: absolute;
+  position: relative;
   z-index: 3;
-  top: 14px;
-  right: 126px;
-  grid-template-columns: repeat(3, 65px);
+  min-width: 0;
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   padding: 3px;
   border-radius: 12px;
 }

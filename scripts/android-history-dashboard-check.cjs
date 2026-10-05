@@ -109,6 +109,18 @@ test('HDB12', 'dashboard projection exposes activity facts and no mixed accuracy
   assert.equal(Object.hasOwn(result.summary, 'completionRate'), false)
 })
 
+test('HDB13', 'all four localized History filters reserve a normal-flow row above records', () => {
+  const css = fs.readFileSync(path.join(__dirname, '../prototype/android-tablet-v1/src/styles.css'), 'utf8')
+  const filter = css.match(/\.history-dashboard__recent \.history-filter\s*\{([^}]+)\}/)?.[1]
+  assert.ok(filter, 'dashboard filter style must exist')
+  assert.match(filter, /position:\s*relative\s*;/)
+  assert.doesNotMatch(filter, /position:\s*absolute\s*;|\btop\s*:|\bright\s*:/)
+  assert.match(filter, /width:\s*100%\s*;/)
+  assert.match(filter, /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)\s*;/)
+  const recent = css.match(/\.history-dashboard__recent\s*\{([^}]+)\}/)?.[1]
+  assert.match(recent, /grid-template-rows:\s*auto\s+auto\s+minmax\(0,\s*1fr\)\s*;/)
+})
+
 let passed = 0
 for (const [id, title, check] of tests) {
   try {

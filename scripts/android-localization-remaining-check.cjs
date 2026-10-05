@@ -80,7 +80,9 @@ test('R5', 'actual subscribed Theme UI locale switch invokes no manager action a
 test('R6', 'Theme API, recipes, PNGs, package/signature/trust and native business are byte frozen; exact B5 presentation delta verified', () => guard.assertFrozenDiff(guard.base, ['theme-packages','theme-api','android','prototype/android-tablet-v1/src/theme']))
 test('R7', 'approved visible artwork/headlines remain identical and intentionally deferred', () => {
   const previous = guard.namedNodes(guard.oldFile(guard.mainPath))
-  for (const name of ['HomeScreen','PracticeHubScreen','ToolsHubScreen','HistoryScreen','SettingsScreen']) assert.equal(declaration(name), previous.get(name).n.getText(previous.get(name).ast))
+  const english = require('./android-readme-english-presentation-contract.cjs')
+  english.assertReadmeEnglishDelta()
+  for (const name of ['HomeScreen','PracticeHubScreen','ToolsHubScreen','HistoryScreen','SettingsScreen']) assert.equal(english.normalize(guard.mainPath, declaration(name)), previous.get(name).n.getText(previous.get(name).ast))
 })
 test('R8', 'actual updater page is bilingual with unchanged current/target version notation', async () => {
   const f = updaterFixture()

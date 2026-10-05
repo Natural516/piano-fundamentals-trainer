@@ -40,11 +40,36 @@ const clickChoiceEdits = [
   ]
 ]
 const stylesPath = 'prototype/android-tablet-v1/src/styles.css'
+// Exact native-acceptance repair: four History filters must occupy their own grid row.
+// Restore only this approved declaration; the rest of the fixed B5 stylesheet stays frozen.
+const historyFilterBefore = `.history-dashboard__recent .history-filter {
+  position: absolute;
+  z-index: 3;
+  top: 14px;
+  right: 126px;
+  grid-template-columns: repeat(3, 65px);
+  padding: 3px;
+  border-radius: 12px;
+}`
+const historyFilterAfter = `.history-dashboard__recent .history-filter {
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 3px;
+  border-radius: 12px;
+}`
+function restoreHistoryFilterCss(source) {
+  assert.equal(source.split(historyFilterAfter).length - 1, 1, 'unique exact accepted History filter repair')
+  assert.equal(source.split(historyFilterBefore).length - 1, 0, 'no obsolete overlaid History filter')
+  return source.replace(historyFilterAfter, historyFilterBefore)
+}
 const clickChoiceCss = "/* Language choices reuse theme-card states; only this Settings row is affected. */\n.settings-language-row {\n  grid-template-columns: 44px minmax(0, 1fr) minmax(240px, .9fr);\n}\n.settings-language-options {\n  display: grid;\n  min-width: 0;\n  grid-template-columns: repeat(2, minmax(0, 1fr));\n  gap: 8px;\n}\n.settings-language-option {\n  min-height: 64px;\n  grid-template-columns: minmax(0, 1fr);\n  padding: 12px 32px 12px 16px;\n}\n.settings-language-option strong {\n  font-size: 15px;\n}\n.settings-language-option:focus-visible {\n  outline: 2px solid var(--accent);\n  outline-offset: 3px;\n}\n.settings-language-option:disabled {\n  cursor: default;\n  opacity: .6;\n}\n@media (max-width: 1100px) {\n  .settings-language-row {\n    grid-template-columns: 44px minmax(0, 1fr);\n  }\n  .settings-language-options {\n    grid-column: 2;\n  }\n}\n"
 function stripClickChoiceCss(source) {
   source = source.replaceAll('\r\n', '\n')
   if (!source.includes('/* Language choices reuse theme-card states;')) return source
-  assert.equal(source, old(stylesPath) + '\n' + clickChoiceCss, 'only exact language-row CSS may change; all existing geometry is frozen')
+  assert.equal(restoreHistoryFilterCss(source), old(stylesPath) + '\n' + clickChoiceCss, 'only exact language-row and History-filter CSS may change; global/staff geometry stays frozen')
   return old(stylesPath)
 }
 
@@ -70,7 +95,7 @@ function assertB6PresentationOnly() {
   const exit = require('./android-practice-early-exit-contract.cjs')
   exit.assertEarlyExitDelta()
   assert.equal(exit.normalizeEarlyExitResources(read(resourcesPath)), approved(resourcesPath, resourceEdits), 'only six dead options and the exact bilingual exit namespace may change')
-  assert.equal(read(stylesPath), old(stylesPath) + '\n' + clickChoiceCss, 'language row only; no global or staff geometry changes')
+  assert.equal(restoreHistoryFilterCss(read(stylesPath)), old(stylesPath) + '\n' + clickChoiceCss, 'exact language row and History filter repair only; no global or staff geometry changes')
 }
 function restoreLegacySelector(source) {
   assertB6PresentationOnly()
@@ -82,8 +107,12 @@ function assertB6ScopeFrozen() {
   const exit = require('./android-practice-early-exit-contract.cjs')
   const exitPaths = ['prototype/android-tablet-v1/src/main.tsx', 'prototype/android-tablet-v1/src/sightReadingIntegration.ts', 'prototype/android-tablet-v1/src/localization/localizationService.ts']
   for (const [file, normalize] of [[exitPaths[0], exit.normalizeEarlyExitMain], [exitPaths[1], exit.normalizeEarlyExitRuntime], [exitPaths[2], exit.normalizeEarlyExitService]]) assert.equal(normalize(read(file)), old(file), file + ': exact early-exit delta only')
+  const english = require('./android-readme-english-presentation-contract.cjs')
+  english.assertReadmeEnglishDelta()
+  const englishPaths = ['prototype/android-tablet-v1/src/localization/homePresentation.ts', 'prototype/android-tablet-v1/src/localization/intervalFlowResources.ts']
+  for (const file of englishPaths) assert.equal(english.normalize(file, read(file)), old(file), file + ': exact reviewed English presentation delta only')
   execFileSync('git', ['diff', '--exit-code', base, '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages', 'capacitor.config.ts', 'package-lock.json',
-    ':(exclude)' + selectorPath, ':(exclude)' + resourcesPath, ':(exclude)' + stylesPath, ...exitPaths.map(file => ':(exclude)' + file), ...exit.reviewedAdditionPaths.map(file => ':(exclude)' + file)], { cwd: root })
+    ':(exclude)' + selectorPath, ':(exclude)' + resourcesPath, ':(exclude)' + stylesPath, ...exitPaths.map(file => ':(exclude)' + file), ...englishPaths.map(file => ':(exclude)' + file), ...exit.reviewedAdditionPaths.map(file => ':(exclude)' + file)], { cwd: root })
   const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages'], { cwd: root, encoding: 'utf8' }).trim()
   const reviewedAdditions = new Set(exit.reviewedAdditionPaths)
   assert.deepEqual(untracked.split('\n').filter(Boolean).filter(file => !reviewedAdditions.has(file)), [], 'no unreviewed product source/resource additions')

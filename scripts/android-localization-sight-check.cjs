@@ -297,7 +297,12 @@ test('SIGHT-E25', 'scope freeze: domain/native/runtime/Interval and Chord branch
     const raw = execFileSync('git', ['show', `${base}:${file}`], { cwd: root }); const fs = require('node:fs'), now = fs.readFileSync(path.join(root, file))
     // Source checkout line endings are not domain facts. Binary theme files remain byte-exact.
     if (/\.(?:ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh)$/.test(file)) {
-      const source = now.toString().replaceAll('\r\n', '\n')
+      let source = now.toString().replaceAll('\r\n', '\n')
+      if (file.endsWith('/localization/intervalFlowResources.ts')) {
+        const english = require('./android-readme-english-presentation-contract.cjs')
+        english.assertReadmeEnglishDelta()
+        source = english.normalize(file, source)
+      }
       assert.equal(file.endsWith('/sightReadingIntegration.ts') ? require('./android-practice-early-exit-contract.cjs').normalizeEarlyExitRuntime(source) : source, raw.toString().replaceAll('\r\n', '\n'), file)
     }
     else assert.equal(createHash('sha256').update(now).digest('hex'), createHash('sha256').update(raw).digest('hex'), file)
