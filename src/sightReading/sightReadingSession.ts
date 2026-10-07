@@ -1,6 +1,8 @@
 import type { SightReadingMidiEvent } from './midi'
 import type { SightReadingClef, SightReadingNote } from './sightReadingNotes'
 import type { SightReadingNoteMode } from './sightReadingSettings'
+import { recordSightNoteOutcome, type SightNoteStats } from './noteAnalysis'
+import type { MajorKeyId } from './musicKeySignatures'
 
 export type SightReadingQuestionPhase = 'idle' | 'display' | 'answering' | 'feedback'
 export type SightReadingRecordedOutcome = 'correct' | 'wrong_note' | 'timeout'
@@ -11,6 +13,7 @@ export function getSightReadingAnswerProgress(remainingTimeMs: number, totalTime
 }
 
 export interface SightReadingSessionCounters {
+  noteStats: SightNoteStats[]
   completed: number
   correct: number
   wrong: number
@@ -55,6 +58,7 @@ function createEmptyNoteCounts(notes: SightReadingNote[]): Record<number, number
 
 export function createSightReadingSessionCounters(notes: SightReadingNote[]): SightReadingSessionCounters {
   return {
+    noteStats: [],
     completed: 0,
     correct: 0,
     wrong: 0,
@@ -113,7 +117,7 @@ export class SightReadingSessionCore {
   private readonly observedTargetPitches = new Set<number>()
   private targetSetCompletedAtMs: number | null = null
 
-  constructor(notes: SightReadingNote[], readonly noteMode: SightReadingNoteMode = 'single') {
+  constructor(notes: SightReadingNote[], readonly noteMode: SightReadingNoteMode = 'single', private readonly keySignature: MajorKeyId = 'C') {
     this.counters = createSightReadingSessionCounters(notes)
   }
 
@@ -333,6 +337,7 @@ export class SightReadingSessionCore {
     this.phase = 'feedback'
     this.questionDeadlineMs = null
     counters.completed += 1
+    if (this.noteMode === 'single') recordSightNoteOutcome(counters.noteStats, this.currentNotes.map(target => target.notation), this.keySignature, outcome, reactionTimeMs)
     counters.clefTotals[note.clef] += 1
 
     if (outcome === 'correct') {

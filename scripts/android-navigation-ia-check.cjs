@@ -165,10 +165,12 @@ const tests = [
     assert.match(ui, /setSelectedChordRecordId\(null\)[\s\S]*navigate\('history'\)/)
     assert.match(ui, /currentScreen === 'chord-report-detail'[\s\S]*closeChordReportDetail\(\)/)
   }],
-  ['NAV17', 'Sight History remains non-interactive and no router framework is introduced', () => {
+  ['NAV17', 'Sight History opens saved reports through explicit lightweight routes, no router framework', () => {
     const sightBranch = historyRecord.slice(historyRecord.lastIndexOf('  return ('))
-    assert.match(sightBranch, /<article/)
-    assert.doesNotMatch(sightBranch, /onClick|<button/)
+    assert.match(sightBranch, /<button/)
+    assert.match(sightBranch, /onOpenSightReport\?\.\(item\.recordId\)/)
+    assert.match(ui, /case 'sight-analysis':/)
+    assert.match(ui, /case 'sight-report-detail':/)
     assert.doesNotMatch(ui, /react-router|RouterProvider|createBrowserRouter/)
   }],
   ['NAV18', 'Settings and Update share installed package metadata without fixed release copy', () => {

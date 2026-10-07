@@ -211,13 +211,13 @@ async function complete(h) {
   await act(async () => h.runtime.flushPersistence()); assert.equal(h.state().screen, 'sight-result')
 }
 test('SIGHT-E13', 'real completed runtime Result is bilingual with truthful unchanged metrics/CTA', async () => flow(async h => {
-  await complete(h); contains(h.getText(), '识谱练习结果'); await h.switchTo('en'); contains(h.getText(), 'Sight Reading result'); contains(h.getText(), 'Practice again'); contains(h.getText(), '100'); assert.doesNotMatch(h.getText(), /[\u3400-\u9fff]/)
+  await complete(h); contains(h.getText(), '本轮完成'); contains(h.getText(), '平均反应时间'); await h.switchTo('en'); contains(h.getText(), 'Session complete'); contains(h.getText(), 'Average response time'); contains(h.getText(), 'Practice again'); contains(h.getText(), '100'); assert.doesNotMatch(h.getText(), /[\u3400-\u9fff]/)
 }))
 test('SIGHT-E14', 'Result object/body/index/time/statistics are unchanged and never resaved on locale', async () => flow(async h => { await complete(h); await roundTrip(h); assert.equal(h.runtime.historySnapshot.records.length, 2) }))
 test('SIGHT-E15', 'exact legacy sentinel has bilingual semantic empty display; English V1 writer still writes 暂无', async () => flow(async h => {
   await complete(h); const report = h.runtime.snapshot.report
   for (const key of ['weakestNote', 'mostWrongNote', 'mostTimedOutNote']) assert.equal(report[key], '暂无')
-  await h.switchTo('en'); contains(h.getText(), 'No data'); await roundTrip(h)
+  await h.switchTo('en'); contains(h.getText(), 'No error-prone notes this session'); assert.equal(getSightNoteDisplayValue(report.weakestNote, translator('en', 'common')), 'No data'); await roundTrip(h)
   const raw = h.backend.values.get(persistence.ANDROID_PERSISTENCE_KEYS.sightReadingReportPrefix + 'new-sight-real-runtime')
   assert.ok(raw); assert.equal(JSON.parse(raw).weakestNote, '暂无'); assert.doesNotMatch(raw, /No data/)
 }))
@@ -225,8 +225,8 @@ test('SIGHT-E16', 'real note strings and unknown legacy text are displayed verba
   for (const locale of ['zh-CN', 'en']) for (const note of ['C4', 'F♯3', 'B♭2', ' 暂无 ', 'Old legal note text']) assert.equal(getSightNoteDisplayValue(note, translator(locale, 'common')), note)
   assert.equal(getSightNoteDisplayValue('暂无', translator('en', 'common')), 'No data')
 })
-test('SIGHT-E17', 'actual Sight History row is bilingual and remains a noninteractive record, no invented Detail', async () => flow(async h => {
-  const row = () => h.renderer.root.findByProps({ className: 'history-row is-stopped' }); contains(text(row()), '识谱'); const node = row()
+test('SIGHT-E17', 'actual saved Sight History report action remains bilingual and locale-stable', async () => flow(async h => {
+  const row = () => h.renderer.root.findByProps({ className: 'history-row is-stopped is-interactive' }); contains(text(row()), '识谱'); const node = row(); assert.equal(node.type, 'button')
   await h.switchTo('en'); contains(text(row()), 'Sight Reading'); contains(text(row()), 'Grand staff'); contains(text(row()), 'C Major'); contains(text(row()), 'Ended early'); assert.doesNotMatch(text(row()), /[\u3400-\u9fff]/); assert.equal(row(), node)
 }, { screen: 'history' }))
 test('SIGHT-E18', 'legal legacy History raw body/index/timestamps/settings retain exact bytes across locale', async () => flow(async h => {
@@ -240,7 +240,7 @@ test('SIGHT-E19', 'existing Light/Dark/decorated assets and theme pointers remai
   }, { themeId, decorated: themeId === 'bocchi' })
 })
 test('SIGHT-E20', 'Result/History metric and row instances persist; all React keys use stable identities', async () => {
-  await flow(async h => { await complete(h); const metrics = h.renderer.root.findByProps({ className: 'result-metrics' }).findAllByType('div'); await roundTrip(h); assert.deepEqual(h.renderer.root.findByProps({ className: 'result-metrics' }).findAllByType('div'), metrics) })
+  await flow(async h => { await complete(h); const metrics = h.renderer.root.findByProps({ className: 'sight-report-metrics' }).findAllByType('div'); assert.equal(metrics.length, 7); await roundTrip(h); assert.deepEqual(h.renderer.root.findByProps({ className: 'sight-report-metrics' }).findAllByType('div'), metrics) })
   await flow(roundTrip, { screen: 'history' })
   assert.match(current.get('HistoryScreen'), /key=\{`\$\{item.module\}-\$\{item.recordId\}`\}/)
   assert.doesNotMatch(current.get('SightResultScreen'), /key=\{.*(?:label|displayName|noteName)/)
@@ -298,6 +298,7 @@ test('SIGHT-E25', 'scope freeze: domain/native/runtime/Interval and Chord branch
     // Source checkout line endings are not domain facts. Binary theme files remain byte-exact.
     if (/\.(?:ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh)$/.test(file)) {
       let source = now.toString().replaceAll('\r\n', '\n')
+      source = require('./android-sight-analysis-contract.cjs').normalize(file, source)
       if (file === 'android/version.properties') source = require('./android-release-candidate-version-contract.cjs').normalizeCandidateVersion(source)
       if (file.endsWith('/localization/intervalFlowResources.ts')) {
         const english = require('./android-readme-english-presentation-contract.cjs')
@@ -331,7 +332,8 @@ test('SIGHT-E27', 'completed report with a real missed note keeps spelling/count
   for (let i = 1; i < 10; i++) { await advance(h, 80); await answer(h); await advance(h, 350); if (i !== 9) await advance(h, 32) }
   await act(async () => h.runtime.flushPersistence()); assert.equal(h.state().screen, 'sight-result')
   assert.equal(h.runtime.snapshot.report.weakestNote, target); assert.equal(h.runtime.snapshot.report.wrong, 1); assert.equal(h.runtime.snapshot.report.averageReactionMs, 80)
-  contains(h.getText(), target); contains(h.getText(), '0.08 秒'); await h.switchTo('en'); contains(h.getText(), target); contains(h.getText(), '0.08 s'); contains(h.getText(), '1 wrong answer or timeout'); await roundTrip(h)
+  const writtenLabel = target.replace(/#/g, '♯').replace(/b/g, '♭')
+  contains(h.getText(), writtenLabel); contains(h.getText(), '错误 1 次'); contains(h.getText(), '0.08 秒'); await h.switchTo('en'); contains(h.getText(), writtenLabel); contains(h.getText(), '0.08 s'); contains(h.getText(), '1 error'); await roundTrip(h)
 }, { settings: { keySignature: 'Gb' } }))
 module.exports = { flow, start, answer, advance, complete, note, click, roundTrip }
 if (require.main === module) void (async () => {

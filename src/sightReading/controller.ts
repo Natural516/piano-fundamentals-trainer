@@ -56,7 +56,7 @@ export class SightReadingController {
   constructor(settings: SightReadingSettings, private readonly dependencies: SightReadingDependencies) {
     this.settings = migrateSightReadingSettings(settings)
     this.notes = getSightReadingNotes(this.settings)
-    this.core = new SightReadingSessionCore(this.notes)
+    this.core = new SightReadingSessionCore(this.notes, this.settings.noteMode, this.settings.keySignature)
   }
 
   get snapshot() {
@@ -180,7 +180,7 @@ export class SightReadingController {
       ...this.settings,
       notePoolMode: getEffectiveSightReadingNotePoolMode(this.settings)
     })
-    this.core = new SightReadingSessionCore(this.notes, this.settings.noteMode)
+    this.core = new SightReadingSessionCore(this.notes, this.settings.noteMode, this.settings.keySignature)
     this.bag = []
     this.doubleQuestions = this.settings.noteMode === 'double'
       ? createSightReadingDoubleQuestions({

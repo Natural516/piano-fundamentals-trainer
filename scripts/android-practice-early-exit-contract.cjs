@@ -131,8 +131,8 @@ const resourceEdits = [
   { old: "  en: {", value: "  en: {\n    practiceExit: practiceExitResources.en," }
 ]
 const serviceEdits = [{ old: "'updater'], defaultNS", value: "'updater', 'practiceExit'], defaultNS" }]
-const normalizeEarlyExitResources = source => reverse(source, resourceEdits)
-const normalizeEarlyExitService = source => reverse(source, serviceEdits)
+const normalizeEarlyExitResources = source => reverse(require('./android-sight-analysis-contract.cjs').normalize('prototype/android-tablet-v1/src/localization/resources.ts', source), resourceEdits)
+const normalizeEarlyExitService = source => reverse(require('./android-sight-analysis-contract.cjs').normalize('prototype/android-tablet-v1/src/localization/localizationService.ts', source), serviceEdits)
 function assertEarlyExitDelta() {
   const screenshot = require('./android-readme-english-presentation-contract.cjs')
   screenshot.assertReadmeEnglishDelta()

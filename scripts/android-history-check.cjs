@@ -350,7 +350,8 @@ test('HIS23 History introduces no delete edit or session-recovery action', () =>
   assert.match(historySource, /className="history-filter"/)
   assert.match(historyRows, /onOpenChordReport/)
   assert.match(historyPresentationSource, /item\.module === 'chord'[\s\S]*?<button/)
-  assert.match(historyPresentationSource, /<article className=\{`history-row is-\$\{item\.completionState\}`\}>/)
+  assert.match(historyPresentationSource, /<button className=\{`history-row is-\$\{item\.completionState\} is-interactive`\}/)
+  assert.match(historyPresentationSource, /onOpenSightReport\?\.\(item\.recordId\)/)
 })
 
 test('HIS25 Chord empty state remains truthful when no durable Chord record exists', () => {

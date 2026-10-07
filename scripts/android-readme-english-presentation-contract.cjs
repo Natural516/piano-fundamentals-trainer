@@ -20,6 +20,7 @@ const edits = {
   ]
 }
 function normalize(file, source) {
+  source = require('./android-sight-analysis-contract.cjs').normalize(file, source)
   source = source.replaceAll('\r\n', '\n')
   for (const [old, value] of edits[file] ?? []) source = source.replace(value, old)
   return source
@@ -27,7 +28,7 @@ function normalize(file, source) {
 function assertReadmeEnglishDelta() {
   for (const file of Object.keys(edits)) {
     const previous = execFileSync('git', ['show', base + ':' + file], {cwd:root,encoding:'utf8',maxBuffer:32*1024*1024}).replaceAll('\r\n','\n')
-    const actual = fs.readFileSync(path.join(root,file),'utf8').replaceAll('\r\n','\n')
+    const actual = require('./android-sight-analysis-contract.cjs').normalize(file, fs.readFileSync(path.join(root,file),'utf8'))
     for (const [, value] of edits[file]) assert.equal(actual.split(value).length - 1, 1, 'exact authorized presentation delta: ' + file)
     assert.equal(normalize(file,actual),previous, 'no changes beyond the explicit English screenshot presentation delta: ' + file)
     assert.throws(() => assert.equal(normalize(file,actual+'\n// unauthorized mutation\n'),previous))

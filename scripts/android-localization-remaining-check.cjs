@@ -129,7 +129,7 @@ test('R18', 'React keys and action/disabled identities remain source-frozen', ()
 test('R19', 'every unrelated production declaration and core lifecycle is byte-frozen', () => {
   assert.equal(guard.normalizeB46Main(require('./android-practice-early-exit-contract.cjs').normalizeEarlyExitMain(actual)),guard.oldFile(guard.mainPath))
   guard.assertRendererDisplayOnly()
-  execFileSync('git',['diff','--exit-code',guard.base,'--','src',':(exclude)'+guard.rendererPath,'prototype/android-tablet-v1/src/chordPractice','prototype/android-tablet-v1/src/intervalPractice','prototype/android-tablet-v1/src/musicTheory'],{cwd:root})
+  guard.assertFrozenDiff(guard.base, ['src', 'prototype/android-tablet-v1/src/chordPractice', 'prototype/android-tablet-v1/src/intervalPractice', 'prototype/android-tablet-v1/src/musicTheory'])
   const old=guard.namedNodes(guard.oldFile(guard.mainPath))
   const effect = source => { const a=ts.createSourceFile('x.tsx',source,99,true,ts.ScriptKind.TSX), r=[];function f(n){if(ts.isCallExpression(n)&&n.expression.getText(a)==='useEffect')r.push(n.getText(a));ts.forEachChild(n,f)}f(a);return r }
   assert.deepEqual(effect(declaration('AndroidAppBootstrap')),effect(old.get('AndroidAppBootstrap').n.getText(old.get('AndroidAppBootstrap').ast)))

@@ -8927,6 +8927,65 @@ button.setting-row {
   cursor: default;
   opacity: .6;
 }
+
+/* Sight analysis: dense production notation, normal flow, no landscape internal scroll. */
+.product-content:has(> .sight-history-analysis) { padding-top: 8px; padding-bottom: 16px; }
+.sight-history-analysis, .sight-session-analysis { min-width: 0; }
+.sight-history-analysis > header { margin-bottom: 8px; }
+.sight-history-analysis > header p { margin: 0; color: var(--text-secondary); font-size: 14px; }
+.sight-analysis-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.sight-analysis-card { min-width: 0; border: 1px solid var(--border); border-radius: 20px; padding: 12px 16px; background: var(--surface-elevated); }
+.sight-analysis-card h2 { margin: 0 0 4px; font-size: 21px; line-height: 1.2; }
+.sight-analysis-card > p { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.4; }
+.sight-analysis-card > p:not(.sight-analysis-empty) { min-height: 1.4em; }
+.sight-analysis-ranking { list-style: none; margin: 4px 0 0; padding: 0; }
+.sight-analysis-ranking li { display: grid; grid-template-columns: 20px 180px minmax(42px, 1fr) minmax(100px, auto); gap: 8px; align-items: center; min-height: 54px; border-top: 1px solid var(--divider); }
+.sight-analysis-rank { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.sight-analysis-staff { width: 180px; min-height: 54px; background: var(--practice-staff-paper, #fff); border-radius: 8px; }
+.sight-analysis-staff .music-staff-renderer.is-analysis-dense { width: 180px; min-width: 180px; height: auto; min-height: 54px; }
+.sight-analysis-staff .music-staff-renderer.is-analysis-dense svg { display: block; width: 180px; height: auto; max-width: none; }
+.sight-analysis-note { font-family: Arial, sans-serif; font-size: 18px; white-space: nowrap; letter-spacing: 0; word-spacing: 0; }
+.sight-analysis-value { text-align: right; font-size: 13px; line-height: 1.4; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.sight-analysis-caption { color: var(--text-muted); font-size: 12px; line-height: 1.4; margin: 6px 0 0; }
+.sight-analysis-empty { padding: 16px 0; }
+.sight-analysis-entry { position: relative; display: inline-flex; align-items: center; gap: 5px; min-height: 0; color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--surface)); border: 0; border-radius: 8px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 500; line-height: 18px; white-space: nowrap; }
+/* Transparent hit area only; the visible header action stays 26px high. */
+.sight-analysis-entry::after { content: ''; position: absolute; inset: -9px 0; }
+.sight-analysis-entry > span { font-size: 12px; line-height: 1; }
+.history-dashboard__heading-actions { display: flex; margin-left: auto; align-items: center; justify-content: flex-end; gap: 16px; min-width: 0; }
+.history-dashboard__heading-actions > span { color: var(--text-muted); font-size: 12px; }
+.sight-report-identity { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.sight-report-identity strong { font-size: 20px; }
+.sight-report-identity p { margin: 4px 0 0; color: var(--text-secondary); font-size: 13px; }
+.sight-report-actions { display: flex; gap: 10px; }
+.sight-report-actions button { min-height: 40px; padding: 8px 18px; font-size: 14px; }
+.sight-report-metrics { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; margin: 16px 0; padding: 14px 16px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface-elevated); }
+.sight-report-metrics dt { font-size: 13px; color: var(--text-secondary); }
+.sight-report-metrics dd { margin: 4px 0 0; font-size: 25px; font-weight: 700; }
+.sight-report-metrics .is-accuracy dd { color: var(--accent); }
+.sight-report-dashboard .sight-analysis-ranking li { min-height: 76px; }
+@media (max-width: 1100px), (max-height: 780px) {
+  .product-content:has(> .sight-history-analysis), .product-content:has(> .sight-report-dashboard) { overflow-y: auto; }
+}
+@media (max-width: 1100px) {
+  .sight-analysis-columns { grid-template-columns: minmax(0, 1fr); }
+  .sight-report-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sight-report-identity { flex-wrap: wrap; }
+  .history-dashboard__heading-actions { flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 560px) {
+  .sight-analysis-card { padding: 16px; }
+  .sight-analysis-ranking li { grid-template-columns: 24px 180px minmax(0, 1fr); gap: 8px; }
+  .sight-analysis-value { grid-column: 2 / -1; text-align: left; padding-bottom: 12px; }
+}
+@media (max-width: 420px) {
+  .sight-analysis-card { padding: 8px; }
+  .sight-analysis-ranking li { grid-template-columns: 24px minmax(0, 1fr); }
+  .sight-analysis-rank { grid-row: 1; }
+  .sight-analysis-note { grid-column: 2; grid-row: 1; padding-top: 12px; }
+  .sight-analysis-staff { grid-column: 1 / -1; grid-row: 2; }
+  .sight-analysis-value { grid-column: 1 / -1; grid-row: 3; }
+}
 @media (max-width: 1100px) {
   .settings-language-row {
     grid-template-columns: 44px minmax(0, 1fr);

@@ -18,6 +18,11 @@ const compile = (source, filename) => ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true }, fileName: filename
 }).outputText
 for (const ext of ['.ts', '.tsx']) require.extensions[ext] = (module, filename) => module._compile(compile(fs.readFileSync(filename, 'utf8'), filename), filename)
+const originalLoad = Module._load
+Module._load = function (request, parent, isMain) {
+  if (request === '@vexflow-fonts/bravura/bravura.woff2?url') return require.resolve('@vexflow-fonts/bravura/bravura.woff2')
+  return originalLoad.call(this, request, parent, isMain)
+}
 const loc = '../prototype/android-tablet-v1/src/localization/'
 const { LocalizationService, createLocalizationInstance } = require(loc + 'localizationService.ts')
 const { AppPreferencesRepository, APP_PREFERENCES_KEY } = require(loc + 'appPreferences.ts')
@@ -44,6 +49,7 @@ const current = declarations(main), old = declarations(baseline(mainPath))
 const frozenCurrent = declarations(normalizeEarlyExitMain(main))
 const componentNames = ['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'useChordPracticeRuntime', 'toChordWrittenPitches', 'MidiUiContext', 'UpdaterUiContext', 'AppNavigationContext', 'useMidiUi', 'useUpdaterUi', 'useAppNavigation', 'productNavigation', 'SETTINGS_THEME_OPTIONS', 'Icon', 'navigate', 'presentMidiStatus', 'MidiStatusButton', 'ProductHeader', 'BottomNavigation', 'ProductFrame', 'SettingRow', 'SettingSelect', 'SettingsThemeOption', 'useThemeRuntime', 'ExternalThemeCard', 'SettingsScreen', 'MidiScreen', 'OrientationNotice', 'HomeScreen', 'PracticeHubScreen', 'THEORY_TOOLS', 'ToolsHubScreen', 'ScaleNoteToken', 'parseChordAccidentalGroup', 'ChordAccidentalGlyph', 'ChordAccidentalGroup', 'ChordSymbol', 'ChordTheoreticalNoteToken', 'ToolDetailShell', 'ChordQueryToolScreen', 'ScaleKeySignatureToolScreen', 'IntervalPitchToken', 'IntervalPitchSelector', 'IntervalQueryToolScreen', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'useRemainingTime', 'PracticeMetric', 'getPracticeScreen', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'NotationPaper', 'useIntervalPracticeRuntime', 'useIntervalPersistence', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice']
 const componentSource = `
+import { SightSessionNoteAnalysis, presentSightHistoryAverage } from './SightReadingAnalysis'
 import { CHORD_SEQUENTIAL_MAJOR_KEY_IDS, formatWrittenPitchClass } from './musicTheory/chords'
 import { getChordMockCase, getChordMockState } from './chordPracticeMocks'
 import { presentChordKey, presentChordQuestion, presentChordHistorySummary, presentLocalizedChordPractice, presentLocalizedChordReport } from './localization/chordPracticePresentation'
@@ -240,7 +246,9 @@ test('N3', 'live round trip preserves route; navigation clicks still use stable 
   assert.equal(global.window.location.hash, 'practice')
 }))
 test('N4', 'ScreenId, ProductNavigationId, screen metadata and route functions are byte frozen', () => {
-  for (const name of ['ScreenId', 'ProductNavigationId', 'screens', 'productNavigation', 'navigate', 'readScreen']) assert.equal(current.get(name), old.get(name), name)
+  const analysis = require('./android-sight-analysis-contract.cjs'); analysis.assertAnalysisDelta()
+  const prior = declarations(analysis.normalize(mainPath, main))
+  for (const name of ['ScreenId', 'ProductNavigationId', 'screens', 'productNavigation', 'navigate', 'readScreen']) assert.equal(prior.get(name), old.get(name), name)
 })
 test('N5', 'Home/Hub B4.2A presentation retains removed summaries/pills and original entry routes', () => {
   assert.doesNotMatch(current.get('HomeScreen'), /homeSettingsSummary|home-training-summary/)

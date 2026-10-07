@@ -1,6 +1,7 @@
 import { getMostMissedNote, type SightReadingStaffMode, type SightReadingNote, type SightReadingClef } from './sightReadingNotes'
 import { getSightReadingReactionSummary, type SightReadingSessionCounters } from './sightReadingSession'
 import { getMajorKeySignature, type MajorKeyId } from './musicKeySignatures'
+import { cloneSightNoteStats, compareSightNotation, type SightNoteStats } from './noteAnalysis'
 import { getSightReadingAnswerTimeoutMs, type SightReadingSettings, type SightReadingNoteCount, type SightReadingNotePoolMode, type SightReadingWriteResult } from './sightReadingSettings'
 
 export interface SightReadingClefStats {
@@ -12,6 +13,8 @@ export interface SightReadingClefStats {
 }
 
 export interface SightReadingReport {
+  noteStatsVersion?: 1
+  noteStats?: SightNoteStats[]
   totalQuestions: number
   completedQuestions: number
   correct: number
@@ -71,6 +74,8 @@ export function createSightReadingReport(
 
   return {
     totalQuestions: settings.questionCount,
+    noteStatsVersion: 1,
+    noteStats: cloneSightNoteStats(counters.noteStats).sort(compareSightNotation),
     completedQuestions: counters.completed,
     correct: counters.correct,
     wrong: counters.wrong,

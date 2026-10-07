@@ -38,10 +38,18 @@ function normalizeB46Main(source) {
   return source
 }
 function assertRendererDisplayOnly(ref = base) {
-  const renderer = read(rendererPath).replace('  fontErrorLabel?: string\n','').replace('{props.fontErrorLabel ?? fontError}','{fontError}')
+  const renderer = require('./android-sight-analysis-contract.cjs').normalize(rendererPath, read(rendererPath)).replace('  fontErrorLabel?: string\n','').replace('{props.fontErrorLabel ?? fontError}','{fontError}')
   assert.equal(renderer,oldFile(rendererPath,ref),'shared renderer permits ONLY optional localized error text')
 }
 function assertFrozenDiff(ref, paths) {
+  const analysis = require('./android-sight-analysis-contract.cjs')
+  analysis.assertAnalysisDelta()
+  const analysisExclusions = analysis.allowedPaths.filter(file => paths.some(scope => file === scope || file.startsWith(scope + '/')))
+  for (const file of analysisExclusions) {
+    // Keep the original historical baseline comparison after reversing exact approved hunks.
+    const normalized = analysis.normalize(file, read(file))
+    if (file !== rendererPath) assert.equal(normalized, oldFile(file, ref), file + ' unchanged beyond exact analysis delta')
+  }
   const native = require('./android-localization-native-contract.cjs')
   // B5 separately freezes every native byte except the exact verified resources/two display calls.
   native.assertNativePresentationOnly()
@@ -59,11 +67,12 @@ function assertFrozenDiff(ref, paths) {
   }
   const candidate = require('./android-release-candidate-version-contract.cjs')
   assert.equal(candidate.normalizeCandidateVersion(read(candidate.VERSION_PATH)), oldFile(candidate.VERSION_PATH, ref), 'candidate metadata is the only version-file delta')
-  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+candidate.VERSION_PATH,':(exclude)'+rendererPath,':(exclude)'+sightRuntime,...englishExclusions,...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
+  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+candidate.VERSION_PATH,':(exclude)'+rendererPath,':(exclude)'+sightRuntime,...englishExclusions,...analysisExclusions.map(f => ':(exclude)'+f),...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
   assertRendererDisplayOnly(ref)
 }
 const cssSuffix = "/* Theme/update English wrapping only; practice and artwork geometry stay frozen. */\n.theme-manager-modal__card header > span,\n.theme-manager-modal__card dd,\n.update-card .version-line strong,\n.update-release-notes {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n.theme-manager-modal__card footer {\n  flex-wrap: wrap;\n}\n.theme-manager-modal__card small,\n.update-card p,\n.update-security-note {\n  white-space: normal;\n  line-height: 1.6;\n}";
 function stripB46Css(source) {
+  source = require('./android-sight-analysis-contract.cjs').normalize('prototype/android-tablet-v1/src/styles.css', source)
   source=require('./android-language-selector-contract.cjs').stripClickChoiceCss(source)
   if (!source.includes('/* Theme/update English wrapping only;')) return source
   assert.ok(source.endsWith('\n\n'+cssSuffix+'\n'),'only exact B4.6 CSS suffix is allowed')

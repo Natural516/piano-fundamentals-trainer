@@ -39,6 +39,7 @@
     "test:android-persistence": "node scripts/android-persistence-check.cjs",
     "test:android-history": "node scripts/android-history-check.cjs",
     "test:android-history-dashboard": "node scripts/android-history-dashboard-check.cjs",
+    "test:android-sight-analysis": "node scripts/android-sight-analysis-check.cjs",
     "test:android-settings": "node scripts/android-settings-check.cjs",
     "test:android-localization": "node scripts/android-localization-check.cjs && node scripts/android-localization-compatibility-check.cjs",
     "test:android-language-selector": "node scripts/android-language-selector-check.cjs",

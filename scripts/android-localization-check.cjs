@@ -191,9 +191,9 @@ test('LOC15', 'all migrated resource namespaces have identical nonempty key shap
   assert.deepEqual(keys(zh), keys(en))
   assert.deepEqual(Object.keys(localizationResources.en.midi).filter(key => key.startsWith('devicesFound')), ['devicesFound_one', 'devicesFound_other'])
   assert.equal(localizationResources['zh-CN'].midi.devicesFound, '{{count}} 个候选')
-  assert.equal(zh.length, 150 + 58 + 121 + 19 + 112 + 107 + 148 + 148 - 3 + 11 + 2) // B6 removes three options; early-exit adds eleven keys; History headline adds exactly two.
+  assert.equal(zh.length, 150 + 58 + 121 + 19 + 112 + 107 + 148 + 148 - 3 + 11 + 2 + 27) // Refined Sight Analysis has exactly 27 Chinese leaves.
   for (const locale of ['zh-CN', 'en']) for (const key of ['system', 'chinese', 'english']) assert.equal(Object.hasOwn(localizationResources[locale].settings, key), false)
-  assert.equal(en.length, zh.length + 30) // Existing plural differences plus five Chord English plurals.
+  assert.equal(en.length, zh.length + 32) // Sight Analysis has two explicit one/other English plural pairs.
   for (const [, value] of [...zh, ...en]) assert.ok(value.trim())
   for (const [key] of en) {
     const [ns, ...parts] = key.split('.')

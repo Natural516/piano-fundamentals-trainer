@@ -12,7 +12,7 @@ const compile = (source, filename) => ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true }, fileName: filename
 }).outputText
 for (const ext of ['.ts', '.tsx']) require.extensions[ext] = (module, filename) => module._compile(compile(fs.readFileSync(filename, 'utf8'), filename), filename)
-const read = (file) => fs.readFileSync(path.join(root, file), 'utf8').replaceAll('\r\n', '\n')
+const read = (file) => require('./android-sight-analysis-contract.cjs').normalize(file, fs.readFileSync(path.join(root, file), 'utf8'))
 const baseline = (file) => execFileSync('git', ['show', `${base}:${file}`], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
 const loc = '../prototype/android-tablet-v1/src/localization/'
 const { createLocalizationInstance, LocalizationService } = require(loc + 'localizationService.ts')

@@ -54,7 +54,10 @@ test('NATIVE-L10', 'Web preference/infrastructure/bridge files remain byte-froze
   english.assertReadmeEnglishDelta()
   const englishPaths = ['prototype/android-tablet-v1/src/localization/homePresentation.ts', 'prototype/android-tablet-v1/src/localization/intervalFlowResources.ts']
   for (const file of englishPaths) assert.equal(english.normalize(file, c.read(file)), c.old(file), 'exact reviewed English presentation delta: ' + file)
-  c.git(['diff', '--exit-code', c.base, '--', 'prototype', 'src', 'capacitor.config.ts',
+  const analysis = require('./android-sight-analysis-contract.cjs'); analysis.assertAnalysisDelta()
+  const analysisFiles = analysis.allowedPaths.filter(file => file.startsWith('src/') || file.endsWith('/androidPersistenceCore.ts'))
+  for (const file of analysisFiles) assert.equal(analysis.normalize(file, c.read(file)), c.old(file), file + ' only the exact approved analysis extension')
+  c.git(['diff', '--exit-code', c.base, '--', 'prototype', 'src', 'capacitor.config.ts', ...analysisFiles.map(file => ':(exclude)' + file), ...analysis.additionPaths.map(file => ':(exclude)' + file),
     ':(exclude)' + selector.selectorPath, ':(exclude)' + selector.resourcesPath, ':(exclude)' + selector.stylesPath, ...exitPaths.map(file => ':(exclude)' + file), ...englishPaths.map(file => ':(exclude)' + file), ...exit.reviewedAdditionPaths.map(file => ':(exclude)' + file)])
 })
 test('NATIVE-L11', 'no per-app locale sync/configuration override/recreate implementation', () => {

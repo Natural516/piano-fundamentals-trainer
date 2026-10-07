@@ -74,12 +74,15 @@ function audit() {
       assert.ok(/Resources\.ts$|\/resources\.ts$/.test(file), 'unclassified localization literal: ' + file)
       for (const entry of entries) evidence.push({ file, ...entry, category: 'A', reason: 'Explicit Chinese locale resource; paired English resource tested without fallback' })
     } else if (file === mainPath) {
+      const analysis = require('./android-sight-analysis-contract.cjs'); analysis.assertAnalysisDelta()
+      const normalizedOwners = namedNodes(analysis.normalize(mainPath, source))
       const old = namedNodes(oldFile(mainPath))
       for (const [owner, { n, ast }] of namedNodes(source)) {
         const found = literals(n.getText(ast), file)
         if (!found.length) continue
         assert.ok(mainPolicy[owner], 'unclassified normal-user literal owner: ' + owner)
-        assert.deepEqual(found.map(e => e.value), literals(old.get(owner).n.getText(old.get(owner).ast), file).map(e => e.value), owner + ' approved literals changed')
+        const normalized = normalizedOwners.get(owner)
+        assert.deepEqual(literals(normalized.n.getText(normalized.ast), file).map(e => e.value), literals(old.get(owner).n.getText(old.get(owner).ast), file).map(e => e.value), owner + ' only exact approved analysis metadata may be added')
         for (const entry of found) evidence.push({ file, owner, ...entry, line: entry.line + ast.getLineAndCharacterOfPosition(n.getStart(ast)).line, category: mainPolicy[owner][0], reason: mainPolicy[owner][1] })
       }
     } else {

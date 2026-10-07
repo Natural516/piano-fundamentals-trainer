@@ -9,6 +9,7 @@ import {
   type SightReadingWriteResult
 } from '../../../src/sightReading/sightReadingSettings'
 import type { SightReadingStaffMode } from '../../../src/sightReading/sightReadingNotes'
+import { cloneSightNoteStats, isSightNoteStats, type SightNoteStats } from '../../../src/sightReading/noteAnalysis'
 
 export const ANDROID_PERSISTENCE_SCHEMA_VERSION = 1 as const
 export const ANDROID_PERSISTENCE_KEYS = {
@@ -39,6 +40,9 @@ export interface AndroidSightReadingSettingsDocument {
 }
 
 export interface DurableSightReadingReport {
+  /** Optional V1 extension. Missing on legacy reports; never inferred or backfilled. */
+  noteStatsVersion?: 1
+  noteStats?: SightNoteStats[]
   schemaVersion: typeof ANDROID_PERSISTENCE_SCHEMA_VERSION
   recordId: string
   practiceType: 'sightReading'
@@ -201,6 +205,17 @@ export function isDurableSightReadingReport(value: unknown): value is DurableSig
     !value.targetNoteErrors.wrong.every(isNoteCountEntry) || !Array.isArray(value.targetNoteErrors.timeout) ||
     !value.targetNoteErrors.timeout.every(isNoteCountEntry)) return false
   if (typeof value.mostWrongNote !== 'string' || typeof value.mostTimedOutNote !== 'string' || typeof value.weakestNote !== 'string') return false
+  if (value.noteStats !== undefined || value.noteStatsVersion !== undefined) {
+    if (value.noteStatsVersion !== 1 || !isSightNoteStats(value.noteStats)) return false
+    const settings = value.settings
+    // Double-note questions have no defensible per-key attribution in V1.
+    const count = settings.noteMode === 'double' ? 0 : 1
+    if (value.noteStats.some(stat => stat.keySignature !== settings.keySignature ||
+      (settings.staffMode !== 'grand' && stat.notation.clef !== settings.staffMode))) return false
+    if (value.noteStats.reduce((sum, stat) => sum + stat.occurrences, 0) !== value.completed * count ||
+      value.noteStats.reduce((sum, stat) => sum + stat.errorCount, 0) !== (value.wrong + value.timeout) * count ||
+      value.noteStats.reduce((sum, stat) => sum + stat.responseTimesMs.length, 0) !== value.correct * count) return false
+  }
   return isObject(value.clefStats) && isClefStats(value.clefStats.treble) && isClefStats(value.clefStats.bass)
 }
 
@@ -223,9 +238,8 @@ export function createDurableSightReadingReport(
     startedAt: options.startedAt,
     endedAt: options.endedAt,
     durationMs: Math.max(0, options.endedAt - options.startedAt),
-    // Durable report shape remains code-8-compatible: note mode and interval analytics
-    // are intentionally not added to historical records in this phase.
-    settings: createSettingsDocument(options.settings, false),
+    // Existing V1 remains readable; new detailed reports retain their real target count.
+    settings: createSettingsDocument(options.settings, report.noteStatsVersion === 1),
     plannedQuestionCount: report.totalQuestions,
     completed: report.completedQuestions,
     correct: report.correct,
@@ -244,6 +258,10 @@ export function createDurableSightReadingReport(
     mostTimedOutNote: report.mostTimedOutNote,
     weakestNote: report.weakestNote,
     clefStats: { treble: { ...report.treble }, bass: { ...report.bass } }
+  }
+  if (report.noteStatsVersion === 1 && report.noteStats) {
+    record.noteStatsVersion = 1
+    record.noteStats = cloneSightNoteStats(report.noteStats)
   }
   if (!isDurableSightReadingReport(record)) throw new Error('Sight Reading report cannot be persisted because its facts are invalid')
   return record

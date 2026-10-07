@@ -12,8 +12,7 @@ import { getSightReadingAnswerTimeoutMs, type SightReadingNoteMode, type SightRe
 import {
   AndroidSightReadingRuntime,
   createBrowserAndroidSightReadingRuntime,
-  formatReactionTime,
-  getPrimaryErrorNote
+  formatReactionTime
 } from './sightReadingIntegration'
 import type { AndroidBluetoothMidiConnectionState } from './androidBluetoothMidi'
 import {
@@ -148,6 +147,7 @@ import {
 } from './theme/themeRegistry'
 import { ThemeRuntimeManager, type InstalledThemeRecord, type ThemeRuntimeSnapshot } from './theme/themePackageRuntime'
 import './styles.css'
+import { SightHistoryAnalysis, SightSessionNoteAnalysis, sightSessionFromHistory, presentSightHistoryAverage } from './SightReadingAnalysis'
 
 declare const __QA_BUILD__: boolean
 declare const __ANDROID_VERSION_CODE__: number
@@ -167,6 +167,8 @@ type ScreenId =
   | 'sight-timeout'
   | 'sight-early-end'
   | 'sight-result'
+  | 'sight-report-detail'
+  | 'sight-analysis'
   | 'chord-mode-select'
   | 'chord-practice'
   | 'interval-practice'
@@ -235,6 +237,8 @@ const screens: ScreenOption[] = [
   { id: 'sight-timeout', label: '识谱 · 超时反馈', shortLabel: 'TIMEOUT' },
   { id: 'sight-early-end', label: '识谱 · 提前结束确认', shortLabel: 'EARLY END' },
   { id: 'sight-result', label: '识谱 · 结果', shortLabel: 'RESULT' },
+  { id: 'sight-report-detail', label: '识谱 · 练习报告', shortLabel: 'SIGHT REPORT' },
+  { id: 'sight-analysis', label: '识谱分析', shortLabel: 'SIGHT ANALYSIS' },
   { id: 'chord-mode-select', label: '和弦 · 方式选择', shortLabel: 'CHORD MODE' },
   { id: 'chord-practice', label: '和弦 · 静态练习', shortLabel: 'CHORD V1' },
   { id: 'interval-practice', label: '音程 · 静态练习', shortLabel: 'INTERVAL V1' },
@@ -2471,50 +2475,37 @@ function SightFocusScreen({
 }
 
 function SightResultScreen({
-  report
+  report,
+  onBack
 }: {
   report: SightReadingSessionReport
+  onBack?: () => void
 }): JSX.Element {
   const { t } = useTranslation('sightReading')
-  const primaryError = getPrimaryErrorNote(report)
-  const primaryErrorCount = primaryError
-    ? (report.wrongNoteCounts.find((entry) => entry.noteName === primaryError)?.count ?? 0)
-      + (report.timeoutNoteCounts.find((entry) => entry.noteName === primaryError)?.count ?? 0)
-    : 0
+  const { t: analysisT } = useTranslation('sightAnalysis')
 
   return (
-    <ProductFrame active="practice" onBack={() => navigate('practice')} title={t('resultTitle')}>
-      <section className="result-layout sight-result-layout">
-        <div className="result-score">
-          <span className="eyebrow">{t('result')}</span>
-          <div className="score-ring"><strong>{report.accuracy}</strong><span>%</span><small>{t('accuracy')}</small></div>
-          <h1>{primaryError
-            ? <>{t('resultAccuracy', { accuracy: report.accuracy })}<br />{t('errorHeadline')}</>
-            : <>{t('resultFinished')}<br />{t('noErrorHeadline')}</>}</h1>
-          <p>{t('resultSummary', { staff: t(`staffs.${report.staffMode}`), key: presentSightKey(report.keySignature, t), count: report.totalQuestions, seconds: report.answerTimeLimitSeconds })}</p>
-        </div>
-        <div className="result-details">
-          <div className="result-metrics">
-            <div><span>{t('completed')}</span><strong>{report.completedQuestions}</strong></div>
-            <div><span>{t('correct')}</span><strong className="success-text">{report.correct}</strong></div>
-            <div><span>{t('wrong')}</span><strong className="danger-text">{report.wrong}</strong></div>
-            <div><span>{t('timeout')}</span><strong>{report.timeout}</strong></div>
-            <div><span>{t('averageReaction')}</span><strong>{presentSightReaction(report.averageReactionMs, t)}</strong></div>
-            <div><span>{t('bestStreak')}</span><strong>{report.bestStreak}</strong></div>
-          </div>
-          <div className="result-note">
-            <span className="result-note__icon"><Icon name="info" /></span>
-            <div>{primaryError ? (
-              <><small>{t('attention')}</small><strong><SightNoteValue value={primaryError} /></strong><p>{t('errorCount', { count: primaryErrorCount })}</p></>
-            ) : (
-              <><small>{t('attention')}</small><strong><SightNoteValue value={primaryError} /></strong><p>{t('noErrors')}</p></>
-            )}</div>
-          </div>
-          <div className="result-actions">
+    <ProductFrame active={onBack ? 'history' : 'practice'} onBack={onBack ?? (() => navigate('practice'))} title={t('resultTitle')}>
+      <section className="sight-report-dashboard">
+        <header className="sight-report-identity">
+          <div><strong>{t('title')}</strong><p>{t('resultSummary', { staff: t(`staffs.${report.staffMode}`), key: presentSightKey(report.keySignature, t), count: report.totalQuestions, seconds: report.answerTimeLimitSeconds })}</p></div>
+          <div className="sight-report-actions">
+            {onBack ? <button className="secondary-action" type="button" onClick={onBack}>{t('sightAnalysis:back')}</button> : <>
             <button className="secondary-action" type="button" onClick={() => navigate('sight-ready')}>{t('again')}</button>
             <button className="primary-action" type="button" onClick={() => navigate('practice')}><Icon name="check" />{t('done')}</button>
+            </>}
           </div>
-        </div>
+        </header>
+        <dl className="sight-report-metrics">
+          <div className="is-accuracy"><dt>{t('accuracy')}</dt><dd>{report.accuracy}%</dd></div>
+          <div><dt>{t('completed')}</dt><dd>{report.completedQuestions}/{report.totalQuestions}</dd></div>
+          <div><dt>{t('correct')}</dt><dd className="success-text">{report.correct}</dd></div>
+          <div><dt>{t('wrong')}</dt><dd className="danger-text">{report.wrong}</dd></div>
+          <div><dt>{t('timeout')}</dt><dd>{report.timeout}</dd></div>
+          <div><dt>{analysisT('averageLabel')}</dt><dd>{presentSightReaction(report.averageReactionMs, t)}</dd></div>
+          <div><dt>{t('bestStreak')}</dt><dd>{report.bestStreak}</dd></div>
+        </dl>
+        <SightSessionNoteAnalysis stats={report.noteStats} />
       </section>
     </ProductFrame>
   )
@@ -2676,16 +2667,19 @@ function HistoryRecord({
   item,
   chordReport,
   onOpenChordReport,
-  onOpenIntervalReport
+  onOpenIntervalReport,
+  onOpenSightReport
 }: {
   item: MixedPracticeHistoryItem
   chordReport?: ChordPersistenceSnapshot['records'][number]
   onOpenChordReport: (recordId: string) => void
   onOpenIntervalReport: (recordId: string) => void
+  onOpenSightReport?: (recordId: string) => void
 }): JSX.Element {
   const { t } = useTranslation('intervalPractice')
   const { t: chordT } = useTranslation('chordPractice')
   const { t: sightT } = useTranslation('sightReading')
+  const { t: analysisT } = useTranslation('sightAnalysis')
   const { runtime } = useMidiUi()
   const { resolvedLocale } = useAppLocale()
   if (item.module === 'chord') {
@@ -2724,15 +2718,15 @@ function HistoryRecord({
   }
   const sightPresentation = presentSightHistory(runtime.historySnapshot.records.find(record => record.recordId === item.recordId), sightT)
   return (
-    <article className={`history-row is-${item.completionState}`}>
+    <button className={`history-row is-${item.completionState} is-interactive`} type="button" aria-label={sightT('sightAnalysis:reportTitle')} onClick={() => onOpenSightReport?.(item.recordId)}>
       <span className="history-row__mark"><Icon name="book" /></span>
       <span className="history-row__copy">
         <small><b className="history-module-badge">{sightT('historyModule')}</b>{formatIntervalHistoryTimestamp(item.endedAt, resolvedLocale)} · {sightT(item.completionState === 'completed' ? 'completedStatus' : 'stoppedStatus')}</small>
         <strong>{sightPresentation.title}</strong>
-        <em>{sightT('historyFacts', { settings: sightPresentation.settings, completed: item.completed, total: item.plannedQuestionCount, correct: item.correct, wrong: item.wrong, timeout: item.timeout, duration: presentSightDuration(item.durationMs, sightT) })}</em>
+        <em>{analysisT('historyFacts', { settings: sightPresentation.settings, completed: item.completed, total: item.plannedQuestionCount, correct: item.correct, wrong: item.wrong, timeout: item.timeout, average: presentSightHistoryAverage(runtime.historySnapshot.records.find(record => record.recordId === item.recordId)?.averageReactionMs, analysisT) })}</em>
       </span>
       <span className="history-row__score"><strong>{formatHistoryPercentage(item.accuracy)}%</strong><small>{sightT('accuracy')}</small></span>
-    </article>
+    </button>
   )
 }
 
@@ -2745,6 +2739,7 @@ function HistoryScreen({
   onFilterChange,
   onOpenChordReport,
   onOpenIntervalReport,
+  onOpenSightReport,
   runtime,
   theme
 }: {
@@ -2756,6 +2751,7 @@ function HistoryScreen({
   onFilterChange: (filter: HistoryFilter) => void
   onOpenChordReport: (recordId: string, filter: HistoryFilter) => void
   onOpenIntervalReport: (recordId: string, filter: HistoryFilter) => void
+  onOpenSightReport?: (recordId: string, filter: HistoryFilter) => void
   runtime: AndroidSightReadingRuntime
   theme: ThemeDefinition
 }): JSX.Element {
@@ -2814,7 +2810,10 @@ function HistoryScreen({
           <section className="history-list history-dashboard__recent">
             <div className="history-dashboard__section-heading">
               <div><span className="eyebrow">RECENT PRACTICE</span><h2>{t('recent')}</h2></div>
-              <span>{listStatus}</span>
+              <div className="history-dashboard__heading-actions">
+                {filter === 'sight' ? <button className="sight-analysis-entry" type="button" onClick={() => navigate('sight-analysis')}>{t('sightAnalysis:title')} <span aria-hidden="true">→</span></button> : null}
+                <span>{listStatus}</span>
+              </div>
             </div>
             <div className="history-filter" aria-label={t('filterLabel')} role="group">
               {([['all', 'all'], ['sight', 'sightBadge'], ['chord', 'chordBadge'], ['interval', 'intervalBadge']] as const).map(([value, label]) => (
@@ -2823,7 +2822,7 @@ function HistoryScreen({
             </div>
             <div className="history-list__rows">
               {visibleItems.length > 0
-                ? visibleItems.map((item) => <HistoryRecord chordReport={chordHistory.records.find(record => record.recordId === item.recordId)} item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} onOpenIntervalReport={(recordId) => onOpenIntervalReport(recordId, filter)} />)
+                ? visibleItems.map((item) => <HistoryRecord chordReport={chordHistory.records.find(record => record.recordId === item.recordId)} item={item} key={`${item.module}-${item.recordId}`} onOpenChordReport={(recordId) => onOpenChordReport(recordId, filter)} onOpenIntervalReport={(recordId) => onOpenIntervalReport(recordId, filter)} onOpenSightReport={(recordId) => onOpenSightReport?.(recordId, filter)} />)
                 : (
                   <div className="history-empty" role={anyError ? 'alert' : 'status'}>
                     <span className="history-row__mark"><Icon name={anyError ? 'info' : 'history'} /></span>
@@ -3635,6 +3634,7 @@ class ThemeRecoveryBoundary extends Component<{ children: ReactNode; manager: Th
 }
 
 function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; themeManager: ThemeRuntimeManager }): JSX.Element {
+  const { t: analysisT } = useTranslation('sightAnalysis')
   const themeRuntime = useThemeRuntime(themeManager)
   const snapshot = useSightReadingRuntime(runtime)
   const activeSessionHost = useMemo(() => new ActivePracticeSessionHost(), [])
@@ -3682,6 +3682,7 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
   const [intervalSettingsReady, setIntervalSettingsReady] = useState(false)
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all')
   const [selectedChordRecordId, setSelectedChordRecordId] = useState<string | null>(null)
+  const [selectedSightRecordId, setSelectedSightRecordId] = useState<string | null>(null)
   const [selectedIntervalRecordId, setSelectedIntervalRecordId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -3949,6 +3950,8 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
       const parentScreen: Partial<Record<ScreenId, ScreenId>> = {
         'sight-ready': 'practice',
         'sight-result': 'practice',
+        'sight-report-detail': 'history',
+        'sight-analysis': 'history',
         'chord-mode-select': 'practice',
         'chord-practice': 'chord-mode-select',
         'interval-practice': 'practice',
@@ -4094,6 +4097,7 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
           onFilterChange={setHistoryFilter}
           onOpenChordReport={openChordReportDetail}
           onOpenIntervalReport={openIntervalReportDetail}
+          onOpenSightReport={(recordId, filter) => { setHistoryFilter(filter); setSelectedSightRecordId(recordId); navigate('sight-report-detail') }}
           runtime={runtime}
           theme={activeTheme}
         />
@@ -4104,6 +4108,17 @@ function App({ runtime, themeManager }: { runtime: AndroidSightReadingRuntime; t
           report={resolveChordReportById(chordPersistenceSnapshot.records, selectedChordRecordId)}
         />
       )
+      case 'sight-analysis': return (
+        <ProductFrame active="history" title={analysisT('title')} onBack={() => navigate('history')}>
+          <SightHistoryAnalysis records={runtime.historySnapshot.records} status={runtime.historySnapshot.status} warning={runtime.historySnapshot.warning} />
+        </ProductFrame>
+      )
+      case 'sight-report-detail': {
+        const record = runtime.historySnapshot.records.find(value => value.recordId === selectedSightRecordId)
+        return record ? <SightResultScreen report={sightSessionFromHistory(record)} onBack={() => navigate('history')} /> : (
+          <ProductFrame active="history" title={analysisT('reportTitle')} onBack={() => navigate('history')}><p>{analysisT('missing')}</p></ProductFrame>
+        )
+      }
       case 'interval-report-detail': return (
         <IntervalReportDetailScreen
           onBack={closeIntervalReportDetail}

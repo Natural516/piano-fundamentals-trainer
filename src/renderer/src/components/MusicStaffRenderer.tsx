@@ -25,6 +25,8 @@ interface MusicStaffRendererProps {
   feedback: MusicNotationFeedback
   ariaLabel: string
   fontErrorLabel?: string
+  compact?: boolean
+  analysisDense?: boolean
 }
 
 const MIN_RENDER_WIDTH = 420
@@ -174,6 +176,37 @@ function drawMusicStaff(
   drawNote(context, bassStave, notes.filter((note) => note.clef === 'bass'), 'bass', noteColor)
 }
 
+/** Compact presentation uses the identical VexFlow clef/key/accidental/note helpers.
+ * Dense analysis uses 8px staff spacing and compact padding; default/ACTIVE notation is unchanged.
+ */
+function drawCompactMusicStaff(container: HTMLDivElement, model: ReturnType<typeof createMusicStaffRenderModel>, dense = false): void {
+  container.replaceChildren()
+  const width = Math.max(dense ? 180 : 220, container.clientWidth)
+  const renderer = new Renderer(container, Renderer.Backends.SVG)
+  renderer.resize(width, dense ? 54 : 132)
+  const context = renderer.getContext()
+  const clef = model.notes[0]?.clef ?? 'treble'
+  const stave = new Stave(8, dense ? -22 : 20, width - 16, dense ? { spacingBetweenLinesPx: 8 } : {}).addClef(clef, dense ? 'small' : 'default').addKeySignature(model.keySignature)
+  drawStyledStave(context, stave, MUSIC_STAFF_INK_COLOR, MUSIC_STAFF_INK_COLOR)
+  drawNote(context, stave, model.notes, clef, MUSIC_STAFF_INK_COLOR)
+  if (dense) {
+    // VexFlow owns staff/note ordinates, including ledger-line notes. Avoid SVG text getBBox:
+    // its font-em box is not the visible music-ink bounds. Translate only, never scale ink.
+    const svg = container.querySelector('svg')
+    const note = createStaveNote(model.notes, clef, {}, {})
+    if (svg && note) {
+      note.setStave(stave)
+      const ys = note.getYs()
+      const padding = model.notes.some(pitch => pitch.displayAccidental) ? 16 : 8
+      const top = Math.floor(Math.min(stave.getYForLine(0) - 10, ...ys.map(y => y - padding)))
+      const bottom = Math.ceil(Math.max(stave.getYForLine(4) + 10, ...ys.map(y => y + padding)))
+      const height = Math.max(54, bottom - top)
+      renderer.resize(width, height)
+      svg.setAttribute('viewBox', `0 ${top} ${width} ${height}`)
+    }
+  }
+}
+
 export function MusicStaffRenderer(props: MusicStaffRendererProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const [fontReady, setFontReady] = useState(false)
@@ -213,6 +246,10 @@ export function MusicStaffRenderer(props: MusicStaffRendererProps): JSX.Element 
     const redraw = (): void => {
       window.cancelAnimationFrame(frameId)
       frameId = window.requestAnimationFrame(() => {
+        if (props.compact || props.analysisDense) {
+          drawCompactMusicStaff(container, model, props.analysisDense)
+          return
+        }
         drawMusicStaff(
           container,
           container.clientWidth,
@@ -238,12 +275,12 @@ export function MusicStaffRenderer(props: MusicStaffRendererProps): JSX.Element 
       themeObserver.disconnect()
       container.replaceChildren()
     }
-  }, [fontReady, model])
+  }, [fontReady, model, props.compact, props.analysisDense])
 
   return (
     <div
       ref={containerRef}
-      className={`music-staff-renderer is-${model.staffMode}`}
+      className={`music-staff-renderer is-${model.staffMode}${props.compact ? ' is-compact' : ''}${props.analysisDense ? ' is-analysis-dense' : ''}`}
       role="img"
       aria-label={props.ariaLabel}
       aria-busy={!fontReady && !fontError}
