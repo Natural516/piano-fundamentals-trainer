@@ -74,7 +74,7 @@ test('NATIVE-L13', 'Updater native/network/installer behavior frozen and system 
 })
 test('NATIVE-L14', 'native business/signing/version/permissions/assets frozen beyond exact display delta', () => {
   c.assertNativePresentationOnly()
-  assert.deepEqual([...c.read('android/version.properties').matchAll(/^(versionCode|versionName)=([^\n]+)$/gm)].map(m => [m[1], m[2]]), [['versionCode', '15'], ['versionName', '1.7.0']])
+  assert.deepEqual([...c.read('android/version.properties').matchAll(/^(versionCode|versionName)=([^\n]+)$/gm)].map(m => [m[1], m[2]]), [['versionCode', '16'], ['versionName', '1.7.1']])
   assert.equal(c.git(['rev-parse', 'v1.6.0^{}']).trim(), '1cc465afad7fae7d00508fb20a0e36e176c8fb90')
   const file = 'scripts/android-signing-foundation-check.cjs'
   const before = '  assert.match(strings, /<string name="app_name">钢琴基本功训练器<\\/string>/)'

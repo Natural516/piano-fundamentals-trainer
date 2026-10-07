@@ -210,7 +210,9 @@ test('byte parser and mature judgement/persistence/signing/updater source stay f
   const base = '622b2ee3384c8997b8c0389ec7d4e5751e1b70a8'
   const frozen = ['src/sightReading/midi.ts', 'src/sightReading/controller.ts', 'prototype/android-tablet-v1/src/intervalPractice/judgement.ts', 'prototype/android-tablet-v1/src/intervalPractice/sessionRuntime.ts', 'prototype/android-tablet-v1/src/chordPractice/runtime/core.ts', 'prototype/android-tablet-v1/src/androidPersistenceCore.ts', 'android/version.properties', 'android/updater.properties', 'android/app/build.gradle']
   const candidate = require('./android-release-candidate-version-contract.cjs')
-  for (const file of frozen) assert.equal(file === candidate.VERSION_PATH ? candidate.normalizeCandidateVersion(read(file)) : read(file).replace(/\r/g, ''), execFileSync('git', ['show', `${base}:${file}`], { cwd: root, encoding: 'utf8' }).replace(/\r/g, ''), file)
+  const analysis = require('./android-sight-analysis-contract.cjs')
+  analysis.assertAnalysisDelta()
+  for (const file of frozen) assert.equal(file === candidate.VERSION_PATH ? candidate.normalizeCandidateVersion(read(file)) : analysis.normalize(file, read(file)), execFileSync('git', ['show', `${base}:${file}`], { cwd: root, encoding: 'utf8' }).replace(/\r/g, ''), file)
   const file = 'prototype/android-tablet-v1/src/androidBluetoothMidiCore.ts'; const original = execFileSync('git', ['show', `${base}:${file}`], { cwd: root, encoding: 'utf8' })
   assert.equal(read(file).replace(/\r/g, '').replace("'bluetooth' | 'usb' | 'development'", "'bluetooth' | 'development'"), original.replace(/\r/g, ''))
 })

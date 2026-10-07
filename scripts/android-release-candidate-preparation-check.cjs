@@ -5,7 +5,7 @@ const version = require('./android-release-candidate-version-contract.cjs')
 const { loadLocalPublicSource, assertPublicReleaseFacts, assertNoLegacyRepositoryReferences, publicPathAudit } = require('./android-release-preflight.cjs')
 const root = path.resolve(__dirname, '..')
 const read = file => fs.readFileSync(path.join(root, file), 'utf8').replaceAll('\r\n', '\n')
-const before = file => execFileSync('git', ['show', `${version.PREPARATION_BASE}:${file}`], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
+const before = (file, ref = version.PREPARATION_BASE) => execFileSync('git', ['show', `${ref}:${file}`], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
 const arg = process.argv.slice(2)
 assert.equal(arg.length, 1, 'explicit repo-external --public-root=<path> required')
 assert.match(arg[0], /^--public-root=.+/)
@@ -17,15 +17,15 @@ const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex')
 test('CAND1 exact version delta rejects wrong names/codes, duplicate keys and unrelated bytes', () => {
   version.assertCandidateVersion()
   assert.equal(version.normalizeCandidateVersion(version.candidateVersion), version.beforeVersion)
-  for (const source of [version.beforeVersion, version.candidateVersion.replace('versionCode=15','versionCode=16'), version.candidateVersion.replace('versionName=1.7.0','versionName=1.7.01'), version.candidateVersion + 'versionCode=15\n', version.candidateVersion + '# unrelated change\n']) assert.throws(() => version.normalizeCandidateVersion(source))
+  for (const source of [version.beforeVersion, version.previousVersion, version.candidateVersion.replace('versionCode=16','versionCode=15'), version.candidateVersion.replace('versionName=1.7.1','versionName=1.7.10'), version.candidateVersion + 'versionCode=16\n', version.candidateVersion + '# unrelated change\n']) assert.throws(() => version.normalizeCandidateVersion(source))
 })
 test('CAND2 committed verification retains exact equality and bounds the uncommitted preparation exception', () => {
   version.assertCommittedVersionOrPreparation(version.candidateVersion, version.candidateVersion, 'future-checkpoint', 'candidate-branch')
-  version.assertCommittedVersionOrPreparation(version.beforeVersion, version.candidateVersion, version.PREPARATION_BASE, 'codex/release-1.7.0-prep')
+  version.assertCommittedVersionOrPreparation(version.previousVersion, version.candidateVersion, version.CURRENT_PREPARATION_BASE, 'codex/release-1.7.1')
   for (const [committed, current, head, branch] of [
-    [version.beforeVersion, version.candidateVersion, 'wrong-head', 'codex/release-1.7.0-prep'],
-    [version.beforeVersion, version.candidateVersion, version.PREPARATION_BASE, 'main'],
-    [version.beforeVersion + '# extra\n', version.candidateVersion, version.PREPARATION_BASE, 'codex/release-1.7.0-prep'],
+    [version.previousVersion, version.candidateVersion, 'wrong-head', 'codex/release-1.7.1'],
+    [version.previousVersion, version.candidateVersion, version.CURRENT_PREPARATION_BASE, 'main'],
+    [version.previousVersion + '# extra\n', version.candidateVersion, version.CURRENT_PREPARATION_BASE, 'codex/release-1.7.1'],
     [version.candidateVersion, version.candidateVersion + 'extra=true\n', 'future-checkpoint', 'candidate-branch']
   ]) assert.throws(() => version.assertCommittedVersionOrPreparation(committed, current, head, branch))
 })
@@ -40,7 +40,7 @@ test('CAND4 exact approved released docs; package/theme and archived stable sect
   // Fixed hashes of the reviewed release-document delta, never inferred from current HEAD.
   assert.equal(digest(Buffer.from(read('README.md'))), '1ca37e856aceb23a1f4d064a566b04cb56a2ac96e50c1a3f16c7c2075a20eb61')
   assert.equal(digest(Buffer.from(read('CHANGELOG.md'))), 'd66b32e8d61e54dba240ea88914666f7902d108d3fae969e8cfa00b309f8ac2c')
-  for (const file of ['package.json','package-lock.json','theme-packages/bocchi/manifest.json']) assert.equal(read(file), before(file), file)
+  for (const file of ['package.json','package-lock.json','theme-packages/bocchi/manifest.json']) assert.equal(read(file), before(file, version.CURRENT_PREPARATION_BASE), file)
   assert.ok(read('README.md').includes('Android 1.7.0 · versionCode 15'))
   assert.match(read('CHANGELOG.md'), /^## 1\.7\.0 — 2026-10-05 — versionCode 15$/m)
   assert.equal(read('CHANGELOG.md').slice(read('CHANGELOG.md').indexOf('## 1.6.0 —')), before('CHANGELOG.md').slice(before('CHANGELOG.md').indexOf('## 1.6.0 —')))
@@ -50,18 +50,18 @@ test('CAND4 exact approved released docs; package/theme and archived stable sect
 test('CAND5 normal preflight loader reads untracked candidate files with exact new facts', () => {
   assert.equal(fs.existsSync(path.join(publicRoot, '.git')), false)
   const candidate = loadLocalPublicSource(publicRoot)
-  assert.equal(assertPublicReleaseFacts(candidate, '15','1.7.0'), 8)
+  assert.equal(assertPublicReleaseFacts(candidate, '16','1.7.1'), 8)
   publicPathAudit(candidate.paths); assertNoLegacyRepositoryReferences(candidate.documents, 'candidate projection')
   assert.match(candidate.documents.get('README.md'), /CANDIDATE \/ UNRELEASED DOCUMENT PROJECTION/)
-  assert.match(candidate.documents.get('CHANGELOG.md'), /^## 1\.7\.0 — Candidate \/ Unreleased — versionCode 15$/m)
-  const existing = candidate.documents.get('CHANGELOG.md').slice(candidate.documents.get('CHANGELOG.md').indexOf('## 1.6.0 —'))
-  assert.equal(existing.replaceAll('\r\n', '\n'), read('CHANGELOG.md').slice(read('CHANGELOG.md').indexOf('## 1.6.0 —')))
+  assert.match(candidate.documents.get('CHANGELOG.md'), /^## 1\.7\.1 — Candidate \/ Unreleased — versionCode 16$/m)
+  const existing = candidate.documents.get('CHANGELOG.md').slice(candidate.documents.get('CHANGELOG.md').indexOf('## 1.7.0 —'))
+  assert.equal(existing.replaceAll('\r\n', '\n'), read('CHANGELOG.md').slice(read('CHANGELOG.md').indexOf('## 1.7.0 —')))
 })
 test('CAND6 wrong future facts/prefixes and missing screenshots still fail', () => {
   const candidate = loadLocalPublicSource(publicRoot), original = candidate.documents.get('README.md')
   const withReadme = text => ({ ...candidate, documents: new Map(candidate.documents).set('README.md', text) })
-  for (const wrong of ['Android 1.7.01 · versionCode 15','Android 1.7.0 · versionCode 150','Android 1.6.0 · versionCode 15','Android 1.7.0']) assert.throws(() => assertPublicReleaseFacts(withReadme(original.replace('Android 1.7.0 · versionCode 15', wrong)), '15','1.7.0'))
-  assert.throws(() => assertPublicReleaseFacts({ ...candidate, paths: candidate.paths.filter(p => p !== 'docs/screenshots/android-development-en-home.png') }, '15','1.7.0'))
+  for (const wrong of ['Android 1.7.10 · versionCode 16','Android 1.7.1 · versionCode 160','Android 1.7.0 · versionCode 16','Android 1.7.1']) assert.throws(() => assertPublicReleaseFacts(withReadme(original.replace('Android 1.7.1 · versionCode 16', wrong)), '16','1.7.1'))
+  assert.throws(() => assertPublicReleaseFacts({ ...candidate, paths: candidate.paths.filter(p => p !== 'docs/screenshots/android-development-en-home.png') }, '16','1.7.1'))
 })
 test('CAND7 all eight real screenshot files preserve original source bytes/names', () => {
   const candidate = loadLocalPublicSource(publicRoot)

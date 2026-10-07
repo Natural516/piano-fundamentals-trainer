@@ -60,7 +60,7 @@ for (const [id, locale, qualifier, description] of [
 })
 if (production) test('PACK3', 'Production APK has exact package/version, no debug identity and permanent signer', () => {
   const badging = execFileSync(aapt, ['dump', 'badging', apk], { encoding: 'utf8' })
-  assert.match(badging, /package: name='com\.pianofundamentals\.trainer' versionCode='15' versionName='1\.7\.0'/)
+  assert.match(badging, /package: name='com\.pianofundamentals\.trainer' versionCode='16' versionName='1\.7\.1'/)
   assert.doesNotMatch(badging, /^application-debuggable$/m)
   assert.match(badging, /^application-label:'Piano Fundamentals Trainer'$/m)
   const signing = execFileSync(process.execPath, [path.join(__dirname, 'android-apk-signing-report.cjs'), apk, '--expect-release'], { encoding: 'utf8' })
@@ -70,7 +70,7 @@ if (production) test('PACK3', 'Production APK has exact package/version, no debu
 })
 else test('PACK3', 'APK stays QA/debuggable channel with isolated package and exact candidate version', () => {
   const badging = execFileSync(aapt, ['dump', 'badging', apk], { encoding: 'utf8' })
-  assert.match(badging, /package: name='com\.pianofundamentals\.trainer\.qa' versionCode='15' versionName='1\.7\.0'/)
+  assert.match(badging, /package: name='com\.pianofundamentals\.trainer\.qa' versionCode='16' versionName='1\.7\.1'/)
   assert.match(badging, /^application-debuggable$/m)
   assert.match(badging, /^application-label:'Piano Fundamentals Trainer QA'$/m)
 })

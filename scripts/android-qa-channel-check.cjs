@@ -30,9 +30,9 @@ const checks = [
     assert.match(gradle, /qa\s*\{[\s\S]*?initWith debug[\s\S]*?applicationIdSuffix\s+["']\.qa["']/)
     assert.match(gradle, /qa\s*\{[\s\S]*?buildConfigField\s+["']String["'],\s*["']UPDATE_MANIFEST_URL["'],\s*'""'/)
   }],
-  ['Candidate source version is 15 / 1.7.0; production assets are not rebuilt', () => {
-    assert.match(version, /^versionCode=15$/m)
-    assert.match(version, /^versionName=1\.7\.0$/m)
+  ['Candidate source version is 16 / 1.7.1; QA identity remains isolated', () => {
+    assert.match(version, /^versionCode=16$/m)
+    assert.match(version, /^versionName=1\.7\.1$/m)
   }],
   ['QA launcher name and package resources are distinct', () => {
     assert.match(qaStrings, />Piano Fundamentals Trainer QA</)

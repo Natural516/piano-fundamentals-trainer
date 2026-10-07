@@ -85,8 +85,8 @@ const tests = [
     assert.equal((registry.match(/settingsVisual: standardSettingsVisual/g) ?? []).length, 2)
   }],
   ['SET12', 'Android release identity remains frozen', () => {
-    assert.match(version, /^versionCode=15$/m)
-    assert.match(version, /^versionName=1\.7\.0$/m)
+    assert.match(version, /^versionCode=16$/m)
+    assert.match(version, /^versionName=1\.7\.1$/m)
   }],
   ['SET13', 'Language is an app-level appearance preference with a real bilingual Settings surface', () => {
     assert.match(settings, /useTranslation\('settings'\)/)

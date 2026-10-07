@@ -108,8 +108,8 @@ const tests = [
     assert.match(chordResources, /backPractice: 'Back to practice'/)
   }],
   ['NAV09', 'QA channel and production version identities remain frozen', () => {
-    assert.match(version, /^versionCode=15$/m)
-    assert.match(version, /^versionName=1\.7\.0$/m)
+    assert.match(version, /^versionCode=16$/m)
+    assert.match(version, /^versionName=1\.7\.1$/m)
     assert.match(ui, /if \(!__QA_BUILD__\) void updater\.initialize\(\)/)
     assert.match(settings, /description=\{t\('qaUpdateDescription'\)\}/)
     assert.match(fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/localization/shellResources.ts'), 'utf8'), /qaUpdateDescription: '与正式版独立安装；正式更新通道已关闭'/)
