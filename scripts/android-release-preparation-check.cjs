@@ -9,7 +9,7 @@ const git = (...args) => cp.execFileSync('git', args, { cwd: root, encoding: 'ut
 const { assertPublicReleaseFacts, assertNoLegacyRepositoryReferences, publicPathAudit } = require('./android-release-preflight.cjs')
 const properties = Object.fromEntries(read('android/version.properties').split(/\r?\n/).filter(line => /^\w+=/.test(line)).map(line => line.split('=')))
 assert.deepEqual(properties, { versionCode: '16', versionName: '1.7.1' })
-console.log('PASS Android candidate version 1.7.1 / code16; public stable remains 1.7.0 / code15')
+console.log('PASS Android release version source and public stable facts: 1.7.1 / code16')
 
 const gradle = read('android/app/build.gradle')
 assert.match(gradle, /rootProject\.file\('version\.properties'\)/)
@@ -55,7 +55,7 @@ console.log('PASS real old Bocchi 1.0.0 definition uses standard Interval fallba
 const paths = git('ls-files', '--cached', '--others', '--exclude-standard').split('\n').filter(Boolean)
 const documents = new Map(paths.filter(p => p.endsWith('.md')).map(p => [p, read(p)]))
 const publicSource = {paths, documents}
-assert.equal(assertPublicReleaseFacts(publicSource, '15', '1.7.0'), 8)
+assert.equal(assertPublicReleaseFacts(publicSource, '16', '1.7.1'), 8)
 const stableScreenshots = [
   'docs/screenshots/android-v1.6.0-home.png',
   'docs/screenshots/android-v1.6.0-sight-reading.png',
@@ -76,27 +76,30 @@ assert.equal(screenshotReferences.filter(file => developmentEnglishScreenshots.i
 assert.ok(readme.includes('**Development preview:**'))
 console.log('PASS exact screenshot paths: 4 stable + 4 development English = 8, development attribution retained')
 
-const stableFact = 'Android 1.7.0 · versionCode 15'
+const stableFact = 'Android 1.7.1 · versionCode 16'
 assert.ok(readme.includes(stableFact), 'negative fixtures must mutate the actual stable release fact')
 const withReadme = source => ({paths, documents: new Map(documents).set('README.md', source)})
-for (const formatted of ['Android `1.7.0` · `versionCode 15`', '**Android 1.7.0 · versionCode 15**']) {
-  assert.equal(assertPublicReleaseFacts(withReadme(readme.replace(stableFact, formatted)), '15', '1.7.0'), 8)
+for (const formatted of ['Android `1.7.1` · `versionCode 16`', '**Android 1.7.1 · versionCode 16**']) {
+  assert.equal(assertPublicReleaseFacts(withReadme(readme.replace(stableFact, formatted)), '16', '1.7.1'), 8)
 }
 for (const invalid of [
-  'Android 1.6.0 · versionCode 15',
-  'Android 1.7.01 · versionCode 15',
-  'Android 1.7.0 · versionCode 14',
-  'Android 1.7.0 · versionCode 150',
-  'Android 1.7.0'
+  'Android 1.7.0 · versionCode 16',
+  'Android 1.7.10 · versionCode 16',
+  'Android 1.7.1 · versionCode 15',
+  'Android 1.7.1 · versionCode 160',
+  'Android 1.7.1'
 ]) {
-  assert.throws(() => assertPublicReleaseFacts(withReadme(readme.replace(stableFact, invalid)), '15', '1.7.0'), /public README stable release/)
+  assert.throws(() => assertPublicReleaseFacts(withReadme(readme.replace(stableFact, invalid)), '16', '1.7.1'), /public README stable release/)
 }
-assert.throws(() => assertPublicReleaseFacts({...publicSource, paths: paths.filter(file => file !== developmentEnglishScreenshots[0])}, '15', '1.7.0'), /missing screenshots/)
+assert.throws(() => assertPublicReleaseFacts({...publicSource, paths: paths.filter(file => file !== developmentEnglishScreenshots[0])}, '16', '1.7.1'), /missing screenshots/)
 console.log('PASS release facts are Markdown-independent and reject wrong/missing values, prefix matches and missing screenshots')
 publicPathAudit(paths)
 assertNoLegacyRepositoryReferences(documents, 'integration public docs')
 assert.match(read('CHANGELOG.md'), /^## 1\.6\.0 — 2026-10-02 — versionCode 14$/m)
 assert.match(read('CHANGELOG.md'), /^## 1\.7\.0 — 2026-10-05 — versionCode 15$/m)
+assert.match(read('CHANGELOG.md'), /^## 1\.7\.1 — 2026-10-07 — versionCode 16$/m)
+const released170Changelog = cp.execFileSync('git', ['show', '4c02a828938a4afc90ec1dc3b90e2824449fbb21:CHANGELOG.md'], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
+assert.equal(read('CHANGELOG.md').replaceAll('\r\n', '\n').slice(read('CHANGELOG.md').replaceAll('\r\n', '\n').indexOf('## 1.7.0 —')), released170Changelog.slice(released170Changelog.indexOf('## 1.7.0 —')))
 // The tag predates the post-release date closure; freeze the accepted final 1.6.0 section instead.
 const closed160Changelog = cp.execFileSync('git', ['show', '37fb125f0192e351a86b350d85569704ec050c40:CHANGELOG.md'], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
 assert.equal(read('CHANGELOG.md').replaceAll('\r\n', '\n').slice(read('CHANGELOG.md').replaceAll('\r\n', '\n').indexOf('## 1.6.0 —')), closed160Changelog.slice(closed160Changelog.indexOf('## 1.6.0 —')))

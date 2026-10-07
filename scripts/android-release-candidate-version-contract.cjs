@@ -50,15 +50,11 @@ function normalizeExactEdits(source, edits) {
 }
 function normalizeSigningContract(source) { return normalizeExactEdits(source, signingEdits) }
 function assertPreparationContractDelta(source = read('scripts/android-release-preparation-check.cjs')) {
-  const file = 'scripts/android-release-preparation-check.cjs'
-  // Exact reviewed 1.7.0 release-document contract. Not a current-HEAD/directory allowance.
-  // Keep the historical two-line candidate projection below for its archived fixture.
-  const releaseContractSha256 = '050739caa8ef3b1c7b3ba7597d9ea57b0688c36e7fea9a74216cc9e31d085542'
-  source = normalizeExactEdits(source, [
-    ["assert.deepEqual(properties, { versionCode: '15', versionName: '1.7.0' })", "assert.deepEqual(properties, { versionCode: '16', versionName: '1.7.1' })"],
-    ["console.log('PASS Android release version source and public stable facts: 1.7.0 / code15')", "console.log('PASS Android candidate version 1.7.1 / code16; public stable remains 1.7.0 / code15')"]
-  ])
-  if (createHash('sha256').update(source.replaceAll('\r\n', '\n')).digest('hex') === releaseContractSha256) return
-  assert.equal(normalizeExactEdits(source, preparationEdits).trimEnd(), git('show', `${PREPARATION_BASE}:${file}`), 'release preparation permits ONLY the two candidate metadata lines; stable/docs/theme/security assertions stay exact')
+  // Fixed, reviewed final 1.7.1 contract: exact release facts/negative fixtures,
+  // plus the added byte-preservation assertion for the entire 1.7.0 changelog.
+  // No current-HEAD or directory allowance; any other assertion edit fails.
+  const releaseContractSha256 = 'd3a8bc8a60b29c9011ce96be25ef0f7549f0296b830435b3189ac1b26981c154'
+  assert.equal(createHash('sha256').update(source.replaceAll('\r\n', '\n')).digest('hex'), releaseContractSha256,
+    'release preparation permits ONLY the reviewed exact 1.7.1 final contract; theme/security/screenshot assertions stay frozen')
 }
 module.exports = { PREPARATION_BASE, CURRENT_PREPARATION_BASE, VERSION_PATH, beforeVersion, previousVersion, candidateVersion, normalizeCandidateVersion, assertCandidateVersion, assertCommittedVersionOrPreparation, normalizeSigningContract, assertPreparationContractDelta }

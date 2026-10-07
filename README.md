@@ -9,9 +9,9 @@ A focused Android tablet trainer for sight reading, chords, intervals, and pract
 
 [中文](#zh) · [English](#en) · [Latest Release](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest) · [Changelog](CHANGELOG.md) · [Themes](https://github.com/Natural516/piano-fundamentals-trainer-themes)
 
-Android 1.7.0 · versionCode 15
+Android 1.7.1 · versionCode 16
 
-> Latest stable release: **Android 1.7.0**.<br>
+> Latest stable release: **Android 1.7.1**.<br>
 > Release artifacts are the source of truth for what is currently installable; repository documentation and development work may move ahead of the latest packaged release.
 
 ---
@@ -41,6 +41,8 @@ Piano Fundamentals Trainer（钢琴基本功训练器）是一款面向横屏 An
 看到谱面后直接用 MIDI 键盘作答，训练谱面音符与键盘位置之间的快速联系。
 
 可根据练习需要选择谱表、调号与题数，并支持单音 / 双音等现有练习流程。
+
+单音练习报告提供本次易错音与长思考音；在 History 的识谱筛选中，可通过“识谱分析”回顾最近最多 10 次完整练习。音符按谱面拼写和八度分别统计，旧报告没有详细音符数据时不会补造分析。
 
 #### 和弦练习
 
@@ -110,7 +112,7 @@ MIDI 判定不等于完整演奏评价：应用不声称能够判断手型、身
 
 ### 下载与安装
 
-当前稳定版本：**Android 1.7.0**，主要面向横屏 Android 平板。
+当前稳定版本：**Android 1.7.1**，主要面向横屏 Android 平板。
 
 **[前往 Latest Release 下载 APK](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest)**
 
@@ -118,6 +120,7 @@ MIDI 判定不等于完整演奏评价：应用不声称能够判断手型、身
 - 正式应用提供用户主动触发的“检查更新”流程；下载后仍由 Android 系统确认安装。
 - 兼容的正式旧版本可以覆盖安装并保留兼容的历史记录与主要设置。
 - 已在 Lenovo TB375FC 上验证从 1.5.3 升级到 1.6.0，以及从 1.6.0 同签名覆盖升级到 1.7.0 的 History、主要设置与主题保留。
+- 本版已在同一平板上验证从 1.7.0 同签名覆盖升级到 1.7.1；升级前的 History、主要设置、语言和主题保持不变。
 - 不要为了升级先卸载应用或清除数据；其它设备的兼容性与数据保留应以实际情况为准。
 
 ### 个性化主题
@@ -175,6 +178,8 @@ Current core areas include:
 Read the staff and answer directly from a MIDI keyboard, building a faster connection between written notes and physical key positions.
 
 Existing practice flows include configurable staff, key, question count, and single / double-note work.
+
+Single-note reports highlight notes with errors and slower correct responses. Under the Sight Reading filter in History, open Sight Reading Analysis to review up to the latest 10 completed sessions. Notes retain their written spelling and octave; missing detail in older reports is never fabricated.
 
 #### Chord Practice
 
@@ -244,7 +249,7 @@ When the operating system provides real device or port names, the app preserves 
 
 ### Download and installation
 
-Latest stable version: **Android 1.7.0**, primarily targeting landscape Android tablets.
+Latest stable version: **Android 1.7.1**, primarily targeting landscape Android tablets.
 
 **[Download the latest APK from GitHub Releases](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest)**
 
@@ -252,6 +257,7 @@ Latest stable version: **Android 1.7.0**, primarily targeting landscape Android 
 - The production app also provides a user-triggered update check; Android still asks for confirmation before installation.
 - Compatible production releases can be installed over older versions while preserving compatible history and major settings.
 - History, major settings, and theme retention have been verified on the Lenovo TB375FC for 1.5.3 to 1.6.0 and for a same-signer in-place upgrade from 1.6.0 to 1.7.0.
+- This release also passed a same-signer in-place upgrade from 1.7.0 to 1.7.1 on that tablet, retaining the existing History, major settings, language, and theme.
 - Do not uninstall the app or clear its data just to update it; behavior on other devices should be verified in practice.
 
 ### Themes
