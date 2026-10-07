@@ -45,6 +45,8 @@ function assertFrozenDiff(ref, paths) {
   const analysis = require('./android-sight-analysis-contract.cjs')
   analysis.assertAnalysisDelta()
   const analysisExclusions = analysis.allowedPaths.filter(file => paths.some(scope => file === scope || file.startsWith(scope + '/')))
+  // New reviewed files have no historical blob; assertAnalysisDelta pins each exact digest above.
+  const analysisAdditionExclusions = analysis.additionPaths.filter(file => paths.some(scope => file === scope || file.startsWith(scope + '/')))
   for (const file of analysisExclusions) {
     // Keep the original historical baseline comparison after reversing exact approved hunks.
     const normalized = analysis.normalize(file, read(file))
@@ -67,7 +69,7 @@ function assertFrozenDiff(ref, paths) {
   }
   const candidate = require('./android-release-candidate-version-contract.cjs')
   assert.equal(candidate.normalizeCandidateVersion(read(candidate.VERSION_PATH)), oldFile(candidate.VERSION_PATH, ref), 'candidate metadata is the only version-file delta')
-  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+candidate.VERSION_PATH,':(exclude)'+rendererPath,':(exclude)'+sightRuntime,...englishExclusions,...analysisExclusions.map(f => ':(exclude)'+f),...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
+  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+candidate.VERSION_PATH,':(exclude)'+rendererPath,':(exclude)'+sightRuntime,...englishExclusions,...analysisExclusions.map(f => ':(exclude)'+f),...analysisAdditionExclusions.map(f => ':(exclude)'+f),...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
   assertRendererDisplayOnly(ref)
 }
 const cssSuffix = "/* Theme/update English wrapping only; practice and artwork geometry stay frozen. */\n.theme-manager-modal__card header > span,\n.theme-manager-modal__card dd,\n.update-card .version-line strong,\n.update-release-notes {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n.theme-manager-modal__card footer {\n  flex-wrap: wrap;\n}\n.theme-manager-modal__card small,\n.update-card p,\n.update-security-note {\n  white-space: normal;\n  line-height: 1.6;\n}";
