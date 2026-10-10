@@ -1,9 +1,6 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const ts = require('typescript')
-const React = require('react')
-const TestRenderer = require('react-test-renderer')
-const { act } = TestRenderer
 
 // Same in-memory TypeScript loading approach as the existing regression suite.
 for (const extension of ['.ts', '.tsx']) {
@@ -20,12 +17,8 @@ for (const extension of ['.ts', '.tsx']) {
 
 const tests = []
 const test = (name, callback) => tests.push({ name, callback })
-const desktopSettings = require('../src/renderer/src/utils/sightReadingSettings.ts')
-const notes = require('../src/renderer/src/utils/sightReadingNotes.ts')
-const keys = require('../src/renderer/src/utils/musicKeySignatures.ts')
-const midiBus = require('../src/renderer/src/midi/midiEventBus.ts')
-const midiMessages = require('../src/renderer/src/midi/midiMessages.ts')
-const { useSightReadingPractice } = require('../src/renderer/src/hooks/useSightReadingPractice.ts')
+
+const keys = require('../src/sightReading/musicKeySignatures.ts')
 
 function memoryStorage() {
   const values = new Map()
@@ -66,272 +59,6 @@ function fakeTime() {
   }
 }
 
-function eventTarget() {
-  const handlers = new Map()
-  return {
-    addEventListener(type, callback) {
-      if (!handlers.has(type)) handlers.set(type, new Set())
-      handlers.get(type).add(callback)
-    },
-    removeEventListener: (type, callback) => handlers.get(type)?.delete(callback),
-    dispatchEvent(event) {
-      for (const callback of handlers.get(event.type) ?? []) callback(event)
-    }
-  }
-}
-
-function withDesktop(overrides, callback) {
-  const previous = { window: global.window, document: global.document, now: Date.now, random: Math.random }
-  const clock = fakeTime()
-  const storage = memoryStorage()
-  storage.setItem(desktopSettings.SIGHT_READING_SETTINGS_STORAGE_KEY, JSON.stringify({
-    ...desktopSettings.DEFAULT_SIGHT_READING_SETTINGS, ...overrides
-  }))
-  global.window = { ...eventTarget(), localStorage: storage, setTimeout: clock.schedule, clearTimeout: clock.cancel }
-  global.document = { ...eventTarget(), hidden: false, hasFocus: () => true }
-  Date.now = clock.now
-  Math.random = () => 0.42
-  midiBus.resetMidiEventBusForTests()
-  let current
-  let renderer
-  let eventId = 0
-  function Probe() {
-    current = useSightReadingPractice()
-    return null
-  }
-  const api = {
-    get current() { return current },
-    clock,
-    storage,
-    act: (fn) => act(fn),
-    advance: (ms) => act(() => clock.advance(ms)),
-    emit(midiNumber, changes = {}) {
-      const event = { id: ++eventId, type: 'noteOn', velocity: 100, midiNumber,
-        timestamp: clock.now(), deviceName: 'Contract MIDI', ...changes }
-      act(() => midiBus.publishMidiEvent(event))
-      return event
-    },
-    start: () => act(() => current.start()),
-    pause: () => act(() => current.pause()),
-    resume: () => act(() => current.resume())
-  }
-  try {
-    act(() => { renderer = TestRenderer.create(React.createElement(Probe)) })
-    callback(api)
-  } finally {
-    if (renderer) act(() => renderer.unmount())
-    midiBus.resetMidiEventBusForTests()
-    if (previous.window === undefined) delete global.window
-    else global.window = previous.window
-    if (previous.document === undefined) delete global.document
-    else global.document = previous.document
-    Date.now = previous.now
-    Math.random = previous.random
-  }
-}
-
-test('Desktop baseline: defaults/migration retain treble + visible names, single note, fixed timeout', () => {
-  assert.deepEqual(desktopSettings.DEFAULT_SIGHT_READING_SETTINGS, {
-    staffMode: 'treble', noteCount: 1, noteMode: 'single', questionCount: 20, keySignature: 'C', notePoolMode: 'diatonic', noteNameVisible: true
-  })
-  assert.deepEqual(desktopSettings.migrateSightReadingSettings({ staffMode: 'mixed', noteCount: 3, range: 'common', answerTimeLimitSeconds: 10 }), {
-    ...desktopSettings.DEFAULT_SIGHT_READING_SETTINGS, staffMode: 'grand'
-  })
-  assert.equal(desktopSettings.SIGHT_READING_ANSWER_TIMEOUT_MS, 5000)
-})
-
-test('Desktop baseline: fixed ranges, all 15 keys, spelling and chromatic candidates', () => {
-  assert.equal(keys.MAJOR_KEY_IDS.length, 15)
-  for (const staffMode of ['treble', 'bass', 'grand']) {
-    const range = notes.SIGHT_READING_MIDI_RANGES[staffMode]
-    assert.deepEqual(range, { treble: [60, 88], bass: [36, 64], grand: [36, 88] }[staffMode])
-    for (const keySignature of keys.MAJOR_KEY_IDS) {
-      const degrees = keys.getMajorKeySignature(keySignature).scaleDegrees
-      const diatonic = notes.getSightReadingNotes({ staffMode, keySignature, notePoolMode: 'diatonic' })
-      const chromatic = notes.getSightReadingNotes({ staffMode, keySignature, notePoolMode: 'chromatic' })
-      assert.equal(chromatic.length, range[1] - range[0] + 1)
-      for (const note of diatonic) {
-        assert.ok(note.midiNumber >= range[0] && note.midiNumber <= range[1])
-        assert.equal(note.pitchClass, degrees.find((degree) => degree.pitchClass === note.midiNumber % 12).spelling)
-        assert.equal(note.notation.displayAccidental, null)
-        assert.equal(note.clef, staffMode === 'grand' ? (note.midiNumber >= 60 ? 'treble' : 'bass') : staffMode)
-      }
-    }
-  }
-})
-
-test('Desktop baseline: Fisher-Yates bag is a permutation and protects the boundary', () => {
-  const pool = notes.getSightReadingNotes({ staffMode: 'grand', keySignature: 'C', notePoolMode: 'diatonic' })
-  const first = notes.createShuffledSightReadingBag(pool, null, () => 0.42)
-  const second = notes.createShuffledSightReadingBag(pool, first.at(-1).midiNumber, () => 0.42)
-  assert.equal(new Set(first.map((note) => note.midiNumber)).size, pool.length)
-  assert.deepEqual(first.map((note) => note.midiNumber).sort((a, b) => a - b), pool.map((note) => note.midiNumber))
-  assert.notEqual(second[0].midiNumber, first.at(-1).midiNumber)
-})
-
-test('Desktop baseline: start/reset, 32ms lock, first correct input and 350ms advance', () => {
-  withDesktop({}, (d) => {
-    d.start()
-    const first = d.current.currentNote.midiNumber
-    d.emit(first)
-    d.advance(31)
-    d.emit(first)
-    assert.equal(d.current.completedQuestions, 0)
-    d.advance(1)
-    d.emit(first)
-    d.emit(first + 1)
-    assert.equal(d.current.result, 'correct')
-    assert.equal(d.current.completedQuestions, 1)
-    d.advance(349)
-    assert.equal(d.current.currentNote.midiNumber, first)
-    d.advance(1)
-    assert.equal(d.current.result, null)
-    assert.notEqual(d.current.currentNote.midiNumber, first)
-    d.act(() => d.current.reset())
-    d.start()
-    assert.equal(d.current.completedQuestions, 0)
-    assert.equal(d.current.currentStreak, 0)
-  })
-})
-
-test('Desktop baseline: first wrong input, velocity0 normalization, noteOff/CC ignored', () => {
-  withDesktop({}, (d) => {
-    d.start(); d.advance(32)
-    const target = d.current.currentNote.midiNumber
-    const zero = midiMessages.parseMidiMessage([0x90, target, 0], 'Contract', 1, d.clock.now())
-    assert.equal(zero.type, 'noteOff')
-    d.emit(target, { type: 'noteOff', velocity: 0 })
-    d.emit(target, { velocity: 0 })
-    d.emit(undefined, { type: 'controlChange', controllerNumber: 64, value: 127 })
-    assert.equal(d.current.completedQuestions, 0)
-    d.emit(target + 1)
-    d.emit(target)
-    assert.equal(d.current.result, 'wrong_note')
-    assert.equal(d.current.wrongCount, 1)
-    assert.equal(d.current.correctCount, 0)
-  })
-})
-
-test('Desktop baseline: 5000ms timeout starts at unlock, not display', () => {
-  withDesktop({}, (d) => {
-    d.start(); d.advance(5031)
-    assert.equal(d.current.result, null)
-    d.advance(1)
-    assert.equal(d.current.result, 'timeout')
-    assert.equal(d.current.timeoutCount, 1)
-    d.advance(350)
-    assert.equal(d.current.result, null)
-  })
-})
-
-test('Desktop baseline: all question counts finish exactly after the final feedback', () => {
-  for (const questionCount of [10, 20, 50, 100]) withDesktop({ questionCount }, (d) => {
-    d.start()
-    for (let i = 0; i < questionCount; i++) {
-      d.advance(32)
-      d.emit(d.current.currentNote.midiNumber)
-      d.advance(349)
-      assert.equal(d.current.status, 'running')
-      d.advance(1)
-    }
-    assert.equal(d.current.status, 'finished')
-    assert.equal(d.current.report.completedQuestions, questionCount)
-    assert.equal(d.current.report.accuracy, 100)
-    assert.equal(d.current.report.bestStreak, questionCount)
-  })
-})
-
-test('Desktop baseline: mixed outcomes, reaction times, accuracy, streak and target-note aggregates', () => {
-  withDesktop({ questionCount: 10 }, (d) => {
-    d.start()
-    d.advance(32); d.advance(100); d.emit(d.current.currentNote.midiNumber); d.advance(350)
-    d.advance(32); const wrongTarget = d.current.currentNote
-    d.advance(300); d.emit(wrongTarget.midiNumber + 1); d.advance(350)
-    assert.equal(d.current.currentStreak, 0)
-    d.advance(32); const timeoutTarget = d.current.currentNote
-    d.advance(5000); d.advance(350)
-    for (let i = 3; i < 10; i++) {
-      d.advance(32); d.advance(100); d.emit(d.current.currentNote.midiNumber); d.advance(350)
-    }
-    const report = d.current.report
-    assert.deepEqual([report.correct, report.wrong, report.timeout, report.completedQuestions, report.accuracy, report.bestStreak], [8, 1, 1, 10, 80, 7])
-    assert.equal(report.averageReactionMs, 122)
-    assert.equal(report.fastestReactionMs, 100)
-    assert.equal(report.slowestReactionMs, 300)
-    assert.equal(report.wrongNoteCounts.find((entry) => entry.noteName === wrongTarget.noteName).count, 1)
-    assert.equal(report.timeoutNoteCounts.find((entry) => entry.noteName === timeoutTarget.noteName).count, 1)
-  })
-})
-
-test('Desktop baseline: all-timeout reactions stay null', () => {
-  withDesktop({ questionCount: 10 }, (d) => {
-    d.start()
-    for (let i = 0; i < 10; i++) d.advance(32 + 5000 + 350)
-    assert.equal(d.current.report.timeout, 10)
-    assert.equal(d.current.report.averageReactionMs, null)
-    assert.equal(d.current.report.fastestReactionMs, null)
-    assert.equal(d.current.report.slowestReactionMs, null)
-  })
-})
-
-test('Desktop baseline: display pause restarts the full lock interval', () => {
-  withDesktop({}, (d) => {
-    d.start(); d.advance(10); d.pause(); d.advance(9000); d.resume()
-    d.advance(31); d.emit(d.current.currentNote.midiNumber)
-    assert.equal(d.current.completedQuestions, 0)
-    d.advance(1); d.emit(d.current.currentNote.midiNumber)
-    assert.equal(d.current.completedQuestions, 1)
-  })
-})
-
-test('Desktop baseline: answering pause freezes remaining time and rejects stale input', () => {
-  withDesktop({}, (d) => {
-    d.start(); d.advance(1032); d.pause()
-    const target = d.current.currentNote.midiNumber
-    const pausedEvent = d.emit(target)
-    assert.equal(d.current.getRemainingTimeMs(), 4000)
-    d.advance(9000); d.resume()
-    d.emit(target, { id: pausedEvent.id })
-    assert.equal(d.current.completedQuestions, 0)
-    d.advance(3999)
-    assert.equal(d.current.result, null)
-    d.advance(1)
-    assert.equal(d.current.result, 'timeout')
-  })
-})
-
-test('Desktop baseline: feedback pause preserves remaining advance', () => {
-  withDesktop({}, (d) => {
-    d.start(); d.advance(32); d.emit(d.current.currentNote.midiNumber)
-    d.advance(100); d.pause(); d.advance(9000); d.resume(); d.advance(249)
-    assert.equal(d.current.result, 'correct')
-    d.advance(1)
-    assert.equal(d.current.result, null)
-  })
-})
-
-test('Desktop baseline: manual pause survives focus; panic clears input without changing facts', () => {
-  withDesktop({}, (d) => {
-    d.start(); d.advance(32); d.emit(d.current.currentNote.midiNumber + 1)
-    d.act(() => midiBus.publishMidiPanic('device-disconnected'))
-    assert.equal(d.current.currentInputMidiNumber, null)
-    assert.equal(d.current.completedQuestions, 1)
-    d.pause()
-    d.act(() => global.window.dispatchEvent({ type: 'focus' }))
-    assert.equal(d.current.isPaused, true)
-  })
-})
-
-test('Desktop baseline: legacy reset does not manufacture a partial report', () => {
-  withDesktop({}, (d) => {
-    d.start(); d.advance(32); d.emit(d.current.currentNote.midiNumber)
-    assert.equal(d.current.report, null)
-    d.act(() => d.current.reset())
-    assert.equal(d.current.status, 'idle')
-    assert.equal(d.current.report, null)
-  })
-})
-
 const path = require('node:path')
 const sharedSettings = require('../src/sightReading/sightReadingSettings.ts')
 const sharedNotes = require('../src/sightReading/sightReadingNotes.ts')
@@ -339,9 +66,6 @@ const { SightReadingController } = require('../src/sightReading/controller.ts')
 const { SightReadingSessionCore } = require('../src/sightReading/sightReadingSession.ts')
 const { normalizeSightReadingMidiEvent } = require('../src/sightReading/midi.ts')
 const reports = require('../src/sightReading/report.ts')
-const { createSightReadingRecord } = require('../src/renderer/src/utils/practiceRecordAdapters.ts')
-const { fromLegacyRecord } = require('../src/renderer/src/records/practiceRecordV2.ts')
-const { createPracticeRecordRepository } = require('../src/renderer/src/records/practiceRecordRepository.ts')
 
 function headless(overrides = {}, random = () => 0.42) {
   const time = fakeTime()
@@ -526,13 +250,12 @@ test('C11 first wrong noteOn wins; later correct input does not repair it', () =
   assert.deepEqual([h.state.result, h.state.completedQuestions, h.state.wrongCount, h.state.correctCount], ['wrong_note', 1, 1, 0])
 })
 
-test('C12 normalization: real 0x90 velocity0 becomes noteOff on every channel; event identity preserved', () => {
+test('C12 normalized velocity0 becomes noteOff on every channel; event identity preserved', () => {
   const h = headless(); h.start(); h.advance(32)
   for (let channel = 0; channel < 16; channel++) {
-    const event = midiMessages.parseMidiMessage([0x90 | channel, 60, 0], 'contract', channel + 1, h.time.now())
-    assert.equal(event.type, 'noteOff')
-    const normalized = normalizeSightReadingMidiEvent({ ...event, type: 'noteOn' })
-    assert.deepEqual(normalized, event)
+    const event = { id: channel + 1, type: 'noteOn', channel: channel + 1, midiNumber: 60, velocity: 0, timestamp: h.time.now(), deviceName: 'contract' }
+    const normalized = normalizeSightReadingMidiEvent(event)
+    assert.deepEqual(normalized, { ...event, type: 'noteOff' })
     h.controller.handleMidi(normalized)
   }
   h.emit(h.state.currentNote.midiNumber, { velocity: 0 })
@@ -687,56 +410,16 @@ test('C30 disconnect/panic/reconnect: retain facts, clear transient input, requi
   assert.equal(watermark.state.completedQuestions, 0)
 })
 
-const timing = { id: 'sight-contract-session', startedAt: '2026-08-30T00:00:00.000Z', endedAt: '2026-08-30T00:01:00.000Z', durationMs: 60000 }
-
-test('C31 completed report mapping: existing desktop record adapter + injected V2 repository', () => {
-  const { h } = mixedSession(); for (let i = 4; i < 10; i++) h.answer('correct', 100)
-  const report = h.state.report
-  const record = createSightReadingRecord({ timing, report, showNoteName: false })
-  assert.equal(record.status, 'completed')
-  assert.deepEqual([record.totalEvents, record.correctEvents, record.wrongNoteCount, record.missingNoteCount, record.accuracy], [10, 8, 1, 1, 80])
-  assert.equal(record.details.highestStreak, 6); assert.equal(record.details.averageReactionMs, 167)
-  assert.equal(record.settings.questionCount, 10); assert.equal(record.settings.staffMode, 'grand')
-  assert.equal(record.settings.noteNameVisible, false)
-  assert.equal(record.mistakes.length, 2)
-  const repository = createPracticeRecordRepository(memoryStorage())
-  const v2 = fromLegacyRecord(record)
-  assert.equal(v2.completionState, 'completed')
-  assert.deepEqual(repository.addResult(v2), { success: true })
-  const loaded = repository.get(timing.id)
-  assert.equal(loaded.metrics.find((m) => m.key === 'correctCount').value, 8)
-  assert.equal(loaded.metrics.find((m) => m.key === 'detail.averageReactionMs').value, 167)
-  assert.equal(loaded.errorEvents.length, 2)
-  assert.equal(report.treble.total + report.bass.total, 10)
-})
-
-test('C32 repository failure: explicit result, report retained for retry, no global storage', () => {
+// Desktop V2 record/schema adapters are retired; the shared save port stays tested.
+test('C31 shared report save failure preserves facts and supports retry', () => {
   const { h } = mixedSession(); const report = h.controller.stop()
-  const record = fromLegacyRecord(createSightReadingRecord({ timing, report, showNoteName: false }))
-  // A future Android repository adapter must explicitly preserve report provenance.
-  // This test uses the existing V2 fields; no production repository/schema changes.
-  record.completionState = report.completionState
-  record.metadata.partialEvidence = report.partialEvidence
-  const repository = createPracticeRecordRepository({ ...memoryStorage(), setItem() { throw Error('quota exceeded') } })
-  const adapter = { save(received) {
-    assert.equal(received, report)
-    const result = repository.addResult(record)
-    return result.success ? { success: true } : { success: false, error: result.error }
-  } }
-  assert.deepEqual(reports.saveSightReadingReport(report, adapter), { success: false, error: 'quota exceeded' })
-  assert.equal(h.state.report, report); assert.equal(h.state.report.completedQuestions, 4)
+  const before = JSON.stringify(report)
+  assert.deepEqual(reports.saveSightReadingReport(report, { save: () => ({ success: false, error: 'quota exceeded' }) }), { success: false, error: 'quota exceeded' })
   assert.deepEqual(reports.saveSightReadingReport(report, { save() { throw Error('adapter failed') } }), { success: false, error: 'Error: adapter failed' })
-  const goodRepository = createPracticeRecordRepository(memoryStorage())
-  assert.deepEqual(reports.saveSightReadingReport(report, { save: () => goodRepository.addResult(record) }), { success: true })
-  const loaded = goodRepository.get(timing.id)
-  assert.equal(loaded.completionState, 'stopped')
-  assert.equal(loaded.metadata.partialEvidence, true)
-  assert.equal(loaded.metrics.find((metric) => metric.key === 'totalEvents').value, 4)
-  assert.equal(loaded.metrics.find((metric) => metric.key === 'detail.averageReactionMs').value, 300)
-  assert.equal(loaded.metrics.find((metric) => metric.key === 'detail.highestStreak').value, 2)
-  assert.equal(loaded.errorEvents.reduce((sum, event) => sum + event.aggregateCount, 0), 2)
+  assert.deepEqual(reports.saveSightReadingReport(report, { save: received => { assert.equal(received, report); return { success: true } } }), { success: true })
+  assert.equal(JSON.stringify(report), before)
+  assert.equal(h.state.report, report)
 })
-
 test('E01 Android early end retains mixed partial facts, reactions, streak and target aggregates', () => {
   const { h, wrong, timeout } = mixedSession(); const report = h.controller.stop()
   assert.deepEqual([report.completionState, report.partialEvidence, report.totalQuestions, report.completedQuestions], ['stopped', true, 10, 4])
@@ -822,26 +505,6 @@ test('A02 no React commit needed; cancelled/disposed timer callbacks cannot chan
   })
   controller.start(); const stale = callback; controller.reset(); stale()
   assert.equal(controller.snapshot.status, 'idle'); assert.equal(controller.snapshot.completedQuestions, 0)
-})
-
-test('A03 desktop adapter keeps completed-only report lifetime and existing disconnect/recorder wiring', () => {
-  const source = fs.readFileSync(require.resolve('../src/renderer/src/components/SightReadingPage.tsx'), 'utf8')
-  assert.match(source, /recorder\.stopSession\(\)/)
-  assert.match(source, /practice\.reset\(\)/)
-  assert.match(source, /practice\.pause\(\)/)
-  assert.match(source, /recorder\.interruptDevice\(\)/)
-  withDesktop({}, (d) => {
-    d.start(); d.advance(32); d.emit(d.current.currentNote.midiNumber)
-    d.act(() => d.current.setStaffMode('bass'))
-    assert.equal(d.current.staffMode, 'treble', 'settings remain locked during the session')
-    d.pause(); d.act(() => midiBus.publishMidiPanic('device-disconnected')); d.advance(10000)
-    d.act(() => midiBus.publishMidiPanic('device-reconnected'))
-    assert.equal(d.current.isPaused, true)
-    assert.equal(d.current.completedQuestions, 1)
-    d.resume(); d.advance(350 + 32); d.emit(d.current.currentNote.midiNumber)
-    assert.equal(d.current.correctCount, 2)
-    assert.equal(d.current.report, null)
-  })
 })
 
 let failed = 0

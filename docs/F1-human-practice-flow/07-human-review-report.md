@@ -1,5 +1,7 @@
 # F1 PROTOTYPE READY FOR HUMAN REVIEW
 
+> 历史 Windows 设计与审阅记录，不是当前 Android 开发入口。可运行桌面原型已退役，仅在固定 Git 历史中保留取证。
+
 ## 范围与状态
 
 本次只交付 Human Practice Flow、Information Architecture 与完全独立的静态原型。正式 `src` UI、训练算法、parser、Planner、Record 和 production CSS 均未修改；不宣称 UI COMPLETE。
@@ -11,7 +13,7 @@
 | 1. 全局用户流程 | 今日训练、继续上次、五大基本功、曲谱练习、训练结束、近期进步；逐步说明用户看见/决定/系统代办 | [`01-global-flow.md`](01-global-flow.md) |
 | 2. 页面唯一主任务 | 首页、计划、五大练习、曲谱、结果、统计、设置、AI Coach 的单一任务与边界 | [`02-page-primary-tasks.md`](02-page-primary-tasks.md) |
 | 3. 现有控件分级 | 148 个独立控制意图逐项归入 Level 1/2/3/Remove，并记录改名、合并、隐藏、删除与理由 | [`03-control-inventory.md`](03-control-inventory.md) |
-| 4. 1366×768 静态原型 | 首页、曲谱练习前、曲谱专注模式、结果、基础练习模板、今日训练；主路径可点击 | [`prototype/index.html`](prototype/index.html) |
+| 4. 1366×768 静态原型 | 首页、曲谱练习前、曲谱专注模式、结果、基础练习模板、今日训练；主路径可点击 | [退役原型历史源码](https://github.com/Natural516/piano-fundamentals-trainer/blob/a6a2cfc996ee9a03744c7fcd38cf553ebd07ff08/docs/F1-human-practice-flow/prototype/index.html) |
 
 支持文档：[`04-copy-language.md`](04-copy-language.md)、[`05-design-system.md`](05-design-system.md)、[`06-wireframes.md`](06-wireframes.md)。
 

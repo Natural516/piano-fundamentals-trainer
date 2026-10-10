@@ -24,4 +24,4 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 Copyright © 2019, Steinberg Media Technologies GmbH (http://www.steinberg.net/), with Reserved Font Name "Bravura".
 
-The Bravura font is used and redistributed under the SIL Open Font License, Version 1.1. Complete license texts are included in `src/renderer/public/third-party-licenses/`, which Vite copies into the packaged renderer output.
+The Bravura font is used and redistributed under the SIL Open Font License, Version 1.1. Complete license texts are included in `prototype/android-tablet-v1/public/third-party-licenses/`, which Vite copies into the packaged Android Web output.

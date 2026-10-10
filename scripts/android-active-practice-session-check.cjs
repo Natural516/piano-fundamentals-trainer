@@ -16,7 +16,7 @@ for (const extension of ['.ts', '.tsx']) {
 const root = path.resolve(__dirname, '..')
 const mainSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/main.tsx'), 'utf8')
 const hostSource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/activePracticeSession.ts'), 'utf8')
-const rendererSource = fs.readFileSync(path.join(root, 'src/renderer/src/components/MusicStaffRenderer.tsx'), 'utf8')
+const rendererSource = fs.readFileSync(path.join(root, 'src/shared/musicNotation/MusicStaffRenderer.tsx'), 'utf8')
 const controllerSource = fs.readFileSync(path.join(root, 'src/sightReading/controller.ts'), 'utf8')
 const registrySource = fs.readFileSync(path.join(root, 'prototype/android-tablet-v1/src/theme/themeRegistry.ts'), 'utf8')
 const externalBocchiTheme = JSON.parse(fs.readFileSync(path.join(root, 'theme-packages/bocchi/theme.json'), 'utf8'))

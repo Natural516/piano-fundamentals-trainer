@@ -5,7 +5,9 @@
 ## 工程入口与边界
 
 - `prototype/android-tablet-v1/`：Android 平板 Web UI 与应用集成。
-- `android/`：Capacitor Android 工程、原生 Bluetooth MIDI、更新与主题包边界。
+- `android/`：Capacitor Android 工程、原生 Bluetooth / USB MIDI、更新与主题包边界。
+- `src/shared/musicNotation/`：Android 使用的 VexFlow 五线谱组件、字体加载与谱表模型；`src/shared/styles/` 保留行为等价的共用外观样式。
+- Windows / Electron 桌面端已退役，当前源码树不再提供桌面应用入口、打包或运行命令。历史实现可在 Git 历史中查阅。
 - 识谱核心位于 `src/sightReading/`；Android 和弦、音程的实现分别位于 `prototype/android-tablet-v1/src/chordPractice/` 与 `intervalPractice/`。
 - `android/version.properties`：Android 应用版本唯一来源。
 - `package.json` 与 `scripts/`：已有构建及专项验证入口。

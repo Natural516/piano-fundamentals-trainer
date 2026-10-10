@@ -5,7 +5,7 @@ const root = path.resolve(__dirname, '..')
 const base = '5d4ed3bda5a7493726b4741b36a40786992346c7'
 const mainPath = 'prototype/android-tablet-v1/src/main.tsx'
 const rendererPath = 'src/renderer/src/components/MusicStaffRenderer.tsx'
-const read = file => fs.readFileSync(path.join(root, file), 'utf8').replaceAll('\r\n', '\n')
+const read = file => require('./android-repository-cleanup-contract.cjs').read(file)
 const oldFile = (file, ref = base) => execFileSync('git', ['show', ref + ':' + file], { cwd: root, encoding: 'utf8', maxBuffer: 64*1024*1024 }).replaceAll('\r\n', '\n')
 const astOf = source => ts.createSourceFile(mainPath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 function namedNodes(source) {
@@ -22,7 +22,7 @@ const original = oldFile(mainPath), previous = namedNodes(original)
 // Earlier stage source guards exclude ONLY explicitly authorized B4.6 presentation declarations.
 // The new B4.6 suite separately freezes every other declaration and the effects/actions within these.
 function normalizeB46Main(source) {
-  source = source.replaceAll('\r\n','\n')
+  source = require('./android-repository-cleanup-contract.cjs').normalize(mainPath, source)
   if (!source.includes("from './localization/remainingPresentation'")) return source
   const nodes = namedNodes(source)
   const replacements = [...changed,...added].map(name => {
@@ -42,6 +42,7 @@ function assertRendererDisplayOnly(ref = base) {
   assert.equal(renderer,oldFile(rendererPath,ref),'shared renderer permits ONLY optional localized error text')
 }
 function assertFrozenDiff(ref, paths) {
+  const cleanup = require('./android-repository-cleanup-contract.cjs'); cleanup.assertCleanupDelta()
   const analysis = require('./android-sight-analysis-contract.cjs')
   analysis.assertAnalysisDelta()
   const analysisExclusions = analysis.allowedPaths.filter(file => paths.some(scope => file === scope || file.startsWith(scope + '/')))
@@ -69,7 +70,7 @@ function assertFrozenDiff(ref, paths) {
   }
   const candidate = require('./android-release-candidate-version-contract.cjs')
   assert.equal(candidate.normalizeCandidateVersion(read(candidate.VERSION_PATH)), oldFile(candidate.VERSION_PATH, ref), 'candidate metadata is the only version-file delta')
-  execFileSync('git',['diff','--exit-code',ref,'--',...paths,':(exclude)'+candidate.VERSION_PATH,':(exclude)'+rendererPath,':(exclude)'+sightRuntime,...englishExclusions,...analysisExclusions.map(f => ':(exclude)'+f),...analysisAdditionExclusions.map(f => ':(exclude)'+f),...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
+  execFileSync('git',['diff','--exit-code',ref,'--',...paths,...cleanup.allowedPaths.map(f => ':(exclude)' + f),':(exclude)'+candidate.VERSION_PATH,':(exclude)'+rendererPath,':(exclude)'+sightRuntime,...englishExclusions,...analysisExclusions.map(f => ':(exclude)'+f),...analysisAdditionExclusions.map(f => ':(exclude)'+f),...[...native.allowedPaths].map(f => ':(exclude)'+f)],{cwd:root})
   assertRendererDisplayOnly(ref)
 }
 const cssSuffix = "/* Theme/update English wrapping only; practice and artwork geometry stay frozen. */\n.theme-manager-modal__card header > span,\n.theme-manager-modal__card dd,\n.update-card .version-line strong,\n.update-release-notes {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n.theme-manager-modal__card footer {\n  flex-wrap: wrap;\n}\n.theme-manager-modal__card small,\n.update-card p,\n.update-security-note {\n  white-space: normal;\n  line-height: 1.6;\n}";

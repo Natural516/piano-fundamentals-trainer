@@ -1,6 +1,8 @@
 # F1 1366 × 768 原型说明
 
-可运行原型位于 [`prototype/index.html`](prototype/index.html)。使用 URL hash 切换 6 个屏幕，所有屏幕都在 1366 × 768 首屏内完成主任务，不依赖纵向滚动。
+> 历史 Windows 设计与审阅记录，不是当前 Android 开发入口。可运行桌面原型已退役，仅在固定 Git 历史中保留取证。
+
+可运行原型位于 [退役原型历史源码](https://github.com/Natural516/piano-fundamentals-trainer/blob/a6a2cfc996ee9a03744c7fcd38cf553ebd07ff08/docs/F1-human-practice-flow/prototype/index.html)。使用 URL hash 切换 6 个屏幕，所有屏幕都在 1366 × 768 首屏内完成主任务，不依赖纵向滚动。
 
 ## 屏幕地图
 

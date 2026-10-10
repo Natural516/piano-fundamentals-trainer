@@ -186,13 +186,13 @@ const additionDigests = {
   "prototype/android-tablet-v1/src/localization/sightAnalysisResources.ts": "590be3d65efc9824fb14a21aa38147350b2dc0d6b4a8287bb288bea43207bcaf"
 }
 function normalize(file, source) {
-  source = clean(source)
+  source = require('./android-repository-cleanup-contract.cjs').normalize(file, clean(source))
   for (const [old, value] of [...(edits[file] ?? [])].reverse()) source = source.replace(value, old)
   return source
 }
 function assertAnalysisDelta() {
   for (const [file, expected] of Object.entries(additionDigests)) {
-    const source = clean(fs.readFileSync(path.join(root, file), 'utf8'))
+    const source = require('./android-repository-cleanup-contract.cjs').read(file)
     const digest = text => require('node:crypto').createHash('sha256').update(text).digest('hex')
     assert.equal(digest(source), expected, file + ' exact reviewed analysis addition')
     assert.notEqual(digest(source + '\n// unauthorized mutation\n'), expected)
@@ -201,7 +201,7 @@ function assertAnalysisDelta() {
     const before = clean(execFileSync('git', ['show', base + ':' + file], { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }))
     let expected = before
     for (const [old, value] of changes) { assert.equal(expected.split(old).length - 1, 1, file + ' unique exact baseline edit'); expected = expected.replace(old, value) }
-    const actual = clean(fs.readFileSync(path.join(root, file), 'utf8'))
+    const actual = require('./android-repository-cleanup-contract.cjs').read(file)
     assert.equal(actual, expected, file + ' only explicit analysis delta')
     assert.equal(normalize(file, actual), before)
     assert.throws(() => assert.equal(normalize(file, actual + '\n// unauthorized mutation\n'), before))

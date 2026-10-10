@@ -1,0 +1,1016 @@
+{
+  "base": "a6a2cfc996ee9a03744c7fcd38cf553ebd07ff08",
+  "migrations": {
+    "src/renderer/src/components/MusicStaffRenderer.tsx": "src/shared/musicNotation/MusicStaffRenderer.tsx",
+    "src/renderer/src/utils/musicNotationFont.ts": "src/shared/musicNotation/musicNotationFont.ts",
+    "src/renderer/src/utils/musicStaffModel.ts": "src/shared/musicNotation/musicStaffModel.ts",
+    "src/renderer/src/styles/themes.css": "src/shared/styles/themes.css",
+    "src/renderer/public/third-party-licenses/Bravura-OFL-1.1.txt": "prototype/android-tablet-v1/public/third-party-licenses/Bravura-OFL-1.1.txt",
+    "src/renderer/public/third-party-licenses/VexFlow-MIT.txt": "prototype/android-tablet-v1/public/third-party-licenses/VexFlow-MIT.txt"
+  },
+  "importFiles": [
+    "prototype/android-tablet-v1/src/ChordGrandStaff.tsx",
+    "prototype/android-tablet-v1/src/SightReadingAnalysis.tsx",
+    "prototype/android-tablet-v1/src/main.tsx",
+    "prototype/android-tablet-v1/src/styles.css"
+  ],
+  "retired": [
+    {
+      "path": "build/icon.ico",
+      "blob": "070680f96669f2ac74ff9f310298fc83c9f7d645"
+    },
+    {
+      "path": "electron.vite.config.ts",
+      "blob": "2a7633c9b7aa227e95ae5479e74dbe39d2c046d9"
+    },
+    {
+      "path": "scripts/after-pack.cjs",
+      "blob": "91372c3321851e6c120497487d635a87af79609c"
+    },
+    {
+      "path": "scripts/capture-f2-production.cjs",
+      "blob": "9545d4f8012c5d30d6fb2c4d3d554ad7f33513f9"
+    },
+    {
+      "path": "scripts/generate-app-icon.py",
+      "blob": "6e7c2fb208fea8ff676c88a396a5a6c24e3da2f3"
+    },
+    {
+      "path": "scripts/measure-piano-latency.cjs",
+      "blob": "5649e7c406ac2311a2cc209094e9fcd308613e08"
+    },
+    {
+      "path": "scripts/native-audio-poc.cjs",
+      "blob": "a33435e43af395d3af4d6adc7d73c8568f59fa4c"
+    },
+    {
+      "path": "scripts/regression-check.cjs",
+      "blob": "2d6e1b5a69598f07439b17ec1f00bbd4dd3a83c2"
+    },
+    {
+      "path": "scripts/score-fixtures/accidental-key-change.xml",
+      "blob": "cf18f58c99f4b38f854806ab0be53487e68df91b"
+    },
+    {
+      "path": "scripts/score-fixtures/chord-tie-rest.xml",
+      "blob": "0d070364fa2e92b9bd8279d5cbbe653014d2898e"
+    },
+    {
+      "path": "scripts/score-fixtures/e2e-core-loop.xml",
+      "blob": "a5709ad4db37cc0c50bb491634d418b889d96d71"
+    },
+    {
+      "path": "scripts/score-fixtures/grand-staff-ledger-extremes.musicxml",
+      "blob": "d71aefe78953a4d1236b1dbcb36d7257e96c0705"
+    },
+    {
+      "path": "scripts/score-fixtures/grand-staff-sequential-onset.musicxml",
+      "blob": "0a4a2e95bb2450e517964632e6980ce0af2bb96a"
+    },
+    {
+      "path": "scripts/score-fixtures/grand-staff-shared-onset.musicxml",
+      "blob": "4e33be0544868f9cc97b20e6badd72dcba0230ce"
+    },
+    {
+      "path": "scripts/score-fixtures/musescore-doctype.musicxml",
+      "blob": "836a23cb4567433a53e0ed6558b137cb25743cbc"
+    },
+    {
+      "path": "scripts/score-fixtures/profile-boundary-attributes.musicxml",
+      "blob": "c584d2698117ea5c3bbc5516f1215d5aa8592a77"
+    },
+    {
+      "path": "scripts/score-fixtures/profile-grace-note.musicxml",
+      "blob": "e4c30c48649a4a14b9a04c5254b302a521226812"
+    },
+    {
+      "path": "scripts/score-fixtures/profile-mid-measure-attributes.musicxml",
+      "blob": "55dfafa0926871c860bab8252bd9508d9b54c13e"
+    },
+    {
+      "path": "scripts/score-fixtures/profile-mid-measure-tempo.musicxml",
+      "blob": "59fac0e821a450036e905cc71002120c54309f50"
+    },
+    {
+      "path": "scripts/score-fixtures/profile-multi-part.musicxml",
+      "blob": "e9c5842cfbf732d5ac0a4999969abf075f82bdea"
+    },
+    {
+      "path": "scripts/score-fixtures/profile-pickup.musicxml",
+      "blob": "bfcb51d6f329a59ab915e7be6dfe1edbdff64f0a"
+    },
+    {
+      "path": "scripts/score-fixtures/profile-supported-tuplet.musicxml",
+      "blob": "37e1fdc9952b9c8fd6942020b670128dd99a02a6"
+    },
+    {
+      "path": "scripts/score-fixtures/profile-unsupported-notation.musicxml",
+      "blob": "9f2648047967f69cc3fc4f06da3b9115f4bd5ec2"
+    },
+    {
+      "path": "scripts/score-fixtures/profile-unsupported-tuplet.musicxml",
+      "blob": "0b54dc8c9946f29bc3d083577db85c55c5c55c83"
+    },
+    {
+      "path": "scripts/score-fixtures/single-melody.xml",
+      "blob": "6b846a10d2f7ffac0a3032be1bbc3082180c02dd"
+    },
+    {
+      "path": "scripts/score-fixtures/tempo-change.musicxml",
+      "blob": "8f79366da72b55333f4c6d6602a81e569f337824"
+    },
+    {
+      "path": "scripts/score-fixtures/wait-attack-groups.musicxml",
+      "blob": "08b489d1d0846ae1da0ab051e047adba223b16b6"
+    },
+    {
+      "path": "src/renderer/index.html",
+      "blob": "28509682f17c3d06cb4ca49adafb3930ebec0203"
+    },
+    {
+      "path": "src/renderer/public/third-party-licenses/Bravura-OFL-1.1.txt",
+      "blob": "4b950fb76a468187843e64b56a072bd19afc18ba"
+    },
+    {
+      "path": "src/renderer/public/third-party-licenses/VexFlow-MIT.txt",
+      "blob": "8670b4b25b3942bd94e83e1cc7b7dd65a93affe2"
+    },
+    {
+      "path": "src/renderer/src/App.tsx",
+      "blob": "d768f5fca363b6b6c7c0908e1c4d7287248eb962"
+    },
+    {
+      "path": "src/renderer/src/ability/abilityModel.ts",
+      "blob": "47d041bdea7a39b025cb34d85486f5ed78f2f153"
+    },
+    {
+      "path": "src/renderer/src/ability/scoreMastery.ts",
+      "blob": "3b788e42211fe28ec60c971e21072c608c89d7ec"
+    },
+    {
+      "path": "src/renderer/src/ai/aiCoach.ts",
+      "blob": "fc22b0f9f03552b860760ed32bdbbdf1f979a052"
+    },
+    {
+      "path": "src/renderer/src/ai/aiProvider.ts",
+      "blob": "6fe281500d55108bcb7f681c6ff295e580aa629f"
+    },
+    {
+      "path": "src/renderer/src/ai/aiSettings.ts",
+      "blob": "265596e5f0103ac7043172ace3e23ae2270cf875"
+    },
+    {
+      "path": "src/renderer/src/ai/aiTypes.ts",
+      "blob": "08a846c86d1cfcf9ec2e3de1fe765e4facd3f69b"
+    },
+    {
+      "path": "src/renderer/src/ai/coach2.ts",
+      "blob": "fce5c3b5fbe032a276755c14f6c111316231e31a"
+    },
+    {
+      "path": "src/renderer/src/ai/evidenceResolver.ts",
+      "blob": "7a3f60df6708f14295192b9e337ce5c361ccbdd0"
+    },
+    {
+      "path": "src/renderer/src/ai/musicAi.ts",
+      "blob": "f1dfd0a7a7a10f2be29909d8a1cb2e89fee3faf5"
+    },
+    {
+      "path": "src/renderer/src/ai/scoreCoachProvider.ts",
+      "blob": "e51abb2a6cd3db17018b8838f46a5cad047cbd45"
+    },
+    {
+      "path": "src/renderer/src/analytics/periodStats.ts",
+      "blob": "d2252dd710b3736e6808d1965f4b661f25a0d3b8"
+    },
+    {
+      "path": "src/renderer/src/appInfo.ts",
+      "blob": "26cd5d90acc2b501476e09291e99db11342131af"
+    },
+    {
+      "path": "src/renderer/src/audio/audioModeSettings.ts",
+      "blob": "923c5783850365ba342a16cddd3286c0cde82ed4"
+    },
+    {
+      "path": "src/renderer/src/audio/bundledPianoSamplePack.ts",
+      "blob": "83f9721e47ec4d1ad1d571c7b53c7e51f5c8c111"
+    },
+    {
+      "path": "src/renderer/src/audio/pianoAudioTypes.ts",
+      "blob": "4667def277247f2a5873ad321ab770853314b6b0"
+    },
+    {
+      "path": "src/renderer/src/audio/pianoHotPath.ts",
+      "blob": "f339da0882ad4ac3efcb716a09ee1d3696f1e4d8"
+    },
+    {
+      "path": "src/renderer/src/audio/pianoLatencyDiagnostics.ts",
+      "blob": "f840655e6c518ed15e50844a339b0645d9411966"
+    },
+    {
+      "path": "src/renderer/src/audio/pianoMidiRouter.ts",
+      "blob": "bc433fcb729e2c54ed487845844d57d0b2283455"
+    },
+    {
+      "path": "src/renderer/src/audio/pianoSampler.ts",
+      "blob": "79cd93f134fa9cb5e1123e92be76ef2a00683daa"
+    },
+    {
+      "path": "src/renderer/src/audio/salamanderSamplePack.ts",
+      "blob": "5f6ab4bd3519cc5489b36eec7a4e9a50c3b0555e"
+    },
+    {
+      "path": "src/renderer/src/audio/samplePackLoader.ts",
+      "blob": "23065c700d7b1665ed813685f69df9fcae9c4cbf"
+    },
+    {
+      "path": "src/renderer/src/audio/voicePolicy.ts",
+      "blob": "f2dbf629edf45536e081fe608fb5c9ac11c4d622"
+    },
+    {
+      "path": "src/renderer/src/chordV2/chordIdentity.ts",
+      "blob": "67aa1325ceb948dd2ff8e616632154b92304e688"
+    },
+    {
+      "path": "src/renderer/src/chordV2/chordV2Types.ts",
+      "blob": "5f8a93a620e7087aa80f74b10a50447feb7dcf73"
+    },
+    {
+      "path": "src/renderer/src/chordV2/chordValidator.ts",
+      "blob": "2156e15a60510aa88e73648d13c131c2e7db2332"
+    },
+    {
+      "path": "src/renderer/src/chordV2/harmony.ts",
+      "blob": "d52a79a8c4246870fa6047dd78490bb2dae3e371"
+    },
+    {
+      "path": "src/renderer/src/chordV2/voicing.ts",
+      "blob": "1f729c85eb19f5cee5fb75bbe6cd86287324127c"
+    },
+    {
+      "path": "src/renderer/src/components.css",
+      "blob": "8e4173683b7e7ed05543902b4130fa1e238e3673"
+    },
+    {
+      "path": "src/renderer/src/components/AnalyticsPage.tsx",
+      "blob": "6c454ae34fbe9141bf155bca9d833b6a8a7f99d8"
+    },
+    {
+      "path": "src/renderer/src/components/AppButton.tsx",
+      "blob": "d1cd2ea60b363f6f9468e823c891a8306f770725"
+    },
+    {
+      "path": "src/renderer/src/components/AppCard.tsx",
+      "blob": "6c3fe9433e555b1d7f109c299cb31995510c949f"
+    },
+    {
+      "path": "src/renderer/src/components/AppErrorBoundary.tsx",
+      "blob": "418087392092546fba27694dbb89c5e520e0148d"
+    },
+    {
+      "path": "src/renderer/src/components/CardIllustrations.tsx",
+      "blob": "6b09744d3c4d8cb6967fa1af50be309fdd191157"
+    },
+    {
+      "path": "src/renderer/src/components/ChordPracticePage.tsx",
+      "blob": "87ea962f558ceefedd74218bbb3be7c90d4d1a6d"
+    },
+    {
+      "path": "src/renderer/src/components/ChordTargetView.tsx",
+      "blob": "474492e2bc88b9a83b880d588b2b9c4ba10e4cc9"
+    },
+    {
+      "path": "src/renderer/src/components/ChordV2Page.tsx",
+      "blob": "65f61eb2a1d16e51d5e21da42bc9abc326b1aacd"
+    },
+    {
+      "path": "src/renderer/src/components/CoordinationGridView.tsx",
+      "blob": "8412328f5d29cdc27a7277ee36a1c95c8aaddb99"
+    },
+    {
+      "path": "src/renderer/src/components/CoordinationPracticePage.tsx",
+      "blob": "632410a4a9c2cf4895a838ea9181acaa1a79b9ba"
+    },
+    {
+      "path": "src/renderer/src/components/EventLogIcon.tsx",
+      "blob": "265d7b28edd33151e2bcf975a4f9ce7ff3c13cde"
+    },
+    {
+      "path": "src/renderer/src/components/FirstRunWelcome.tsx",
+      "blob": "76bc662f257bd6dcd624110cbb869a126ebfa3ce"
+    },
+    {
+      "path": "src/renderer/src/components/FreePracticePage.tsx",
+      "blob": "b99771428eea98a4ad4ead2604e455518d82e9c1"
+    },
+    {
+      "path": "src/renderer/src/components/FreePracticeStaffRenderer.tsx",
+      "blob": "7ad52d9b7f7b2d80f73f173309d3d504f5031d0e"
+    },
+    {
+      "path": "src/renderer/src/components/FreePracticeVisualization.tsx",
+      "blob": "db304c7e2d630ce1e4982c7adf4962b1da466e36"
+    },
+    {
+      "path": "src/renderer/src/components/FullKeyboard.tsx",
+      "blob": "ee00bf2287e91b0d5b57c199236431e8e89e0c16"
+    },
+    {
+      "path": "src/renderer/src/components/HomePage.tsx",
+      "blob": "deab0262d0ea79a15f0c6122d4e8cbe495b4dc2d"
+    },
+    {
+      "path": "src/renderer/src/components/JudgementTestPage.tsx",
+      "blob": "069639acf21cc80f85fdfa477519cf490651966a"
+    },
+    {
+      "path": "src/renderer/src/components/MetronomeVolumeControl.tsx",
+      "blob": "6a040a19a16aff32b779123df0ac9a0f61dfdfdf"
+    },
+    {
+      "path": "src/renderer/src/components/MidiTestPage.tsx",
+      "blob": "7e79e15f303afbe3000bfeb3735b07d9d86b27b3"
+    },
+    {
+      "path": "src/renderer/src/components/MiniKeyboard.tsx",
+      "blob": "9ca7d6ccb6eb4e08ded6815e9d36a25c82984e81"
+    },
+    {
+      "path": "src/renderer/src/components/MusicStaffRenderer.tsx",
+      "blob": "fa352bbe6ed8a039e29a8866fbb5d9cf0f321d74"
+    },
+    {
+      "path": "src/renderer/src/components/NumericStepper.tsx",
+      "blob": "1e2f844a2c366d1944696e93deeccafe8a068fbb"
+    },
+    {
+      "path": "src/renderer/src/components/PlaceholderPage.tsx",
+      "blob": "b557297e445f40349cb3f38d10097577532415b7"
+    },
+    {
+      "path": "src/renderer/src/components/PracticeExitConfirmModal.tsx",
+      "blob": "f743dada19e45bec05909b763b4c046511a12600"
+    },
+    {
+      "path": "src/renderer/src/components/PracticeFeedbackNotice.tsx",
+      "blob": "0269eaeba127892614f2b159d142b47eb9781634"
+    },
+    {
+      "path": "src/renderer/src/components/PracticeHistoryPage.tsx",
+      "blob": "851414235d2887f100e2940afd80a5850131f845"
+    },
+    {
+      "path": "src/renderer/src/components/PracticePageHeader.tsx",
+      "blob": "6018fc6c23c2e3e8706147578604300921529a51"
+    },
+    {
+      "path": "src/renderer/src/components/PracticeReportModal.tsx",
+      "blob": "8b6dd854995485bccbc938322c8ee865586ca3c3"
+    },
+    {
+      "path": "src/renderer/src/components/PracticeReportPanel.tsx",
+      "blob": "3e3c4fb1978b162f205f8eb6d2e08bbd12046979"
+    },
+    {
+      "path": "src/renderer/src/components/PracticeSettingsDrawer.tsx",
+      "blob": "a2468f84c3aa692a8407e49b9a83bbf7de8d7e2c"
+    },
+    {
+      "path": "src/renderer/src/components/PracticeStatBar.tsx",
+      "blob": "61aff140a6eea54f701a50cd83b82604f2ebc0a6"
+    },
+    {
+      "path": "src/renderer/src/components/PracticeStatGrid.tsx",
+      "blob": "cf01e4a912dc85b14df5b0a5b7852dbb83037f67"
+    },
+    {
+      "path": "src/renderer/src/components/ProgressionPracticePanel.tsx",
+      "blob": "6383b2b84723555d592ea66017debf786b1e5c80"
+    },
+    {
+      "path": "src/renderer/src/components/RhythmPracticePage.tsx",
+      "blob": "d69e954b380484f6cb1466774ee3df0e60a4d284"
+    },
+    {
+      "path": "src/renderer/src/components/RightInfoPanel.tsx",
+      "blob": "f2584dba48fb2bf23dd1311302780b8befd66a1d"
+    },
+    {
+      "path": "src/renderer/src/components/ScalePracticePage.tsx",
+      "blob": "29632b3a4a3161ece86755585ddf90f3c32bafe8"
+    },
+    {
+      "path": "src/renderer/src/components/ScorePracticePage.tsx",
+      "blob": "a622350ef6881192804b02d657ddb135e575f05c"
+    },
+    {
+      "path": "src/renderer/src/components/ScoreSheetRenderer.tsx",
+      "blob": "fa0242f0703f293c71b5628ae3157e93084b85a0"
+    },
+    {
+      "path": "src/renderer/src/components/SectionHeader.tsx",
+      "blob": "3608450dd921b20342713a38605483e613570ec1"
+    },
+    {
+      "path": "src/renderer/src/components/SettingsIcon.tsx",
+      "blob": "54489cdd4b04abd6b5af978f5e2d4093d4dd702d"
+    },
+    {
+      "path": "src/renderer/src/components/SettingsPage.tsx",
+      "blob": "5dd900d4e975df6ae5aaf826e17af72a46914bec"
+    },
+    {
+      "path": "src/renderer/src/components/Sidebar.tsx",
+      "blob": "522a3450a4e40a9313e76e5662c2485ccd461dbd"
+    },
+    {
+      "path": "src/renderer/src/components/SightReadingPage.tsx",
+      "blob": "91465c7c10a6c34405d242ba12415e48b84410fa"
+    },
+    {
+      "path": "src/renderer/src/components/SightReadingStaff.tsx",
+      "blob": "b051ecc230302eb64a427332edf5196cf0fe8311"
+    },
+    {
+      "path": "src/renderer/src/components/SightReadingTimeBar.tsx",
+      "blob": "b877debaba2dbb99f9c29064287e7bb17430a217"
+    },
+    {
+      "path": "src/renderer/src/components/StatusBadge.tsx",
+      "blob": "4efdba6056d8d7d39774cce9ef63c4d83b129792"
+    },
+    {
+      "path": "src/renderer/src/components/ThemeSwitcher.tsx",
+      "blob": "940e7c41b424be1c48ee4dd5e81759337685e80b"
+    },
+    {
+      "path": "src/renderer/src/components/TrainingPlanPage.tsx",
+      "blob": "47d5e500e73ee7e2e26087fad7d20df068c7a261"
+    },
+    {
+      "path": "src/renderer/src/components/VirtualKeyboard.tsx",
+      "blob": "449c513a059279200b63fdb0094efc24265164a6"
+    },
+    {
+      "path": "src/renderer/src/components/VirtualPianoKeyboard.tsx",
+      "blob": "fc4927f579374fa3266a2beac5bd30681af85c99"
+    },
+    {
+      "path": "src/renderer/src/contexts/ThemeContext.tsx",
+      "blob": "a3de7c59da70b78f7e6021219bf5e20789e96b52"
+    },
+    {
+      "path": "src/renderer/src/curriculum/curriculumCatalog.ts",
+      "blob": "22ac548735caf2c60b37d41012cf66d00a8d3949"
+    },
+    {
+      "path": "src/renderer/src/curriculum/curriculumProgress.ts",
+      "blob": "88035c3fdb93a57c528b3e4663dbbf9842c510b5"
+    },
+    {
+      "path": "src/renderer/src/curriculum/curriculumTypes.ts",
+      "blob": "8e126058ef267b23fd087c2a7fbae8ba4044bf25"
+    },
+    {
+      "path": "src/renderer/src/data.ts",
+      "blob": "98303b46a4940b012eae5e1d93cce44c4158b0b0"
+    },
+    {
+      "path": "src/renderer/src/featureFlags.ts",
+      "blob": "b38cbec278f34b64b6e7da3aaa47f3732caa6b07"
+    },
+    {
+      "path": "src/renderer/src/harmony/arrangement.ts",
+      "blob": "d5ea7909c2c5ea060044f08570abd450ac12fdb9"
+    },
+    {
+      "path": "src/renderer/src/harmony/progressionTypes.ts",
+      "blob": "4a2b179963201ca6c1527bc624cf8be6bbe9e646"
+    },
+    {
+      "path": "src/renderer/src/harmony/progressions.ts",
+      "blob": "d81b78693b9c042e69d2082fad75733e1e37986f"
+    },
+    {
+      "path": "src/renderer/src/hooks/useAiCoach.ts",
+      "blob": "1590f321843be0ffa0d7fac79f08f8e298d39361"
+    },
+    {
+      "path": "src/renderer/src/hooks/useAudioEngine.ts",
+      "blob": "7316bc13f88a70b6c4eebacb10b2b74ca04794e4"
+    },
+    {
+      "path": "src/renderer/src/hooks/useChordPractice.ts",
+      "blob": "be5f4f44f2debd8fc11ba01ead97b6c2a641ab0d"
+    },
+    {
+      "path": "src/renderer/src/hooks/useChordV2Practice.ts",
+      "blob": "1eb2b2f747cef09291cf83a3519a5969540baea9"
+    },
+    {
+      "path": "src/renderer/src/hooks/useCoordinationPractice.ts",
+      "blob": "1b6be3babc8edb04445d21589aa3e87cbc392f67"
+    },
+    {
+      "path": "src/renderer/src/hooks/useDisplayPreferences.ts",
+      "blob": "abe13b317e66ca8612d6d0becc23f8bf6c890bf0"
+    },
+    {
+      "path": "src/renderer/src/hooks/useFreePractice.ts",
+      "blob": "31046d9ffb9e04fc4001f8c397e280302387d9c5"
+    },
+    {
+      "path": "src/renderer/src/hooks/useMetronome.ts",
+      "blob": "ca80404356ad631b51276a0abd2d804181795ddd"
+    },
+    {
+      "path": "src/renderer/src/hooks/useMetronomeSound.ts",
+      "blob": "18d911d2bcaab71afdf5470fb9652f773ffbee88"
+    },
+    {
+      "path": "src/renderer/src/hooks/useMidi.ts",
+      "blob": "2b253ed01fe3de766f9c0a8ee5d3c168810bd069"
+    },
+    {
+      "path": "src/renderer/src/hooks/useMidiDisconnectProtection.ts",
+      "blob": "83c3c39ccfb55234209846eb9d52e74f7e7789ed"
+    },
+    {
+      "path": "src/renderer/src/hooks/useMidiEvents.ts",
+      "blob": "7564d5a555dab9274ba6358e86771b42b42e26b5"
+    },
+    {
+      "path": "src/renderer/src/hooks/usePianoAudio.ts",
+      "blob": "73071cc5b568124f72288dda606e1c43a67d074b"
+    },
+    {
+      "path": "src/renderer/src/hooks/usePracticeEngine.ts",
+      "blob": "0978bce51c99ed755faec90fb4a51a745b5c1ec8"
+    },
+    {
+      "path": "src/renderer/src/hooks/usePracticeHistory.ts",
+      "blob": "73898244dcf617595c736fbe58e6961d6e81799b"
+    },
+    {
+      "path": "src/renderer/src/hooks/usePracticeSessionRecorder.ts",
+      "blob": "06af220dd3ed0b63b6a84a3e49d274a0905cd522"
+    },
+    {
+      "path": "src/renderer/src/hooks/useProgressionPractice.ts",
+      "blob": "4e1888c1e6e93655a7647c0a8882af9615a3eb2b"
+    },
+    {
+      "path": "src/renderer/src/hooks/useRhythmPractice.ts",
+      "blob": "3e20a47241f370759600c78f31a3f05080eeda44"
+    },
+    {
+      "path": "src/renderer/src/hooks/useScalePractice.ts",
+      "blob": "5d96c198fe1ee514a764cc95ce3e27205d5960cc"
+    },
+    {
+      "path": "src/renderer/src/hooks/useScorePractice.ts",
+      "blob": "b81f294690dd68b8d318baaa9c75befad92b103e"
+    },
+    {
+      "path": "src/renderer/src/hooks/useScoreWaitPractice.ts",
+      "blob": "9091268ce2114575dd3f8feb0b68d07f0b1ae4ad"
+    },
+    {
+      "path": "src/renderer/src/hooks/useSightReadingPractice.ts",
+      "blob": "c48e55469050f450cb3050080a862f748d08d1dd"
+    },
+    {
+      "path": "src/renderer/src/hooks/useTheme.ts",
+      "blob": "9449a6f8622f7ac12a610e0c3f25f5ccd056265d"
+    },
+    {
+      "path": "src/renderer/src/main.tsx",
+      "blob": "1bc6df78a25430f992db16aa496b4063820438f0"
+    },
+    {
+      "path": "src/renderer/src/midi/midiDeviceLifecycle.ts",
+      "blob": "d1485e98f848479c1bc638b67b8702ff4fd8206d"
+    },
+    {
+      "path": "src/renderer/src/midi/midiEventBus.ts",
+      "blob": "26d0e4b34a847a58db0b11a5ccd8811f4fc7a24f"
+    },
+    {
+      "path": "src/renderer/src/midi/midiMessages.ts",
+      "blob": "4d5cfba597d0c41a51c053a2128fed100b8a0b34"
+    },
+    {
+      "path": "src/renderer/src/midi/midiRecording.ts",
+      "blob": "ad5a7e7a6c6eb483cb8e409d885026021c3efec6"
+    },
+    {
+      "path": "src/renderer/src/midi/midiRecoveryDiagnostics.ts",
+      "blob": "cfa3fe11a6eba42e597d39f3a37113027e57aceb"
+    },
+    {
+      "path": "src/renderer/src/midiFile/midiFileParser.ts",
+      "blob": "2765eb296d2dd84c5087dfafc0782d76af5f34ae"
+    },
+    {
+      "path": "src/renderer/src/plan/dailyPlanV2Storage.ts",
+      "blob": "d567df1ac6a20e0ac7e45eb690997596b33d2179"
+    },
+    {
+      "path": "src/renderer/src/plan/planV2.ts",
+      "blob": "61734930577ad9d58bb62390b74ae7edbe48c350"
+    },
+    {
+      "path": "src/renderer/src/plan/planner.ts",
+      "blob": "c6de5e658a43d679fb83cfd9d250cd26a3e7db32"
+    },
+    {
+      "path": "src/renderer/src/platform/adapters.ts",
+      "blob": "13205fee457453d9fdcf71fe6e15bdb8e04478a0"
+    },
+    {
+      "path": "src/renderer/src/playback/playback.ts",
+      "blob": "41fa89fff318f7848688cf3bbd598dd420261522"
+    },
+    {
+      "path": "src/renderer/src/prescription/exerciseLibrary.ts",
+      "blob": "0d8562078803aae452672ae5ef6664a0faf27574"
+    },
+    {
+      "path": "src/renderer/src/records/freePracticeRecord.ts",
+      "blob": "0e3f336f0c82bd8441188112dcb1b51f25e713a7"
+    },
+    {
+      "path": "src/renderer/src/records/practiceMetrics.ts",
+      "blob": "cb891a49fe737ad6fdda6924b27f71ed4b62b31b"
+    },
+    {
+      "path": "src/renderer/src/records/practiceRecordRepository.ts",
+      "blob": "f5f91f2f34d6f076fb7579fbfb623378b3b078ac"
+    },
+    {
+      "path": "src/renderer/src/records/practiceRecordV2.ts",
+      "blob": "ccc11e67d98c810543e5a212fdbc79ef805724a2"
+    },
+    {
+      "path": "src/renderer/src/records/practiceRecordViewModel.ts",
+      "blob": "aeee58a3df5971352679d757d59d420823c8be3f"
+    },
+    {
+      "path": "src/renderer/src/records/practiceSessionRepository.ts",
+      "blob": "33199fc3d0fe3d4df53bfb41a7a830b8f1ca0ed0"
+    },
+    {
+      "path": "src/renderer/src/records/scorePracticeRecords.ts",
+      "blob": "ee488b81399c9dc65ba0660b5b9899ae66530eab"
+    },
+    {
+      "path": "src/renderer/src/score/followScoreCore.ts",
+      "blob": "1b7d279f8cf5059e22acabf9aacab954b32c272c"
+    },
+    {
+      "path": "src/renderer/src/score/musicXmlParser.ts",
+      "blob": "c7d767b774b66bf62de1ebd7e6d6ce9863f0c71e"
+    },
+    {
+      "path": "src/renderer/src/score/musicXmlProfile.ts",
+      "blob": "9d2ceb611ae5c1e03a21d3d2db1ebb1583b6abc8"
+    },
+    {
+      "path": "src/renderer/src/score/musicXmlTypes.ts",
+      "blob": "29a6fd81977ea5baa846a779fabdf79d169ec25f"
+    },
+    {
+      "path": "src/renderer/src/score/mxlImportService.ts",
+      "blob": "56e112b1e13504a5107a395a36e9deae201e8641"
+    },
+    {
+      "path": "src/renderer/src/score/practiceSegment.ts",
+      "blob": "08f3b798b72f16555f54e9a327fe8b61e5db6898"
+    },
+    {
+      "path": "src/renderer/src/score/practiceSegmentBuilder.ts",
+      "blob": "cd4f217f7dbc0e02fa40d20c851992223b9b32e4"
+    },
+    {
+      "path": "src/renderer/src/score/realtimeScoreCore.ts",
+      "blob": "16daad70c9124923da0d7c33d4f04cc94cd19b7f"
+    },
+    {
+      "path": "src/renderer/src/score/referenceValidation.ts",
+      "blob": "5bd45d97243a7d88039193da24c22427f2369387"
+    },
+    {
+      "path": "src/renderer/src/score/scoreEngraving.ts",
+      "blob": "62887a83f7602454c67e4d4bf08b26f752270553"
+    },
+    {
+      "path": "src/renderer/src/score/scoreImportRepository.ts",
+      "blob": "f12f7470ae991ba59264d30b44990957b59abdaa"
+    },
+    {
+      "path": "src/renderer/src/score/scoreSheetBounds.ts",
+      "blob": "232bf2ac30362d9e9c306978eefb4050bc5896f3"
+    },
+    {
+      "path": "src/renderer/src/score/scoreSheetLayout.ts",
+      "blob": "2eafe227bcefe50a1b59da1bac31fb148d418bd1"
+    },
+    {
+      "path": "src/renderer/src/score/scoreSheetTimeAxis.ts",
+      "blob": "58106bb77f678aa8dee5e63515c18ad582a3cd5c"
+    },
+    {
+      "path": "src/renderer/src/score/scoreTimeV2.ts",
+      "blob": "a348b22410474bad56a92f333e96f111357a7143"
+    },
+    {
+      "path": "src/renderer/src/score/scoreTimeline.ts",
+      "blob": "0d81f965f7e41d0fa3611785f4b7aa3323d31f47"
+    },
+    {
+      "path": "src/renderer/src/score/waitScoreCore.ts",
+      "blob": "cea808565d739770626f11b8395cf65537e55d61"
+    },
+    {
+      "path": "src/renderer/src/score/xmlMiniParser.ts",
+      "blob": "b8d46f10f7171db568b680e6e25b01c2f8dcf6ce"
+    },
+    {
+      "path": "src/renderer/src/score/zipReader.ts",
+      "blob": "ac20b29ad9bf9a39dad44fed8eb4186b2ad15da9"
+    },
+    {
+      "path": "src/renderer/src/storage/backup.ts",
+      "blob": "bb312e2615ee05766910db18476cbea9a6ab3270"
+    },
+    {
+      "path": "src/renderer/src/storage/firstRun.ts",
+      "blob": "420c5201e3557f5a411035730d5ace965d23ff8c"
+    },
+    {
+      "path": "src/renderer/src/styles.css",
+      "blob": "36d37704c3b239ceea2d1d385a0f7c7b7934618a"
+    },
+    {
+      "path": "src/renderer/src/styles/f2-ui.css",
+      "blob": "b9892fef8b9d51e7b8b017e5228bef0db5bd0d4f"
+    },
+    {
+      "path": "src/renderer/src/styles/practice-usability.css",
+      "blob": "31424d3ddf0dac55395382a4e27f02498ad41952"
+    },
+    {
+      "path": "src/renderer/src/styles/themes.css",
+      "blob": "ba24e7892e547b62936dbf478fc44c519dd13862"
+    },
+    {
+      "path": "src/renderer/src/styles/training-plan.css",
+      "blob": "777d7463a4bf9df2b66c5603bab981283a5b80a0"
+    },
+    {
+      "path": "src/renderer/src/tokens.css",
+      "blob": "cbbdddc2bf5c89f87f02ef3d8d94bc10ce38d7c8"
+    },
+    {
+      "path": "src/renderer/src/types.ts",
+      "blob": "a447bf7b865de28cf4f3df81b20449e08be8d06a"
+    },
+    {
+      "path": "src/renderer/src/utils/audioNotes.ts",
+      "blob": "62e792707f9449cafe9af10aaf76ff15c3aea648"
+    },
+    {
+      "path": "src/renderer/src/utils/chordDefinitions.ts",
+      "blob": "fc4230b83dc14487249119c29a8a1372a54705a5"
+    },
+    {
+      "path": "src/renderer/src/utils/chordFeedback.ts",
+      "blob": "9ef54754d53fd4a154f5aa9072903596434f94b1"
+    },
+    {
+      "path": "src/renderer/src/utils/chordPatterns.ts",
+      "blob": "831f5d92dffef3d1cbc57d784f406ea2f6bc3386"
+    },
+    {
+      "path": "src/renderer/src/utils/chordProgressions.ts",
+      "blob": "0b55707a2ff1ef1760b6ba73f0f8330e59f3f786"
+    },
+    {
+      "path": "src/renderer/src/utils/chordTrainingContents.ts",
+      "blob": "c2d2fa21974574f1cfc421911f5706e49848747c"
+    },
+    {
+      "path": "src/renderer/src/utils/chordTypes.ts",
+      "blob": "aa8f5cde0e1f108d0f3f8b4c3cce1d8eb8dfb62e"
+    },
+    {
+      "path": "src/renderer/src/utils/coordinationPatterns.ts",
+      "blob": "2c512044aa8e81ac19edac5daab160383407c58f"
+    },
+    {
+      "path": "src/renderer/src/utils/coordinationTypes.ts",
+      "blob": "2aaf5f4c110e27cbcde889422df7165d581e12c9"
+    },
+    {
+      "path": "src/renderer/src/utils/dailyTrainingPlan.ts",
+      "blob": "d27aa203633d6aa6f5e2fc685dcaaea678f0f417"
+    },
+    {
+      "path": "src/renderer/src/utils/displayPreferences.ts",
+      "blob": "7a537b57a60dbde1edd3d9455be2a2133de051bd"
+    },
+    {
+      "path": "src/renderer/src/utils/freePracticeStaffGeometry.ts",
+      "blob": "65912655faa11b9a74d7f4c40ad11d3e6c39c116"
+    },
+    {
+      "path": "src/renderer/src/utils/freePracticeVisualization.ts",
+      "blob": "920c1898f8f81d1587354433dbdae1e5ef38ec97"
+    },
+    {
+      "path": "src/renderer/src/utils/freePracticeVisualizationDiagnostics.ts",
+      "blob": "ed17a4d768368e219b574301289cecddbe04a228"
+    },
+    {
+      "path": "src/renderer/src/utils/judgement.ts",
+      "blob": "57b82883c31bbf80ab3d8dd9cb2f4bd8d8059c7f"
+    },
+    {
+      "path": "src/renderer/src/utils/levelSixChecklist.ts",
+      "blob": "d81be8e8bb21171710423ee66a7733dc5b50ba9c"
+    },
+    {
+      "path": "src/renderer/src/utils/localCalendarDate.ts",
+      "blob": "a2cdb4c7d6fa30619a9b87486bc6843f65ecbc40"
+    },
+    {
+      "path": "src/renderer/src/utils/midiNotes.ts",
+      "blob": "76bf28e4f0945eeb58803aac0100583ff30e25e0"
+    },
+    {
+      "path": "src/renderer/src/utils/musicKeySignatures.ts",
+      "blob": "8e6d314afacf9c6a490d30450bd169469484e762"
+    },
+    {
+      "path": "src/renderer/src/utils/musicNotationFont.ts",
+      "blob": "060db5a0abce001b44069fd0dee549a49294e773"
+    },
+    {
+      "path": "src/renderer/src/utils/musicNotationTypes.ts",
+      "blob": "27917e67a66cbab1d53b6d5292e64514b780e21e"
+    },
+    {
+      "path": "src/renderer/src/utils/musicPitchSpelling.ts",
+      "blob": "8b4386de00cd099a11d50d69324e508d8ff07e74"
+    },
+    {
+      "path": "src/renderer/src/utils/musicStaffModel.ts",
+      "blob": "c2e2cce1e3d17fa85734474f0c6ec675ca5cfac6"
+    },
+    {
+      "path": "src/renderer/src/utils/pageRouting.ts",
+      "blob": "0eb3a33002d069f3fc6dceef3fc31d6e94192819"
+    },
+    {
+      "path": "src/renderer/src/utils/practiceContentTypes.ts",
+      "blob": "f37ce6ac90de01d24c3ea6a83ff77479bd569f29"
+    },
+    {
+      "path": "src/renderer/src/utils/practicePresentation.ts",
+      "blob": "4b063b063e0cdac7494e2ad17948b5e49189f0c0"
+    },
+    {
+      "path": "src/renderer/src/utils/practiceRecordAdapters.ts",
+      "blob": "11d971a9fb778f8b5537009b96d4ac0ad470daa0"
+    },
+    {
+      "path": "src/renderer/src/utils/practiceRecordStorage.ts",
+      "blob": "f7b45c42b42f8fb28fd362423eebbd696afbccc1"
+    },
+    {
+      "path": "src/renderer/src/utils/practiceRecordTypes.ts",
+      "blob": "8055569df2ba20614c57a5649bb4c7dfe9f6a494"
+    },
+    {
+      "path": "src/renderer/src/utils/practiceTypes.ts",
+      "blob": "56720cd8ada8ce99d0347aedd26d96ce268e3c4c"
+    },
+    {
+      "path": "src/renderer/src/utils/rhythmPatterns.ts",
+      "blob": "6454b4de021aa3e1c31185683190add2dbcc03c2"
+    },
+    {
+      "path": "src/renderer/src/utils/rhythmTypes.ts",
+      "blob": "58c8638a6856da26c96ca1f519e84613fe983d8c"
+    },
+    {
+      "path": "src/renderer/src/utils/scalePatterns.ts",
+      "blob": "a2d9b7f7c147ad73bab57aa62dd97f91d6720836"
+    },
+    {
+      "path": "src/renderer/src/utils/scalePracticeCore.ts",
+      "blob": "8bfc9065832f08ed0fb99a9de8d06d4a0545a208"
+    },
+    {
+      "path": "src/renderer/src/utils/scaleTypes.ts",
+      "blob": "df2d2740f8eea7826da2c30c0be13cc689eed668"
+    },
+    {
+      "path": "src/renderer/src/utils/sightReadingNotes.ts",
+      "blob": "04fb0c0d6fc762f4dc62efe3274c0018d1d8f846"
+    },
+    {
+      "path": "src/renderer/src/utils/sightReadingSession.ts",
+      "blob": "d2df6f7db53a5cb0448d192dac134877c3fc41e0"
+    },
+    {
+      "path": "src/renderer/src/utils/sightReadingSettings.ts",
+      "blob": "21c41d29e4520c50ff2428d3007b9343f9b26061"
+    },
+    {
+      "path": "src/renderer/src/utils/staffPosition.ts",
+      "blob": "a344d3ccd6ae21caab9201455e53622d34e277da"
+    },
+    {
+      "path": "src/renderer/src/utils/techniqueMappings.ts",
+      "blob": "4e8e3f54d19e1034ce772b57f63159025025b95f"
+    },
+    {
+      "path": "src/renderer/src/utils/themeStorage.ts",
+      "blob": "088d9a8cadca9246a848276dec105497a10541df"
+    },
+    {
+      "path": "src/renderer/src/utils/themeTypes.ts",
+      "blob": "912f14a97b29c3157314decfc073002aa7cdbfd2"
+    },
+    {
+      "path": "src/renderer/src/utils/timingSubdivisions.ts",
+      "blob": "a9060cda735bdba8c4ffb400089c2b1e4b401a4e"
+    },
+    {
+      "path": "src/renderer/src/utils/trainingPlanRecordLink.ts",
+      "blob": "2431bd7e8a615611c442c3d1d1bc31c5226d20dd"
+    },
+    {
+      "path": "src/renderer/src/utils/trainingPlanStages.ts",
+      "blob": "5ef779b97784b04014260a975122dd01f5ebe053"
+    },
+    {
+      "path": "src/renderer/src/utils/trainingPlanStorage.ts",
+      "blob": "8587e948985646fd1dd09afeac92a24ce7bc5f11"
+    },
+    {
+      "path": "src/renderer/src/utils/trainingPlanTypes.ts",
+      "blob": "f53ee98fdb898de7d5b4624989ff2908cbc5a046"
+    },
+    {
+      "path": "src/renderer/src/utils/virtualPianoLayout.ts",
+      "blob": "083419ef4fc5119fcd26d44223d4fd39b7171815"
+    },
+    {
+      "path": "src/renderer/src/utils/weeklyTrainingPlan.ts",
+      "blob": "2860bb252bde805fa3d030cd7c48d7b218bf25ee"
+    },
+    {
+      "path": "src/renderer/src/vite-env.d.ts",
+      "blob": "895814019f37715c4e5cb7c9e6869a18f2ddcda4"
+    },
+    {
+      "path": "tsconfig.node.json",
+      "blob": "b0af774d4d8f5c2c080bd3f784336178621aad76"
+    },
+    {
+      "path": "docs/F1-human-practice-flow/prototype/README.md",
+      "blob": "3d3b3a1933e2e8b577f18f31d42cc79f5a14adb6"
+    },
+    {
+      "path": "docs/F1-human-practice-flow/prototype/index.html",
+      "blob": "b37b667ef17ed4a02792f179601d79527a98e7bf"
+    },
+    {
+      "path": "docs/F1-human-practice-flow/prototype/prototype.js",
+      "blob": "787bcc6cb9b3ab27ab3bfe4317451d3b0d5a396e"
+    },
+    {
+      "path": "docs/F1-human-practice-flow/prototype/styles.css",
+      "blob": "ab2c812e7acade2d9ea04443d84e6425610beaad"
+    }
+  ],
+  "removedScripts": [
+    "dev",
+    "diagnose:piano-latency",
+    "poc:native-audio:build",
+    "poc:native-audio:auto",
+    "test:regression",
+    "build",
+    "preview",
+    "pack",
+    "dist"
+  ],
+  "removedDependencies": [
+    "electron",
+    "electron-builder",
+    "electron-vite",
+    "rcedit"
+  ]
+}

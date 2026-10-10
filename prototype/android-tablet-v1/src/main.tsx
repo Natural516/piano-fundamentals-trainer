@@ -2,7 +2,7 @@ import { Component, StrictMode, createContext, useCallback, useContext, useEffec
 import { createRoot } from 'react-dom/client'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
-import { MusicStaffRenderer as BaseMusicStaffRenderer } from '../../../src/renderer/src/components/MusicStaffRenderer'
+import { MusicStaffRenderer as BaseMusicStaffRenderer } from '../../../src/shared/musicNotation/MusicStaffRenderer'
 import { getMajorKeySignature, MAJOR_KEY_DISPLAY_SIGNATURES, type MajorKeyId } from '../../../src/sightReading/musicKeySignatures'
 import { spellMidiPitch } from '../../../src/sightReading/musicPitchSpelling'
 import type { MusicNotationFeedback, MusicNotationPitch } from '../../../src/sightReading/musicNotationTypes'

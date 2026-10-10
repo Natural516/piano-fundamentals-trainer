@@ -276,7 +276,8 @@ test('CHORD-E20','fixed checkpoint freeze protects Sight/Interval/domain/MIDI/na
   const allowed=new Set(['ChordModeSelectScreen','ChordGroupBadge','ChordSettingsDrawer','ChordPracticeScreen','ChordReportDetailScreen','ChordPersistenceErrorNotice','HistoryRecord','HistoryScreen'])
   assert.deepEqual([...frozenCurrent.keys()],[...previous.keys()]);for(const [name,body]of frozenCurrent)if(!allowed.has(name))assert.equal(body,previous.get(name),name)
   const nonChord=body=>body.slice(body.indexOf("  if (item.module === 'interval')"))
-  assert.equal(nonChord(current.get('HistoryRecord')),nonChord(previous.get('HistoryRecord')))
+  // Reverse only the independently pinned Sight Analysis/early-exit additions first.
+  assert.equal(nonChord(frozenCurrent.get('HistoryRecord')),nonChord(previous.get('HistoryRecord')))
   const wiring='chordReport={chordHistory.records.find(record => record.recordId === item.recordId)} '
   const screenshot = require('./android-readme-english-presentation-contract.cjs'); screenshot.assertReadmeEnglishDelta()
   assert.equal(screenshot.normalize('prototype/android-tablet-v1/src/main.tsx',current.get('HistoryScreen')).replace(wiring,''),previous.get('HistoryScreen'))
@@ -284,9 +285,11 @@ test('CHORD-E20','fixed checkpoint freeze protects Sight/Interval/domain/MIDI/na
   files.push(...['sightReadingIntegration.ts','androidBluetoothMidi.ts','androidBluetoothMidiCore.ts','androidPersistenceCore.ts','activePracticeSession.ts','practiceKeepAwake.ts','historyProjection.ts','mixedHistoryProjection.ts'].map(n=>'prototype/android-tablet-v1/src/'+n))
   files.push(...['sightReadingPresentation.ts','sightReadingResources.ts','intervalPracticePresentation.ts','intervalPreparationResources.ts','intervalFlowResources.ts','theoryQueryResources.ts','legacyPresentation.ts'].map(n=>'prototype/android-tablet-v1/src/localization/'+n))
   const native = require('./android-localization-native-contract.cjs'); native.assertNativePresentationOnly()
-  for(const file of files){if (native.allowedPaths.has(file)) continue
+  const cleanup = require('./android-repository-cleanup-contract.cjs'); cleanup.assertCleanupDelta()
+  for(const file of files){if (cleanup.isRetired(file) && !cleanup.migrations[file]) continue
+    if (native.allowedPaths.has(file)) continue
     if (file === 'src/renderer/src/components/MusicStaffRenderer.tsx') { assertRendererDisplayOnly(base); continue }
-    const was=execFileSync('git',['show',base+':'+file],{cwd:root,maxBuffer:64*1024*1024}),now=fs.readFileSync(path.join(root,file))
+    const was=execFileSync('git',['show',base+':'+file],{cwd:root,maxBuffer:64*1024*1024}),now=fs.readFileSync(path.join(root,cleanup.currentPath(file)))
     if(/\.(ts|tsx|kt|xml|gradle|properties|json|java|md|gitignore|bat|sh|html|css|txt)$/.test(file)) {
       let source = screenshot.normalize(file, now.toString().replaceAll('\r\n','\n'))
       if (file === 'android/version.properties') source = require('./android-release-candidate-version-contract.cjs').normalizeCandidateVersion(source)
@@ -319,7 +322,7 @@ test('CHORD-E23','AST freezes all Chord lifecycle/actions/notation props; only s
       if(ts.isJsxAttribute(n)&&['onClick','onChange','onBack','disabled','pitches','symbol','arpeggioState','blockState'].includes(n.name.text))values.push(n.getText(ast));ts.forEachChild(n,visit)}
     visit(ast);return values}
   for(const name of ['ChordModeSelectScreen','ChordSettingsDrawer','ChordPracticeScreen','ChordReportDetailScreen','ChordPersistenceErrorNotice'])assert.deepEqual(nodes(frozenCurrent.get(name)),nodes(previous.get(name)),name)
-  let renderer=read('prototype/android-tablet-v1/src/ChordGrandStaff.tsx')
+  let renderer=require('./android-repository-cleanup-contract.cjs').read('prototype/android-tablet-v1/src/ChordGrandStaff.tsx')
   renderer=renderer.replace('  ariaLabel?: string\n','').replace('  symbol,\n  ariaLabel','  symbol').replace('aria-label={ariaLabel ?? ','aria-label={')
   renderer=renderer.replace('  fontErrorLabel?: string\n','').replace('  symbol,\n  fontErrorLabel','  symbol').replace('{fontErrorLabel ?? fontError}', '{fontError}')
   assert.equal(renderer,oldFile('prototype/android-tablet-v1/src/ChordGrandStaff.tsx'))

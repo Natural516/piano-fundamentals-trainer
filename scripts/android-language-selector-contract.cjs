@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..')
 const base = '9a6454a361dc0eba5016963add8b0f96c1046138'
 const selectorPath = 'prototype/android-tablet-v1/src/localization/LanguageSetting.tsx'
 const resourcesPath = 'prototype/android-tablet-v1/src/localization/resources.ts'
-const read = file => require('./android-sight-analysis-contract.cjs').normalize(file, fs.readFileSync(path.join(root, file), 'utf8'))
+const read = file => require('./android-sight-analysis-contract.cjs').normalize(file, require('./android-repository-cleanup-contract.cjs').read(file))
 const old = file => execFileSync('git', ['show', base + ':' + file], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
 const optionsDeclaration = [
   '/** Fixed autonyms: language choices are not translated interface copy. */',
@@ -104,6 +104,7 @@ function restoreLegacySelector(source) {
 }
 function assertB6ScopeFrozen() {
   assertB6PresentationOnly()
+  const cleanup = require('./android-repository-cleanup-contract.cjs'); cleanup.assertCleanupDelta()
   const exit = require('./android-practice-early-exit-contract.cjs')
   const exitPaths = ['prototype/android-tablet-v1/src/main.tsx', 'prototype/android-tablet-v1/src/sightReadingIntegration.ts', 'prototype/android-tablet-v1/src/localization/localizationService.ts']
   for (const [file, normalize] of [[exitPaths[0], exit.normalizeEarlyExitMain], [exitPaths[1], exit.normalizeEarlyExitRuntime], [exitPaths[2], exit.normalizeEarlyExitService]]) assert.equal(normalize(read(file)), old(file), file + ': exact early-exit delta only')
@@ -116,10 +117,10 @@ function assertB6ScopeFrozen() {
   const analysis = require('./android-sight-analysis-contract.cjs'); analysis.assertAnalysisDelta()
   const analysisFiles = analysis.allowedPaths.filter(file => file.startsWith('src/') || file.endsWith('/androidPersistenceCore.ts'))
   for (const file of analysisFiles) assert.equal(analysis.normalize(file, read(file)), old(file), file + ': only exact approved analysis extension')
-  execFileSync('git', ['diff', '--exit-code', base, '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages', 'capacitor.config.ts', 'package-lock.json', ':(exclude)' + candidate.VERSION_PATH, ...analysisFiles.map(file => ':(exclude)' + file), ...analysis.additionPaths.map(file => ':(exclude)' + file),
+  execFileSync('git', ['diff', '--exit-code', base, '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages', 'capacitor.config.ts', 'package-lock.json', ...cleanup.allowedPaths.map(file => ':(exclude)' + file), ':(exclude)' + candidate.VERSION_PATH, ...analysisFiles.map(file => ':(exclude)' + file), ...analysis.additionPaths.map(file => ':(exclude)' + file),
     ':(exclude)' + selectorPath, ':(exclude)' + resourcesPath, ':(exclude)' + stylesPath, ...exitPaths.map(file => ':(exclude)' + file), ...englishPaths.map(file => ':(exclude)' + file), ...exit.reviewedAdditionPaths.map(file => ':(exclude)' + file)], { cwd: root })
   const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '--', 'android', 'prototype', 'src', 'theme-api', 'theme-packages'], { cwd: root, encoding: 'utf8' }).trim()
-  const reviewedAdditions = new Set([...exit.reviewedAdditionPaths, ...analysis.additionPaths])
+  const reviewedAdditions = new Set([...exit.reviewedAdditionPaths, ...analysis.additionPaths, ...Object.values(cleanup.migrations)])
   assert.deepEqual(untracked.split('\n').filter(Boolean).filter(file => !reviewedAdditions.has(file)), [], 'no unreviewed product source/resource additions')
 }
 module.exports = { base, root, selectorPath, resourcesPath, stylesPath, read, assertB6PresentationOnly, restoreLegacySelector, assertB6ScopeFrozen, stripClickChoiceCss }

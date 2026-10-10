@@ -7,7 +7,7 @@ const nativeDir = 'android/app/src/main/java/com/pianofundamentals/trainer/'
 const midiPath = nativeDir + 'AndroidBluetoothMidiPlugin.kt'
 const resourcePaths = ['main', 'qa'].flatMap(source => ['values', 'values-zh', 'values-b+zh+Hant'].map(q => `android/app/src/${source}/res/${q}/strings.xml`))
 const allowedPaths = new Set([midiPath, ...resourcePaths])
-const read = file => fs.readFileSync(path.join(root, file), 'utf8').replaceAll('\r\n', '\n')
+const read = file => require('./android-repository-cleanup-contract.cjs').read(file)
 const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).replaceAll('\r\n', '\n')
 const old = file => git(['show', base + ':' + file])
 const display = {
@@ -47,11 +47,12 @@ function normalizeMidi(source) {
   return source
 }
 function assertNativePresentationOnly() {
+  const cleanup = require('./android-repository-cleanup-contract.cjs'); cleanup.assertCleanupDelta()
   assertResources()
   assert.equal(normalizeMidi(read(midiPath)), old(midiPath), 'MIDI only permits the two unnamed display fallbacks, no operational change')
   const candidate = require('./android-release-candidate-version-contract.cjs')
   assert.equal(candidate.normalizeCandidateVersion(read(candidate.VERSION_PATH)), old(candidate.VERSION_PATH), 'only exact candidate version metadata differs')
-  git(['diff', '--exit-code', base, '--', 'android', ':(exclude)' + candidate.VERSION_PATH, ...[...allowedPaths].map(f => ':(exclude)' + f)])
+  git(['diff', '--exit-code', base, '--', 'android', ':(exclude)' + cleanup.nativeTestPath, ':(exclude)' + candidate.VERSION_PATH, ...[...allowedPaths].map(f => ':(exclude)' + f)])
   for (const file of git(['ls-files', '--others', '--exclude-standard', '--', 'android']).trim().split('\n').filter(Boolean)) assert.ok(allowedPaths.has(file), 'unreviewed native file: ' + file)
 }
 // Reviewed ownership: no file in this list directly renders a native dialog/toast/notification.

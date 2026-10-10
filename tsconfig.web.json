@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "composite": true,
+    "composite": false,
     "target": "ES2020",
     "useDefineForClassFields": true,
     "lib": [
@@ -20,9 +20,10 @@
     "skipLibCheck": true
   },
   "include": [
+    "prototype/android-tablet-v1/src/**/*.ts",
+    "prototype/android-tablet-v1/src/**/*.tsx",
     "src/sightReading/**/*.ts",
-    "src/renderer/src/**/*.ts",
-    "src/renderer/src/**/*.tsx",
-    "src/renderer/src/**/*.d.ts"
+    "src/shared/**/*.ts",
+    "src/shared/**/*.tsx"
   ]
 }

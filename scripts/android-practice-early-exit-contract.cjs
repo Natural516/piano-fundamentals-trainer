@@ -111,7 +111,7 @@ const reviewedAdditionPaths = Object.keys(reviewedAdditionDigests)
 function assertReviewedAdditions() {
   const digest = source => createHash('sha256').update(clean(source)).digest('hex')
   for (const [file, expected] of Object.entries(reviewedAdditionDigests)) {
-    const actual = fs.readFileSync(path.join(root, file), 'utf8')
+    const actual = require('./android-repository-cleanup-contract.cjs').read(file)
     assert.equal(digest(actual), expected, file + ': exact reviewed addition, tracked or untracked')
     assert.notEqual(digest(actual + '\n// unauthorized mutation\n'), expected)
   }

@@ -185,7 +185,7 @@ test('SA37 resource semantic / placeholders / plural parity, explicit English no
 test('SA38 renderer handoff is production facts, never display parsing or reference coordinates', () => {
   const source = fs.readFileSync(path.join(__dirname, '../prototype/android-tablet-v1/src/SightReadingAnalysis.tsx'), 'utf8')
   assert.match(source, /notes=\{\[row.notation\]\}/); assert.match(source, /keySignature=\{row.keySignature\}/); assert.match(source, /staffMode=\{row.notation.clef\}/); assert.doesNotMatch(source, /getStaffPosition|midiNumberToNoteName|spellMidiPitch|\.match\(/)
-  const renderer = fs.readFileSync(path.join(__dirname, '../src/renderer/src/components/MusicStaffRenderer.tsx'), 'utf8'); assert.match(renderer, /drawCompactMusicStaff/); assert.match(renderer, /drawNote\(context, stave, model.notes, clef/); assert.match(renderer, /keys: notes.map\(\(note\) => note.vexFlowKey\)/)
+  const renderer = fs.readFileSync(path.join(__dirname, '../src/shared/musicNotation/MusicStaffRenderer.tsx'), 'utf8'); assert.match(renderer, /drawCompactMusicStaff/); assert.match(renderer, /drawNote\(context, stave, model.notes, clef/); assert.match(renderer, /keys: notes.map\(\(note\) => note.vexFlowKey\)/)
 })
 test('SA39 localized labels cannot enter durable identity or domain algorithms', () => { const source = fs.readFileSync(path.join(__dirname, '../src/sightReading/noteAnalysis.ts'), 'utf8'); assert.doesNotMatch(source, /i18next|LocaleProvider|document\.|window\.|localStorage|Date\.now|React/) })
 test('SA40 UI entry only Sight, no new navigation item, Android Back goes to History', () => {
@@ -218,7 +218,7 @@ test('SA43 production notation -> actual VexFlow staff lines B2/F3/B4/C5, not re
     const n = spellMidiPitch(midi, 'C', clef), note = new StaveNote({ clef: n.clef, keys: [n.vexFlowKey], duration: 'w' })
     assert.equal(note.getKeyProps()[0].line, expectedLine)
   }
-  const renderer = fs.readFileSync(path.join(__dirname, '../src/renderer/src/components/MusicStaffRenderer.tsx'), 'utf8')
+  const renderer = fs.readFileSync(path.join(__dirname, '../src/shared/musicNotation/MusicStaffRenderer.tsx'), 'utf8')
   assert.match(renderer, /const ys = note.getYs\(\)/); assert.match(renderer, /stave.getYForLine\(0\)/)
   assert.match(renderer, /svg.setAttribute\('viewBox'/); assert.doesNotMatch(renderer, /svg.getBBox\(\)/)
 })

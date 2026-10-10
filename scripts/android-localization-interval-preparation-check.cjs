@@ -6,7 +6,7 @@ const path = require('node:path')
 const ts = require('typescript')
 const React = require('react')
 const { act } = require('react-test-renderer')
-const { mounted, ui, current, declarations, read, text, contains, businessBytes } = require('./android-localization-shell-check.cjs')
+const { mounted, ui, current, frozenCurrent, declarations, read, text, contains, businessBytes } = require('./android-localization-shell-check.cjs')
 const { createLocalizationInstance } = require('../prototype/android-tablet-v1/src/localization/localizationService.ts')
 const { localizationResources } = require('../prototype/android-tablet-v1/src/localization/resources.ts')
 const { APP_PREFERENCES_KEY } = require('../prototype/android-tablet-v1/src/localization/appPreferences.ts')
@@ -150,7 +150,7 @@ test('IP6', 'Start/Back controls stay frozen; reviewed early-exit saves exactly 
   assert.deepEqual(events(current.get('IntervalPracticeSetupScreen')), events(previous.get('IntervalPracticeSetupScreen')))
   const exit = require('./android-practice-early-exit-contract.cjs')
   exit.assertEarlyExitDelta()
-  assert.equal(exit.normalizeEarlyExitMain(current.get('App')), previous.get('App'))
+  assert.equal(frozenCurrent.get('App'), previous.get('App'))
   const noSaveGate = current.get('App').replace("if (saveReport) { finalizeIntervalPractice('STOPPED'); return }", "finalizeIntervalPractice('STOPPED')")
   assert.notEqual(noSaveGate, current.get('App'))
   assert.throws(() => assert.equal(exit.normalizeEarlyExitMain(noSaveGate), previous.get('App')))
@@ -230,13 +230,13 @@ test('IP11', 'locale round trip keeps exact Start handler identity and cannot cr
   assert.equal(h.runtime.snapshot.status, 'idle')
 }))
 test('IP12', 'original declaration freeze permits only the reviewed early-exit and English Home deltas', () => {
-  assert.deepEqual([...current.keys()], [...previous.keys()])
+  assert.deepEqual([...frozenCurrent.keys()], [...previous.keys()])
   const english = require('./android-readme-english-presentation-contract.cjs')
   const exit = require('./android-practice-early-exit-contract.cjs')
   english.assertReadmeEnglishDelta()
   exit.assertEarlyExitDelta()
   const allowed = new Set(['ChordModeSelectScreen', 'ChordGroupBadge', 'ChordSettingsDrawer', 'ChordPracticeScreen', 'ChordReportDetailScreen', 'ChordPersistenceErrorNotice', 'SightSettingsRows', 'SightSettingsDrawer', 'SightReadyScreen', 'PracticeFocusHeader', 'SightFocusScreen', 'SightResultScreen', 'PersistenceErrorNotice', 'IntervalPracticeSetupScreen', 'IntervalPracticeActiveScreen', 'IntervalReportFacts', 'IntervalResultScreen', 'IntervalReportDetailScreen', 'HistoryRecord', 'HistoryScreen', 'HistoryTrendChart', 'IntervalPersistenceErrorNotice'])
-  for (const [name, source] of current) if (!allowed.has(name)) {
+  for (const [name, source] of frozenCurrent) if (!allowed.has(name)) {
     const normalize = value => name === 'App' ? exit.normalizeEarlyExitMain(value)
       : name === 'HomeScreen' ? english.normalize(mainPath, value) : value
     assert.equal(normalize(source), previous.get(name), name)

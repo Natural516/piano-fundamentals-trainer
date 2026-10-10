@@ -45,6 +45,7 @@ test('NATIVE-L9', 'resource values used only for existing display name fields, n
   assert.equal((source.match(/R\.string\./g) || []).length, 2); c.assertNativePresentationOnly()
 })
 test('NATIVE-L10', 'Web preference/infrastructure/bridge files remain byte-frozen; no locale bridge', () => {
+  const cleanup = require('./android-repository-cleanup-contract.cjs'); cleanup.assertCleanupDelta()
   const selector = require('./android-language-selector-contract.cjs')
   selector.assertB6PresentationOnly() // Exact B6 resources plus user-approved click controls/local CSS; no broad Web exemption.
   const exit = require('./android-practice-early-exit-contract.cjs')
@@ -57,7 +58,7 @@ test('NATIVE-L10', 'Web preference/infrastructure/bridge files remain byte-froze
   const analysis = require('./android-sight-analysis-contract.cjs'); analysis.assertAnalysisDelta()
   const analysisFiles = analysis.allowedPaths.filter(file => file.startsWith('src/') || file.endsWith('/androidPersistenceCore.ts'))
   for (const file of analysisFiles) assert.equal(analysis.normalize(file, c.read(file)), c.old(file), file + ' only the exact approved analysis extension')
-  c.git(['diff', '--exit-code', c.base, '--', 'prototype', 'src', 'capacitor.config.ts', ...analysisFiles.map(file => ':(exclude)' + file), ...analysis.additionPaths.map(file => ':(exclude)' + file),
+  c.git(['diff', '--exit-code', c.base, '--', 'prototype', 'src', 'capacitor.config.ts', ...cleanup.allowedPaths.map(file => ':(exclude)' + file), ...analysisFiles.map(file => ':(exclude)' + file), ...analysis.additionPaths.map(file => ':(exclude)' + file),
     ':(exclude)' + selector.selectorPath, ':(exclude)' + selector.resourcesPath, ':(exclude)' + selector.stylesPath, ...exitPaths.map(file => ':(exclude)' + file), ...englishPaths.map(file => ':(exclude)' + file), ...exit.reviewedAdditionPaths.map(file => ':(exclude)' + file)])
 })
 test('NATIVE-L11', 'no per-app locale sync/configuration override/recreate implementation', () => {

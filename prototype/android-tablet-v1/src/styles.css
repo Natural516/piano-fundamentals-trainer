@@ -1,4 +1,4 @@
-@import url('../../../src/renderer/src/styles/themes.css');
+@import url('../../../src/shared/styles/themes.css');
 
 :root {
   color-scheme: light;

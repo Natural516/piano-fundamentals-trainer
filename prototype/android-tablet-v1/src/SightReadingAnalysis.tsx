@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { MusicStaffRenderer } from '../../../src/renderer/src/components/MusicStaffRenderer'
+import { MusicStaffRenderer } from '../../../src/shared/musicNotation/MusicStaffRenderer'
 import { analyzeSightHistory, rankSightNotes, type SightNoteRank, type SightNoteStats } from '../../../src/sightReading/noteAnalysis'
 import type { DurableSightReadingReport } from './androidPersistenceCore'
 import type { SightReadingSessionReport } from '../../../src/sightReading/report'

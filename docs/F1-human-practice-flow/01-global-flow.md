@@ -1,5 +1,7 @@
 # F1 全局用户流程
 
+> 历史 Windows 设计记录，仅用于追溯；不是当前 Android 开发入口或产品能力清单。旧实现可在正式发布 Git 历史中查阅。
+
 > 范围：Human Practice Flow / Information Architecture Prototype。本文只定义用户可理解的练琴流程，不改变训练引擎、记录结构或正式 UI。
 
 ## 统一入口与唯一主循环

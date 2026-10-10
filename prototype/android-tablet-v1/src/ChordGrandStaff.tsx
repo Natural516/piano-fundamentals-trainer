@@ -8,7 +8,7 @@ import {
   TickContext,
   type ElementStyle
 } from 'vexflow/bravura'
-import { ensureMusicNotationFont } from '../../../src/renderer/src/utils/musicNotationFont'
+import { ensureMusicNotationFont } from '../../../src/shared/musicNotation/musicNotationFont'
 import type {
   ChordClef,
   ChordGroupVisualState,

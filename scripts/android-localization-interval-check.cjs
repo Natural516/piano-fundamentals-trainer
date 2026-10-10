@@ -274,9 +274,9 @@ test('E19', 'scope freeze preserves Preparation and all unrelated main declarati
   const branch = body => body.slice(body.indexOf("if (item.module === 'chord')"), body.indexOf("if (item.module === 'interval')"))
   // B4.5 authorizes Chord text only; preserve its original handlers and stable keys.
   assert.deepEqual(lifecycle(branch(current.get('HistoryRecord'))), lifecycle(branch(previous.get('HistoryRecord'))))
-  // B4.4 authorizes the Sight row's display only; preserve its actions/keys/notation lifecycle.
+  // Reverse independently pinned Sight Analysis actions before the original B4.4 comparison.
   const sight = body => body.slice(body.lastIndexOf('return ('))
-  assert.deepEqual(lifecycle(sight(current.get('HistoryRecord'))), lifecycle(sight(previous.get('HistoryRecord'))))
+  assert.deepEqual(lifecycle(sight(frozenCurrent.get('HistoryRecord'))), lifecycle(sight(previous.get('HistoryRecord'))))
   // Preparation resources were added in B4.3: freeze the reviewed checkpoint content, not their absence in the old base.
   const preparationPath = 'prototype/android-tablet-v1/src/localization/intervalPreparationResources.ts'
   const preparationSnapshot = execFileSync('git', ['show', '1024a9f43b6e1a9401e2627eec98ca6e8d13d246:' + preparationPath], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')

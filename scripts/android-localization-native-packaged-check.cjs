@@ -4,7 +4,8 @@ const { execFileSync } = require('node:child_process')
 const c = require('./android-localization-native-contract.cjs')
 const args = process.argv.slice(2)
 const production = args.includes('--production-apk')
-const expectedOptions = production ? ['--aapt2', '--production-apk', '--release-resources'] : ['--aapt2', '--qa-apk', '--debug-resources']
+const qaLinked = args.includes('--qa-resources')
+const expectedOptions = production ? ['--aapt2', '--production-apk', '--release-resources'] : ['--aapt2', '--qa-apk', qaLinked ? '--qa-resources' : '--debug-resources']
 assert.equal(args.length, expectedOptions.length * 2, 'exactly one explicit APK/resource input pair')
 for (let i = 0; i < args.length; i += 2) assert.ok(expectedOptions.includes(args[i]), 'unknown or mixed-channel option: ' + args[i])
 for (const name of expectedOptions) assert.equal(args.filter(arg => arg === name).length, 1, 'exactly one ' + name)
@@ -13,12 +14,14 @@ function option(name) {
   assert.ok(i >= 0 && args[i + 1] && !args[i + 1].startsWith('--'), name + ' must be explicit')
   return path.resolve(args[i + 1])
 }
-const aapt = option('--aapt2'), apk = option(production ? '--production-apk' : '--qa-apk'), linkedResources = option(production ? '--release-resources' : '--debug-resources')
+const aapt = option('--aapt2'), apk = option(production ? '--production-apk' : '--qa-apk'), linkedResources = option(production ? '--release-resources' : qaLinked ? '--qa-resources' : '--debug-resources')
 for (const file of [aapt, apk, linkedResources]) assert.ok(fs.statSync(file).isFile(), file)
 c.assertNativePresentationOnly()
 const dump = file => execFileSync(aapt, ['dump', 'resources', file], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
 const packaged = dump(apk), linked = dump(linkedResources)
-const resourceInputs = [[linked, false], [packaged, !production]]
+// QA linked resources include QA package/title overrides just like the QA APK.
+// Debug/release linked resources retain the original unsuffixed exact contracts.
+const resourceInputs = [[linked, qaLinked], [packaged, !production]]
 console.log(`PACKAGED_INPUT_CHANNEL=${production ? 'PRODUCTION' : 'QA'}; APK=${apk}; LINKED_RESOURCES=${linkedResources}`)
 function values(raw, key) {
   const block = raw.match(new RegExp(`\\bstring/${key}\\r?\\n([\\s\\S]*?)(?=\\r?\\n\\s*resource |\\r?\\n\\s*type |$)`))

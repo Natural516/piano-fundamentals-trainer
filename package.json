@@ -1,12 +1,10 @@
 {
   "name": "piano-fundamentals-trainer",
   "version": "1.0.0-rc.1",
-  "description": "钢琴基本功训练器：MIDI 输入、节拍器及五个基本功练习模块。",
+  "description": "Piano Fundamentals Trainer for Android tablets: MIDI practice, theory tools and practice history.",
   "productName": "钢琴基本功训练器",
   "author": "Piano Fundamentals Trainer",
-  "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
     "prototype:android": "vite --config vite.android-prototype.config.ts --host 0.0.0.0",
     "build:prototype:android": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && vite build --config vite.android-prototype.config.ts",
     "build:android:debug": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json && vite build --mode android-debug --config vite.android-prototype.config.ts",
@@ -22,10 +20,6 @@
     "android:verify:qa": "node scripts/android-apk-signing-report.cjs android/app/build/outputs/apk/qa/app-qa.apk --expect-debug --expected-application-id=com.pianofundamentals.trainer.qa",
     "android:verify:release": "node scripts/android-apk-signing-report.cjs android/app/build/outputs/apk/release/app-release.apk --expect-release",
     "android:release:preflight": "node scripts/android-release-preflight.cjs --apk=android/app/build/outputs/apk/release/app-release.apk --public-repository=Natural516/piano-fundamentals-trainer --public-ref=main",
-    "diagnose:piano-latency": "electron scripts/measure-piano-latency.cjs",
-    "poc:native-audio:build": "cmake -S native-audio-poc -B native-audio-poc/build -A x64 && cmake --build native-audio-poc/build --config Release",
-    "poc:native-audio:auto": "electron scripts/native-audio-poc.cjs",
-    "test:regression": "node scripts/regression-check.cjs",
     "test:sight-reading": "tsc --noEmit -p tsconfig.sight-reading.json && node scripts/sight-reading-contracts.cjs",
     "test:android-integration": "node scripts/android-sight-reading-integration.cjs",
     "test:android-bluetooth-midi": "node scripts/android-bluetooth-midi-check.cjs",
@@ -96,11 +90,9 @@
     "test:android-theme-asset-audit": "node scripts/android-theme-asset-audit.cjs",
     "test:android-all-inventory": "node scripts/run-android-test-inventory.cjs",
     "test:android-shell": "node scripts/android-shell-check.cjs",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "build": "npm run typecheck && electron-vite build",
-    "preview": "electron-vite preview",
-    "pack": "electron-builder --dir --win --x64",
-    "dist": "electron-builder --win --x64"
+    "typecheck": "tsc --noEmit -p prototype/android-tablet-v1/tsconfig.json",
+    "test:android-repository-cleanup": "node scripts/android-repository-cleanup-check.cjs",
+    "test:android-music-notation": "node scripts/android-music-notation-check.cjs"
   },
   "dependencies": {
     "@capacitor/android": "8.5.0",
@@ -122,69 +114,8 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
-    "electron": "^31.2.1",
-    "electron-builder": "^24.13.3",
-    "electron-vite": "^2.3.0",
-    "rcedit": "^5.0.2",
     "react-test-renderer": "^18.3.1",
     "typescript": "^5.5.3",
     "vite": "^5.3.4"
-  },
-  "build": {
-    "appId": "com.piano.fundamentals.trainer",
-    "productName": "钢琴基本功训练器",
-    "copyright": "Copyright © 2026 Piano Fundamentals Trainer",
-    "asar": true,
-    "electronDist": "node_modules/electron/dist",
-    "afterPack": "scripts/after-pack.cjs",
-    "directories": {
-      "output": "release",
-      "buildResources": "build"
-    },
-    "files": [
-      "out/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "resources/piano-samples",
-        "to": "piano-samples",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "win": {
-      "icon": "build/icon.ico",
-      "signAndEditExecutable": false,
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "runAfterFinish": true,
-      "deleteAppDataOnUninstall": false,
-      "shortcutName": "钢琴基本功训练器",
-      "uninstallDisplayName": "钢琴基本功训练器 ${version}",
-      "artifactName": "${productName}-Setup-${version}.${ext}"
-    },
-    "portable": {
-      "artifactName": "${productName}-Portable-${version}.${ext}"
-    }
   }
 }

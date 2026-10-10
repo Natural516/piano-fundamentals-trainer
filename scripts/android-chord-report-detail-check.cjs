@@ -183,10 +183,12 @@ test('CRD23 Chord filter is retained by the same app-owned filter contract', () 
   assert.match(mainSource, /onOpenChordReport\(recordId, filter\)/)
 })
 
-test('CRD24 Sight History card remains a non-interactive article', () => {
+test('CRD24 Sight History card opens the approved Sight report without Chord routing', () => {
   const sightBranch = historyRecordSource.slice(historyRecordSource.lastIndexOf('  return ('))
-  assert.match(sightBranch, /<article/)
-  assert.doesNotMatch(sightBranch, /onClick|<button/)
+  require('./android-sight-analysis-contract.cjs').assertAnalysisDelta()
+  assert.match(sightBranch, /<button[^>]*type="button"/)
+  assert.match(sightBranch, /onClick=\{\(\) => onOpenSightReport\?\.\(item\.recordId\)\}/)
+  assert.doesNotMatch(sightBranch, /onOpenChordReport|onOpenIntervalReport/)
 })
 
 test('CRD25 Chord History card is a real accessible button', () => {
