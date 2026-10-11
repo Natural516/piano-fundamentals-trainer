@@ -45,11 +45,15 @@ function NoteRanking({ rows, kind, single }: { rows: readonly SightNoteRank[]; k
     {rows.length ? <ol className="sight-analysis-ranking">
       {rows.map((row, index) => {
         const note = presentSightAnalysisNote(row.notation)
-        return <li key={row.identity}>
+        const clef = t(row.notation.clef)
+        return <li key={row.analysisIdentity}>
           <span className="sight-analysis-rank" aria-label={t('rank', { count: index + 1 })}>{index + 1}</span>
-          <div className="sight-analysis-staff"><MusicStaffRenderer analysisDense feedback={null} notes={[row.notation]} keySignature={row.keySignature} staffMode={row.notation.clef} ariaLabel={t('staff', { note })} fontErrorLabel={t('common:fontFailed')} /></div>
-          <strong className="sight-analysis-note">{note}</strong>
-          <span className="sight-analysis-value">{kind === 'errors' ? t('errorCount', { count: row.errorCount }) : t('usually', { seconds: (row.medianResponseMs! / 1000).toFixed(2) })}</span>
+          <div className="sight-analysis-staff"><MusicStaffRenderer analysisDense feedback={null} notes={[row.notation]} keySignature={row.keySignature} staffMode={row.notation.clef} ariaLabel={t('staff', { note, clef })} fontErrorLabel={t('common:fontFailed')} /></div>
+          <div className="sight-analysis-pitch"><strong className="sight-analysis-note">{note}</strong><span className="sight-analysis-clef">{clef}</span></div>
+          <span className="sight-analysis-value">{kind === 'errors' ? t('errorCount', { count: row.errorCount }) : <>
+            {t('usually', { seconds: (row.medianResponseMs! / 1000).toFixed(2) })}
+            <span className="sight-analysis-samples">{t('correctSamples', { count: row.responseTimesMs.length })}</span>
+          </>}</span>
         </li>
       })}
     </ol> : <p className="sight-analysis-empty">{t(single ? kind === 'errors' ? 'noSessionErrors' : 'noSessionSlow' : kind === 'errors' ? 'noErrors' : 'noSlow')}</p>}

@@ -16,12 +16,15 @@ export interface SightNoteStats {
 
 export const MIN_ERROR_OCCURRENCES = 5
 export const MIN_CORRECT_SAMPLES = 5
-export const RELATIVE_SLOW_FACTOR = 1.30
-export const ABSOLUTE_SLOW_DELTA_MS = 300
 export const SIGHT_ANALYSIS_WINDOW = 10
 
 export function sightNoteIdentity(note: MusicNotationPitch): string {
   return `${note.letter}:${note.accidental ?? 'natural'}:${note.octave}`
+}
+
+/** Read-only analysis grouping, NOT the persisted V1 identity or a schema change. */
+export function sightAnalysisIdentity(note: MusicNotationPitch): string {
+  return `${note.clef}:${sightNoteIdentity(note)}`
 }
 
 /** Written diatonic order, then alteration: not physical pitch, locale, or insertion order. */
@@ -30,7 +33,8 @@ export function compareSightNotation(a: SightNoteStats, b: SightNoteStats): numb
   const alterations = { b: -1, natural: 0, '#': 1 }
   return a.notation.octave - b.notation.octave ||
     letters.indexOf(a.notation.letter) - letters.indexOf(b.notation.letter) ||
-    alterations[a.notation.accidental ?? 'natural'] - alterations[b.notation.accidental ?? 'natural']
+    alterations[a.notation.accidental ?? 'natural'] - alterations[b.notation.accidental ?? 'natural'] ||
+    (a.notation.clef === b.notation.clef ? 0 : a.notation.clef === 'treble' ? -1 : 1)
 }
 
 export function medianMs(samples: readonly number[]): number | null {
@@ -83,17 +87,17 @@ export function isSightNoteStats(value: unknown): value is SightNoteStats[] {
   })
 }
 
-export interface SightNoteRank extends SightNoteStats { medianResponseMs: number | null }
+export interface SightNoteRank extends SightNoteStats { analysisIdentity: string; medianResponseMs: number | null }
 
-export function rankSightNotes(stats: readonly SightNoteStats[], limit: number, globalMedian: number | null = null, longTerm = false) {
-  const rows: SightNoteRank[] = stats.map(stat => ({ ...stat, medianResponseMs: medianMs(stat.responseTimesMs) }))
+export function rankSightNotes(stats: readonly SightNoteStats[], limit: number, longTerm = false) {
+  const rows: SightNoteRank[] = stats.map(stat => ({ ...stat, analysisIdentity: sightAnalysisIdentity(stat.notation), medianResponseMs: medianMs(stat.responseTimesMs) }))
   return {
     errors: rows.filter(stat => stat.errorCount > 0 && (!longTerm || stat.occurrences >= MIN_ERROR_OCCURRENCES))
       .sort((a, b) => b.errorCount - a.errorCount || compareSightNotation(a, b)).slice(0, limit),
-    slow: rows.filter(stat => stat.medianResponseMs !== null && (!longTerm || (
-      stat.responseTimesMs.length >= MIN_CORRECT_SAMPLES && globalMedian !== null &&
-      stat.medianResponseMs >= Math.max(globalMedian * RELATIVE_SLOW_FACTOR, globalMedian + ABSOLUTE_SLOW_DELTA_MS)
-    ))).sort((a, b) => b.medianResponseMs! - a.medianResponseMs! || compareSightNotation(a, b)).slice(0, limit)
+    // Relative slowest notes, not statistical outliers. Only correct responses contribute.
+    slow: rows.filter(stat => stat.medianResponseMs !== null && (!longTerm ||
+      stat.responseTimesMs.length >= MIN_CORRECT_SAMPLES
+    )).sort((a, b) => b.medianResponseMs! - a.medianResponseMs! || compareSightNotation(a, b)).slice(0, limit)
   }
 }
 
@@ -118,16 +122,17 @@ export function analyzeSightHistory(reports: readonly SightAnalyzableReport[]) {
   const analyzable = recentWindow.filter(report => report.settings?.noteMode !== 'double' && report.noteStatsVersion === 1 && isSightNoteStats(report.noteStats))
   const notes = new Map<string, SightNoteStats>()
   for (const report of analyzable) for (const stat of report.noteStats!) {
-    const previous = notes.get(stat.identity)
+    const analysisIdentity = sightAnalysisIdentity(stat.notation)
+    const previous = notes.get(analysisIdentity)
     if (previous) {
       previous.occurrences += stat.occurrences
       previous.errorCount += stat.errorCount
       previous.responseTimesMs.push(...stat.responseTimesMs)
-    } else notes.set(stat.identity, cloneSightNoteStats([stat])[0])
+    } else notes.set(analysisIdentity, cloneSightNoteStats([stat])[0])
   }
-  // Retain a real rendering context from the most recent report for each written identity.
+  // Keep the original V1 identity and the most recent real key context within each clef.
   const noteStats = [...notes.values()].sort(compareSightNotation)
   const globalMedian = medianMs(noteStats.flatMap(stat => stat.responseTimesMs))
   return { windowCount: recentWindow.length, analyzableCount: analyzable.length, windowIds: recentWindow.map(report => report.recordId),
-    noteStats, globalMedian, ...rankSightNotes(noteStats, 10, globalMedian, true) }
+    noteStats, globalMedian, ...rankSightNotes(noteStats, 10, true) }
 }

@@ -12,7 +12,7 @@ const nativeTestPath = 'android/app/src/test/java/com/pianofundamentals/trainer/
 const currentPath = file => migrations[file] ?? file
 const historicalPath = file => reverse[file] ?? file
 function normalize(file, source) {
-  source = clean(source)
+  source = require('./android-sight-slow-ranking-contract.cjs').normalize(file, clean(source))
   file = historicalPath(file)
   if(file === nativeTestPath) source = source
     .replace('assertEquals("1.7.1", BuildConfig.VERSION_NAME)', 'assertEquals("1.6.0", BuildConfig.VERSION_NAME)')
@@ -56,7 +56,7 @@ function assertCleanupDelta() {
     if (manifest.importFiles.includes(file) || file === nativeTestPath) assert.equal(read(file), old(file), file + ' exact relocation or test-only version synchronization')
     else {
       let bytes = fs.readFileSync(path.join(root,file))
-      if(/\.(ts|tsx|cjs|mjs|json|css|html|md|txt|kt|java|xml|gradle|properties|bat|sh|pro|toml)$/.test(file)||/\/(?:gradlew|\.gitignore)$/.test(file)) bytes = Buffer.from(clean(bytes.toString('utf8')))
+      if(/\.(ts|tsx|cjs|mjs|json|css|html|md|txt|kt|java|xml|gradle|properties|bat|sh|pro|toml)$/.test(file)||/\/(?:gradlew|\.gitignore)$/.test(file)) bytes = Buffer.from(require('./android-sight-slow-ranking-contract.cjs').normalize(file, clean(bytes.toString('utf8'))))
       const hash = require('node:crypto').createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex')
       assert.equal(hash,blobs.get(file),file+' unchanged')
     }

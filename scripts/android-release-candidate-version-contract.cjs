@@ -50,10 +50,11 @@ function normalizeExactEdits(source, edits) {
 }
 function normalizeSigningContract(source) { return normalizeExactEdits(source, signingEdits) }
 function assertPreparationContractDelta(source = read('scripts/android-release-preparation-check.cjs')) {
-  // Fixed, reviewed final 1.7.1 contract: exact release facts/negative fixtures,
-  // plus the added byte-preservation assertion for the entire 1.7.0 changelog.
+  // Fixed approved README/screenshot contract from commit 5b5b0af: user-facing
+  // stable version, 12 production PNGs and exact CHANGELOG versionCode negatives.
+  // Includes the byte-preservation assertion for the entire 1.7.0 changelog.
   // No current-HEAD or directory allowance; any other assertion edit fails.
-  const releaseContractSha256 = 'd3a8bc8a60b29c9011ce96be25ef0f7549f0296b830435b3189ac1b26981c154'
+  const releaseContractSha256 = 'f41b63c2816ddc10aeb9562aa7f0258907fd9fc0e0b811c9b1359d793a09d0b5'
   assert.equal(createHash('sha256').update(source.replaceAll('\r\n', '\n')).digest('hex'), releaseContractSha256,
     'release preparation permits ONLY the reviewed exact 1.7.1 final contract; theme/security/screenshot assertions stay frozen')
 }

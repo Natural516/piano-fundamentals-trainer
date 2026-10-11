@@ -8945,6 +8945,8 @@ button.setting-row {
 .sight-analysis-staff .music-staff-renderer.is-analysis-dense { width: 180px; min-width: 180px; height: auto; min-height: 54px; }
 .sight-analysis-staff .music-staff-renderer.is-analysis-dense svg { display: block; width: 180px; height: auto; max-width: none; }
 .sight-analysis-note { font-family: Arial, sans-serif; font-size: 18px; white-space: nowrap; letter-spacing: 0; word-spacing: 0; }
+.sight-analysis-pitch { min-width: 0; display: grid; gap: 2px; }
+.sight-analysis-clef, .sight-analysis-samples { display: block; color: var(--text-secondary); font-size: 12px; line-height: 1.4; }
 .sight-analysis-value { text-align: right; font-size: 13px; line-height: 1.4; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .sight-analysis-caption { color: var(--text-muted); font-size: 12px; line-height: 1.4; margin: 6px 0 0; }
 .sight-analysis-empty { padding: 16px 0; }
@@ -8982,7 +8984,7 @@ button.setting-row {
   .sight-analysis-card { padding: 8px; }
   .sight-analysis-ranking li { grid-template-columns: 24px minmax(0, 1fr); }
   .sight-analysis-rank { grid-row: 1; }
-  .sight-analysis-note { grid-column: 2; grid-row: 1; padding-top: 12px; }
+  .sight-analysis-pitch { grid-column: 2; grid-row: 1; padding-top: 12px; }
   .sight-analysis-staff { grid-column: 1 / -1; grid-row: 2; }
   .sight-analysis-value { grid-column: 1 / -1; grid-row: 3; }
 }

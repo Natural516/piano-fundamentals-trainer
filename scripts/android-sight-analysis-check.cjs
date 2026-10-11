@@ -31,7 +31,15 @@ const stat = (midi = 60, times = [1000], errors = 0, key = 'C', clef = 'treble')
 const report = (id, stats, changes = {}) => ({ recordId: `r${id}`, endedAt: id, completionState: 'completed', partialEvidence: false, completed: 10, plannedQuestionCount: 10, ...(stats ? { noteStatsVersion: 1, noteStats: stats } : {}), ...changes })
 test('SA01 B2 and B4 have distinct written identities', () => assert.notEqual(stat(47).identity, stat(71).identity))
 test('SA02 enharmonic F sharp / G flat, same MIDI, remain separate', () => { const a = stat(66, [1], 1, 'G'), b = stat(66, [1], 1, 'Gb'); assert.notEqual(a.identity, b.identity); assert.equal(a.notation.midiNumber, b.notation.midiNumber); assert.equal(domain.analyzeSightHistory([report(1, [a, b])]).noteStats.length, 2) })
-test('SA03 clef/key contexts do not replace written identity', () => { const a = stat(60, [1], 0, 'C', 'treble'), b = stat(60, [2], 0, 'F', 'bass'); assert.equal(a.identity, b.identity); const result = domain.analyzeSightHistory([report(2, [b]), report(1, [a])]); assert.equal(result.noteStats.length, 1); assert.deepEqual(result.noteStats[0].notation, b.notation); assert.equal(result.noteStats[0].keySignature, 'F') })
+test('SA03 V1 identity unchanged; analysis separates clefs and retains real key contexts', () => {
+  const a = stat(60, Array(5).fill(1000), 1, 'C', 'treble'), b = stat(60, Array(5).fill(1200), 2, 'F', 'bass')
+  assert.equal(a.identity, b.identity); assert.notEqual(domain.sightAnalysisIdentity(a.notation), domain.sightAnalysisIdentity(b.notation))
+  const reports = [report(2, [b]), report(1, [a])], before = JSON.stringify(reports)
+  const result = domain.analyzeSightHistory(reports); assert.equal(result.noteStats.length, 2)
+  assert.deepEqual(result.slow.map(s => [s.notation.clef, s.medianResponseMs, s.responseTimesMs.length]), [['bass', 1200, 5], ['treble', 1000, 5]])
+  assert.deepEqual(result.noteStats.map(s => s.notation), [a.notation, b.notation]); assert.equal(result.noteStats[1].keySignature, 'F')
+  assert.equal(JSON.stringify(reports), before); assert.ok(reports.every(r => domain.isSightNoteStats(r.noteStats)))
+})
 for (const [id, values, expected] of [['SA04 odd', [9, 1, 5], 5], ['SA05 even', [9, 1, 7, 2], 4.5], ['SA06 one', [1820.25], 1820.25], ['SA07 empty', [], null]]) test(id, () => { const original = [...values]; assert.equal(domain.medianMs(values), expected); assert.deepEqual(values, original) })
 test('SA08 invalid / negative times rejected', () => { for (const ms of [-1, NaN, Infinity]) assert.throws(() => domain.medianMs([ms])) })
 test('SA09 all actual notes recorded, wrong/timeout excluded from correct samples', () => {
@@ -50,9 +58,13 @@ test('SA15 old-only reports return no invented detail or baseline', () => { cons
 test('SA16 occurrence4 excluded /5 included, errors0 excluded', () => { const result = domain.analyzeSightHistory([report(1, [stat(60, [1, 1, 1], 1), stat(62, [1, 1, 1, 1], 1), stat(64, [1, 1, 1, 1, 1])])]); assert.deepEqual(result.errors.map(n => n.notation.spelling), ['D4']) })
 test('SA17 errors accumulate across complete reports', () => { const result = domain.analyzeSightHistory([report(2, [stat(60, [1, 2], 2)]), report(1, [stat(60, [3], 1)])]); assert.equal(result.errors[0].occurrences, 6); assert.equal(result.errors[0].errorCount, 3) })
 test('SA18 long-term Top10 deterministic, same note may occupy both lists', () => { const stats = Array.from({ length: 13 }, (_, i) => stat(60 + i, [2000, 2000, 2000, 2000, 2000], i + 1)); stats.push(stat(36, Array(100).fill(100))); const result = domain.analyzeSightHistory([report(1, stats)]); assert.equal(result.errors.length, 10); assert.equal(result.slow.length, 10); assert.ok(result.errors.some(a => result.slow.some(b => a.identity === b.identity))) })
-test('SA19 slow sample4 excluded /5 included', () => { const result = domain.analyzeSightHistory([report(1, [stat(60, [2000, 2000, 2000, 2000]), stat(62, Array(5).fill(2000)), stat(64, Array(20).fill(1000))])]); assert.deepEqual(result.slow.map(n => n.notation.spelling), ['D4']) })
+test('SA19 slow sample4 excluded /5 included without outlier gate', () => { const result = domain.analyzeSightHistory([report(1, [stat(60, [2000, 2000, 2000, 2000]), stat(62, Array(5).fill(2000)), stat(64, Array(20).fill(1000))])]); assert.deepEqual(result.slow.map(n => n.notation.spelling), ['D4', 'E4']); assert.deepEqual(result.slow.map(n => n.responseTimesMs.length), [5, 20]) })
 test('SA20 raw merged median is NOT median of medians', () => { const result = domain.analyzeSightHistory([report(1, [stat(60, [100, 100, 100, 100, 100])]), report(2, [stat(60, [2000])])]); assert.equal(result.noteStats[0].responseTimesMs.length, 6); assert.equal(domain.medianMs(result.noteStats[0].responseTimesMs), 100); assert.equal(result.globalMedian, 100) })
-for (const [id, baseline, median, included] of [['SA21 relative-only fails', 100, 130, false], ['SA22 absolute-only fails', 2000, 2300, false], ['SA23 both inclusive thresholds pass', 1000, 1300, true], ['SA24 below absolute boundary fails', 100, 399.99, false], ['SA25 exact absolute boundary passes', 100, 400, true]]) test(id, () => { const result = domain.analyzeSightHistory([report(1, [stat(60, Array(5).fill(median)), stat(62, Array(20).fill(baseline))])]); assert.equal(result.globalMedian, baseline); assert.equal(result.slow.some(n => n.identity === stat(60).identity), included) })
+for (const [id, baseline, median] of [['SA21 20 percent slower ranks', 1000, 1200], ['SA22 small absolute difference ranks', 2000, 2300], ['SA23 former threshold still ranks', 1000, 1300], ['SA24 sub300ms ranks', 100, 399.99], ['SA25 equal medians rank', 100, 100]]) test(id, () => {
+  const result = domain.analyzeSightHistory([report(1, [stat(60, Array(5).fill(median)), stat(62, Array(20).fill(baseline))])])
+  assert.equal(result.globalMedian, baseline); assert.equal(result.slow.length, 2)
+  assert.equal(result.slow[0].identity, stat(60).identity); assert.equal(result.slow[0].medianResponseMs, median)
+})
 test('SA26 pure aggregation leaves all report bytes unchanged across repeated calls', () => { const reports = [report(2, [stat(60, [100, 200])]), report(1, [stat(60, [300])])]; const before = JSON.stringify(reports); assert.deepEqual(domain.analyzeSightHistory(reports), domain.analyzeSightHistory(reports)); assert.equal(JSON.stringify(reports), before) })
 test('SA27 validation rejects duplicate identities, fake spelling/render fields, wrong sample counts', () => {
   assert.equal(domain.isSightNoteStats([stat(), stat()]), false)
@@ -101,10 +113,10 @@ class Timers {
   cancel = id => this.jobs.delete(id)
   advance(ms) { const end = this.now + ms; for (;;) { const next = [...this.jobs].sort((a, b) => a[1].at - b[1].at).find(([, v]) => v.at <= end); if (!next) break; this.now = next[1].at; this.jobs.delete(next[0]); next[1].callback() } this.now = end }
 }
-async function runtimeFixture() {
+async function runtimeFixture(settings = {}, recordId = 'actual-session') {
   const backend = new Backend(), store = new persistence.AndroidPersistenceStore(backend), repository = new persistence.SightReadingReportRepository(store)
   assert.equal((await store.ensureSchema()).success, true); await repository.initialize(); const timers = new Timers()
-  const runtime = new AndroidSightReadingRuntime({ clock: { now: () => timers.now }, scheduler: timers, random: () => .5, wallClock: { now: () => 1000 + timers.now }, idGenerator: () => 'actual-session', initialSettings: { ...ANDROID_SIGHT_READING_DEFAULTS, questionCount: 10 }, reportRepository: repository })
+  const runtime = new AndroidSightReadingRuntime({ clock: { now: () => timers.now }, scheduler: timers, random: () => .5, wallClock: { now: () => 1000 + timers.now }, idGenerator: () => recordId, initialSettings: { ...ANDROID_SIGHT_READING_DEFAULTS, questionCount: 10, ...settings }, reportRepository: repository })
   return { backend, repository, timers, runtime }
 }
 async function reload(backend) {
@@ -222,14 +234,15 @@ test('SA43 production notation -> actual VexFlow staff lines B2/F3/B4/C5, not re
   assert.match(renderer, /const ys = note.getYs\(\)/); assert.match(renderer, /stave.getYForLine\(0\)/)
   assert.match(renderer, /svg.setAttribute\('viewBox'/); assert.doesNotMatch(renderer, /svg.getBBox\(\)/)
 })
-test('SA44 friendly wording keeps median algorithm and removes detailed-count presentation', () => {
+test('SA44 median and correct sample evidence are explicit without changing average facts', () => {
   for (const locale of ['zh-CN', 'en']) {
     const instance = createLocalizationInstance(locale), t = instance.getFixedT(locale, 'sightAnalysis')
     assert.equal(ui.presentSightHistoryAverage(790, t), locale === 'en' ? 'Avg response 0.79s' : '平均反应 0.79 秒')
     for (const value of [null, undefined, -1, NaN, Infinity, '790']) assert.equal(ui.presentSightHistoryAverage(value, t), locale === 'en' ? 'Avg response —' : '平均反应 —')
     const html = renderToStaticMarkup(React.createElement(I18nextProvider, { i18n: instance }, React.createElement(ui.SightSessionNoteAnalysis, { stats: [stat(60, [100, 100, 1900], 1)] })))
-    assert.ok(html.includes(locale === 'en' ? 'Usually answered in 0.10s' : '答对通常用时 0.10 秒'))
-    assert.doesNotMatch(html, /中位反应|典型反应|Median response|Typical response|30%|300ms/)
+    assert.ok(html.includes(locale === 'en' ? 'Median correct time 0.10s' : '答对中位用时 0.10 秒'))
+    assert.ok(html.includes(locale === 'en' ? '3 correct samples' : '3 次正确样本'))
+    assert.doesNotMatch(html, /Typical response|30%|300ms/)
     assert.ok(!('detailed' in sightAnalysisResources[locale])); assert.ok(!('detailed_other' in sightAnalysisResources[locale]))
   }
   assert.equal(domain.medianMs([100, 100, 1900]), 100)
@@ -262,8 +275,115 @@ test('SA47 double reports count in completed window but never contribute per-not
   const invalidOldAttribution = report(2, [stat(60, Array(5).fill(2000), 5)], { settings: { noteMode: 'double' } })
   const result = domain.analyzeSightHistory([invalidOldAttribution, report(1, [stat(62, Array(20).fill(1000))])])
   assert.equal(result.windowCount, 2); assert.equal(result.analyzableCount, 1)
-  assert.deepEqual(result.noteStats.map(s => s.identity), [stat(62).identity]); assert.deepEqual(result.errors, []); assert.deepEqual(result.slow, [])
+  assert.deepEqual(result.noteStats.map(s => s.identity), [stat(62).identity]); assert.deepEqual(result.errors, []); assert.equal(result.slow.length, 1); assert.equal(result.slow[0].responseTimesMs.length, 20)
 })
+test('SR00 exact four-file repair preserves all historical guards and rejects mutations', () => require('./android-sight-slow-ranking-contract.cjs').assertDelta())
+test('SR01 close response times still rank all eligible notes instead of an empty outlier list', () => {
+  const result = domain.analyzeSightHistory([report(1, [stat(60, Array(5).fill(1000)), stat(62, Array(5).fill(1010)), stat(64, Array(5).fill(1020))])])
+  assert.deepEqual(result.slow.map(s => [s.notation.spelling, s.medianResponseMs]), [['E4', 1020], ['D4', 1010], ['C4', 1000]])
+  assert.equal(result.slow.filter(s => s.medianResponseMs >= Math.max(result.globalMedian * 1.30, result.globalMedian + 300)).length, 0, 'old outlier rule would hide every note')
+})
+test('SR02 eligible samples aggregate across reports without mixing clefs or medians of medians', () => {
+  const result = domain.analyzeSightHistory([report(3, [stat(60, [2000, 3000], 0, 'C', 'treble')]), report(2, [stat(60, [100, 200, 300], 0, 'F', 'treble')]), report(1, [stat(60, Array(4).fill(9000), 0, 'C', 'bass')])])
+  assert.equal(result.noteStats.length, 2); assert.equal(result.slow.length, 1)
+  assert.equal(result.slow[0].notation.clef, 'treble'); assert.equal(result.slow[0].medianResponseMs, 300); assert.equal(result.slow[0].responseTimesMs.length, 5)
+  assert.equal(result.slow[0].keySignature, 'C', 'most recent real rendering context retained')
+})
+test('SR03 wrong and timeout timestamps never affect median; same note may rank in both lists', () => {
+  const stats = [], note = spellMidiPitch(74, 'C', 'treble')
+  for (const ms of [900, 1000, 1100, 1200, 1300]) domain.recordSightNoteOutcome(stats, [note], 'C', 'correct', ms)
+  domain.recordSightNoteOutcome(stats, [note], 'C', 'wrong_note', 90000); domain.recordSightNoteOutcome(stats, [note], 'C', 'timeout', 99999)
+  const result = domain.analyzeSightHistory([report(1, stats)])
+  assert.equal(result.errors[0].errorCount, 2); assert.equal(result.slow[0].medianResponseMs, 1100); assert.equal(result.slow[0].responseTimesMs.length, 5)
+  assert.equal(result.slow[0].analysisIdentity, result.errors[0].analysisIdentity)
+})
+test('SR04 clef tie order and enharmonic groups are deterministic and remain separate', () => {
+  const reports = [report(2, [stat(60, Array(5).fill(1000), 0, 'C', 'bass')]), report(1, [stat(60, Array(5).fill(1000), 0, 'C', 'treble')]), report(3, [stat(66, Array(5).fill(1000), 0, 'G'), stat(66, Array(5).fill(1000), 0, 'Gb')])]
+  const result = domain.analyzeSightHistory(reports)
+  assert.equal(result.slow.length, 4); assert.equal(new Set(result.slow.map(s => s.analysisIdentity)).size, 4)
+  assert.deepEqual(result.slow.map(s => [s.notation.clef, s.notation.spelling]), [['treble', 'C4'], ['bass', 'C4'], ['treble', 'F#4'], ['treble', 'Gb4']])
+  assert.deepEqual(domain.analyzeSightHistory([...reports].reverse()), result)
+})
+test('SR05 missing or invalid clef is not inferred from pitch or a neighbouring report', () => {
+  const missing = stat(60, Array(5).fill(1000)); delete missing.notation.clef
+  const result = domain.analyzeSightHistory([report(1, [missing]), report(2, null)])
+  assert.equal(result.windowCount, 2); assert.equal(result.analyzableCount, 0); assert.deepEqual(result.slow, [])
+})
+test('SR06 correct sample minimum and Top10 limit are per clef, not padded with ineligible notes', () => {
+  const reports = [report(1, [stat(60, Array(4).fill(9000), 0, 'C', 'treble')]), report(2, [stat(60, Array(4).fill(9000), 0, 'C', 'bass')]), report(3, [stat(62, Array(6).fill(1100))])]
+  assert.deepEqual(domain.analyzeSightHistory(reports).slow.map(s => s.notation.spelling), ['D4'])
+  const stats = Array.from({ length: 12 }, (_, i) => stat(60 + i, Array(5).fill(1000 + i)))
+  assert.deepEqual(domain.analyzeSightHistory([report(1, stats)]).slow.map(s => s.medianResponseMs), [1011, 1010, 1009, 1008, 1007, 1006, 1005, 1004, 1003, 1002])
+})
+for (const locale of ['zh-CN', 'en']) test(`SR07/${locale} actual React shows clefs, medians, correct samples and honest empty states`, () => {
+  const instance = createLocalizationInstance(locale); instance.options.fallbackLng = false
+  const render = records => renderToStaticMarkup(React.createElement(I18nextProvider, { i18n: instance }, React.createElement(ui.SightHistoryAnalysis, { records, status: 'ready', warning: null })))
+  const html = render([report(2, [stat(60, Array(5).fill(1200), 0, 'C', 'bass')]), report(1, [stat(60, Array(6).fill(1000), 0, 'C', 'treble')])])
+  for (const text of locale === 'en' ? ['Bass clef', 'Treble clef', 'Median correct time 1.20s', 'Median correct time 1.00s', '5 correct samples', '6 correct samples'] : ['低音谱号', '高音谱号', '答对中位用时 1.20 秒', '答对中位用时 1.00 秒', '5 次正确样本', '6 次正确样本']) assert.ok(html.includes(text), text)
+  assert.ok(html.includes('music-staff-renderer is-bass')); assert.ok(html.includes('music-staff-renderer is-treble'))
+  assert.ok(html.includes(locale === 'en' ? 'not necessarily outliers' : '不代表异常')); assert.ok(!html.includes('No clear slow-response notes yet')); assert.ok(!html.includes('暂无明显长思考音'))
+  for (const records of [[], [report(1, null)], [report(1, [stat(60, Array(4).fill(2000))])]]) assert.ok(render(records).includes(locale === 'en' ? 'No eligible notes' : '暂无符合排名条件的音'))
+  if (locale === 'en') assert.doesNotMatch(html, /[\u4e00-\u9fff]/)
+  const single = renderToStaticMarkup(React.createElement(I18nextProvider, { i18n: instance }, React.createElement(ui.SightSessionNoteAnalysis, { stats: [stat(60, [900], 0, 'C', 'bass')] })))
+  assert.ok(single.includes(locale === 'en' ? '1 correct sample' : '1 次正确样本')); assert.ok(single.includes(locale === 'en' ? 'Median correct time 0.90s' : '答对中位用时 0.90 秒'))
+})
+test('SR08 existing generated reports have one real clef per pitch in each fixed staff mode', () => {
+  const { getSightReadingNotes } = require('../src/sightReading/sightReadingNotes.ts')
+  for (const staffMode of ['treble', 'bass', 'grand']) {
+    const seen = new Map()
+    for (const note of getSightReadingNotes({ staffMode, keySignature: 'C', notePoolMode: 'chromatic' })) {
+      const id = domain.sightNoteIdentity(note.notation)
+      assert.ok(!seen.has(id) || seen.get(id) === note.notation.clef); seen.set(id, note.notation.clef)
+    }
+  }
+})
+
+test('SR09 two real runtime 100-question fixture reports reuse durable V1 facts and never rewrite storage', async () => {
+  const fixtures = [], reports = []
+  for (const staffMode of ['treble', 'bass']) {
+    const f = await runtimeFixture({ questionCount: 100, staffMode, noteMode: 'single' }, `hundred-${staffMode}`)
+    fixtures.push(f); f.runtime.start()
+    for (let i = 0; i < 100; i++) {
+      f.timers.advance(32)
+      const c4 = f.runtime.snapshot.currentNote.notation.spelling === 'C4'
+      f.timers.advance(c4 ? staffMode === 'treble' ? 1200 : 1100 : 1000)
+      f.runtime.sendCorrect(); f.timers.advance(350)
+    }
+    await f.runtime.flushPersistence()
+    const r = (await reload(f.backend)).list()[0]
+    assert.ok(persistence.isDurableSightReadingReport(r)); assert.equal(r.completed, 100); assert.equal(r.correct, 100)
+    reports.push(r)
+  }
+  const rawBefore = fixtures.map(f => JSON.stringify([...f.backend.values]))
+  const result = domain.analyzeSightHistory(reports)
+  assert.equal(result.windowCount, 2); assert.equal(result.analyzableCount, 2); assert.equal(result.slow.length, 10)
+  const c4 = result.slow.filter(s => s.notation.spelling === 'C4')
+  assert.deepEqual(c4.map(s => [s.notation.clef, s.medianResponseMs]), [['treble', 1200], ['bass', 1100]])
+  assert.ok(c4.every(s => s.responseTimesMs.length >= 5))
+  assert.equal(result.slow.filter(s => s.medianResponseMs >= Math.max(result.globalMedian * 1.30, result.globalMedian + 300)).length, 0)
+  for (let i = 0; i < fixtures.length; i++) {
+    assert.equal(JSON.stringify([...fixtures[i].backend.values]), rawBefore[i])
+    const single = domain.rankSightNotes(ui.sightSessionFromHistory(reports[i]).noteStats, 5)
+    assert.equal(single.slow.length, 5); assert.equal(single.slow[0].notation.spelling, 'C4')
+    assert.equal(single.slow[0].medianResponseMs, i === 0 ? 1200 : 1100)
+    await fixtures[i].runtime.dispose()
+  }
+})
+
+test('SR10 V1 identity, writer, validator, cloning and median function bodies remain byte-exact', () => {
+  const file = 'src/sightReading/noteAnalysis.ts', baseline = require('./android-sight-slow-ranking-contract.cjs').base
+  const before = require('node:child_process').execFileSync('git', ['show', `${baseline}:${file}`], { cwd: path.resolve(__dirname, '..'), encoding: 'utf8' })
+  const after = fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
+  const functions = source => {
+    const ast = ts.createSourceFile(file, source.replaceAll('\r\n', '\n'), ts.ScriptTarget.Latest, true)
+    return new Map(ast.statements.filter(ts.isFunctionDeclaration).map(n => [n.name.text, n.getText(ast)]))
+  }
+  const old = functions(before), current = functions(after)
+  for (const name of ['sightNoteIdentity', 'recordSightNoteOutcome', 'isSightNoteStats', 'cloneSightNoteStats', 'medianMs']) assert.equal(current.get(name), old.get(name), name)
+  const durable = fs.readFileSync(path.join(__dirname, '../prototype/android-tablet-v1/src/androidPersistenceCore.ts'), 'utf8')
+  assert.doesNotMatch(durable, /sightAnalysisIdentity|analysisIdentity/)
+})
+
 test('SA48 actual History entry absent in All/Chord/Interval and present before count only in Sight', async () => {
   const { mounted, text } = require('./android-localization-shell-check.cjs')
   const empty = { status: 'ready', records: [] }, coordinator = { refresh: async () => {} }
