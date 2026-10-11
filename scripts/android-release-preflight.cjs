@@ -214,12 +214,13 @@ function assertPublicReleaseFacts(publicSource, versionCode, versionName) {
   assert.ok(readme, 'public README.md is missing')
   assert.ok(changelog, 'public CHANGELOG.md is missing')
   // Verify one complete stable-release fact, independent of inline Markdown styling.
-  // Exact equality protects both fields, including against version/code prefix matches.
+  // Public landing-page copy names the stable version; the exact code remains in CHANGELOG.
+  // Exact equality and the anchored CHANGELOG check reject version/code prefix matches.
   const releaseFacts = readme.split(/\r?\n/).map(line => line.replaceAll('`', '').replaceAll('**', '').trim())
-  assert.ok(releaseFacts.includes(`Android ${versionName} · versionCode ${versionCode}`),
-    `public README stable release must be Android ${versionName} · versionCode ${versionCode}`)
+  assert.ok(releaseFacts.includes(`Android ${versionName}`),
+    `public README stable release must be Android ${versionName}`)
   assert.match(changelog, new RegExp(`^## ${versionName.replaceAll('.', '\\.')} .*versionCode ${versionCode}$`, 'm'))
-  const screenshotReferences = [...new Set(readme.match(/docs\/screenshots\/[^)\s"'<>]+/g) ?? [])]
+  const screenshotReferences = [...new Set(readme.match(/docs\/screenshots\/[^)\s"'<>]+\.png/g) ?? [])]
   assert.ok(screenshotReferences.length > 0, 'public README has no screenshot references')
   const pathSet = new Set(publicSource.paths)
   const missing = screenshotReferences.filter((entry) => !pathSet.has(entry))

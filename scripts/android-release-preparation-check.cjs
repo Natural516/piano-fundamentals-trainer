@@ -55,43 +55,45 @@ console.log('PASS real old Bocchi 1.0.0 definition uses standard Interval fallba
 const paths = git('ls-files', '--cached', '--others', '--exclude-standard').split('\n').filter(Boolean)
 const documents = new Map(paths.filter(p => p.endsWith('.md')).map(p => [p, read(p)]))
 const publicSource = {paths, documents}
-assert.equal(assertPublicReleaseFacts(publicSource, '16', '1.7.1'), 8)
+assert.equal(assertPublicReleaseFacts(publicSource, '16', '1.7.1'), 12)
 const stableScreenshots = [
-  'docs/screenshots/android-v1.6.0-home.png',
-  'docs/screenshots/android-v1.6.0-sight-reading.png',
-  'docs/screenshots/android-v1.6.0-chord-practice.png',
-  'docs/screenshots/android-v1.6.0-history.png'
+  'docs/screenshots/android-v1.7.1-home.png',
+  'docs/screenshots/android-v1.7.1-sight-reading.png',
+  'docs/screenshots/android-v1.7.1-chord-practice.png',
+  'docs/screenshots/android-v1.7.1-interval-practice.png',
+  'docs/screenshots/android-v1.7.1-sight-report.png',
+  'docs/screenshots/android-v1.7.1-sight-analysis.png'
 ]
-const developmentEnglishScreenshots = [
-  'docs/screenshots/android-development-en-home.png',
-  'docs/screenshots/android-development-en-sight-reading.png',
-  'docs/screenshots/android-development-en-chord-practice.png',
-  'docs/screenshots/android-development-en-history.png'
-]
-const readme = documents.get('README.md')
-const screenshotReferences = [...new Set(readme.match(/docs\/screenshots\/[^)\s"'<>]+/g) ?? [])]
-assert.deepEqual(screenshotReferences.slice().sort(), [...stableScreenshots, ...developmentEnglishScreenshots].sort())
-assert.equal(screenshotReferences.filter(file => stableScreenshots.includes(file)).length, 4)
-assert.equal(screenshotReferences.filter(file => developmentEnglishScreenshots.includes(file)).length, 4)
-assert.ok(readme.includes('**Development preview:**'))
-console.log('PASS exact screenshot paths: 4 stable + 4 development English = 8, development attribution retained')
+const stableEnglishScreenshots = stableScreenshots.map(file => file.replace('android-v1.7.1-', 'android-v1.7.1-en-'))
+const readme = documents.get('README.md').replaceAll('\r\n', '\n')
+const screenshotReferences = [...new Set(readme.match(/docs\/screenshots\/[^)\s"'<>]+\.png/g) ?? [])]
+assert.deepEqual(screenshotReferences.slice().sort(), [...stableScreenshots, ...stableEnglishScreenshots].sort())
+assert.equal(screenshotReferences.filter(file => stableScreenshots.includes(file)).length, 6)
+assert.equal(screenshotReferences.filter(file => stableEnglishScreenshots.includes(file)).length, 6)
+assert.ok(readme.includes('**Android 1.7.1 正式应用**'))
+assert.ok(readme.includes('**Android 1.7.1 production app**'))
+assert.doesNotMatch(readme, /Development preview:|android-development-en-|android-v1\.6\.0-/)
+console.log('PASS exact screenshot paths: 6 Production Chinese + 6 Production English = 12, honest 1.7.1 attribution')
 
-const stableFact = 'Android 1.7.1 · versionCode 16'
+const stableFact = '\nAndroid 1.7.1\n'
 assert.ok(readme.includes(stableFact), 'negative fixtures must mutate the actual stable release fact')
 const withReadme = source => ({paths, documents: new Map(documents).set('README.md', source)})
-for (const formatted of ['Android `1.7.1` · `versionCode 16`', '**Android 1.7.1 · versionCode 16**']) {
-  assert.equal(assertPublicReleaseFacts(withReadme(readme.replace(stableFact, formatted)), '16', '1.7.1'), 8)
+for (const formatted of ['\nAndroid `1.7.1`\n', '\n**Android 1.7.1**\n']) {
+  assert.equal(assertPublicReleaseFacts(withReadme(readme.replace(stableFact, formatted)), '16', '1.7.1'), 12)
 }
 for (const invalid of [
-  'Android 1.7.0 · versionCode 16',
-  'Android 1.7.10 · versionCode 16',
-  'Android 1.7.1 · versionCode 15',
-  'Android 1.7.1 · versionCode 160',
-  'Android 1.7.1'
+  '\nAndroid 1.7.0\n',
+  '\nAndroid 1.7.10\n',
+  '\nAndroid\n',
+  '\n'
 ]) {
   assert.throws(() => assertPublicReleaseFacts(withReadme(readme.replace(stableFact, invalid)), '16', '1.7.1'), /public README stable release/)
 }
-assert.throws(() => assertPublicReleaseFacts({...publicSource, paths: paths.filter(file => file !== developmentEnglishScreenshots[0])}, '16', '1.7.1'), /missing screenshots/)
+for (const invalidCode of ['15', '160', '']) {
+  const invalidChangelog = documents.get('CHANGELOG.md').replace('## 1.7.1 — 2026-10-07 — versionCode 16', `## 1.7.1 — 2026-10-07 — versionCode ${invalidCode}`)
+  assert.throws(() => assertPublicReleaseFacts({paths, documents: new Map(documents).set('CHANGELOG.md', invalidChangelog)}, '16', '1.7.1'))
+}
+assert.throws(() => assertPublicReleaseFacts({...publicSource, paths: paths.filter(file => file !== stableEnglishScreenshots[0])}, '16', '1.7.1'), /missing screenshots/)
 console.log('PASS release facts are Markdown-independent and reject wrong/missing values, prefix matches and missing screenshots')
 publicPathAudit(paths)
 assertNoLegacyRepositoryReferences(documents, 'integration public docs')
@@ -103,8 +105,8 @@ assert.equal(read('CHANGELOG.md').replaceAll('\r\n', '\n').slice(read('CHANGELOG
 // The tag predates the post-release date closure; freeze the accepted final 1.6.0 section instead.
 const closed160Changelog = cp.execFileSync('git', ['show', '37fb125f0192e351a86b350d85569704ec050c40:CHANGELOG.md'], { cwd: root, encoding: 'utf8' }).replaceAll('\r\n', '\n')
 assert.equal(read('CHANGELOG.md').replaceAll('\r\n', '\n').slice(read('CHANGELOG.md').replaceAll('\r\n', '\n').indexOf('## 1.6.0 —')), closed160Changelog.slice(closed160Changelog.indexOf('## 1.6.0 —')))
-assert.ok(readme.includes('以下截图来自 Android 1.6.0'))
-assert.ok(readme.includes('They are not captures of the final Android 1.7.0 Production APK.'))
+assert.ok(readme.includes('使用内置浅色主题'))
+assert.ok(readme.includes('with the built-in Light theme'))
 const previousChangelog = git('show', '4866e59:CHANGELOG.md')
 assert.ok(read('CHANGELOG.md').replaceAll('\r\n', '\n').includes(previousChangelog.slice(previousChangelog.indexOf('## 1.5.3')).replaceAll('\r\n', '\n').trim()))
 assert.doesNotMatch(read('README.md'), /音程复现|双模式|0\.9\.1-beta/)
