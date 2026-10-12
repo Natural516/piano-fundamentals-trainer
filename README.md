@@ -3,7 +3,7 @@
 连接兼容 MIDI 电钢琴或键盘，练习识谱、和弦与音程，并回顾练习表现。<br>
 A free Android tablet app for reading notes, practicing chords and intervals, and reviewing your progress with a compatible MIDI piano or keyboard.
 
-Android 1.7.1
+Android 1.7.2
 
 [下载正式 APK / Download APK](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest) · [中文](#zh) · [English](#en) · [更新记录 / Changelog](CHANGELOG.md)
 
@@ -23,7 +23,7 @@ Piano Fundamentals Trainer（钢琴基本功训练器）面向拥有兼容 MIDI 
 
 ### 真实应用画面
 
-以下画面均来自 **Android 1.7.1 正式应用**，在 Lenovo TB375FC 上使用内置浅色主题。报告与分析展示已有真实练习记录。
+报告与分析来自 **Android 1.7.2 正式应用**；首页和练习运行画面保留 **Android 1.7.1 正式应用** 的真实截图。均在 Lenovo TB375FC 上使用内置浅色主题，报告与分析展示已有真实练习记录。
 
 #### 首页
 
@@ -48,11 +48,11 @@ Piano Fundamentals Trainer（钢琴基本功训练器）面向拥有兼容 MIDI 
 
 #### 单次识谱报告
 
-![单次识谱报告：本次易错音与长思考音](docs/screenshots/android-v1.7.1-sight-report.png)
+![单次识谱报告：本次易错音与长思考音](docs/screenshots/android-v1.7.2-sight-report.png)
 
 #### 长期识谱分析
 
-![长期识谱分析：最近完整练习中的易错音；当前真实数据尚无明显长思考音](docs/screenshots/android-v1.7.1-sight-analysis.png)
+![长期识谱分析：最近完整练习中相对较慢的正确作答，按谱号分别统计](docs/screenshots/android-v1.7.2-sight-analysis.png)
 
 ### 为什么使用它
 
@@ -83,7 +83,7 @@ MIDI 反馈用于音符与练习任务判定，不评价手型、音色、触键
 
 ### 下载与升级
 
-当前稳定版本：**Android 1.7.1**，可以免费获取。
+当前稳定版本：**Android 1.7.2**，可以免费获取。
 
 **[下载正式 APK](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest)**
 
@@ -93,7 +93,7 @@ MIDI 反馈用于音符与练习任务判定，不评价手型、音色、触键
 
 在 **记录** 中回顾已保存练习的完成题数、正确率和练习趋势。单次识谱报告展示 **本次易错音** 与 **本次长思考音**，帮助决定下一轮重点练什么。
 
-在 **记录 → 识谱筛选 → 识谱分析** 中，查看最近最多 10 次完整识谱练习的长期表现。逐音分析仅使用实际存在的 **单音逐音数据**，按谱面拼写和八度分别统计；双音练习不提供同等逐音分析。数据不足或未出现明显弱项时，页面会如实显示相应状态。
+在 **记录 → 识谱筛选 → 识谱分析** 中，查看最近最多 10 次完整识谱练习的长期表现。逐音分析仅使用实际存在的 **单音逐音数据**，按谱号、谱面拼写和八度分别统计；双音练习不提供同等逐音分析。长思考音展示正确作答反应时间中位数最长的最多 10 个音，每个音至少需要 5 次正确样本，帮助找到最近相对较慢的音，而不是判断异常或能力。没有合格样本时会明确提示数据不足。
 
 ### 个性化主题
 
@@ -132,7 +132,7 @@ Piano Fundamentals Trainer is for learners with a compatible MIDI keyboard who w
 
 ### Real app screenshots
 
-These captures are from the **Android 1.7.1 production app** on a Lenovo TB375FC with the built-in Light theme. Reports and analysis use existing real practice records.
+Reports and analysis are from the **Android 1.7.2 production app**; Home and practice-in-progress captures remain from the **Android 1.7.1 production app**. All were captured on a Lenovo TB375FC with the built-in Light theme. Reports and analysis use existing real practice records.
 
 #### Home
 
@@ -157,11 +157,11 @@ These captures are from the **Android 1.7.1 production app** on a Lenovo TB375FC
 
 #### Single-session sight-reading report
 
-![Sight-reading report: errors and slow responses in this session](docs/screenshots/android-v1.7.1-en-sight-report.png)
+![Sight-reading report: errors and slow responses in this session](docs/screenshots/android-v1.7.2-en-sight-report.png)
 
 #### Long-term sight-reading analysis
 
-![Long-term analysis: error-prone notes from completed sessions; current real data has no clear slow-response notes](docs/screenshots/android-v1.7.1-en-sight-analysis.png)
+![Long-term analysis: relatively slower correct responses from completed sessions, separated by clef](docs/screenshots/android-v1.7.2-en-sight-analysis.png)
 
 ### Why use it
 
@@ -192,7 +192,7 @@ In **Settings**, choose **中文 / English** and Light / Dark appearance. You ca
 
 ### Download and update
 
-Latest stable version: **Android 1.7.1**, available free of charge.
+Latest stable version: **Android 1.7.2**, available free of charge.
 
 **[Download the production APK](https://github.com/Natural516/piano-fundamentals-trainer/releases/latest)**
 
@@ -202,7 +202,7 @@ To update, install the official Release APK over the existing app, or use **Chec
 
 Open **History** to review completed-question counts, accuracy and practice trends. A single-session sight-reading report highlights **Errors in this session** and **Slow responses in this session**, helping you choose what to focus on next.
 
-Choose **History → Sight reading filter → Sight Reading Analysis** to review up to the latest 10 completed sight-reading sessions. Per-note analysis uses only actual **single-note detail**, counting written spellings and octaves separately. Double-note practice does not provide equivalent per-note analysis. The page shows an honest empty state when data is insufficient or no clear weakness is found.
+Choose **History → Sight reading filter → Sight Reading Analysis** to review up to the latest 10 completed sight-reading sessions. Per-note analysis uses only actual **single-note detail**, counting clefs, written spellings and octaves separately. Double-note practice does not provide equivalent per-note analysis. Slow-response notes rank up to 10 notes by their longest median correct-response times, with at least 5 correct samples per note. This identifies relatively slower responses, not abnormalities or ability scores. The page explains when there are no eligible samples.
 
 ### Personalize the appearance
 

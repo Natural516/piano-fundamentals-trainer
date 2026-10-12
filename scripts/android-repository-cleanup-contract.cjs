@@ -15,10 +15,10 @@ function normalize(file, source) {
   source = require('./android-sight-slow-ranking-contract.cjs').normalize(file, clean(source))
   file = historicalPath(file)
   if(file === nativeTestPath) source = source
-    .replace('assertEquals("1.7.1", BuildConfig.VERSION_NAME)', 'assertEquals("1.6.0", BuildConfig.VERSION_NAME)')
-    .replace('assertEquals(16, BuildConfig.VERSION_CODE)', 'assertEquals(14, BuildConfig.VERSION_CODE)')
-    .replace('inspect("1.1.0", "1.7.2", "2.0.0")', 'inspect("1.1.0", "1.6.1", "2.0.0")')
-    .replace('inspect("1.1.0", "1.5.3", "1.7.1")', 'inspect("1.1.0", "1.5.3", "1.6.0")')
+    .replace('assertEquals("1.7.2", BuildConfig.VERSION_NAME)', 'assertEquals("1.6.0", BuildConfig.VERSION_NAME)')
+    .replace('assertEquals(17, BuildConfig.VERSION_CODE)', 'assertEquals(14, BuildConfig.VERSION_CODE)')
+    .replace('inspect("1.1.0", "1.7.3", "2.0.0")', 'inspect("1.1.0", "1.6.1", "2.0.0")')
+    .replace('inspect("1.1.0", "1.5.3", "1.7.2")', 'inspect("1.1.0", "1.5.3", "1.6.0")')
   if (manifest.importFiles.includes(file)) source = source
     .replaceAll('src/shared/musicNotation/MusicStaffRenderer', 'src/renderer/src/components/MusicStaffRenderer')
     .replaceAll('src/shared/musicNotation/musicNotationFont', 'src/renderer/src/utils/musicNotationFont')
@@ -33,7 +33,16 @@ function normalize(file, source) {
     .replace("from '../../sightReading/musicNotationTypes'", "from './musicNotationTypes'")
   return source
 }
-const read = file => normalize(file, fs.readFileSync(path.join(root, currentPath(file)), 'utf8'))
+// Keep caller-facing current metadata intact; only the historical cleanup comparison
+// reverses this exact authorized release delta to published 1.7.1/16.
+function frozenVersion(source) {
+  const candidate = require('./android-release-candidate-version-contract.cjs')
+  candidate.normalizeCandidateVersion(source)
+  return candidate.previousVersion
+}
+const read = file => file === 'android/version.properties'
+  ? clean(fs.readFileSync(path.join(root, file), 'utf8'))
+  : normalize(file, fs.readFileSync(path.join(root, currentPath(file)), 'utf8'))
 const oldCache = new Map()
 const old = file => { if(!oldCache.has(file)) oldCache.set(file,clean(execFileSync('git', ['show', base + ':' + file], {cwd:root, encoding:'utf8', maxBuffer:64*1024*1024}))); return oldCache.get(file) }
 const allowedPaths = [...retired, ...Object.values(migrations), ...manifest.importFiles, nativeTestPath, 'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.web.json', 'prototype/android-tablet-v1/tsconfig.json']
@@ -56,7 +65,7 @@ function assertCleanupDelta() {
     if (manifest.importFiles.includes(file) || file === nativeTestPath) assert.equal(read(file), old(file), file + ' exact relocation or test-only version synchronization')
     else {
       let bytes = fs.readFileSync(path.join(root,file))
-      if(/\.(ts|tsx|cjs|mjs|json|css|html|md|txt|kt|java|xml|gradle|properties|bat|sh|pro|toml)$/.test(file)||/\/(?:gradlew|\.gitignore)$/.test(file)) bytes = Buffer.from(require('./android-sight-slow-ranking-contract.cjs').normalize(file, clean(bytes.toString('utf8'))))
+      if(/\.(ts|tsx|cjs|mjs|json|css|html|md|txt|kt|java|xml|gradle|properties|bat|sh|pro|toml)$/.test(file)||/\/(?:gradlew|\.gitignore)$/.test(file)) bytes = Buffer.from(file === 'android/version.properties' ? frozenVersion(clean(bytes.toString('utf8'))) : normalize(file, clean(bytes.toString('utf8'))))
       const hash = require('node:crypto').createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex')
       assert.equal(hash,blobs.get(file),file+' unchanged')
     }
@@ -78,7 +87,7 @@ function assertCleanupDelta() {
   for(const name of manifest.removedDependencies) assert.equal(after.packages['node_modules/'+name],undefined,name+' absent')
   assert.deepEqual(after.packages[''].dependencies,actual.dependencies)
   assert.deepEqual(after.packages[''].devDependencies,actual.devDependencies)
-  assert.equal(read('android/version.properties'),old('android/version.properties'))
+  assert.equal(frozenVersion(read('android/version.properties')),old('android/version.properties'))
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,"tsconfig.json"),'utf8')), {"extends":"./prototype/android-tablet-v1/tsconfig.json"}, 'precise Android compiler configuration')
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,"tsconfig.web.json"),'utf8')), {"compilerOptions":{"composite":false,"target":"ES2020","useDefineForClassFields":true,"lib":["DOM","DOM.Iterable","ES2020"],"allowSyntheticDefaultImports":true,"esModuleInterop":true,"strict":true,"module":"ESNext","moduleResolution":"Bundler","resolveJsonModule":true,"isolatedModules":true,"noEmit":true,"jsx":"react-jsx","skipLibCheck":true},"include":["prototype/android-tablet-v1/src/**/*.ts","prototype/android-tablet-v1/src/**/*.tsx","src/sightReading/**/*.ts","src/shared/**/*.ts","src/shared/**/*.tsx"]}, 'precise Android compiler configuration')
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,"prototype/android-tablet-v1/tsconfig.json"),'utf8')), {"extends":"../../tsconfig.web.json","compilerOptions":{"composite":false,"noEmit":true,"types":["vite/client"]},"include":["./src/**/*.ts","./src/**/*.tsx","../../src/shared/**/*.ts","../../src/shared/**/*.tsx"]}, 'precise Android compiler configuration')

@@ -38,8 +38,8 @@ class ThemeHostCompatibilityTest {
     }
 
     @Test fun hostUsesTheActualAndroidVersion() {
-        assertEquals("1.7.1", BuildConfig.VERSION_NAME)
-        assertEquals(16, BuildConfig.VERSION_CODE)
+        assertEquals("1.7.2", BuildConfig.VERSION_NAME)
+        assertEquals(17, BuildConfig.VERSION_CODE)
         assertEquals(BuildConfig.VERSION_NAME, BuildConfig.THEME_HOST_COMPAT_VERSION)
     }
 
@@ -48,12 +48,12 @@ class ThemeHostCompatibilityTest {
     }
 
     @Test fun higherMinimumIsRejected() {
-        val failure = assertThrows(ThemePackageFailure::class.java) { inspect("1.1.0", "1.7.2", "2.0.0") }
+        val failure = assertThrows(ThemePackageFailure::class.java) { inspect("1.1.0", "1.7.3", "2.0.0") }
         assertEquals("THEME_VERSION_INCOMPATIBLE", failure.errorCode)
     }
 
     @Test fun maximumRemainsExclusive() {
-        val failure = assertThrows(ThemePackageFailure::class.java) { inspect("1.1.0", "1.5.3", "1.7.1") }
+        val failure = assertThrows(ThemePackageFailure::class.java) { inspect("1.1.0", "1.5.3", "1.7.2") }
         assertEquals("THEME_VERSION_INCOMPATIBLE", failure.errorCode)
     }
 

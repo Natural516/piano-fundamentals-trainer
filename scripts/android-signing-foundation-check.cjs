@@ -13,10 +13,10 @@ const {
 
 const repositoryRoot = path.resolve(__dirname, '..')
 const read = (relativePath) => fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8')
-// Exact V1.7.1 candidate metadata contract; published V1.7.0 artifacts remain frozen.
+// Exact V1.7.2 candidate metadata contract; published V1.7.1 artifacts remain frozen.
 // version.properties remains the authoritative source used by Gradle and verification.
-const EXPECTED_VERSION_NAME = '1.7.1'
-const EXPECTED_VERSION_CODE = 16
+const EXPECTED_VERSION_NAME = '1.7.2'
+const EXPECTED_VERSION_CODE = 17
 const checks = []
 const check = (name, callback) => checks.push({ name, callback })
 

@@ -1,6 +1,25 @@
 # 产品截图来源
 
-## 当前正式 Android 1.7.1
+## 当前正式 Android 1.7.2：报告与识谱分析
+
+采集日期：2026-10-12。真实 Lenovo TB375FC 横屏，2944 × 1840，正式 `com.pianofundamentals.trainer`，1.7.2 / versionCode 17，内置浅色 / Light，分别采集中文与 English。APK SHA-256：`896a3f7abd0b1e15fda10d952c8e52475eea67b831909b75809ce6f715f795ce`。
+
+来自保留的真实用户 History，不是 QA 夹具或浏览器。四张 PNG 都是 Android `screencap` 原始截图的逐字节副本；未裁切、缩放、重压缩、替字、拼接、重绘或生成 UI。Pillow 完整解码验证尺寸与有效像素。保留设备系统灰色笔形快捷入口，不是开发工具。
+
+| 文件 | 语言 | 字节 | SHA-256 |
+| --- | --- | ---: | --- |
+| [android-v1.7.2-sight-analysis.png](android-v1.7.2-sight-analysis.png) | 中文 | 405417 | `e7f0a76ca5092504572476a76211d6d6b0297d78bfba05ea0c88f8a22ddddc20` |
+| [android-v1.7.2-sight-report.png](android-v1.7.2-sight-report.png) | 中文 | 290202 | `5960450523f0d70f193ae4d27d4fc2f0299e2fe6d56a750e90144e3238f766d1` |
+| [android-v1.7.2-en-sight-analysis.png](android-v1.7.2-en-sight-analysis.png) | English | 462093 | `c9dea3da0051bcfdcb1af2082aeab399df385004c97997f844a75c010e74a6ca` |
+| [android-v1.7.2-en-sight-report.png](android-v1.7.2-en-sight-report.png) | English | 303429 | `033ed7a8c9b8e8f91788c08cb1e1220cf4ca119db29bc2237a9bdffaec9eb6db` |
+
+升级前后可见 History 均为 46 条、累计 2323 题，识谱 44 条；最近报告仍为 100/100、正确 96、错误 4、超时 0、平均 1.24 秒、最高连对 25。原中文与 Bocchi 1.1.0 在截图后恢复，主要练习设置核对保持一致。未卸载、清空或注入正式 History，没有对私有数据库字节进行审计。
+
+真实长期分析显示最近 10 次完整练习的 10 行相对慢反应排名，首位高音谱号 D5（1.38 秒，18 次正确样本）。高音谱号 E4 未进入该 Top 10，但出现在单次报告（1.59 秒，4 次正确样本）。没有预设排名或修改记录。图中每个谱号、音名、样本数与时间均来自实际保存的数据。
+
+主 README 的首页与三个练习运行页保留下面真实 1.7.1 来源，因这些页面未改变；报告与分析使用本批 1.7.2 画面，不将旧空榜截图改名充当新版。
+
+## 历史正式 Android 1.7.1（保留未变页面）
 
 采集日期：2026-10-12。设备为 Lenovo TB375FC，横屏 2944 × 1840。App 为正式 `com.pianofundamentals.trainer`，版本 1.7.1 / versionCode 16，未使用 QA 或浏览器模拟。安装 APK 的 SHA-256 与 GitHub 正式 Release 完全一致：`2838f94a68603698a0a02e04b2a2bce54ffee825f8c2c4710b6b1885af442e2a`。
 
